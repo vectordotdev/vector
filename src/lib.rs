@@ -4,19 +4,22 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate byteorder;
 
+#[cfg(test)]
+extern crate tempdir;
+
 pub mod log;
 
 #[cfg(test)]
 mod test {
-    use std::fs::remove_file;
+    use tempdir::TempDir;
     use super::log::{Producer, Record};
 
     #[test]
     fn basic_write_then_read() {
-        let filename = "logs/foo.log";
-        remove_file(&filename).expect("error truncating file");
+        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
+        let path = dir.path().join("read_write.log");
 
-        let mut producer = Producer::new(filename).expect("failed to build producer");
+        let mut producer = Producer::new(path).expect("failed to build producer");
         let mut consumer = producer.build_consumer().expect("failed to build consumer");
 
         let batch_in = vec![
@@ -32,10 +35,10 @@ mod test {
 
     #[test]
     fn consumer_starts_from_the_end() {
-        let filename = "logs/bar.log";
-        remove_file(&filename).expect("error truncating file");
+        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
+        let path = dir.path().join("from_end.log");
 
-        let mut producer = Producer::new(filename).expect("failed to build producer");
+        let mut producer = Producer::new(path).expect("failed to build producer");
 
         let first_batch = vec![
             Record::new("i am the first message"),

@@ -2,6 +2,7 @@ use std::io;
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::fs::{File, OpenOptions};
+use std::path::{Path, PathBuf};
 
 use serde;
 use serde_json;
@@ -21,7 +22,7 @@ impl Record {
 
 #[derive(Clone)]
 struct LogPosition {
-    filename: String,
+    path: PathBuf,
     offset: u64,
 }
 
@@ -31,11 +32,11 @@ pub struct Producer {
 }
 
 impl Producer {
-    pub fn new(filename: &str) -> io::Result<Producer> {
-        let filename = filename.to_string();
+    pub fn new<T: AsRef<Path>>(filename: T) -> io::Result<Producer> {
+        let path = filename.as_ref().to_path_buf();
         let file = OpenOptions::new().append(true).create(true).open(&filename)?;
         let offset = file.metadata()?.len();
-        Ok(Producer { file, position: LogPosition { filename, offset } })
+        Ok(Producer { file, position: LogPosition { path, offset } })
     }
 
     pub fn send(&mut self, records: &[Record]) -> io::Result<()> {
@@ -61,7 +62,7 @@ pub struct Consumer {
 
 impl Consumer {
     fn new(position: LogPosition) -> io::Result<Consumer> {
-        let mut file = OpenOptions::new().read(true).open(&position.filename)?;
+        let mut file = OpenOptions::new().read(true).open(&position.path)?;
         let _pos = file.seek(SeekFrom::Start(position.offset))?;
         Ok(Consumer { file, position })
     }
