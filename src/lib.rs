@@ -21,13 +21,15 @@ impl Record {
 }
 
 pub struct Producer {
+    filename: String,
     file: File,
 }
 
 impl Producer {
     pub fn new(filename: &str) -> io::Result<Producer> {
-        OpenOptions::new().append(true).create(true).open(filename)
-            .map(|file| Producer { file })
+        let filename = filename.to_string();
+        OpenOptions::new().append(true).create(true).open(&filename)
+            .map(|file| Producer { file, filename })
     }
 
     pub fn send(&mut self, records: &[Record]) -> io::Result<()> {
@@ -39,6 +41,10 @@ impl Producer {
         }
         Ok(())
     }
+
+    pub fn build_consumer(&self) -> io::Result<Consumer> {
+        Consumer::new(&self.filename)
+    }
 }
 
 pub struct Consumer {
@@ -46,7 +52,7 @@ pub struct Consumer {
 }
 
 impl Consumer {
-    pub fn new(filename: &str) -> io::Result<Consumer> {
+    fn new(filename: &str) -> io::Result<Consumer> {
         OpenOptions::new().read(true).open(filename)
             .map(|file| Consumer { file })
     }
@@ -55,7 +61,7 @@ impl Consumer {
         let mut records = Vec::new();
         loop {
             match self.file.read_u32::<BigEndian>() {
-                Ok(len) => {
+                Ok(_len) => {
                     let mut de = serde_json::Deserializer::from_reader(&mut self.file);
                     let record: Record = serde::Deserialize::deserialize(&mut de).expect("failed to deserialize json");
                     records.push(record);
@@ -75,7 +81,7 @@ impl Consumer {
 #[cfg(test)]
 mod test {
     use std::fs::remove_file;
-    use super::{Producer, Consumer, Record};
+    use super::{Producer, Record};
 
     #[test]
     fn basic_write_then_read() {
@@ -83,7 +89,7 @@ mod test {
         remove_file(&filename).expect("error truncating file");
 
         let mut producer = Producer::new(filename).expect("failed to build producer");
-        let mut consumer = Consumer::new(filename).expect("failed to build consumer");
+        let mut consumer = producer.build_consumer().expect("failed to build consumer");
 
         let batch_in = vec![
             Record::new("i am the first message"),
