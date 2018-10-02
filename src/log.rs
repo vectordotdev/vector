@@ -20,62 +20,87 @@ impl Record {
 }
 
 
-#[derive(Clone)]
-struct LogPosition {
-    path: PathBuf,
-    offset: u64,
-}
-
-pub struct Producer {
+struct Segment {
     file: File,
-    position: LogPosition,
+    position: u64,
 }
 
-impl Producer {
-    pub fn new<T: AsRef<Path>>(filename: T) -> io::Result<Producer> {
-        let path = filename.as_ref().to_path_buf();
-        let file = OpenOptions::new().append(true).create(true).open(&filename)?;
-        let offset = file.metadata()?.len();
-        Ok(Producer { file, position: LogPosition { path, offset } })
+impl Segment {
+    fn new(dir: &Path, offset: u64) -> io::Result<Segment> {
+        let filename = format!("{:08}.log", offset);
+        let file = OpenOptions::new().append(true).create(true).open(dir.join(filename))?;
+        Ok(Segment { file, position: 0 })
     }
 
-    pub fn send(&mut self, records: &[Record]) -> io::Result<()> {
+    fn append(&mut self, bytes: &[u8]) -> io::Result<()> {
+        self.file.write_u32::<BigEndian>(bytes.len() as u32)?;
+        self.file.write_all(bytes)?;
+        self.position += 4 + bytes.len() as u64;
+        Ok(())
+    }
+}
+
+pub struct Log {
+    dir: PathBuf,
+    current_segment: Segment,
+}
+
+impl Log {
+    pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Log> {
+        let dir = path.as_ref().to_path_buf();
+        assert!(dir.is_dir());
+
+        let current_segment = Segment::new(&dir, 0)?;
+
+        Ok(Log { dir, current_segment })
+    }
+
+    pub fn append(&mut self, records: &[Record]) -> io::Result<()> {
         for record in records {
             let encoded = serde_json::to_string(&record).expect("json encoding failure");
-            let len = encoded.len();
-            self.file.write_u32::<BigEndian>(len as u32)?;
-            self.file.write_all(encoded.as_bytes())?;
-            self.position.offset += 4 + len as u64;
+            self.current_segment.append(encoded.as_bytes())?;
         }
         Ok(())
     }
 
-    pub fn build_consumer(&self) -> io::Result<Consumer> {
-        Consumer::new(self.position.clone())
+    pub fn roll_segment(&mut self) -> io::Result<()> {
+        self.current_segment = Segment::new(&self.dir, 1)?;
+        Ok(())
     }
 }
 
 pub struct Consumer {
+    dir: PathBuf,
     file: File,
-    position: LogPosition,
+    // position: (Path, u64),
 }
 
 impl Consumer {
-    fn new(position: LogPosition) -> io::Result<Consumer> {
-        let mut file = OpenOptions::new().read(true).open(&position.path)?;
-        let _pos = file.seek(SeekFrom::Start(position.offset))?;
-        Ok(Consumer { file, position })
+    pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Consumer> {
+        let dir = path.as_ref().to_path_buf();
+
+        let latest_segment = ::std::fs::read_dir(&dir)?
+            .map(|r| r.map(|entry| entry.path()))
+            .collect::<Result<Vec<PathBuf>, _>>()?
+            .into_iter()
+            .max()
+            .expect("i don't know how to deal with empty dirs yet");
+
+        let mut file = OpenOptions::new().read(true).open(latest_segment)?;
+        let _pos = file.seek(SeekFrom::End(0))?;
+
+        Ok(Consumer { dir, file })
     }
 
     pub fn poll(&mut self) -> io::Result<Vec<Record>> {
         let mut records = Vec::new();
         loop {
             match self.file.read_u32::<BigEndian>() {
-                Ok(len) => {
+                Ok(_len) => {
                     let mut de = serde_json::Deserializer::from_reader(&mut self.file);
                     let record: Record = serde::Deserialize::deserialize(&mut de).expect("failed to deserialize json");
                     records.push(record);
-                    self.position.offset += 4 + len as u64;
+                    // self.position.offset += 4 + len as u64;
                 },
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
                     break
