@@ -72,6 +72,7 @@ impl Log {
 pub struct Consumer {
     dir: PathBuf,
     file: File,
+    current_path: PathBuf,
     // position: (Path, u64),
 }
 
@@ -86,10 +87,10 @@ impl Consumer {
             .max()
             .expect("i don't know how to deal with empty dirs yet");
 
-        let mut file = OpenOptions::new().read(true).open(latest_segment)?;
+        let mut file = OpenOptions::new().read(true).open(&latest_segment)?;
         let _pos = file.seek(SeekFrom::End(0))?;
 
-        Ok(Consumer { dir, file })
+        Ok(Consumer { dir, file, current_path: latest_segment })
     }
 
     pub fn poll(&mut self) -> io::Result<Vec<Record>> {
@@ -103,7 +104,11 @@ impl Consumer {
                     // self.position.offset += 4 + len as u64;
                 },
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                    break
+                    if self.maybe_advance_segment()? {
+                        continue
+                    } else {
+                        break
+                    }
                 },
                 Err(e) => {
                     return Err(e)
@@ -111,5 +116,25 @@ impl Consumer {
             }
         }
         Ok(records)
+    }
+
+    fn maybe_advance_segment(&mut self) -> io::Result<bool> {
+        let mut segments = ::std::fs::read_dir(&self.dir)?
+            .map(|r| r.map(|entry| entry.path()))
+            .collect::<Result<Vec<PathBuf>, _>>()?;
+        segments.sort();
+
+        let next_segment = segments.into_iter()
+            .skip_while(|path| path != &self.current_path)
+            .skip(1)
+            .next();
+
+        if let Some(path) = next_segment {
+            self.file = OpenOptions::new().read(true).open(&path)?;
+            self.current_path = path;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }

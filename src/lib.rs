@@ -61,16 +61,20 @@ mod test {
         let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
 
         let mut log = Log::new(&dir).expect("failed to build log");
+        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
-        let batch = vec![Record::new("i am the first message")];
-        log.append(&batch).expect("failed to append batch");
+        let records = vec![
+            Record::new("i am the first message"),
+            Record::new("i am the second message"),
+        ];
+        log.append(&records[..1]).expect("failed to append first record");
 
         // make this auto with config?
         log.roll_segment().expect("failed to roll new segment");
 
-        let batch = vec![Record::new("i am the second message")];
-        log.append(&batch).expect("failed to append batch");
+        log.append(&records[1..]).expect("failed to append batch");
 
         assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
+        assert_eq!(records, consumer.poll().expect("failed to poll"));
     }
 }
