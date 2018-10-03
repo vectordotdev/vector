@@ -3,9 +3,11 @@ use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
 
 use serde;
 use serde_json;
+use uuid::Uuid;
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -46,12 +48,9 @@ pub struct Log {
 }
 
 impl Log {
-    pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Log> {
-        let dir = path.as_ref().to_path_buf();
+    fn new(dir: PathBuf) -> io::Result<Log> {
         assert!(dir.is_dir());
-
         let current_segment = Segment::new(&dir, 0)?;
-
         Ok(Log { dir, current_segment })
     }
 
@@ -69,28 +68,63 @@ impl Log {
     }
 }
 
+#[derive(Default)]
+pub struct Coordinator {
+    logs: BTreeMap<PathBuf, BTreeMap<Uuid, PathBuf>>,
+}
+
+impl Coordinator {
+    pub fn create_log<T: AsRef<Path>>(&mut self, path: T) -> io::Result<Log> {
+        let dir = path.as_ref().to_path_buf();
+        let log = Log::new(dir.clone())?;
+        self.logs.insert(dir, BTreeMap::new());
+        Ok(log)
+    }
+
+    fn set_offset(&mut self, log: &Path, consumer: &Uuid, segment: &Path) {
+        if let Some(offsets) = self.logs.get_mut(log) {
+            offsets.insert(consumer.to_owned(), segment.to_path_buf());
+        }
+    }
+
+    pub fn enforce_retention(&mut self) -> io::Result<()> {
+        for (dir, offsets) in self.logs.iter() {
+            if let Some(min_segment) = offsets.values().min() {
+                for old_segment in get_segment_paths(&dir)?.filter(|path| path < min_segment) {
+                    ::std::fs::remove_file(old_segment)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// if we put this in log we have to create one, which is side effect-y
+fn get_segment_paths(dir: &Path) -> io::Result<impl Iterator<Item=PathBuf>> {
+    ::std::fs::read_dir(dir)?
+        .map(|r| r.map(|entry| entry.path()))
+        .collect::<Result<Vec<PathBuf>, _>>()
+        .map(|r| r.into_iter())
+}
+
 pub struct Consumer {
+    id: Uuid,
     dir: PathBuf,
     file: File,
     current_path: PathBuf,
-    // position: (Path, u64),
 }
 
 impl Consumer {
     pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Consumer> {
         let dir = path.as_ref().to_path_buf();
 
-        let latest_segment = ::std::fs::read_dir(&dir)?
-            .map(|r| r.map(|entry| entry.path()))
-            .collect::<Result<Vec<PathBuf>, _>>()?
-            .into_iter()
-            .max()
+        let latest_segment = get_segment_paths(&dir)?.max()
             .expect("i don't know how to deal with empty dirs yet");
 
         let mut file = OpenOptions::new().read(true).open(&latest_segment)?;
         let _pos = file.seek(SeekFrom::End(0))?;
 
-        Ok(Consumer { dir, file, current_path: latest_segment })
+        Ok(Consumer { id: Uuid::new_v4(), dir, file, current_path: latest_segment })
     }
 
     pub fn poll(&mut self) -> io::Result<Vec<Record>> {
@@ -136,5 +170,9 @@ impl Consumer {
         } else {
             Ok(false)
         }
+    }
+
+    pub fn commit_offsets(&self, coordinator: &mut Coordinator) {
+        coordinator.set_offset(&self.dir, &self.id, &self.current_path);
     }
 }

@@ -3,6 +3,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate byteorder;
+extern crate uuid;
 
 #[cfg(test)]
 extern crate tempdir;
@@ -12,13 +13,14 @@ pub mod log;
 #[cfg(test)]
 mod test {
     use tempdir::TempDir;
-    use super::log::{Log, Consumer, Record};
+    use super::log::{Coordinator, Consumer, Record};
 
     #[test]
     fn basic_write_then_read() {
         let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
 
-        let mut log = Log::new(&dir).expect("failed to build log");
+        let mut coordinator = Coordinator::default();
+        let mut log = coordinator.create_log(&dir).expect("failed to build log");
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
         let batch_in = vec![
@@ -36,7 +38,8 @@ mod test {
     fn consumer_starts_from_the_end() {
         let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
 
-        let mut log = Log::new(&dir).expect("failed to build log");
+        let mut coordinator = Coordinator::default();
+        let mut log = coordinator.create_log(&dir).expect("failed to build log");
 
         let first_batch = vec![
             Record::new("i am the first message"),
@@ -60,7 +63,8 @@ mod test {
     fn logs_split_into_segments() {
         let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
 
-        let mut log = Log::new(&dir).expect("failed to build log");
+        let mut coordinator = Coordinator::default();
+        let mut log = coordinator.create_log(&dir).expect("failed to build log");
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
         let records = vec![
@@ -76,5 +80,33 @@ mod test {
 
         assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
         assert_eq!(records, consumer.poll().expect("failed to poll"));
+    }
+
+    #[test]
+    fn only_retains_segments_with_active_consumers() {
+        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
+
+        let mut coordinator = Coordinator::default();
+        let mut log = coordinator.create_log(&dir).expect("failed to build log");
+        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+
+        let records = vec![
+            Record::new("i am the first message"),
+            Record::new("i am the second message"),
+        ];
+        log.append(&records[..1]).expect("failed to append first record");
+
+        // make this auto with config
+        log.roll_segment().expect("failed to roll new segment");
+
+        log.append(&records[1..]).expect("failed to append batch");
+
+        assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
+        assert_eq!(records, consumer.poll().expect("failed to poll"));
+        consumer.commit_offsets(&mut coordinator);
+
+        // make this auto
+        coordinator.enforce_retention().expect("failed to enforce retention");
+        assert_eq!(1, ::std::fs::read_dir(&dir).unwrap().count());
     }
 }

@@ -11,3 +11,4 @@ serde_derive = "1.0.79"
 serde_json = "1.0.31"
 byteorder = "1.2.6"
 tempdir = "0.3.7"
+uuid = { version = "0.7.1", features = ["serde", "v4"] }
