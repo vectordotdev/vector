@@ -1,25 +1,10 @@
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde;
-use serde_json;
 use uuid::Uuid;
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Record {
-    pub message: String,
-}
-
-impl Record {
-    pub fn new<T: Into<String>>(msg: T) -> Record {
-        Record {
-            message: msg.into(),
-        }
-    }
-}
 
 struct Segment {
     file: BufWriter<File>,
@@ -41,9 +26,12 @@ impl Segment {
     fn append(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.file.write_u32::<BigEndian>(bytes.len() as u32)?;
         self.file.write_all(bytes)?;
-        self.file.flush()?;
         self.position += 4 + bytes.len() as u64;
         Ok(())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
     }
 }
 
@@ -62,10 +50,10 @@ impl Log {
         })
     }
 
-    pub fn append(&mut self, records: &[Record]) -> io::Result<()> {
+    pub fn append(&mut self, records: &[&[u8]]) -> io::Result<()> {
         for record in records {
-            let encoded = serde_json::to_string(&record).expect("json encoding failure");
-            self.current_segment.append(encoded.as_bytes())?;
+            self.current_segment.append(record)?;
+            self.current_segment.flush()?;
         }
         Ok(())
     }
@@ -141,14 +129,13 @@ impl Consumer {
         })
     }
 
-    pub fn poll(&mut self) -> io::Result<Vec<Record>> {
+    pub fn poll(&mut self) -> io::Result<Vec<Vec<u8>>> {
         let mut records = Vec::new();
         loop {
             match self.file.read_u32::<BigEndian>() {
-                Ok(_len) => {
-                    let mut de = serde_json::Deserializer::from_reader(&mut self.file);
-                    let record: Record = serde::Deserialize::deserialize(&mut de)
-                        .expect("failed to deserialize json");
+                Ok(len) => {
+                    let mut record = vec![0; len as usize];
+                    self.file.read_exact(&mut record[..])?;
                     records.push(record);
                     if records.len() > 10_000 {
                         break;

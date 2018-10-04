@@ -6,9 +6,6 @@ authors = ["Luke Steensen <luke.steensen@gmail.com>"]
 [dependencies]
 fern = "0.5.6"
 log = "0.4.5"
-serde = "1.0.79"
-serde_derive = "1.0.79"
-serde_json = "1.0.31"
 byteorder = "1.2.6"
 tempdir = "0.3.7"
-uuid = { version = "0.7.1", features = ["serde", "v4"] }
+uuid = { version = "0.7.1", features = ["v4"] }

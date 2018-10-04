@@ -4,7 +4,7 @@ extern crate router;
 extern crate log;
 extern crate fern;
 
-use router::transport::{Consumer, Coordinator, Record};
+use router::transport::{Consumer, Coordinator};
 use std::io::BufRead;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::thread;
@@ -32,7 +32,10 @@ fn main() {
                 break;
             } else {
                 for record in batch {
-                    println!("{}", record.message);
+                    println!(
+                        "{}",
+                        std::str::from_utf8(&record).expect("invalid utf8 message")
+                    );
                 }
             }
         }
@@ -40,7 +43,7 @@ fn main() {
 
     let stdin = ::std::io::stdin();
     for line in stdin.lock().lines().filter_map(Result::ok) {
-        log.append(&[Record::new(line)])
+        log.append(&[line.as_bytes()])
             .expect("failed to append input");
     }
     finished.store(false, std::sync::atomic::Ordering::Relaxed);

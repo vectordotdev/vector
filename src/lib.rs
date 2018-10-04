@@ -1,11 +1,7 @@
 #[macro_use]
 extern crate log;
 
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 extern crate byteorder;
-extern crate serde_json;
 extern crate uuid;
 
 #[cfg(test)]
@@ -15,8 +11,15 @@ pub mod transport;
 
 #[cfg(test)]
 mod test {
-    use super::transport::{Consumer, Coordinator, Record};
+    use super::transport::{Consumer, Coordinator};
     use tempdir::TempDir;
+
+    static MESSAGES: &[&[u8]] = &[
+        b"i am the first message",
+        b"i am the second message",
+        b"i am the third message",
+        b"i am the fourth message",
+    ];
 
     #[test]
     fn basic_write_then_read() {
@@ -26,15 +29,10 @@ mod test {
         let mut log = coordinator.create_log(&dir).expect("failed to build log");
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
-        let batch_in = vec![
-            Record::new("i am the first message"),
-            Record::new("i am the second message"),
-        ];
-
-        log.append(&batch_in).expect("failed to append batch");
+        log.append(MESSAGES).expect("failed to append batch");
 
         let batch_out = consumer.poll().expect("failed to poll for batch");
-        assert_eq!(batch_in, batch_out);
+        assert_eq!(batch_out, MESSAGES);
     }
 
     #[test]
@@ -44,22 +42,14 @@ mod test {
         let mut coordinator = Coordinator::default();
         let mut log = coordinator.create_log(&dir).expect("failed to build log");
 
-        let first_batch = vec![
-            Record::new("i am the first message"),
-            Record::new("i am the second message"),
-        ];
-        log.append(&first_batch).expect("failed to append batch");
+        log.append(&MESSAGES[0..2]).expect("failed to append batch");
 
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
-        let second_batch = vec![
-            Record::new("i am the third message"),
-            Record::new("i am the fourth message"),
-        ];
-        log.append(&second_batch).expect("failed to append batch");
+        log.append(&MESSAGES[2..4]).expect("failed to append batch");
 
         let batch_out = consumer.poll().expect("failed to poll for batch");
-        assert_eq!(second_batch, batch_out);
+        assert_eq!(batch_out, &MESSAGES[2..4]);
     }
 
     #[test]
@@ -70,20 +60,16 @@ mod test {
         let mut log = coordinator.create_log(&dir).expect("failed to build log");
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
-        let records = vec![
-            Record::new("i am the first message"),
-            Record::new("i am the second message"),
-        ];
-        log.append(&records[..1])
+        log.append(&MESSAGES[..1])
             .expect("failed to append first record");
 
         // make this auto with config?
         log.roll_segment().expect("failed to roll new segment");
 
-        log.append(&records[1..]).expect("failed to append batch");
+        log.append(&MESSAGES[1..]).expect("failed to append batch");
 
         assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
-        assert_eq!(records, consumer.poll().expect("failed to poll"));
+        assert_eq!(consumer.poll().expect("failed to poll"), MESSAGES);
     }
 
     #[test]
@@ -94,20 +80,16 @@ mod test {
         let mut log = coordinator.create_log(&dir).expect("failed to build log");
         let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
 
-        let records = vec![
-            Record::new("i am the first message"),
-            Record::new("i am the second message"),
-        ];
-        log.append(&records[..1])
+        log.append(&MESSAGES[..1])
             .expect("failed to append first record");
 
         // make this auto with config
         log.roll_segment().expect("failed to roll new segment");
 
-        log.append(&records[1..]).expect("failed to append batch");
+        log.append(&MESSAGES[1..]).expect("failed to append batch");
 
         assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
-        assert_eq!(records, consumer.poll().expect("failed to poll"));
+        assert_eq!(consumer.poll().expect("failed to poll"), MESSAGES);
         consumer.commit_offsets(&mut coordinator);
 
         // make this auto
