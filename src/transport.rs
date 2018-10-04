@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
-use std::io;
-use std::io::prelude::*;
-use std::io::{BufReader, BufWriter, SeekFrom};
+use std::io::{self, BufReader, BufWriter, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
