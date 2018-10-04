@@ -4,8 +4,8 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 extern crate byteorder;
+extern crate serde_json;
 extern crate uuid;
 
 #[cfg(test)]
@@ -15,8 +15,8 @@ pub mod transport;
 
 #[cfg(test)]
 mod test {
+    use super::transport::{Consumer, Coordinator, Record};
     use tempdir::TempDir;
-    use super::transport::{Coordinator, Consumer, Record};
 
     #[test]
     fn basic_write_then_read() {
@@ -74,7 +74,8 @@ mod test {
             Record::new("i am the first message"),
             Record::new("i am the second message"),
         ];
-        log.append(&records[..1]).expect("failed to append first record");
+        log.append(&records[..1])
+            .expect("failed to append first record");
 
         // make this auto with config?
         log.roll_segment().expect("failed to roll new segment");
@@ -97,7 +98,8 @@ mod test {
             Record::new("i am the first message"),
             Record::new("i am the second message"),
         ];
-        log.append(&records[..1]).expect("failed to append first record");
+        log.append(&records[..1])
+            .expect("failed to append first record");
 
         // make this auto with config
         log.roll_segment().expect("failed to roll new segment");
@@ -109,7 +111,9 @@ mod test {
         consumer.commit_offsets(&mut coordinator);
 
         // make this auto
-        coordinator.enforce_retention().expect("failed to enforce retention");
+        coordinator
+            .enforce_retention()
+            .expect("failed to enforce retention");
         assert_eq!(1, ::std::fs::read_dir(&dir).unwrap().count());
     }
 }

@@ -1,14 +1,14 @@
+use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, SeekFrom};
-use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::collections::BTreeMap;
 
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde;
 use serde_json;
 use uuid::Uuid;
-use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Record {
@@ -17,10 +17,11 @@ pub struct Record {
 
 impl Record {
     pub fn new<T: Into<String>>(msg: T) -> Record {
-        Record { message: msg.into() }
+        Record {
+            message: msg.into(),
+        }
     }
 }
-
 
 struct Segment {
     file: BufWriter<File>,
@@ -30,7 +31,12 @@ struct Segment {
 impl Segment {
     fn new(dir: &Path, offset: u64) -> io::Result<Segment> {
         let filename = format!("{:08}.log", offset);
-        let file = BufWriter::new(OpenOptions::new().append(true).create(true).open(dir.join(filename))?);
+        let file = BufWriter::new(
+            OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(dir.join(filename))?,
+        );
         Ok(Segment { file, position: 0 })
     }
 
@@ -52,7 +58,10 @@ impl Log {
     fn new(dir: PathBuf) -> io::Result<Log> {
         assert!(dir.is_dir());
         let current_segment = Segment::new(&dir, 0)?;
-        Ok(Log { dir, current_segment })
+        Ok(Log {
+            dir,
+            current_segment,
+        })
     }
 
     pub fn append(&mut self, records: &[Record]) -> io::Result<()> {
@@ -101,7 +110,7 @@ impl Coordinator {
 }
 
 // if we put this in log we have to create one, which is side effect-y
-fn get_segment_paths(dir: &Path) -> io::Result<impl Iterator<Item=PathBuf>> {
+fn get_segment_paths(dir: &Path) -> io::Result<impl Iterator<Item = PathBuf>> {
     ::std::fs::read_dir(dir)?
         .map(|r| r.map(|entry| entry.path()))
         .collect::<Result<Vec<PathBuf>, _>>()
@@ -119,13 +128,19 @@ impl Consumer {
     pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Consumer> {
         let dir = path.as_ref().to_path_buf();
 
-        let latest_segment = get_segment_paths(&dir)?.max()
+        let latest_segment = get_segment_paths(&dir)?
+            .max()
             .expect("i don't know how to deal with empty dirs yet");
 
         let mut file = BufReader::new(OpenOptions::new().read(true).open(&latest_segment)?);
         let _pos = file.seek(SeekFrom::End(0))?;
 
-        Ok(Consumer { id: Uuid::new_v4(), dir, file, current_path: latest_segment })
+        Ok(Consumer {
+            id: Uuid::new_v4(),
+            dir,
+            file,
+            current_path: latest_segment,
+        })
     }
 
     pub fn poll(&mut self) -> io::Result<Vec<Record>> {
@@ -134,23 +149,22 @@ impl Consumer {
             match self.file.read_u32::<BigEndian>() {
                 Ok(_len) => {
                     let mut de = serde_json::Deserializer::from_reader(&mut self.file);
-                    let record: Record = serde::Deserialize::deserialize(&mut de).expect("failed to deserialize json");
+                    let record: Record = serde::Deserialize::deserialize(&mut de)
+                        .expect("failed to deserialize json");
                     records.push(record);
                     if records.len() > 10_000 {
-                        break
+                        break;
                     }
                     // self.position.offset += 4 + len as u64;
-                },
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
                     if self.maybe_advance_segment()? {
-                        continue
+                        continue;
                     } else {
-                        break
+                        break;
                     }
-                },
-                Err(e) => {
-                    return Err(e)
-                },
+                }
+                Err(e) => return Err(e),
             }
         }
         if records.is_empty() {
@@ -166,7 +180,8 @@ impl Consumer {
             .collect::<Result<Vec<PathBuf>, _>>()?;
         segments.sort();
 
-        let next_segment = segments.into_iter()
+        let next_segment = segments
+            .into_iter()
             .skip_while(|path| path != &self.current_path)
             .skip(1)
             .next();
