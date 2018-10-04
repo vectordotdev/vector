@@ -7,7 +7,7 @@ extern crate fern;
 use std::thread;
 use std::io::BufRead;
 use std::sync::{Arc, atomic::AtomicBool};
-use router::log::{Coordinator, Consumer, Record};
+use router::transport::{Coordinator, Consumer, Record};
 
 fn main() {
     fern::Dispatch::new()

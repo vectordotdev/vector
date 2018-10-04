@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate log as stdlog;
+extern crate log;
 
 extern crate serde;
 #[macro_use]
@@ -11,12 +11,12 @@ extern crate uuid;
 #[cfg(test)]
 extern crate tempdir;
 
-pub mod log;
+pub mod transport;
 
 #[cfg(test)]
 mod test {
     use tempdir::TempDir;
-    use super::log::{Coordinator, Consumer, Record};
+    use super::transport::{Coordinator, Consumer, Record};
 
     #[test]
     fn basic_write_then_read() {
