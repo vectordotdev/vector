@@ -84,7 +84,7 @@ impl Coordinator {
     }
 
     pub fn enforce_retention(&mut self) -> io::Result<()> {
-        for (dir, offsets) in self.logs.iter() {
+        for (dir, offsets) in &self.logs {
             if let Some(min_segment) = offsets.values().min() {
                 for old_segment in get_segment_paths(&dir)?.filter(|path| path < min_segment) {
                     ::std::fs::remove_file(old_segment)?;
@@ -168,8 +168,7 @@ impl Consumer {
         let next_segment = segments
             .into_iter()
             .skip_while(|path| path != &self.current_path)
-            .skip(1)
-            .next();
+            .nth(1);
 
         if let Some(path) = next_segment {
             self.file = BufReader::new(OpenOptions::new().read(true).open(&path)?);

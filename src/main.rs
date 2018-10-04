@@ -28,7 +28,7 @@ fn main() {
     let handle = thread::spawn(move || {
         ::std::thread::sleep(::std::time::Duration::from_millis(10));
         while let Ok(batch) = consumer.poll() {
-            if batch.len() == 0 && finished2.load(std::sync::atomic::Ordering::Relaxed) == false {
+            if batch.is_empty() && !finished2.load(std::sync::atomic::Ordering::Relaxed) {
                 break;
             } else {
                 for record in batch {
