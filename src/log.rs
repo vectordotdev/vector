@@ -1,6 +1,6 @@
 use std::io;
 use std::io::prelude::*;
-use std::io::SeekFrom;
+use std::io::{BufReader, BufWriter, SeekFrom};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::collections::BTreeMap;
@@ -12,31 +12,32 @@ use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Record {
-    message: String,
+    pub message: String,
 }
 
 impl Record {
-    pub fn new(msg: &str) -> Record {
-        Record { message: msg.to_string() }
+    pub fn new<T: Into<String>>(msg: T) -> Record {
+        Record { message: msg.into() }
     }
 }
 
 
 struct Segment {
-    file: File,
+    file: BufWriter<File>,
     position: u64,
 }
 
 impl Segment {
     fn new(dir: &Path, offset: u64) -> io::Result<Segment> {
         let filename = format!("{:08}.log", offset);
-        let file = OpenOptions::new().append(true).create(true).open(dir.join(filename))?;
+        let file = BufWriter::new(OpenOptions::new().append(true).create(true).open(dir.join(filename))?);
         Ok(Segment { file, position: 0 })
     }
 
     fn append(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.file.write_u32::<BigEndian>(bytes.len() as u32)?;
         self.file.write_all(bytes)?;
+        self.file.flush()?;
         self.position += 4 + bytes.len() as u64;
         Ok(())
     }
@@ -110,7 +111,7 @@ fn get_segment_paths(dir: &Path) -> io::Result<impl Iterator<Item=PathBuf>> {
 pub struct Consumer {
     id: Uuid,
     dir: PathBuf,
-    file: File,
+    file: BufReader<File>,
     current_path: PathBuf,
 }
 
@@ -121,7 +122,7 @@ impl Consumer {
         let latest_segment = get_segment_paths(&dir)?.max()
             .expect("i don't know how to deal with empty dirs yet");
 
-        let mut file = OpenOptions::new().read(true).open(&latest_segment)?;
+        let mut file = BufReader::new(OpenOptions::new().read(true).open(&latest_segment)?);
         let _pos = file.seek(SeekFrom::End(0))?;
 
         Ok(Consumer { id: Uuid::new_v4(), dir, file, current_path: latest_segment })
@@ -135,6 +136,9 @@ impl Consumer {
                     let mut de = serde_json::Deserializer::from_reader(&mut self.file);
                     let record: Record = serde::Deserialize::deserialize(&mut de).expect("failed to deserialize json");
                     records.push(record);
+                    if records.len() > 10_000 {
+                        break
+                    }
                     // self.position.offset += 4 + len as u64;
                 },
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
@@ -148,6 +152,10 @@ impl Consumer {
                     return Err(e)
                 },
             }
+        }
+        if records.is_empty() {
+            info!("sleeping!");
+            ::std::thread::sleep(::std::time::Duration::from_millis(100));
         }
         Ok(records)
     }
@@ -164,7 +172,7 @@ impl Consumer {
             .next();
 
         if let Some(path) = next_segment {
-            self.file = OpenOptions::new().read(true).open(&path)?;
+            self.file = BufReader::new(OpenOptions::new().read(true).open(&path)?);
             self.current_path = path;
             Ok(true)
         } else {

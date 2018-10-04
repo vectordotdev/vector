@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log as stdlog;
+
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
