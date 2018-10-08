@@ -2,67 +2,47 @@ extern crate router;
 
 #[macro_use]
 extern crate log;
+extern crate chrono;
 extern crate fern;
-extern crate memchr;
 
-use memchr::memchr;
-use router::transport::Coordinator;
-use std::io::{BufRead, Write};
+use router::{transport::Coordinator, ConsoleSink, ConsoleSource};
 use std::sync::{atomic::AtomicBool, Arc};
-use std::thread;
 
 fn main() {
     fern::Dispatch::new()
-        .level(log::LevelFilter::Debug)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        }).level(log::LevelFilter::Debug)
         .chain(std::io::stderr())
         .apply()
         .unwrap();
 
-    info!("Hello, world!");
-
     let topic = "foo";
     let mut coordinator = Coordinator::new("logs");
-    let mut log = coordinator.create_log(topic).expect("failed to create log");
-    let mut consumer = coordinator.build_consumer(topic).expect("failed to build consumer");
+    let log = coordinator.create_log(topic).expect("failed to create log");
+    let consumer = coordinator
+        .build_consumer(topic)
+        .expect("failed to build consumer");
 
-    let mut writer = ::std::io::stdout();
+    let source = ConsoleSource::new(log);
+    info!("starting source");
+    let source_handle = source.run();
 
     let finished = Arc::new(AtomicBool::new(true));
-    let finished2 = finished.clone();
-    let handle = thread::spawn(move || {
-        ::std::thread::sleep(::std::time::Duration::from_millis(10));
-        while let Ok(batch) = consumer.poll() {
-            if batch.is_empty() && !finished2.load(std::sync::atomic::Ordering::Relaxed) {
-                break;
-            } else {
-                for record in batch {
-                    writer.write(&record).unwrap();
-                }
-            }
-        }
-    });
+    let stop = finished.clone();
+    let sink = ConsoleSink::new(consumer, stop);
+    info!("starting sink");
+    let sink_handle = sink.run();
 
-    let reader = ::std::io::stdin();
-    let mut buffer = reader.lock();
-    loop {
-        let consumed = match buffer.fill_buf() {
-            Ok(bytes) => {
-                if bytes.len() == 0 { break }
-                if let Some(newline) = memchr(b'\n', bytes) {
-                    let pos = newline + 1;
-                    log.append(&[&bytes[0..pos]])
-                        .expect("failed to append input");
-                    pos
-                } else {
-                    // if we couldn't find a newline, just throw away the buffer
-                    bytes.len()
-                }
-            },
-            _ => break,
-        };
-        buffer.consume(consumed);
-    }
+    source_handle.join().unwrap();
+    info!("source finished");
     finished.store(false, std::sync::atomic::Ordering::Relaxed);
-
-    handle.join().unwrap();
+    sink_handle.join().unwrap();
+    info!("sink finished");
 }

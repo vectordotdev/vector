@@ -2,12 +2,88 @@
 extern crate log;
 
 extern crate byteorder;
+extern crate memchr;
 extern crate uuid;
 
 #[cfg(test)]
 extern crate tempdir;
 
 pub mod transport;
+
+use std::io::{BufRead, Write};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::thread;
+
+use memchr::memchr;
+
+use transport::{Consumer, Log};
+
+pub struct ConsoleSource {
+    log: Log,
+}
+
+impl ConsoleSource {
+    pub fn new(log: Log) -> Self {
+        ConsoleSource { log }
+    }
+
+    pub fn run(mut self) -> thread::JoinHandle<()> {
+        thread::spawn(move || {
+            let reader = ::std::io::stdin();
+            let mut buffer = reader.lock();
+            loop {
+                let consumed = match buffer.fill_buf() {
+                    Ok(bytes) => {
+                        if bytes.len() == 0 {
+                            break;
+                        }
+                        if let Some(newline) = memchr(b'\n', bytes) {
+                            let pos = newline + 1;
+                            self.log
+                                .append(&[&bytes[0..pos]])
+                                .expect("failed to append input");
+                            pos
+                        } else {
+                            // if we couldn't find a newline, just throw away the buffer
+                            bytes.len()
+                        }
+                    }
+                    _ => break,
+                };
+                buffer.consume(consumed);
+            }
+        })
+    }
+}
+
+pub struct ConsoleSink {
+    consumer: Consumer,
+    stop: Arc<AtomicBool>,
+}
+
+impl ConsoleSink {
+    pub fn new(consumer: Consumer, stop: Arc<AtomicBool>) -> Self {
+        ConsoleSink { consumer, stop }
+    }
+
+    pub fn run(mut self) -> thread::JoinHandle<()> {
+        thread::spawn(move || {
+            let mut writer = ::std::io::stdout();
+            while let Ok(batch) = self.consumer.poll() {
+                if batch.is_empty() && !self.stop.load(Ordering::Relaxed) {
+                    break;
+                } else {
+                    for record in batch {
+                        writer.write(&record).unwrap();
+                    }
+                }
+            }
+        })
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -26,7 +102,9 @@ mod test {
 
         let mut coordinator = Coordinator::new(&data_dir);
         let log = coordinator.create_log(topic).expect("failed to build log");
-        let consumer = coordinator.build_consumer(topic).expect("failed to build consumer");
+        let consumer = coordinator
+            .build_consumer(topic)
+            .expect("failed to build consumer");
         (data_dir, coordinator, log, consumer)
     }
 
@@ -46,7 +124,9 @@ mod test {
 
         log.append(&MESSAGES[0..2]).expect("failed to append batch");
 
-        let mut consumer = coordinator.build_consumer("foo").expect("failed to build consumer");
+        let mut consumer = coordinator
+            .build_consumer("foo")
+            .expect("failed to build consumer");
 
         log.append(&MESSAGES[2..4]).expect("failed to append batch");
 

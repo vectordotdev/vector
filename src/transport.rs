@@ -157,7 +157,6 @@ impl Consumer {
                     if records.len() > 10_000 {
                         break;
                     }
-                    // self.position.offset += 4 + len as u64;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
                     if self.maybe_advance_segment()? {
@@ -170,7 +169,7 @@ impl Consumer {
             }
         }
         if records.is_empty() {
-            info!("sleeping!");
+            trace!("sleeping!");
             ::std::thread::sleep(::std::time::Duration::from_millis(100));
         }
         Ok(records)
