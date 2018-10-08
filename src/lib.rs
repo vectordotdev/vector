@@ -11,7 +11,7 @@ pub mod transport;
 
 #[cfg(test)]
 mod test {
-    use super::transport::{Consumer, Coordinator};
+    use super::transport::{Consumer, Coordinator, Log};
     use tempdir::TempDir;
 
     static MESSAGES: &[&[u8]] = &[
@@ -21,13 +21,18 @@ mod test {
         b"i am the fourth message",
     ];
 
+    fn setup(topic: &str) -> (TempDir, Coordinator, Log, Consumer) {
+        let data_dir = TempDir::new_in(".", "logs").expect("creating tempdir");
+
+        let mut coordinator = Coordinator::new(&data_dir);
+        let log = coordinator.create_log(topic).expect("failed to build log");
+        let consumer = coordinator.build_consumer(topic).expect("failed to build consumer");
+        (data_dir, coordinator, log, consumer)
+    }
+
     #[test]
     fn basic_write_then_read() {
-        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
-
-        let mut coordinator = Coordinator::default();
-        let mut log = coordinator.create_log(&dir).expect("failed to build log");
-        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+        let (_data_dir, _coordinator, mut log, mut consumer) = setup("foo");
 
         log.append(MESSAGES).expect("failed to append batch");
 
@@ -37,14 +42,11 @@ mod test {
 
     #[test]
     fn consumer_starts_from_the_end() {
-        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
-
-        let mut coordinator = Coordinator::default();
-        let mut log = coordinator.create_log(&dir).expect("failed to build log");
+        let (_data_dir, coordinator, mut log, _) = setup("foo");
 
         log.append(&MESSAGES[0..2]).expect("failed to append batch");
 
-        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+        let mut consumer = coordinator.build_consumer("foo").expect("failed to build consumer");
 
         log.append(&MESSAGES[2..4]).expect("failed to append batch");
 
@@ -54,11 +56,7 @@ mod test {
 
     #[test]
     fn logs_split_into_segments() {
-        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
-
-        let mut coordinator = Coordinator::default();
-        let mut log = coordinator.create_log(&dir).expect("failed to build log");
-        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+        let (_data_dir, _coordinator, mut log, mut consumer) = setup("foo");
 
         log.append(&MESSAGES[..1])
             .expect("failed to append first record");
@@ -68,17 +66,13 @@ mod test {
 
         log.append(&MESSAGES[1..]).expect("failed to append batch");
 
-        assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
+        assert_eq!(2, log.get_segments().unwrap().count());
         assert_eq!(consumer.poll().expect("failed to poll"), MESSAGES);
     }
 
     #[test]
     fn only_retains_segments_with_active_consumers() {
-        let dir = TempDir::new_in(".", "logs").expect("creating tempdir");
-
-        let mut coordinator = Coordinator::default();
-        let mut log = coordinator.create_log(&dir).expect("failed to build log");
-        let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+        let (_data_dir, mut coordinator, mut log, mut consumer) = setup("foo");
 
         log.append(&MESSAGES[..1])
             .expect("failed to append first record");
@@ -88,7 +82,7 @@ mod test {
 
         log.append(&MESSAGES[1..]).expect("failed to append batch");
 
-        assert_eq!(2, ::std::fs::read_dir(&dir).unwrap().count());
+        assert_eq!(2, log.get_segments().unwrap().count());
         assert_eq!(consumer.poll().expect("failed to poll"), MESSAGES);
         consumer.commit_offsets(&mut coordinator);
 
@@ -96,6 +90,6 @@ mod test {
         coordinator
             .enforce_retention()
             .expect("failed to enforce retention");
-        assert_eq!(1, ::std::fs::read_dir(&dir).unwrap().count());
+        assert_eq!(1, log.get_segments().unwrap().count());
     }
 }

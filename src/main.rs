@@ -6,7 +6,7 @@ extern crate fern;
 extern crate memchr;
 
 use memchr::memchr;
-use router::transport::{Consumer, Coordinator};
+use router::transport::Coordinator;
 use std::io::{BufRead, Write};
 use std::sync::{atomic::AtomicBool, Arc};
 use std::thread;
@@ -20,10 +20,10 @@ fn main() {
 
     info!("Hello, world!");
 
-    let dir = "logs";
-    let mut coordinator = Coordinator::default();
-    let mut log = coordinator.create_log(&dir).expect("failed to create log");
-    let mut consumer = Consumer::new(&dir).expect("failed to build consumer");
+    let topic = "foo";
+    let mut coordinator = Coordinator::new("logs");
+    let mut log = coordinator.create_log(topic).expect("failed to create log");
+    let mut consumer = coordinator.build_consumer(topic).expect("failed to build consumer");
 
     let mut writer = ::std::io::stdout();
 

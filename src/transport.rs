@@ -62,19 +62,38 @@ impl Log {
         self.current_segment = Segment::new(&self.dir, 1)?;
         Ok(())
     }
+
+    pub fn get_segments(&self) -> io::Result<impl Iterator<Item = PathBuf>> {
+        get_segment_paths(&self.dir)
+    }
 }
 
-#[derive(Default)]
 pub struct Coordinator {
+    data_dir: PathBuf,
     logs: BTreeMap<PathBuf, BTreeMap<Uuid, PathBuf>>,
 }
 
 impl Coordinator {
-    pub fn create_log<T: AsRef<Path>>(&mut self, path: T) -> io::Result<Log> {
-        let dir = path.as_ref().to_path_buf();
+    pub fn new<T: AsRef<Path>>(dir: T) -> Coordinator {
+        Coordinator {
+            data_dir: dir.as_ref().to_path_buf(),
+            logs: BTreeMap::new(),
+        }
+    }
+
+    pub fn create_log(&mut self, topic: &str) -> io::Result<Log> {
+        let dir = self.data_dir.join(topic);
+        ::std::fs::create_dir_all(&dir)?;
+        debug!("creating log at {:?}", dir);
         let log = Log::new(dir.clone())?;
         self.logs.insert(dir, BTreeMap::new());
         Ok(log)
+    }
+
+    pub fn build_consumer(&self, topic: &str) -> io::Result<Consumer> {
+        let dir = self.data_dir.join(topic);
+        debug!("building consumer for log at {:?}", dir);
+        Consumer::new(dir)
     }
 
     fn set_offset(&mut self, log: &Path, consumer: &Uuid, segment: &Path) {
@@ -105,16 +124,14 @@ fn get_segment_paths(dir: &Path) -> io::Result<impl Iterator<Item = PathBuf>> {
 
 pub struct Consumer {
     id: Uuid,
-    dir: PathBuf,
+    topic_dir: PathBuf,
     file: BufReader<File>,
     current_path: PathBuf,
 }
 
 impl Consumer {
-    pub fn new<T: AsRef<Path>>(path: T) -> io::Result<Consumer> {
-        let dir = path.as_ref().to_path_buf();
-
-        let latest_segment = get_segment_paths(&dir)?
+    fn new(topic_dir: PathBuf) -> io::Result<Consumer> {
+        let latest_segment = get_segment_paths(&topic_dir)?
             .max()
             .expect("i don't know how to deal with empty dirs yet");
 
@@ -123,7 +140,7 @@ impl Consumer {
 
         Ok(Consumer {
             id: Uuid::new_v4(),
-            dir,
+            topic_dir,
             file,
             current_path: latest_segment,
         })
@@ -160,7 +177,7 @@ impl Consumer {
     }
 
     fn maybe_advance_segment(&mut self) -> io::Result<bool> {
-        let mut segments = ::std::fs::read_dir(&self.dir)?
+        let mut segments = ::std::fs::read_dir(&self.topic_dir)?
             .map(|r| r.map(|entry| entry.path()))
             .collect::<Result<Vec<PathBuf>, _>>()?;
         segments.sort();
@@ -180,6 +197,6 @@ impl Consumer {
     }
 
     pub fn commit_offsets(&self, coordinator: &mut Coordinator) {
-        coordinator.set_offset(&self.dir, &self.id, &self.current_path);
+        coordinator.set_offset(&self.topic_dir, &self.id, &self.current_path);
     }
 }
