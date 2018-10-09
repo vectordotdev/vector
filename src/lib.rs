@@ -4,6 +4,7 @@ extern crate log;
 extern crate byteorder;
 extern crate memchr;
 extern crate uuid;
+extern crate rand;
 
 #[cfg(test)]
 extern crate tempdir;
@@ -12,12 +13,13 @@ pub mod transport;
 
 use std::io::{BufRead, Write};
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicUsize, Ordering},
     Arc,
 };
 use std::thread;
 
 use memchr::memchr;
+use rand::{SeedableRng, Rng};
 
 use transport::{Consumer, Log};
 
@@ -30,8 +32,9 @@ impl ConsoleSource {
         ConsoleSource { log }
     }
 
-    pub fn run(mut self) -> thread::JoinHandle<()> {
+    pub fn run(mut self) -> thread::JoinHandle<u64> {
         thread::spawn(move || {
+            let mut offset = 0;
             let reader = ::std::io::stdin();
             let mut buffer = reader.lock();
             loop {
@@ -45,6 +48,7 @@ impl ConsoleSource {
                             self.log
                                 .append(&[&bytes[0..pos]])
                                 .expect("failed to append input");
+                            offset += 1;
                             pos
                         } else {
                             // if we couldn't find a newline, just throw away the buffer
@@ -55,32 +59,74 @@ impl ConsoleSource {
                 };
                 buffer.consume(consumed);
             }
+            offset
         })
     }
 }
 
 pub struct ConsoleSink {
     consumer: Consumer,
-    stop: Arc<AtomicBool>,
+    last_offset: Arc<AtomicUsize>,
 }
 
 impl ConsoleSink {
-    pub fn new(consumer: Consumer, stop: Arc<AtomicBool>) -> Self {
-        ConsoleSink { consumer, stop }
+    pub fn new(consumer: Consumer, last_offset: Arc<AtomicUsize>) -> Self {
+        ConsoleSink { consumer, last_offset }
     }
 
     pub fn run(mut self) -> thread::JoinHandle<()> {
         thread::spawn(move || {
+            let mut offset = 0;
             let mut writer = ::std::io::stdout();
             while let Ok(batch) = self.consumer.poll() {
-                if batch.is_empty() && !self.stop.load(Ordering::Relaxed) {
-                    break;
+                if batch.is_empty() {
+                    let lo = self.last_offset.load(Ordering::Relaxed);
+                    if lo > 0 && offset == lo {
+                        break;
+                    }
                 } else {
                     for record in batch {
                         writer.write(&record).unwrap();
+                        offset += 1;
                     }
                 }
             }
+        })
+    }
+}
+
+pub struct Sampler {
+    rate: u8,
+    consumer: Consumer,
+    log: Log,
+    last_offset: Arc<AtomicUsize>,
+}
+
+impl Sampler {
+    pub fn new(rate: u8, consumer: Consumer, log: Log, last_offset: Arc<AtomicUsize>) -> Self {
+        assert!(rate <= 100);
+        Sampler { rate, consumer, log, last_offset }
+    }
+
+    pub fn run(mut self) -> thread::JoinHandle<u64> {
+        let mut offset_in = 0;
+        let mut offset_out = 0;
+        let mut rng = rand::Isaac64Rng::from_seed(rand::random());
+        thread::spawn(move || {
+            while let Ok(batch) = self.consumer.poll() {
+                for record in batch {
+                    if rng.gen_range(0, 100) < self.rate {
+                        self.log.append(&[&record]).expect("failed to append to log");
+                        offset_out += 1;
+                    }
+                    offset_in += 1;
+                }
+                let lo = self.last_offset.load(Ordering::Relaxed);
+                if lo > 0 && offset_in == lo {
+                    break;
+                }
+            }
+            offset_out
         })
     }
 }

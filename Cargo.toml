@@ -11,3 +11,4 @@ tempdir = "0.3.7"
 uuid = { version = "0.7.1", features = ["v4"] }
 memchr = "2.1.0"
 chrono = "0.4.6"
+rand = "0.5.5"
