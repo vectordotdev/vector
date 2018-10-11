@@ -3,12 +3,13 @@ extern crate log;
 
 extern crate byteorder;
 extern crate memchr;
-extern crate uuid;
 extern crate rand;
+extern crate uuid;
 
 #[cfg(test)]
 extern crate tempdir;
 
+pub mod splunk;
 pub mod transport;
 
 use std::io::{BufRead, Write};
@@ -19,7 +20,7 @@ use std::sync::{
 use std::thread;
 
 use memchr::memchr;
-use rand::{SeedableRng, Rng};
+use rand::{Rng, SeedableRng};
 
 use transport::{Consumer, Log};
 
@@ -43,6 +44,7 @@ impl ConsoleSource {
                         if bytes.len() == 0 {
                             break;
                         }
+                        // TODO: don't include the newlines
                         if let Some(newline) = memchr(b'\n', bytes) {
                             let pos = newline + 1;
                             self.log
@@ -71,7 +73,10 @@ pub struct ConsoleSink {
 
 impl ConsoleSink {
     pub fn new(consumer: Consumer, last_offset: Arc<AtomicUsize>) -> Self {
-        ConsoleSink { consumer, last_offset }
+        ConsoleSink {
+            consumer,
+            last_offset,
+        }
     }
 
     pub fn run(mut self) -> thread::JoinHandle<()> {
@@ -87,6 +92,7 @@ impl ConsoleSink {
                 } else {
                     for record in batch {
                         writer.write(&record).unwrap();
+                        writer.write(b"\n").unwrap();
                         offset += 1;
                     }
                 }
@@ -105,7 +111,12 @@ pub struct Sampler {
 impl Sampler {
     pub fn new(rate: u8, consumer: Consumer, log: Log, last_offset: Arc<AtomicUsize>) -> Self {
         assert!(rate <= 100);
-        Sampler { rate, consumer, log, last_offset }
+        Sampler {
+            rate,
+            consumer,
+            log,
+            last_offset,
+        }
     }
 
     pub fn run(mut self) -> thread::JoinHandle<u64> {
@@ -116,7 +127,9 @@ impl Sampler {
             while let Ok(batch) = self.consumer.poll() {
                 for record in batch {
                     if rng.gen_range(0, 100) < self.rate {
-                        self.log.append(&[&record]).expect("failed to append to log");
+                        self.log
+                            .append(&[&record])
+                            .expect("failed to append to log");
                         offset_out += 1;
                     }
                     offset_in += 1;

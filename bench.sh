@@ -12,4 +12,6 @@ fi
 cargo build --release
 
 echo "input: $(wc -l < sample.log) lines"
-time cat sample.log | pv | ./target/release/router | wc -l
+./target/release/router | wc -l &
+time cat sample.log | pv | nc localhost 1234
+wait
