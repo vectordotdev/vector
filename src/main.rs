@@ -5,7 +5,7 @@ extern crate log;
 extern crate chrono;
 extern crate fern;
 
-use router::{console, splunk, transport::Coordinator, Sampler};
+use router::{console, splunk, transforms::Sampler, transport::Coordinator};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
