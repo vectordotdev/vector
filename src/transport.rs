@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use uuid::Uuid;
@@ -24,7 +26,7 @@ impl Coordinator {
 
     pub fn create_log(&mut self, topic: &str) -> io::Result<Log> {
         let dir = self.data_dir.join(topic);
-        ::std::fs::create_dir_all(&dir)?;
+        fs::create_dir_all(&dir)?;
         debug!("creating log at {:?}", dir);
         let log = Log::new(dir.clone())?;
         self.logs.insert(dir, BTreeMap::new());
@@ -47,7 +49,7 @@ impl Coordinator {
         for (dir, offsets) in &self.logs {
             if let Some(min_segment) = offsets.values().min() {
                 for old_segment in get_segment_paths(&dir)?.filter(|path| path < min_segment) {
-                    ::std::fs::remove_file(old_segment)?;
+                    fs::remove_file(old_segment)?;
                 }
             }
         }
@@ -190,7 +192,7 @@ impl Consumer {
         }
         if records.is_empty() {
             trace!("sleeping!");
-            ::std::thread::sleep(::std::time::Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(100));
         }
         Ok(records)
     }
