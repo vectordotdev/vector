@@ -9,97 +9,19 @@ extern crate uuid;
 #[cfg(test)]
 extern crate tempdir;
 
+pub mod console;
 pub mod splunk;
 pub mod transport;
 
-use std::io::{BufRead, Write};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
 use std::thread;
 
-use memchr::memchr;
 use rand::{Rng, SeedableRng};
 
 use transport::{Consumer, Log};
-
-pub struct ConsoleSource {
-    log: Log,
-}
-
-impl ConsoleSource {
-    pub fn new(log: Log) -> Self {
-        ConsoleSource { log }
-    }
-
-    pub fn run(mut self) -> thread::JoinHandle<u64> {
-        thread::spawn(move || {
-            let mut offset = 0;
-            let reader = ::std::io::stdin();
-            let mut buffer = reader.lock();
-            loop {
-                let consumed = match buffer.fill_buf() {
-                    Ok(bytes) => {
-                        if bytes.is_empty() {
-                            break;
-                        }
-                        // TODO: don't include the newlines
-                        if let Some(newline) = memchr(b'\n', bytes) {
-                            let pos = newline + 1;
-                            self.log
-                                .append(&[&bytes[0..pos]])
-                                .expect("failed to append input");
-                            offset += 1;
-                            pos
-                        } else {
-                            // if we couldn't find a newline, just throw away the buffer
-                            bytes.len()
-                        }
-                    }
-                    _ => break,
-                };
-                buffer.consume(consumed);
-            }
-            offset
-        })
-    }
-}
-
-pub struct ConsoleSink {
-    consumer: Consumer,
-    last_offset: Arc<AtomicUsize>,
-}
-
-impl ConsoleSink {
-    pub fn new(consumer: Consumer, last_offset: Arc<AtomicUsize>) -> Self {
-        ConsoleSink {
-            consumer,
-            last_offset,
-        }
-    }
-
-    pub fn run(mut self) -> thread::JoinHandle<()> {
-        thread::spawn(move || {
-            let mut offset = 0;
-            let mut writer = ::std::io::stdout();
-            while let Ok(batch) = self.consumer.poll() {
-                if batch.is_empty() {
-                    let lo = self.last_offset.load(Ordering::Relaxed);
-                    if lo > 0 && offset == lo {
-                        break;
-                    }
-                } else {
-                    for record in batch {
-                        writer.write_all(&record).unwrap();
-                        writer.write_all(b"\n").unwrap();
-                        offset += 1;
-                    }
-                }
-            }
-        })
-    }
-}
 
 pub struct Sampler {
     rate: u8,

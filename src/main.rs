@@ -5,7 +5,7 @@ extern crate log;
 extern crate chrono;
 extern crate fern;
 
-use router::{splunk, transport::Coordinator, ConsoleSink, Sampler};
+use router::{console, splunk, transport::Coordinator, Sampler};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -45,10 +45,10 @@ fn main() {
         .build_consumer("output")
         .expect("failed to build consumer");
 
-    // let source = ConsoleSource::new(input_log);
+    // let source = console::Source::new(input_log);
     let source = splunk::RawTcpSource::new(input_log);
     let sampler = Sampler::new(1, input_consumer, output_log, last_input_offset.clone());
-    let sink = ConsoleSink::new(output_consumer, last_output_offset.clone());
+    let sink = console::Sink::new(output_consumer, last_output_offset.clone());
 
     info!("starting source");
     let source_handle = source.run();
