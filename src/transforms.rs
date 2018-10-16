@@ -4,21 +4,45 @@ use std::sync::{
 };
 use std::thread;
 
-use rand::{self, Rng, SeedableRng};
+use rand::{self, Isaac64Rng, Rng, SeedableRng};
+use regex::bytes::RegexSet;
 use transport::{Consumer, Log};
 
 pub struct Sampler {
-    rate: u8,
+    inner: SamplerInner,
     consumer: Consumer,
     log: Log,
     last_offset: Arc<AtomicUsize>,
+}
+
+struct SamplerInner {
+    rate: u8,
+    rng: Isaac64Rng,
+    pass_list: Option<RegexSet>,
+}
+
+impl SamplerInner {
+    fn new(rate: u8, pass_list: Option<RegexSet>) -> Self {
+        Self {
+            rate,
+            rng: Isaac64Rng::from_seed(rand::random()),
+            pass_list,
+        }
+    }
+
+    fn filter(&mut self, record: &[u8]) -> bool {
+        self.pass_list
+            .as_ref()
+            .map(|set| set.is_match(record))
+            .unwrap_or_else(|| self.rng.gen_range(0, 100) < self.rate)
+    }
 }
 
 impl Sampler {
     pub fn new(rate: u8, consumer: Consumer, log: Log, last_offset: Arc<AtomicUsize>) -> Self {
         assert!(rate <= 100);
         Sampler {
-            rate,
+            inner: SamplerInner::new(rate, None),
             consumer,
             log,
             last_offset,
@@ -28,11 +52,10 @@ impl Sampler {
     pub fn run(mut self) -> thread::JoinHandle<u64> {
         let mut offset_in = 0;
         let mut offset_out = 0;
-        let mut rng = rand::Isaac64Rng::from_seed(rand::random());
         thread::spawn(move || {
             while let Ok(batch) = self.consumer.poll() {
                 for record in batch {
-                    if rng.gen_range(0, 100) < self.rate {
+                    if self.inner.filter(&record) {
                         self.log
                             .append(&[&record])
                             .expect("failed to append to log");
@@ -47,5 +70,32 @@ impl Sampler {
             }
             offset_out
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::SamplerInner as Sampler;
+    use regex::bytes::RegexSet;
+
+    #[test]
+    fn samples_at_roughly_the_configured_rate() {
+        let record = &[0u8];
+        let mut sampler = Sampler::new(50, None);
+        let iterations = 0..1000;
+        let total_passed = iterations.filter(|_| sampler.filter(record)).count();
+        assert!(total_passed > 400);
+        assert!(total_passed < 600);
+    }
+
+    #[test]
+    fn always_passes_records_matching_pass_list() {
+        let record = "i am important";
+        let mut sampler = Sampler::new(0, Some(RegexSet::new(&["important"]).unwrap()));
+        let iterations = 0..1000;
+        let total_passed = iterations
+            .filter(|_| sampler.filter(record.as_bytes()))
+            .count();
+        assert_eq!(total_passed, 1000);
     }
 }

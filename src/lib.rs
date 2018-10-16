@@ -4,6 +4,7 @@ extern crate log;
 extern crate byteorder;
 extern crate memchr;
 extern crate rand;
+extern crate regex;
 extern crate uuid;
 
 #[cfg(test)]
