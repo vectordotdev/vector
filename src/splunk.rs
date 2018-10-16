@@ -15,16 +15,16 @@ impl RawTcpSource {
 
     pub fn run(mut self) -> thread::JoinHandle<u64> {
         thread::spawn(move || {
-            // TODO: more efficient way to handle multiple writers
+            // TODO: more efficient way to handle multiple writers?
             let (tx, rx) = channel();
 
             let listener = TcpListener::bind("0.0.0.0:1234").expect("failed to bind to tcp socket");
             let listener_handle = thread::spawn(move || {
-                // taking 1 connection for now so we don't run forever
+                // only taking 1 connection for now so we don't run forever
                 for stream in listener.incoming().take(1) {
                     let tx = tx.clone();
                     let conn = stream.expect("failed to open tcpstream");
-                    // connection thread
+                    // connection handling thread
                     thread::spawn(move || {
                         let reader = BufReader::new(conn);
                         for line in reader.lines().filter_map(Result::ok) {
