@@ -41,7 +41,7 @@ impl ConsoleSource {
             loop {
                 let consumed = match buffer.fill_buf() {
                     Ok(bytes) => {
-                        if bytes.len() == 0 {
+                        if bytes.is_empty() {
                             break;
                         }
                         // TODO: don't include the newlines
@@ -91,8 +91,8 @@ impl ConsoleSink {
                     }
                 } else {
                     for record in batch {
-                        writer.write(&record).unwrap();
-                        writer.write(b"\n").unwrap();
+                        writer.write_all(&record).unwrap();
+                        writer.write_all(b"\n").unwrap();
                         offset += 1;
                     }
                 }
