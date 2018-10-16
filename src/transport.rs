@@ -13,7 +13,7 @@ struct Segment {
 
 impl Segment {
     fn new(dir: &Path, offset: u64) -> io::Result<Segment> {
-        let filename = format!("{:08}.log", offset);
+        let filename = format!("{:020}.log", offset);
         let file = BufWriter::new(
             OpenOptions::new()
                 .append(true)
@@ -38,6 +38,7 @@ impl Segment {
 pub struct Log {
     dir: PathBuf,
     current_segment: Segment,
+    current_offset: u64,
 }
 
 impl Log {
@@ -47,11 +48,16 @@ impl Log {
         Ok(Log {
             dir,
             current_segment,
+            current_offset: 0,
         })
     }
 
     pub fn append(&mut self, records: &[&[u8]]) -> io::Result<()> {
         for record in records {
+            self.current_offset += 1;
+            if self.current_segment.position + record.len() as u64 > 64 * 1024 * 1024 {
+                self.roll_segment()?;
+            }
             self.current_segment.append(record)?;
             self.current_segment.flush()?;
         }
@@ -59,7 +65,7 @@ impl Log {
     }
 
     pub fn roll_segment(&mut self) -> io::Result<()> {
-        self.current_segment = Segment::new(&self.dir, 1)?;
+        self.current_segment = Segment::new(&self.dir, self.current_offset)?;
         Ok(())
     }
 
