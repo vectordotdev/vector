@@ -4,8 +4,10 @@ extern crate router;
 extern crate log;
 extern crate chrono;
 extern crate fern;
+extern crate regex;
 
-use router::{console, splunk, transforms::Sampler, transport::Coordinator};
+use regex::bytes::RegexSet;
+use router::{splunk, transforms::Sampler, transport::Coordinator};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -47,8 +49,20 @@ fn main() {
 
     // let source = console::Source::new(input_log);
     let source = splunk::RawTcpSource::new(input_log);
-    let sampler = Sampler::new(1, input_consumer, output_log, last_input_offset.clone());
-    let sink = console::Sink::new(output_consumer, last_output_offset.clone());
+    let pass_list = RegexSet::new(&["important"]).unwrap();
+    let sampler = Sampler::new(
+        100,
+        pass_list,
+        input_consumer,
+        output_log,
+        last_input_offset.clone(),
+    );
+    // let sink = console::Sink::new(output_consumer, last_output_offset.clone());
+    let sink = splunk::RawTcpSink::new(
+        output_consumer,
+        "localhost:9999",
+        last_output_offset.clone(),
+    );
 
     info!("starting source");
     let source_handle = source.run();

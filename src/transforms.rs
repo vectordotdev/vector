@@ -8,21 +8,14 @@ use rand::{self, Isaac64Rng, Rng, SeedableRng};
 use regex::bytes::RegexSet;
 use transport::{Consumer, Log};
 
-pub struct Sampler {
-    inner: SamplerInner,
-    consumer: Consumer,
-    log: Log,
-    last_offset: Arc<AtomicUsize>,
-}
-
 struct SamplerInner {
     rate: u8,
     rng: Isaac64Rng,
-    pass_list: Option<RegexSet>,
+    pass_list: RegexSet,
 }
 
 impl SamplerInner {
-    fn new(rate: u8, pass_list: Option<RegexSet>) -> Self {
+    fn new(rate: u8, pass_list: RegexSet) -> Self {
         Self {
             rate,
             rng: Isaac64Rng::from_seed(rand::random()),
@@ -31,18 +24,32 @@ impl SamplerInner {
     }
 
     fn filter(&mut self, record: &[u8]) -> bool {
-        self.pass_list
-            .as_ref()
-            .map(|set| set.is_match(record))
-            .unwrap_or_else(|| self.rng.gen_range(0, 100) < self.rate)
+        if self.pass_list.is_match(record) {
+            true
+        } else {
+            self.rng.gen_range(0, 100) < self.rate
+        }
     }
 }
 
+pub struct Sampler {
+    inner: SamplerInner,
+    consumer: Consumer,
+    log: Log,
+    last_offset: Arc<AtomicUsize>,
+}
+
 impl Sampler {
-    pub fn new(rate: u8, consumer: Consumer, log: Log, last_offset: Arc<AtomicUsize>) -> Self {
+    pub fn new(
+        rate: u8,
+        pass_list: RegexSet,
+        consumer: Consumer,
+        log: Log,
+        last_offset: Arc<AtomicUsize>,
+    ) -> Self {
         assert!(rate <= 100);
         Sampler {
-            inner: SamplerInner::new(rate, None),
+            inner: SamplerInner::new(rate, pass_list),
             consumer,
             log,
             last_offset,
@@ -81,7 +88,7 @@ mod test {
     #[test]
     fn samples_at_roughly_the_configured_rate() {
         let record = &[0u8];
-        let mut sampler = Sampler::new(50, None);
+        let mut sampler = Sampler::new(50, RegexSet::new(&["na"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations.filter(|_| sampler.filter(record)).count();
         assert!(total_passed > 400);
@@ -91,7 +98,7 @@ mod test {
     #[test]
     fn always_passes_records_matching_pass_list() {
         let record = "i am important";
-        let mut sampler = Sampler::new(0, Some(RegexSet::new(&["important"]).unwrap()));
+        let mut sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
             .filter(|_| sampler.filter(record.as_bytes()))

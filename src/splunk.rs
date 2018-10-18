@@ -1,8 +1,13 @@
-use std::io::{BufRead, BufReader};
-use std::net::TcpListener;
-use std::sync::mpsc::channel;
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    mpsc::channel,
+    Arc,
+};
 use std::thread;
-use transport::Log;
+
+use transport::{Consumer, Log};
 
 pub struct RawTcpSource {
     log: Log,
@@ -49,6 +54,48 @@ impl RawTcpSource {
                 .join()
                 .expect("failed to join listener thread");
             writer_handle.join().expect("failed to join writer thread")
+        })
+    }
+}
+
+pub struct RawTcpSink {
+    consumer: Consumer,
+    stream: TcpStream,
+    last_offset: Arc<AtomicUsize>,
+}
+
+impl RawTcpSink {
+    pub fn new(
+        consumer: Consumer,
+        addr: impl ToSocketAddrs,
+        last_offset: Arc<AtomicUsize>,
+    ) -> Self {
+        let stream = TcpStream::connect(addr).unwrap();
+        RawTcpSink {
+            consumer,
+            stream,
+            last_offset,
+        }
+    }
+
+    pub fn run(mut self) -> thread::JoinHandle<()> {
+        thread::spawn(move || {
+            let mut offset = 0;
+            let mut writer = BufWriter::new(self.stream);
+            while let Ok(batch) = self.consumer.poll() {
+                if batch.is_empty() {
+                    let lo = self.last_offset.load(Ordering::Relaxed);
+                    if lo > 0 && offset == lo {
+                        break;
+                    }
+                } else {
+                    for record in batch {
+                        writer.write_all(&record).unwrap();
+                        writer.write_all(b"\n").unwrap();
+                        offset += 1;
+                    }
+                }
+            }
         })
     }
 }
