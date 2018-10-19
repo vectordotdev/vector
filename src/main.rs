@@ -2,8 +2,6 @@ extern crate router;
 
 #[macro_use]
 extern crate log;
-extern crate chrono;
-extern crate fern;
 extern crate regex;
 
 use regex::bytes::RegexSet;
@@ -14,19 +12,7 @@ use std::sync::{
 };
 
 fn main() {
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        }).level(log::LevelFilter::Debug)
-        .chain(std::io::stderr())
-        .apply()
-        .unwrap();
+    router::setup_logger();
 
     // keep track of last offset of upstream producers so consumers know when to quit
     let last_input_offset = Arc::new(AtomicUsize::new(0));
@@ -51,7 +37,7 @@ fn main() {
     let source = splunk::RawTcpSource::new(input_log);
     let pass_list = RegexSet::new(&["important"]).unwrap();
     let sampler = Sampler::new(
-        100,
+        10,
         pass_list,
         input_consumer,
         output_log,
