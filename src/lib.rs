@@ -4,6 +4,7 @@ extern crate chrono;
 extern crate fern;
 
 extern crate byteorder;
+extern crate bytes;
 extern crate memchr;
 extern crate rand;
 extern crate regex;
@@ -13,6 +14,7 @@ extern crate uuid;
 extern crate tempdir;
 
 pub mod console;
+pub mod sources;
 pub mod splunk;
 pub mod transforms;
 pub mod transport;
