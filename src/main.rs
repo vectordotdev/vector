@@ -2,17 +2,42 @@ extern crate router;
 
 #[macro_use]
 extern crate log;
+extern crate futures;
 extern crate regex;
+extern crate tokio;
 
+use futures::{Future, Sink, Stream};
 use regex::bytes::RegexSet;
-use router::{splunk, transforms::Sampler, transport::Coordinator};
+use router::{sources, splunk, transforms::Sampler, transport::Coordinator};
+use std::io::BufWriter;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use tokio::{
+    codec::{Decoder, FramedWrite, LinesCodec},
+    fs::File,
+};
 
 fn main() {
     router::setup_logger();
+
+    let sink = File::create("woop")
+        .map(|f| BufWriter::new(f))
+        .map_err(|e| error!("error creating file: {:?}", e))
+        .and_then(|file| {
+            // bug in length delimited will be fixed in tokio 0.1.12
+            // let file_out = FramedWrite::new(file, LengthDelimitedCodec::new())
+            let sink = FramedWrite::new(file, LinesCodec::new());
+            sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap(), sink)
+        });
+
+    // let splunk_in = sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap(), sink);
+    if true {
+        tokio::run(sink);
+        // tokio::run(splunk_in.run());
+        ::std::process::exit(0);
+    }
 
     // keep track of last offset of upstream producers so consumers know when to quit
     let last_input_offset = Arc::new(AtomicUsize::new(0));

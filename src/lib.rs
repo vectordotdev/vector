@@ -5,9 +5,11 @@ extern crate fern;
 
 extern crate byteorder;
 extern crate bytes;
+extern crate futures;
 extern crate memchr;
 extern crate rand;
 extern crate regex;
+extern crate tokio;
 extern crate uuid;
 
 #[cfg(test)]
@@ -29,7 +31,7 @@ pub fn setup_logger() {
                 record.level(),
                 message
             ))
-        }).level(log::LevelFilter::Debug)
+        }).level(log::LevelFilter::Info)
         .chain(std::io::stderr())
         .apply()
         .unwrap();

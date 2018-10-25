@@ -3,6 +3,7 @@ use memchr::memchr;
 use std::io::{self, Read};
 
 pub mod console;
+pub mod splunk;
 
 pub struct ReaderSource<T> {
     inner: T,
