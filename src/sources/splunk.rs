@@ -9,11 +9,7 @@ use tokio::{
     net::TcpListener,
 };
 
-pub fn raw_tcp<S, E>(addr: SocketAddr, sink: S) -> impl Future<Item = (), Error = ()>
-where
-    E: Debug,
-    S: Sink<SinkItem = String, SinkError = E>,
-{
+pub fn raw_tcp(addr: SocketAddr) -> impl Stream<Item = String, Error = ()> {
     let (tx, rx) = mpsc::channel(1000);
     let listener = TcpListener::bind(&addr).unwrap();
 
@@ -37,9 +33,5 @@ where
             tokio::spawn(handler)
         });
 
-    let collector = sink
-        .sink_map_err(|e| error!("error writing to sink: {:?}", e))
-        .send_all(rx);
-
-    server.join(collector).map(|_| ())
+    rx
 }

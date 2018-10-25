@@ -15,24 +15,25 @@ use std::sync::{
     Arc,
 };
 use tokio::{
-    codec::{Decoder, FramedWrite, LinesCodec},
+    codec::{FramedWrite, LinesCodec},
     fs::File,
 };
 
 fn main() {
     router::setup_logger();
 
+    let splunk_in = sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap());
     let sink = File::create("woop")
         .map(|f| BufWriter::new(f))
         .map_err(|e| error!("error creating file: {:?}", e))
         .and_then(|file| {
             // bug in length delimited will be fixed in tokio 0.1.12
             // let file_out = FramedWrite::new(file, LengthDelimitedCodec::new())
-            let sink = FramedWrite::new(file, LinesCodec::new());
-            sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap(), sink)
+            let sink = FramedWrite::new(file, LinesCodec::new())
+                .sink_map_err(|e| error!("error writing to file: {:?}", e));
+            splunk_in.forward(sink).map(|_| ())
         });
 
-    // let splunk_in = sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap(), sink);
     if true {
         tokio::run(sink);
         // tokio::run(splunk_in.run());
