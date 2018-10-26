@@ -8,35 +8,29 @@ extern crate tokio;
 
 use futures::{Future, Sink, Stream};
 use regex::bytes::RegexSet;
-use router::{sources, splunk, transforms::Sampler, transport::Coordinator};
-use std::io::BufWriter;
+use router::{
+    sources, splunk,
+    transforms::Sampler,
+    transport::{Coordinator, Logg},
+};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
-};
-use tokio::{
-    codec::{FramedWrite, LinesCodec},
-    fs::File,
 };
 
 fn main() {
     router::setup_logger();
 
     let splunk_in = sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap());
-    let sink = File::create("woop")
-        .map(|f| BufWriter::new(f))
-        .map_err(|e| error!("error creating file: {:?}", e))
-        .and_then(|file| {
-            // bug in length delimited will be fixed in tokio 0.1.12
-            // let file_out = FramedWrite::new(file, LengthDelimitedCodec::new())
-            let sink = FramedWrite::new(file, LinesCodec::new())
-                .sink_map_err(|e| error!("error writing to file: {:?}", e));
-            splunk_in.forward(sink).map(|_| ())
-        });
+    let log_create = Logg::create("logs").map_err(|e| error!("error creating log: {:?}", e));
+    let task = log_create.and_then(|log| {
+        let log = log.sink_map_err(|e| error!("error writing to file: {:?}", e));
+        splunk_in.forward(log).map(|_| info!("done?"))
+    });
 
     if true {
-        tokio::run(sink);
-        // tokio::run(splunk_in.run());
+        tokio::run(task);
+        info!("done running");
         ::std::process::exit(0);
     }
 

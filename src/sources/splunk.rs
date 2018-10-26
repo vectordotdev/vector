@@ -1,20 +1,16 @@
-use futures::{sync::mpsc, Future, Sink, Stream};
-use std::fmt::Debug;
-use std::io::BufWriter;
+use futures::{future, sync::mpsc, Future, Sink, Stream};
 use std::net::SocketAddr;
 use tokio::{
     self,
-    codec::{Decoder, FramedWrite, LinesCodec},
-    fs::File,
+    codec::{Decoder, LinesCodec},
     net::TcpListener,
 };
 
 pub fn raw_tcp(addr: SocketAddr) -> impl Stream<Item = String, Error = ()> {
-    let (tx, rx) = mpsc::channel(1000);
-    let listener = TcpListener::bind(&addr).unwrap();
-
+    // TODO: buf size?
+    let (tx, rx) = mpsc::channel(0);
     let server = TcpListener::bind(&addr)
-        .unwrap()
+        .expect("failed to bind to listener socket")
         .incoming()
         .map_err(|e| error!("failed to accept socket; error = {:?}", e))
         .for_each(move |socket| {
@@ -26,12 +22,16 @@ pub fn raw_tcp(addr: SocketAddr) -> impl Stream<Item = String, Error = ()> {
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             let handler = tx
-                .sink_map_err(|e| error!("error sending lines: {:?}", e))
+                .sink_map_err(|e| error!("error sending line: {:?}", e))
                 .send_all(lines_in)
                 .map(|_| info!("finished sending"));
 
             tokio::spawn(handler)
         });
 
-    rx
+    future::lazy(move || tokio::spawn(server))
+        .map(|_| String::new())
+        .into_stream()
+        .chain(rx)
+        .skip(1)
 }
