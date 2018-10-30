@@ -28,8 +28,19 @@ fn main() {
         splunk_in.forward(log).map(|_| info!("done?"))
     });
 
+    // let r = router::transport::read_log("logs")
+    // .map_err(|e| error!("error creating log: {:?}", e))
+    // .fold(0, |mut count, _line| {
+    // count += 1;
+    // if count % 1000 == 0 {
+    // println!("lines so far: {}", count);
+    // }
+    // Ok(count)
+    // }).map(|x| info!("done reading {} lines?", x));
+
     if true {
         tokio::run(task);
+        // tokio::run(task.join(r).map(|_| ()));
         info!("done running");
         ::std::process::exit(0);
     }

@@ -2,13 +2,59 @@ pub mod file;
 
 pub use self::file::*;
 
-use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::io::{self, BufWriter};
+use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use std::io::{self, BufReader, BufWriter, Read, SeekFrom};
 use std::path::{Path, PathBuf};
 use tokio::{
-    codec::{FramedWrite, LinesCodec},
-    fs::{file::CreateFuture, File},
+    codec::{FramedRead, FramedWrite, LinesCodec},
+    fs::{file::CreateFuture, read_dir, File},
+    io::AsyncRead,
 };
+
+pub fn read_log(data_dir: &str) -> impl Stream<Item = String, Error = io::Error> {
+    let data_dir = PathBuf::from(data_dir);
+    read_dir(data_dir.clone())
+        .flatten_stream()
+        .collect()
+        .and_then(|entries| {
+            let biggest = entries
+                .into_iter()
+                .map(|e| e.path())
+                .filter(|p| p.extension().map(|e| e == "log").unwrap_or(false))
+                .max()
+                .unwrap();
+            info!("opening {:?} for reading", biggest);
+            File::open(biggest)
+        }).and_then(|file| file.seek(SeekFrom::End(0)))
+        .map(|(inner, _pos)| TailReader { inner })
+        .map(|reader| {
+            FramedRead::new(
+                BufReader::new(reader),
+                LinesCodec::new_with_max_length(100 * 1024),
+            )
+        }).flatten_stream()
+}
+
+struct TailReader<T: AsyncRead> {
+    inner: T,
+}
+
+impl<T: AsyncRead> Read for TailReader<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.inner.read(buf) {
+            Ok(0) => Err(io::Error::new(io::ErrorKind::WouldBlock, "eof")),
+            x => x,
+        }
+    }
+}
+
+impl<T: AsyncRead> AsyncRead for TailReader<T> {}
+
+impl<T: AsyncRead> Drop for TailReader<T> {
+    fn drop(&mut self) {
+        info!("dropped!");
+    }
+}
 
 type InnerSink = FramedWrite<BufWriter<File>, LinesCodec>;
 

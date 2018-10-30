@@ -10,6 +10,7 @@ extern crate memchr;
 extern crate rand;
 extern crate regex;
 extern crate tokio;
+extern crate tokio_fs;
 extern crate uuid;
 
 #[cfg(test)]
