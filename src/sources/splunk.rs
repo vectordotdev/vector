@@ -1,13 +1,14 @@
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use log::{error, info};
 use std::net::SocketAddr;
+use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     self,
     codec::{FramedRead, LinesCodec},
     net::TcpListener,
 };
 
-pub fn raw_tcp(addr: SocketAddr) -> impl Stream<Item = String, Error = ()> {
+pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = String, Error = ()> {
     // TODO: buf size?
     let (tx, rx) = mpsc::channel(1000);
     let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
@@ -16,6 +17,7 @@ pub fn raw_tcp(addr: SocketAddr) -> impl Stream<Item = String, Error = ()> {
 
     let server = listener
         .incoming()
+        .take_until(exit)
         .map_err(|e| error!("failed to accept socket; error = {:?}", e))
         .for_each(move |socket| {
             let tx = tx.clone();

@@ -2,6 +2,7 @@ extern crate futures;
 extern crate log;
 extern crate regex;
 extern crate router;
+extern crate stream_cancel;
 extern crate tokio;
 
 use futures::{Future, Sink, Stream};
@@ -9,12 +10,15 @@ use log::{error, info};
 use regex::bytes::RegexSet;
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
+use stream_cancel::Tripwire;
 use tokio::fs::File;
 
 fn main() {
     router::setup_logger();
     let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
     let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
+
+    let (trigger, tripwire) = Tripwire::new();
 
     // build up a thing that will pipe some sample data at our server
     let input = File::open("sample.log")
@@ -24,16 +28,17 @@ fn main() {
     let sender = sinks::splunk::raw_tcp(in_addr)
         .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
         .map_err(|e| error!("error creating sender: {:?}", e));
-    let sender_task = sender
-        .and_then(|sink| input.forward(sink))
-        .map(|_| info!("done sending test input!"));
+    let sender_task = sender.and_then(|sink| input.forward(sink)).map(|_| {
+        info!("done sending test input!");
+        drop(trigger);
+    });
 
     // build up a thing that accept the data our server forwards upstream
-    let receiver = sources::splunk::raw_tcp(out_addr)
+    let receiver = sources::splunk::raw_tcp(out_addr, tripwire.clone())
         .fold((0usize, 0usize), |(count, bytes), line| {
             let count = count + 1;
             let bytes = bytes + line.len();
-            if count % 10_000 == 0 {
+            if count % 100_000 == 0 {
                 info!("{} lines ({} bytes) so far", count, bytes);
             }
             Ok((count, bytes))
@@ -46,7 +51,7 @@ fn main() {
     rt.spawn(receiver);
 
     info!("starting server");
-    rt.spawn(comcast(in_addr, out_addr));
+    rt.spawn(comcast(in_addr, out_addr, tripwire));
 
     info!("starting sender");
     rt.block_on_all(sender_task).unwrap();
@@ -55,8 +60,12 @@ fn main() {
 }
 
 // the server topology we'd actally use for the comcast use case
-fn comcast(in_addr: SocketAddr, out_addr: SocketAddr) -> impl Future<Item = (), Error = ()> {
-    let splunk_in = sources::splunk::raw_tcp(in_addr);
+fn comcast(
+    in_addr: SocketAddr,
+    out_addr: SocketAddr,
+    exit: Tripwire,
+) -> impl Future<Item = (), Error = ()> {
+    let splunk_in = sources::splunk::raw_tcp(in_addr, exit);
 
     let exceptions = RegexSet::new(&["(very )?important"]).unwrap();
     let mut sampler = transforms::Sampler::new(100, exceptions);

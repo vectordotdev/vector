@@ -7,6 +7,7 @@ extern crate log;
 extern crate memchr;
 extern crate rand;
 extern crate regex;
+extern crate stream_cancel;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate uuid;
