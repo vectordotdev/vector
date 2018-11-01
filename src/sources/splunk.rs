@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
-
 use futures::{future, sync::mpsc, Future, Sink, Stream};
+use log::{error, info};
+use std::net::SocketAddr;
 use tokio::{
     self,
     codec::{FramedRead, LinesCodec},

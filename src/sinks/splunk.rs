@@ -6,12 +6,10 @@ use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
 
 pub fn raw_tcp(
-    id: &'static str,
     addr: SocketAddr,
 ) -> impl Future<Item = impl Sink<SinkItem = String, SinkError = io::Error>, Error = io::Error> {
     // lazy so that we don't actually try to connect until the future is polled
     future::lazy(move || {
-        info!("{} connecting to {:?}", id, addr);
         TcpStream::connect(&addr).map(|socket| FramedWrite::new(socket, LinesCodec::new()))
     })
 }

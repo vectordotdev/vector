@@ -1,11 +1,9 @@
-#[macro_use]
-extern crate log;
-extern crate chrono;
-extern crate fern;
-
 extern crate byteorder;
 extern crate bytes;
+extern crate chrono;
+extern crate fern;
 extern crate futures;
+extern crate log;
 extern crate memchr;
 extern crate rand;
 extern crate regex;

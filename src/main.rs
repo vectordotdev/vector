@@ -1,12 +1,11 @@
-extern crate router;
-
-#[macro_use]
-extern crate log;
 extern crate futures;
+extern crate log;
 extern crate regex;
+extern crate router;
 extern crate tokio;
 
 use futures::{Future, Sink, Stream};
+use log::{error, info};
 use regex::bytes::RegexSet;
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
@@ -22,7 +21,7 @@ fn main() {
         .map_err(|e| error!("error opening file: {:?}", e))
         .map(sources::reader_source)
         .flatten_stream();
-    let sender = sinks::splunk::raw_tcp("sender_out", in_addr)
+    let sender = sinks::splunk::raw_tcp(in_addr)
         .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
         .map_err(|e| error!("error creating sender: {:?}", e));
     let sender_task = sender
@@ -63,7 +62,7 @@ fn comcast(in_addr: SocketAddr, out_addr: SocketAddr) -> impl Future<Item = (), 
     let mut sampler = transforms::Sampler::new(100, exceptions);
     let sampled = splunk_in.filter(move |record| sampler.filter(record.as_bytes()));
 
-    let splunk_out = sinks::splunk::raw_tcp("server_out", out_addr)
+    let splunk_out = sinks::splunk::raw_tcp(out_addr)
         .map(|sink| sink.sink_map_err(|e| error!("tcp sink error: {:?}", e)))
         .map_err(|e| error!("error creating tcp sink: {:?}", e));
 

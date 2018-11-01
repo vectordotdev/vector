@@ -1,4 +1,5 @@
 use futures::Stream;
+use log::error;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncRead;
 
