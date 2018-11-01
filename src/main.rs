@@ -8,98 +8,66 @@ extern crate tokio;
 
 use futures::{Future, Sink, Stream};
 use regex::bytes::RegexSet;
-use router::{
-    sources, splunk,
-    transforms::Sampler,
-    transport::{Coordinator, Logg},
-};
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use router::{sinks, sources, transforms};
+use std::net::SocketAddr;
+use tokio::fs::File;
 
 fn main() {
     router::setup_logger();
+    let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
+    let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
 
-    let splunk_in = sources::splunk::raw_tcp("0.0.0.0:1234".parse().unwrap());
-    let log_create = Logg::create("logs").map_err(|e| error!("error creating log: {:?}", e));
-    let task = log_create.and_then(|log| {
-        let log = log.sink_map_err(|e| error!("error writing to file: {:?}", e));
-        splunk_in.forward(log).map(|_| info!("done?"))
-    });
+    // build up a thing that will pipe some sample data at our server
+    let input = File::open("sample.log")
+        .map_err(|e| error!("error opening file: {:?}", e))
+        .map(sources::reader_source)
+        .flatten_stream();
+    let sender = sinks::splunk::raw_tcp("sender_out", in_addr)
+        .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
+        .map_err(|e| error!("error creating sender: {:?}", e));
+    let sender_task = sender
+        .and_then(|sink| input.forward(sink))
+        .map(|_| info!("done sending test input!"));
 
-    // let r = router::transport::read_log("logs")
-    // .map_err(|e| error!("error creating log: {:?}", e))
-    // .fold(0, |mut count, _line| {
-    // count += 1;
-    // if count % 1000 == 0 {
-    // println!("lines so far: {}", count);
-    // }
-    // Ok(count)
-    // }).map(|x| info!("done reading {} lines?", x));
+    // build up a thing that accept the data our server forwards upstream
+    let receiver = sources::splunk::raw_tcp(out_addr)
+        .fold((0usize, 0usize), |(count, bytes), line| {
+            let count = count + 1;
+            let bytes = bytes + line.len();
+            if count % 10_000 == 0 {
+                info!("{} lines ({} bytes) so far", count, bytes);
+            }
+            Ok((count, bytes))
+        }).map(|(count, bytes)| info!("{} total lines ({} total bytes)", count, bytes));
 
-    if true {
-        tokio::run(task);
-        // tokio::run(task.join(r).map(|_| ()));
-        info!("done running");
-        ::std::process::exit(0);
-    }
+    info!("starting runtime");
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    // keep track of last offset of upstream producers so consumers know when to quit
-    let last_input_offset = Arc::new(AtomicUsize::new(0));
-    let last_output_offset = Arc::new(AtomicUsize::new(0));
+    info!("starting receiver");
+    rt.spawn(receiver);
 
-    // build up producer/consumer graph first so everything starts at the beginning
-    let mut coordinator = Coordinator::new("logs");
-    let input_log = coordinator
-        .create_log("input")
-        .expect("failed to create log");
-    let input_consumer = coordinator
-        .build_consumer("input")
-        .expect("failed to build consumer");
-    let output_log = coordinator
-        .create_log("output")
-        .expect("failed to create log");
-    let output_consumer = coordinator
-        .build_consumer("output")
-        .expect("failed to build consumer");
+    info!("starting server");
+    rt.spawn(comcast(in_addr, out_addr));
 
-    // let source = console::Source::new(input_log);
-    let source = splunk::RawTcpSource::new(input_log);
-    let pass_list = RegexSet::new(&["important"]).unwrap();
-    let sampler = Sampler::new(
-        10,
-        pass_list,
-        input_consumer,
-        output_log,
-        last_input_offset.clone(),
-    );
-    // let sink = console::Sink::new(output_consumer, last_output_offset.clone());
-    let sink = splunk::RawTcpSink::new(
-        output_consumer,
-        "localhost:9999",
-        last_output_offset.clone(),
-    );
+    info!("starting sender");
+    rt.block_on_all(sender_task).unwrap();
 
-    info!("starting source");
-    let source_handle = source.run();
-    let sampler_handle = sampler.run();
-    let sink_handle = sink.run();
+    info!("sender finished!");
+}
 
-    // wait for source to finish (i.e. consume all of stdin)
-    let input_end_offset = source_handle.join().unwrap();
-    info!("source finished at offset {}", input_end_offset);
+// the server topology we'd actally use for the comcast use case
+fn comcast(in_addr: SocketAddr, out_addr: SocketAddr) -> impl Future<Item = (), Error = ()> {
+    let splunk_in = sources::splunk::raw_tcp(in_addr);
 
-    // tell sampler we're done
-    last_input_offset.store(input_end_offset as usize, Ordering::Relaxed);
+    let exceptions = RegexSet::new(&["(very )?important"]).unwrap();
+    let mut sampler = transforms::Sampler::new(100, exceptions);
+    let sampled = splunk_in.filter(move |record| sampler.filter(record.as_bytes()));
 
-    // wait for sampler to finish
-    let output_end_offset = sampler_handle.join().unwrap();
-    info!("sampler finished at offset {}", output_end_offset);
+    let splunk_out = sinks::splunk::raw_tcp("server_out", out_addr)
+        .map(|sink| sink.sink_map_err(|e| error!("tcp sink error: {:?}", e)))
+        .map_err(|e| error!("error creating tcp sink: {:?}", e));
 
-    // tell sink we're done
-    last_output_offset.store(output_end_offset as usize, Ordering::Relaxed);
-
-    // wait for sink to finish
-    sink_handle.join().unwrap();
+    splunk_out
+        .and_then(|sink| sampled.forward(sink))
+        .map(|_| info!("done!"))
 }

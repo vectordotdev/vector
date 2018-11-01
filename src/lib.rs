@@ -16,11 +16,9 @@ extern crate uuid;
 #[cfg(test)]
 extern crate tempdir;
 
-pub mod console;
+pub mod sinks;
 pub mod sources;
-pub mod splunk;
 pub mod transforms;
-pub mod transport;
 
 pub fn setup_logger() {
     fern::Dispatch::new()
