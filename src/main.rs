@@ -1,5 +1,6 @@
 extern crate futures;
 extern crate log;
+extern crate prometheus;
 extern crate regex;
 extern crate router;
 extern crate stream_cancel;
@@ -7,6 +8,7 @@ extern crate tokio;
 
 use futures::{Future, Sink, Stream};
 use log::{error, info};
+use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};
 use regex::bytes::RegexSet;
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
@@ -15,6 +17,7 @@ use tokio::fs::File;
 
 fn main() {
     router::setup_logger();
+
     let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
     let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
 
@@ -34,15 +37,13 @@ fn main() {
     });
 
     // build up a thing that accept the data our server forwards upstream
-    let receiver = sources::splunk::raw_tcp(out_addr, tripwire.clone())
-        .fold((0usize, 0usize), |(count, bytes), line| {
-            let count = count + 1;
-            let bytes = bytes + line.len();
-            if count % 100_000 == 0 {
-                info!("{} lines ({} bytes) so far", count, bytes);
-            }
-            Ok((count, bytes))
-        }).map(|(count, bytes)| info!("{} total lines ({} total bytes)", count, bytes));
+    let counter =
+        register_counter!("receiver_lines", "Lines received at forwarding destination").unwrap();
+    let receiver =
+        sources::splunk::raw_tcp(out_addr, tripwire.clone()).fold((), move |(), _line| {
+            counter.inc();
+            Ok(())
+        });
 
     info!("starting runtime");
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -55,8 +56,13 @@ fn main() {
 
     info!("starting sender");
     rt.block_on_all(sender_task).unwrap();
-
     info!("sender finished!");
+
+    let mut buf = Vec::new();
+    let encoder = TextEncoder::new();
+    let metrics_families = prometheus::gather();
+    encoder.encode(&metrics_families, &mut buf).unwrap();
+    info!("prom output:\n{}", String::from_utf8(buf).unwrap());
 }
 
 // the server topology we'd actally use for the comcast use case
@@ -65,11 +71,17 @@ fn comcast(
     out_addr: SocketAddr,
     exit: Tripwire,
 ) -> impl Future<Item = (), Error = ()> {
-    let splunk_in = sources::splunk::raw_tcp(in_addr, exit);
+    let counter = register_counter!("input_lines", "Lines ingested").unwrap();
+
+    let splunk_in = sources::splunk::raw_tcp(in_addr, exit).inspect(move |_| counter.inc());
+
+    let counter = register_counter!("output_lines", "Lines forwarded upstream").unwrap();
 
     let exceptions = RegexSet::new(&["(very )?important"]).unwrap();
-    let mut sampler = transforms::Sampler::new(100, exceptions);
-    let sampled = splunk_in.filter(move |record| sampler.filter(record.as_bytes()));
+    let mut sampler = transforms::Sampler::new(10, exceptions);
+    let sampled = splunk_in
+        .filter(move |record| sampler.filter(record.as_bytes()))
+        .inspect(move |_| counter.inc());
 
     let splunk_out = sinks::splunk::raw_tcp(out_addr)
         .map(|sink| sink.sink_map_err(|e| error!("tcp sink error: {:?}", e)))
