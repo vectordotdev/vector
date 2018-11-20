@@ -16,6 +16,7 @@ impl Sampler {
         }
     }
 
+    // TODO: annotate record with current sampling rate
     pub fn filter(&mut self, record: &[u8]) -> bool {
         if self.pass_list.is_match(record) {
             true

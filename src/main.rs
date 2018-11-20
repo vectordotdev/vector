@@ -19,50 +19,68 @@ fn main() {
     router::setup_logger();
 
     let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
-    let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
-
     let (trigger, tripwire) = Tripwire::new();
-
-    // build up a thing that will pipe some sample data at our server
-    let input = File::open("sample.log")
-        .map_err(|e| error!("error opening file: {:?}", e))
-        .map(sources::reader_source)
-        .flatten_stream();
-    let sender = sinks::splunk::raw_tcp(in_addr)
-        .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
-        .map_err(|e| error!("error creating sender: {:?}", e));
-    let sender_task = sender.and_then(|sink| input.forward(sink)).map(|_| {
-        info!("done sending test input!");
-        drop(trigger);
-    });
-
-    // build up a thing that accept the data our server forwards upstream
-    let counter =
-        register_counter!("receiver_lines", "Lines received at forwarding destination").unwrap();
-    let receiver =
-        sources::splunk::raw_tcp(out_addr, tripwire.clone()).fold((), move |(), _line| {
-            counter.inc();
-            Ok(())
-        });
 
     info!("starting runtime");
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    info!("starting receiver");
-    rt.spawn(receiver);
+    if true {
+        // ES Writer topology
+        rt.spawn(es_writer(in_addr, tripwire));
+    } else {
+        // Comcast topology + input and harness
 
-    info!("starting server");
-    rt.spawn(comcast(in_addr, out_addr, tripwire));
+        // build up a thing that will pipe some sample data at our server
+        let input = File::open("sample.log")
+            .map_err(|e| error!("error opening file: {:?}", e))
+            .map(sources::reader_source)
+            .flatten_stream();
+        let sender = sinks::splunk::raw_tcp(in_addr)
+            .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
+            .map_err(|e| error!("error creating sender: {:?}", e));
+        let sender_task = sender.and_then(|sink| input.forward(sink)).map(|_| {
+            info!("done sending test input!");
+            drop(trigger);
+        });
 
-    info!("starting sender");
-    rt.block_on_all(sender_task).unwrap();
-    info!("sender finished!");
+        // build up a thing that accept the data our server forwards upstream
+        let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
+        let counter =
+            register_counter!("receiver_lines", "Lines received at forwarding destination")
+                .unwrap();
+        let receiver =
+            sources::splunk::raw_tcp(out_addr, tripwire.clone()).fold((), move |(), _line| {
+                counter.inc();
+                Ok(())
+            });
+
+        info!("starting receiver");
+        rt.spawn(receiver);
+
+        info!("starting server");
+        rt.spawn(comcast(in_addr, out_addr, tripwire));
+
+        info!("starting sender");
+        rt.block_on(sender_task).unwrap();
+        info!("sender finished!");
+    }
+
+    rt.shutdown_on_idle().wait().unwrap();
 
     let mut buf = Vec::new();
     let encoder = TextEncoder::new();
     let metrics_families = prometheus::gather();
     encoder.encode(&metrics_families, &mut buf).unwrap();
     info!("prom output:\n{}", String::from_utf8(buf).unwrap());
+}
+
+fn es_writer(in_addr: SocketAddr, exit: Tripwire) -> impl Future<Item = (), Error = ()> {
+    let counter = register_counter!("input_lines", "Lines ingested").unwrap();
+    let splunk_in = sources::splunk::raw_tcp(in_addr, exit).inspect(move |_| counter.inc());
+
+    let sink = sinks::elasticsearch::ElasticseachSink::new()
+        .sink_map_err(|e| error!("es sink error: {:?}", e));
+    sink.send_all(splunk_in).map(|_| info!("done!"))
 }
 
 // the server topology we'd actally use for the comcast use case
