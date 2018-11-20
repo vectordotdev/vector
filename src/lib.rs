@@ -1,11 +1,9 @@
-extern crate byteorder;
 extern crate bytes;
 extern crate chrono;
 extern crate fern;
 extern crate futures;
 extern crate hyper;
 extern crate log;
-extern crate memchr;
 extern crate rand;
 extern crate regex;
 extern crate serde;
@@ -14,9 +12,6 @@ extern crate stream_cancel;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate uuid;
-
-#[cfg(test)]
-extern crate tempdir;
 
 pub mod sinks;
 pub mod sources;
