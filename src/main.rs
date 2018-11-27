@@ -9,7 +9,7 @@ extern crate tokio;
 use futures::{Future, Sink, Stream};
 use log::{error, info};
 use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};
-use regex::bytes::RegexSet;
+use regex::RegexSet;
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use stream_cancel::Tripwire;
@@ -99,7 +99,7 @@ fn comcast(
     let exceptions = RegexSet::new(&["(very )?important"]).unwrap();
     let sampler = transforms::Sampler::new(10, exceptions);
     let sampled = splunk_in
-        .filter(move |record| sampler.filter(record.as_bytes()))
+        .filter(move |record| sampler.filter(record))
         .inspect(move |_| counter.inc());
 
     let splunk_out = sinks::splunk::raw_tcp(out_addr)

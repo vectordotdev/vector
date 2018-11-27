@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 use std::{marker::PhantomData, mem};
 use tokio::executor::DefaultExecutor;
 use uuid::Uuid;
+use Record;
 
 pub trait Document {
     type Body: Serialize;
@@ -47,6 +48,30 @@ impl<T: Serialize> Document for T {
 
     fn body(&self) -> Self::Body {
         json!({ "msg": self })
+    }
+}
+
+impl Document for Record {
+    type Body = serde_json::Value;
+
+    fn app_id(&self) -> &str {
+        "12345"
+    }
+
+    fn id(&self) -> Uuid {
+        Uuid::new_v4()
+    }
+
+    fn ty(&self) -> &str {
+        "log_lines"
+    }
+
+    fn dt(&self) -> Date<Utc> {
+        Utc::today()
+    }
+
+    fn body(&self) -> Self::Body {
+        json!({ "msg": self.line })
     }
 }
 

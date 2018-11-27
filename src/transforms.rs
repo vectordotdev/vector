@@ -1,10 +1,11 @@
-use regex::bytes::RegexSet;
+use regex::RegexSet;
 // TODO: The DefaultHasher algorithm is liable to change across rust versions, so if we want
 // long term consistency, this should be set to something more stable. It also currently
 // uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
 // but is slightly slower than some alternatives (which might matter for this use case).
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
+use Record;
 
 pub struct Sampler {
     rate: u8,
@@ -17,12 +18,12 @@ impl Sampler {
     }
 
     // TODO: annotate record with current sampling rate
-    pub fn filter(&self, record: &[u8]) -> bool {
-        if self.pass_list.is_match(record) {
+    pub fn filter(&self, record: &Record) -> bool {
+        if self.pass_list.is_match(&record.line) {
             true
         } else {
             let mut hasher = DefaultHasher::new();
-            hasher.write(record);
+            hasher.write(record.line.as_bytes());
             let hash = hasher.finish();
 
             hash % 100 < self.rate.into()
@@ -33,7 +34,8 @@ impl Sampler {
 #[cfg(test)]
 mod test {
     use super::Sampler;
-    use regex::bytes::RegexSet;
+    use regex::RegexSet;
+    use Record;
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
@@ -66,21 +68,21 @@ mod test {
 
     #[test]
     fn always_passes_records_matching_pass_list() {
-        let record = "i am important";
+        let record = Record::new_from_line("i am important".to_string());
         let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
-        let total_passed = iterations
-            .filter(|_| sampler.filter(record.as_bytes()))
-            .count();
+        let total_passed = iterations.filter(|_| sampler.filter(&record)).count();
         assert_eq!(total_passed, 1000);
     }
 
-    fn random_records(n: usize) -> Vec<Vec<u8>> {
-        use rand::distributions::Standard;
+    fn random_records(n: usize) -> Vec<Record> {
+        use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
 
         (0..n)
-            .map(|_| thread_rng().sample_iter(&Standard).take(10).collect())
-            .collect()
+            .map(|_| {
+                let line = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
+                Record::new_from_line(line)
+            }).collect()
     }
 }
