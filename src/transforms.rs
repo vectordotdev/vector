@@ -13,10 +13,7 @@ pub struct Sampler {
 
 impl Sampler {
     pub fn new(rate: u8, pass_list: RegexSet) -> Self {
-        Self {
-            rate,
-            pass_list,
-        }
+        Self { rate, pass_list }
     }
 
     // TODO: annotate record with current sampling rate
@@ -42,7 +39,10 @@ mod test {
     fn samples_at_roughly_the_configured_rate() {
         let records = random_records(1000);
         let sampler = Sampler::new(50, RegexSet::new(&["na"]).unwrap());
-        let total_passed = records.iter().filter(|record| sampler.filter(record)).count();
+        let total_passed = records
+            .iter()
+            .filter(|record| sampler.filter(record))
+            .count();
         assert!(total_passed > 400);
         assert!(total_passed < 600);
     }
@@ -52,8 +52,14 @@ mod test {
         let records = random_records(1000);
         let sampler = Sampler::new(50, RegexSet::new(&["na"]).unwrap());
 
-        let first_run = records.iter().filter(|record| sampler.filter(record)).collect::<Vec<_>>();
-        let second_run = records.iter().filter(|record| sampler.filter(record)).collect::<Vec<_>>();
+        let first_run = records
+            .iter()
+            .filter(|record| sampler.filter(record))
+            .collect::<Vec<_>>();
+        let second_run = records
+            .iter()
+            .filter(|record| sampler.filter(record))
+            .collect::<Vec<_>>();
 
         assert_eq!(first_run, second_run);
     }
@@ -70,14 +76,11 @@ mod test {
     }
 
     fn random_records(n: usize) -> Vec<Vec<u8>> {
+        use rand::distributions::Standard;
         use rand::{thread_rng, Rng};
-        use rand::distributions::{Standard};
 
-        (0..n).map(|_| {
-            thread_rng()
-                .sample_iter(&Standard)
-                .take(10)
-                .collect()
-        }).collect()
+        (0..n)
+            .map(|_| thread_rng().sample_iter(&Standard).take(10).collect())
+            .collect()
     }
 }
