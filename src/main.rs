@@ -97,7 +97,7 @@ fn comcast(
     let counter = register_counter!("output_lines", "Lines forwarded upstream").unwrap();
 
     let exceptions = RegexSet::new(&["(very )?important"]).unwrap();
-    let mut sampler = transforms::Sampler::new(10, exceptions);
+    let sampler = transforms::Sampler::new(10, exceptions);
     let sampled = splunk_in
         .filter(move |record| sampler.filter(record.as_bytes()))
         .inspect(move |_| counter.inc());
