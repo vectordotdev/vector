@@ -7,8 +7,9 @@ use tokio::{
     codec::{FramedRead, LinesCodec},
     net::TcpListener,
 };
+use Record;
 
-pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = String, Error = ()> {
+pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = Record, Error = ()> {
     // TODO: buf size?
     let (tx, rx) = mpsc::channel(1000);
     let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
@@ -23,6 +24,7 @@ pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = String, E
             let tx = tx.clone();
 
             let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
+                .map(Record::new_from_line)
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             let handler = tx
@@ -34,7 +36,7 @@ pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = String, E
         });
 
     future::lazy(move || tokio::spawn(server))
-        .map(|_| String::new())
+        .map(|_| Record::new_from_line(String::new()))
         .into_stream()
         .chain(rx)
         .skip(1)
