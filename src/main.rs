@@ -24,7 +24,8 @@ fn main() {
     info!("starting runtime");
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    if true {
+    // TODO: actually switch between configurations in a reasonable way (separate binaries?)
+    if false {
         // ES Writer topology
         rt.spawn(es_writer(in_addr, tripwire));
     } else {
