@@ -1,12 +1,14 @@
 use chrono::{Date, Utc};
-use futures::{try_ready, Async, AsyncSink, Future, Sink, Stream};
-use hyper::{
-    client::{HttpConnector, ResponseFuture},
-    Body, Client, Request, Uri,
+use elastic_responses::{bulk::BulkErrorsResponse, parse};
+use futures::{
+    stream::FuturesUnordered,
+    sync::oneshot::{spawn, SpawnHandle},
+    Async, AsyncSink, Future, Sink, Stream,
 };
+use hyper::{client::HttpConnector, Body, Client, Request, Uri};
 use log::info;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::{marker::PhantomData, mem};
 use tokio::executor::DefaultExecutor;
 use uuid::Uuid;
@@ -80,18 +82,9 @@ pub struct ElasticseachSink<T: Document> {
     buffer: Vec<u8>,
     buffer_limit: usize,
     buffered_lines: usize,
-    state: SinkState,
+    in_flight_requests: FuturesUnordered<SpawnHandle<(), ()>>,
+    in_flight_limit: usize,
     _pd: PhantomData<T>,
-}
-
-enum SinkState {
-    // zero in-flight requests
-    Ready,
-    // one in-flight request
-    Waiting {
-        body: Vec<u8>, // keep this around for retries
-        response_future: ResponseFuture,
-    },
 }
 
 impl<T: Document> ElasticseachSink<T> {
@@ -106,7 +99,8 @@ impl<T: Document> ElasticseachSink<T> {
             // TODO: configurable
             buffer_limit: 2 * 1024 * 1024,
             buffered_lines: 0,
-            state: SinkState::Ready,
+            in_flight_requests: FuturesUnordered::new(),
+            in_flight_limit: 3, // TODO: configurable
             _pd: PhantomData,
         }
     }
@@ -133,16 +127,33 @@ impl<T: Document> ElasticseachSink<T> {
         Ok(())
     }
 
-    fn initiate_request(&mut self, body: Vec<u8>) -> ResponseFuture {
+    fn spawn_request(&mut self, body: Vec<u8>) -> SpawnHandle<(), ()> {
         // TODO: configurable
         let uri: Uri = "http://localhost:9200/_bulk".parse().unwrap();
 
-        let request = Request::put(uri)
+        let request = Request::post(uri)
             .header("Content-Type", "application/x-ndjson")
             .body(body.into())
             .unwrap();
 
-        self.client.request(request)
+        let request = self
+            .client
+            .request(request)
+            .map_err(|e| println!("error sending request: {:?}", e))
+            .and_then(|response| {
+                let (parts, body) = response.into_parts();
+                info!("got response! {:?}", parts);
+                body.concat2()
+                    .map(move |body| {
+                        let parsed: Result<BulkErrorsResponse, _> =
+                            parse().from_reader(parts.status.as_u16(), body.as_ref());
+
+                        // TODO: do something with result
+                        // info!("res body:\n{:#?}", parsed);
+                    }).map_err(|e| println!("error reading body: {:?}", e))
+            });
+
+        spawn(request, &DefaultExecutor::current())
     }
 }
 
@@ -168,61 +179,36 @@ impl<T: Document> Sink for ElasticseachSink<T> {
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
         loop {
-            self.state = match self.state {
-                SinkState::Ready { .. } => if !self.buffer.is_empty() {
-                    // if we're ready and have messages to send, initiate sending them
-                    info!(
-                        "preparing to send request of {} messages ({} bytes)",
-                        self.buffered_lines,
-                        self.buffer.len(),
-                    );
+            if self.buffer.is_empty() && self.in_flight_requests.is_empty() {
+                return Ok(Async::Ready(()));
 
-                    // existing buffer becomes request body, replace with fresh buffer
-                    // TODO: use a Buf instead
-                    let body = mem::replace(&mut self.buffer, Vec::new());
-                    self.buffered_lines = 0;
+            // do we have records to send and room for another request?
+            } else if !self.buffer.is_empty()
+                && self.in_flight_requests.len() < self.in_flight_limit
+            {
+                info!(
+                    "preparing to send request of {} messages ({} bytes)",
+                    self.buffered_lines,
+                    self.buffer.len(),
+                );
 
-                    let response_future = self.initiate_request(body.clone());
+                // existing buffer becomes request body, replace with fresh buffer
+                // TODO: use a Buf instead
+                let body = mem::replace(&mut self.buffer, Vec::new());
+                self.buffered_lines = 0;
 
-                    SinkState::Waiting {
-                        body,
-                        response_future,
-                    }
-                } else {
-                    return Ok(Async::Ready(()));
-                },
+                let request = self.spawn_request(body);
+                self.in_flight_requests.push(request);
 
-                SinkState::Waiting {
-                    body: ref _body,
-                    ref mut response_future,
-                } => {
-                    let response =
-                        try_ready!(response_future.poll().map_err(|e| format!("err: {}", e)));
-                    info!("got response! {:?}", response);
-                    // info!("req body was:\n{}", std::str::from_utf8(body).unwrap());
-                    if response.status().is_success() {
-                        // done, go back to ready state
-                        SinkState::Ready
-                    } else {
-                        // request failed
-                        // TODO: retry with body
-                        response
-                            .into_body()
-                            .concat2()
-                            .map(|body| {
-                                let parsed: Value = serde_json::from_slice(&body).unwrap();
-                                info!(
-                                    "res body:\n{}",
-                                    serde_json::to_string_pretty(&parsed).unwrap()
-                                )
-                            }).map_err(|e| println!("body err: {:?}", e))
-                            .wait() // TODO: waiting is BAD, find a better way to get errors
-                            .unwrap();
-
-                        // probably actually go back to waiting on retry request
-                        SinkState::Ready
-                    }
+            // do we have in flight requests we need to poll?
+            } else if !self.in_flight_requests.is_empty() {
+                if let Ok(Async::NotReady) = self.in_flight_requests.poll() {
+                    return Ok(Async::NotReady);
                 }
+
+            // catch any unexpected states instead of looping forever
+            } else {
+                panic!("this should only be possible if in_flight_limit < 1, which is broken")
             }
         }
     }

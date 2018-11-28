@@ -1,5 +1,6 @@
 extern crate bytes;
 extern crate chrono;
+extern crate elastic_responses;
 extern crate fern;
 extern crate futures;
 extern crate hyper;
