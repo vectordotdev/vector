@@ -222,7 +222,7 @@ impl<T: Document> Sink for ElasticseachSink<T> {
                 let body = mem::replace(&mut self.buffer, Vec::new());
                 self.buffered_lines = 0;
 
-                let request = self.spawn_request(body.clone());
+                let request = self.spawn_request(body);
                 self.in_flight_requests.push(request);
 
             // do we have in flight requests we need to poll?
