@@ -2,15 +2,19 @@ use chrono::{Date, Utc};
 use elastic_responses::{bulk::BulkErrorsResponse, parse};
 use futures::{
     stream::FuturesUnordered,
-    sync::oneshot::{spawn, SpawnHandle},
+    sync::oneshot::{self, SpawnHandle},
     Async, AsyncSink, Future, Sink, Stream,
 };
 use hyper::{client::HttpConnector, Body, Client, Request, Uri};
-use log::info;
+use log::{error, info};
 use serde::Serialize;
 use serde_json::json;
 use std::{marker::PhantomData, mem};
 use tokio::executor::DefaultExecutor;
+use tokio_retry::{
+    strategy::{jitter, ExponentialBackoff},
+    Retry,
+};
 use uuid::Uuid;
 use Record;
 
@@ -128,32 +132,53 @@ impl<T: Document> ElasticseachSink<T> {
     }
 
     fn spawn_request(&mut self, body: Vec<u8>) -> SpawnHandle<(), ()> {
-        // TODO: configurable
-        let uri: Uri = "http://localhost:9200/_bulk".parse().unwrap();
+        // this is cheap and reuses the same connection pools, etc
+        // TODO: try to make the whole client Send + Sync so we don't need this?
+        let client = self.client.clone();
 
-        let request = Request::post(uri)
-            .header("Content-Type", "application/x-ndjson")
-            .body(body.into())
-            .unwrap();
+        // before jitter, this gives us 15ms, 225ms, and 3.375s retries
+        let retry_strategy = ExponentialBackoff::from_millis(15).map(jitter).take(3);
 
-        let request = self
-            .client
-            .request(request)
-            .map_err(|e| println!("error sending request: {:?}", e))
-            .and_then(|response| {
-                let (parts, body) = response.into_parts();
-                info!("got response! {:?}", parts);
-                body.concat2()
-                    .map(move |body| {
-                        let parsed: Result<BulkErrorsResponse, _> =
-                            parse().from_reader(parts.status.as_u16(), body.as_ref());
+        // TODO: request ids for logging
+        let request = Retry::spawn(retry_strategy, move || {
+            // TODO: configurable
+            let uri: Uri = "http://localhost:9200/_bulk".parse().unwrap();
 
-                        // TODO: do something with result
-                        // info!("res body:\n{:#?}", parsed);
-                    }).map_err(|e| println!("error reading body: {:?}", e))
-            });
+            let request = Request::post(uri)
+                .header("Content-Type", "application/x-ndjson")
+                .body(body.clone().into()) // TODO: don't actually clone the whole vec everytime
+                .unwrap();
 
-        spawn(request, &DefaultExecutor::current())
+            client
+                .request(request)
+                .and_then(|response| {
+                    let (parts, body) = response.into_parts();
+                    info!("got response headers! status code {:?}", parts.status);
+                    body.concat2().map(|body| (parts, body))
+                }).map_err(|e| error!("request error: {:?}", e))
+                .and_then(|(parts, body)| {
+                    parse::<BulkErrorsResponse>()
+                        .from_reader(parts.status.as_u16(), body.as_ref())
+                        .map_err(|e| error!("response error: {:?}", e))
+                }).and_then(|response| {
+                    // TODO: use the response to build a new body for retries that include
+                    // only the failed items
+                    if response.is_err() {
+                        info!("{} bulk items failed", response.iter().count());
+                        Err(())
+                    } else {
+                        info!("all bulk items succeeded!");
+                        Ok(())
+                    }
+                })
+        }).map_err(|e| match e {
+            tokio_retry::Error::OperationError(()) => {
+                error!("retry limited exhausted, dropping request")
+            }
+            tokio_retry::Error::TimerError(e) => error!("timer error during retry: {}", e),
+        });
+
+        oneshot::spawn(request, &DefaultExecutor::current())
     }
 }
 

@@ -20,6 +20,7 @@ hyper = "0.12.14"
 serde = "1.0.80"
 serde_json = "1.0.33"
 elastic_responses = "0.20.10"
+tokio-retry = "0.2.0"
 
 [dev-dependencies]
 approx = "0.3.0"
