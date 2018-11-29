@@ -12,6 +12,7 @@ extern crate serde_json;
 extern crate stream_cancel;
 extern crate tokio;
 extern crate tokio_fs;
+extern crate tokio_retry;
 extern crate uuid;
 
 pub mod sinks;
