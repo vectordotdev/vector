@@ -151,27 +151,25 @@ impl<T: Document> ElasticseachSink<T> {
 
             client
                 .request(request)
-                .map_err(|e| error!("error sending request: {:?}", e))
                 .and_then(|response| {
                     let (parts, body) = response.into_parts();
                     info!("got response headers! status code {:?}", parts.status);
-                    body.concat2()
-                        .map_err(|e| error!("error reading body: {:?}", e))
-                        .and_then(move |body| {
-                            parse::<BulkErrorsResponse>()
-                                .from_reader(parts.status.as_u16(), body.as_ref())
-                                .map_err(|e| error!("response error: {:?}", e))
-                        }).and_then(|response| {
-                            // TODO: use the response to build a new body for retries that include
-                            // only the failed items
-                            if response.is_err() {
-                                info!("{} bulk items failed", response.iter().count());
-                                Err(())
-                            } else {
-                                info!("all bulk items succeeded!");
-                                Ok(())
-                            }
-                        })
+                    body.concat2().map(|body| (parts, body))
+                }).map_err(|e| error!("request error: {:?}", e))
+                .and_then(|(parts, body)| {
+                    parse::<BulkErrorsResponse>()
+                        .from_reader(parts.status.as_u16(), body.as_ref())
+                        .map_err(|e| error!("response error: {:?}", e))
+                }).and_then(|response| {
+                    // TODO: use the response to build a new body for retries that include
+                    // only the failed items
+                    if response.is_err() {
+                        info!("{} bulk items failed", response.iter().count());
+                        Err(())
+                    } else {
+                        info!("all bulk items succeeded!");
+                        Ok(())
+                    }
                 })
         }).map_err(|e| match e {
             tokio_retry::Error::OperationError(()) => {
