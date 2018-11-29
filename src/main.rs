@@ -60,6 +60,8 @@ fn main() {
 
         info!("starting server");
         rt.spawn(comcast(in_addr, out_addr, tripwire));
+        // wait for the server to come up before trying to send to it
+        while let Err(_) = std::net::TcpStream::connect(in_addr) {}
 
         info!("starting sender");
         rt.block_on(sender_task).unwrap();
