@@ -11,33 +11,33 @@ use Record;
 
 pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = Record, Error = ()> {
     // TODO: buf size?
-    let (tx, rx) = mpsc::channel(1000);
-    let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
+    future::lazy(move || {
+        let (tx, rx) = mpsc::channel(1000);
+        let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
 
-    info!("listening on {:?}", listener.local_addr());
+        info!("listening on {:?}", listener.local_addr());
 
-    let server = listener
-        .incoming()
-        .take_until(exit)
-        .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-        .for_each(move |socket| {
-            let tx = tx.clone();
+        let server = listener
+            .incoming()
+            .take_until(exit)
+            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+            .for_each(move |socket| {
+                let tx = tx.clone();
 
-            let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
-                .map(Record::new_from_line)
-                .map_err(|e| error!("error reading line: {:?}", e));
+                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
+                    .map(Record::new_from_line)
+                    .map_err(|e| error!("error reading line: {:?}", e));
 
-            let handler = tx
-                .sink_map_err(|e| error!("error sending line: {:?}", e))
-                .send_all(lines_in)
-                .map(|_| info!("finished sending"));
+                let handler = tx
+                    .sink_map_err(|e| error!("error sending line: {:?}", e))
+                    .send_all(lines_in)
+                    .map(|_| info!("finished sending"));
 
-            tokio::spawn(handler)
-        });
+                tokio::spawn(handler)
+            });
 
-    future::lazy(move || tokio::spawn(server))
-        .map(|_| Record::new_from_line(String::new()))
-        .into_stream()
-        .chain(rx)
-        .skip(1)
+        tokio::spawn(server);
+
+        Ok(rx)
+    }).flatten_stream()
 }
