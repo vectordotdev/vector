@@ -1,6 +1,7 @@
 use chrono::{Date, Utc};
 use elastic_responses::{bulk::BulkErrorsResponse, parse};
 use futures::{
+    future,
     stream::FuturesUnordered,
     sync::oneshot::{self, SpawnHandle},
     Async, AsyncSink, Future, Sink, Stream,
@@ -243,5 +244,13 @@ impl<T: Document> Sink for ElasticseachSink<T> {
                 panic!("this should only be possible if in_flight_limit < 1, which is broken")
             }
         }
+    }
+}
+
+impl ElasticseachSink<Record> {
+    pub fn build() -> super::RouterSinkFuture {
+        let sink: super::RouterSink =
+            Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)));
+        Box::new(future::lazy(|| future::ok(sink)))
     }
 }
