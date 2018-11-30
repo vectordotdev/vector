@@ -7,9 +7,18 @@ extern crate tokio;
 use futures::{Future, Sink, Stream};
 use router::{sinks, sources};
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use stream_cancel::Tripwire;
 use tokio::codec::{BytesCodec, FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
+
+static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
+fn next_addr() -> SocketAddr {
+    use std::net::{IpAddr, Ipv4Addr};
+
+    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+}
 
 #[test]
 fn test_pipe() {
@@ -17,8 +26,8 @@ fn test_pipe() {
 
     let num_lines: usize = 10000;
 
-    let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
-    let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
+    let in_addr = next_addr();
+    let out_addr = next_addr();
 
     let splunk_in = sources::splunk::raw_tcp(in_addr, tripwire);
     let splunk_out = sinks::splunk::raw_tcp(out_addr)
