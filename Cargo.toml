@@ -19,3 +19,6 @@ prometheus = "0.4.2"
 hyper = "0.12.14"
 serde = "1.0.80"
 serde_json = "1.0.33"
+
+[dev-dependencies]
+approx = "0.3.0"

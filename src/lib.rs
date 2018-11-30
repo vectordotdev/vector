@@ -17,7 +17,7 @@ pub mod sinks;
 pub mod sources;
 pub mod transforms;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Record {
     line: String,
     timestamp: chrono::DateTime<chrono::Utc>,
