@@ -86,7 +86,7 @@ pub struct ElasticseachSink<T: Document> {
     buffer: Vec<u8>,
     buffer_limit: usize,
     buffered_lines: usize,
-    in_flight_requests: FuturesUnordered<SpawnHandle<(), ()>>,
+    in_flight_requests: FuturesUnordered<SpawnHandle<(), String>>,
     in_flight_limit: usize,
     _pd: PhantomData<T>,
 }
@@ -131,7 +131,7 @@ impl<T: Document> ElasticseachSink<T> {
         Ok(())
     }
 
-    fn spawn_request(&mut self, body: Vec<u8>) -> SpawnHandle<(), ()> {
+    fn spawn_request(&mut self, body: Vec<u8>) -> SpawnHandle<(), String> {
         // this is cheap and reuses the same connection pools, etc
         // TODO: try to make the whole client Send + Sync so we don't need this?
         let client = self.client.clone();
@@ -155,27 +155,26 @@ impl<T: Document> ElasticseachSink<T> {
                     let (parts, body) = response.into_parts();
                     info!("got response headers! status code {:?}", parts.status);
                     body.concat2().map(|body| (parts, body))
-                }).map_err(|e| error!("request error: {:?}", e))
+                }).map_err(|e| format!("request error: {:?}", e))
                 .and_then(|(parts, body)| {
                     parse::<BulkErrorsResponse>()
                         .from_reader(parts.status.as_u16(), body.as_ref())
-                        .map_err(|e| error!("response error: {:?}", e))
+                        .map_err(|e| format!("response error: {:?}", e))
                 }).and_then(|response| {
                     // TODO: use the response to build a new body for retries that include
                     // only the failed items
                     if response.is_err() {
-                        info!("{} bulk items failed", response.iter().count());
-                        Err(())
+                        Err(format!("{} bulk items failed", response.iter().count()))
                     } else {
                         info!("all bulk items succeeded!");
                         Ok(())
                     }
                 })
         }).map_err(|e| match e {
-            tokio_retry::Error::OperationError(()) => {
-                error!("retry limited exhausted, dropping request")
+            tokio_retry::Error::OperationError(e) => {
+                format!("retry limited exhausted, dropping request: {}", e)
             }
-            tokio_retry::Error::TimerError(e) => error!("timer error during retry: {}", e),
+            tokio_retry::Error::TimerError(e) => format!("timer error during retry: {}", e),
         });
 
         oneshot::spawn(request, &DefaultExecutor::current())
@@ -227,8 +226,13 @@ impl<T: Document> Sink for ElasticseachSink<T> {
 
             // do we have in flight requests we need to poll?
             } else if !self.in_flight_requests.is_empty() {
-                if let Ok(Async::NotReady) = self.in_flight_requests.poll() {
-                    return Ok(Async::NotReady);
+                match self.in_flight_requests.poll() {
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    Ok(Async::Ready(Some(()))) => {} // request finished normally, continue
+                    Err(e) => error!("{}", e), // request finished with an error, just log and continue
+                    Ok(Async::Ready(None)) => {
+                        unreachable!("got Ready(None) with requests in flight")
+                    }
                 }
 
             // catch any unexpected states instead of looping forever
