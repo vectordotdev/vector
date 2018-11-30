@@ -15,10 +15,13 @@ extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_retry;
 extern crate uuid;
+#[macro_use]
+extern crate serde_derive;
 
 pub mod record;
 pub mod sinks;
 pub mod sources;
+pub mod topology;
 pub mod transforms;
 
 pub use record::Record;

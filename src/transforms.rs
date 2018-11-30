@@ -8,6 +8,10 @@ use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;
 use Record;
 
+pub trait Transform: Sync + Send {
+    fn transform(&self, record: Record) -> Option<Record>;
+}
+
 pub struct Sampler {
     rate: u8,
     pass_list: RegexSet,
@@ -32,6 +36,16 @@ impl Sampler {
     }
 }
 
+impl Transform for Sampler {
+    fn transform(&self, record: Record) -> Option<Record> {
+        if self.filter(&record) {
+            Some(record)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct RegexParser {
     regex: Regex,
 }
@@ -40,8 +54,10 @@ impl RegexParser {
     pub fn new(regex: Regex) -> Self {
         Self { regex }
     }
+}
 
-    pub fn apply(&self, mut record: Record) -> Record {
+impl Transform for RegexParser {
+    fn transform(&self, mut record: Record) -> Option<Record> {
         if let Some(captures) = self.regex.captures(&record.line) {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
@@ -52,7 +68,7 @@ impl RegexParser {
             }
         }
 
-        record
+        Some(record)
     }
 }
 
@@ -68,17 +84,22 @@ impl FieldFilter {
             value,
         }
     }
+}
 
-    pub fn filter(&self, record: &Record) -> bool {
-        record.custom.get(&self.field_name) == Some(&self.value)
+impl Transform for FieldFilter {
+    fn transform(&self, record: Record) -> Option<Record> {
+        if record.custom.get(&self.field_name) == Some(&self.value) {
+            Some(record)
+        } else {
+            None
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{RegexParser, Sampler};
+    use super::{RegexParser, Sampler, Transform};
     use regex::{Regex, RegexSet};
-    use std::sync::Arc;
     use Record;
 
     #[test]
@@ -125,7 +146,7 @@ mod test {
         let parser =
             RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
-        let record = parser.apply(record);
+        let record = parser.transform(record).unwrap();
 
         assert_eq!(record.custom[&"status".into()], "1234");
         assert_eq!(record.custom[&"time".into()], "5678");
@@ -136,7 +157,7 @@ mod test {
         let record = Record::new_from_line("asdf1234".to_string());
         let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
-        let record = parser.apply(record);
+        let record = parser.transform(record).unwrap();
 
         assert_eq!(record.custom.get(&"status".into()), None);
     }
