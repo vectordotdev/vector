@@ -9,7 +9,11 @@ extern crate tokio;
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Sink, Stream};
 use regex::RegexSet;
-use router::{sinks, sources, transforms};
+use router::{
+    sinks::{self, SinkFactory},
+    sources::{self, SourceFactory},
+    transforms,
+};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use stream_cancel::Tripwire;
@@ -33,8 +37,8 @@ fn test_pipe() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in = sources::splunk::raw_tcp(in_addr, tripwire);
-    let splunk_out = sinks::splunk::raw_tcp(out_addr)
+    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
+    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
     let server = splunk_out.and_then(|sink| splunk_in.forward(sink).map(|_| ()));
@@ -69,8 +73,8 @@ fn test_sample() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in = sources::splunk::raw_tcp(in_addr, tripwire);
-    let splunk_out = sinks::splunk::raw_tcp(out_addr)
+    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
+    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
     let empty: &[&str] = &[];
@@ -125,9 +129,9 @@ fn test_merge() {
     let in_addr2 = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in1 = sources::splunk::raw_tcp(in_addr1, tripwire.clone());
-    let splunk_in2 = sources::splunk::raw_tcp(in_addr2, tripwire.clone());
-    let splunk_out = sinks::splunk::raw_tcp(out_addr)
+    let splunk_in1 = sources::splunk::SplunkSource::build(in_addr1, tripwire.clone());
+    let splunk_in2 = sources::splunk::SplunkSource::build(in_addr2, tripwire.clone());
+    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
     let server =
@@ -184,11 +188,11 @@ fn test_fork() {
     let out_addr1 = next_addr();
     let out_addr2 = next_addr();
 
-    let splunk_in = sources::splunk::raw_tcp(in_addr, tripwire);
-    let splunk_out1 = sinks::splunk::raw_tcp(out_addr1)
+    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
+    let splunk_out1 = sinks::splunk::SplunkSink::build(out_addr1)
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let splunk_out2 = sinks::splunk::raw_tcp(out_addr2)
+    let splunk_out2 = sinks::splunk::SplunkSink::build(out_addr2)
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
     let server = splunk_out1

@@ -10,7 +10,11 @@ use futures::{Future, Sink, Stream};
 use log::{error, info};
 use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};
 use regex::RegexSet;
-use router::{sinks, sources, transforms};
+use router::{
+    sinks::{self, SinkFactory},
+    sources::{self, SourceFactory},
+    transforms,
+};
 use std::net::SocketAddr;
 use stream_cancel::Tripwire;
 use tokio::fs::File;
@@ -36,7 +40,7 @@ fn main() {
             .map_err(|e| error!("error opening file: {:?}", e))
             .map(sources::reader_source)
             .flatten_stream();
-        let sender = sinks::splunk::raw_tcp(in_addr)
+        let sender = sinks::splunk::SplunkSink::build(in_addr)
             .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
             .map_err(|e| error!("error creating sender: {:?}", e));
         let sender_task = sender.and_then(|sink| input.forward(sink)).map(|_| {
@@ -49,11 +53,13 @@ fn main() {
         let counter =
             register_counter!("receiver_lines", "Lines received at forwarding destination")
                 .unwrap();
-        let receiver =
-            sources::splunk::raw_tcp(out_addr, tripwire.clone()).fold((), move |(), _line| {
+        let receiver = sources::splunk::SplunkSource::build(out_addr, tripwire.clone()).fold(
+            (),
+            move |(), _line| {
                 counter.inc();
                 Ok(())
-            });
+            },
+        );
 
         info!("starting receiver");
         rt.spawn(receiver);
@@ -79,7 +85,8 @@ fn main() {
 
 fn es_writer(in_addr: SocketAddr, exit: Tripwire) -> impl Future<Item = (), Error = ()> {
     let counter = register_counter!("input_lines", "Lines ingested").unwrap();
-    let splunk_in = sources::splunk::raw_tcp(in_addr, exit).inspect(move |_| counter.inc());
+    let splunk_in =
+        sources::splunk::SplunkSource::build(in_addr, exit).inspect(move |_| counter.inc());
 
     let sink = sinks::elasticsearch::ElasticseachSink::new()
         .sink_map_err(|e| error!("es sink error: {:?}", e));
@@ -94,7 +101,8 @@ fn comcast(
 ) -> impl Future<Item = (), Error = ()> {
     let counter = register_counter!("input_lines", "Lines ingested").unwrap();
 
-    let splunk_in = sources::splunk::raw_tcp(in_addr, exit).inspect(move |_| counter.inc());
+    let splunk_in =
+        sources::splunk::SplunkSource::build(in_addr, exit).inspect(move |_| counter.inc());
 
     let counter = register_counter!("output_lines", "Lines forwarded upstream").unwrap();
 
@@ -104,7 +112,7 @@ fn comcast(
         .filter(move |record| sampler.filter(record))
         .inspect(move |_| counter.inc());
 
-    let splunk_out = sinks::splunk::raw_tcp(out_addr)
+    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
         .map(|sink| sink.sink_map_err(|e| error!("tcp sink error: {:?}", e)))
         .map_err(|e| error!("error creating tcp sink: {:?}", e));
 
