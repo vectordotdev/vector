@@ -28,9 +28,7 @@ fn test_pipe() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let receiver = TcpListener::bind(&out_addr).unwrap();
-    let output_lines = receive_lines(receiver).collect();
-    let output_lines = futures::sync::oneshot::spawn(output_lines, &rt.executor());
+    let output_lines = receive_lines(&out_addr, &rt.executor());
 
     rt.spawn(server);
     // Wait for server to accept traffic
@@ -84,11 +82,19 @@ fn send_lines(
         })
 }
 
-fn receive_lines(listener: TcpListener) -> impl Stream<Item = String, Error = ()> {
-    listener
+fn receive_lines(
+    addr: &SocketAddr,
+    executor: &tokio::runtime::TaskExecutor,
+) -> impl Future<Item = Vec<String>, Error = ()> {
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let lines = listener
         .incoming()
         .take(1)
         .map(|socket| FramedRead::new(socket, LinesCodec::new()))
         .flatten()
         .map_err(|e| panic!("{:?}", e))
+        .collect();
+
+    futures::sync::oneshot::spawn(lines, executor)
 }
