@@ -224,6 +224,89 @@ fn test_fork() {
     assert_eq!(input_lines, output_lines2);
 }
 
+#[test]
+fn test_merge_and_fork() {
+    let (trigger, tripwire) = Tripwire::new();
+
+    let num_lines: usize = 10000;
+
+    let in_addr1 = next_addr();
+    let in_addr2 = next_addr();
+    let out_addr1 = next_addr();
+    let out_addr2 = next_addr();
+
+    let splunk_in1 = sources::splunk::SplunkSource::build(in_addr1, tripwire.clone());
+    let splunk_in2 = sources::splunk::SplunkSource::build(in_addr2, tripwire.clone());
+    let splunk_out1 = sinks::splunk::SplunkSink::build(out_addr1)
+        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
+        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
+    let splunk_out2 = sinks::splunk::SplunkSink::build(out_addr2)
+        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
+        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
+    let server = splunk_out1
+        .join(splunk_out2)
+        .and_then(|(sink1, sink2)| {
+            // out1 receives both in1 and in2
+            // out2 receives in2 only
+
+            let (sink1_tx, sink1_rx) = futures::sync::mpsc::channel(0);
+            let sink1_tx = sink1_tx.sink_map_err(|e| panic!("{:?}", e));
+
+            let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![
+                Box::new(splunk_in1.forward(sink1_tx.clone()).map(|_| ())),
+                Box::new(splunk_in2.forward(sink1_tx.clone().fanout(sink2)).map(|_| ())),
+                Box::new(sink1_rx.forward(sink1).map(|_| ())),
+            ];
+
+            futures::future::join_all(futures.into_iter()).map(|_| ())
+        });
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let output_lines1 = receive_lines(&out_addr1, &rt.executor());
+    let output_lines2 = receive_lines(&out_addr2, &rt.executor());
+
+    rt.spawn(server);
+    // Wait for server to accept traffic
+    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
+    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+
+    let input_lines1 = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines2 = random_lines().take(num_lines).collect::<Vec<_>>();
+    let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
+    let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
+    let send = send1.join(send2);
+    rt.block_on(send).unwrap();
+
+    // Shut down server
+    drop(trigger);
+
+    rt.shutdown_on_idle().wait().unwrap();
+    let output_lines1 = output_lines1.wait().unwrap();
+    let output_lines2 = output_lines2.wait().unwrap();
+
+    assert_eq!(num_lines, output_lines2.len());
+
+    assert_eq!(input_lines2, output_lines2);
+
+    assert_eq!(num_lines * 2, output_lines1.len());
+    // Assert that all of the output lines were present in the input and in the same order
+    let mut input_lines1 = input_lines1.into_iter().peekable();
+    let mut input_lines2 = input_lines2.into_iter().peekable();
+    for output_line in &output_lines1 {
+        if Some(output_line) == input_lines1.peek() {
+            input_lines1.next();
+        } else if Some(output_line) == input_lines2.peek() {
+            input_lines2.next();
+        } else {
+            panic!("Got line in output that wasn't in input");
+        }
+    }
+    assert_eq!(input_lines1.next(), None);
+    assert_eq!(input_lines2.next(), None);
+
+}
+
 fn random_lines() -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;
     use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
