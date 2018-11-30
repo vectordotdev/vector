@@ -13,8 +13,7 @@ pub fn raw_tcp(
     // lazy so that we don't actually try to connect until the future is polled
     future::lazy(move || {
         TcpStream::connect(&addr).map(|socket| {
-            FramedWrite::new(socket, LinesCodec::new())
-                .with(|record: Record| Ok(record.line))
+            FramedWrite::new(socket, LinesCodec::new()).with(|record: Record| Ok(record.line))
         })
     })
 }
