@@ -1,12 +1,12 @@
+extern crate approx;
 extern crate futures;
 extern crate rand;
 extern crate regex;
 extern crate router;
 extern crate stream_cancel;
 extern crate tokio;
-#[macro_use]
-extern crate approx;
 
+use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Sink, Stream};
 use regex::RegexSet;
 use router::{sinks, sources, transforms};
