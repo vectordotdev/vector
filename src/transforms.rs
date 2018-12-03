@@ -7,9 +7,24 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use Record;
 
+pub trait TransformFactory {
+    type Config;
+
+    fn build(config: Self::Config) -> Box<dyn Transform>;
+}
+
+pub trait Transform: Sync + Send {
+    fn transform(&self, record: Record) -> Option<Record>;
+}
+
 pub struct Sampler {
     rate: u8,
     pass_list: RegexSet,
+}
+
+pub struct SamplerConfig {
+    pub rate: u8,
+    pub pass_list: Vec<String>,
 }
 
 impl Sampler {
@@ -27,6 +42,28 @@ impl Sampler {
             let hash = hasher.finish();
 
             hash % 100 < self.rate.into()
+        }
+    }
+}
+
+impl TransformFactory for Sampler {
+    type Config = SamplerConfig;
+
+    fn build(config: SamplerConfig) -> Box<dyn Transform> {
+        let pass_list = RegexSet::new(config.pass_list).unwrap();
+        Box::new(Self {
+            rate: config.rate,
+            pass_list,
+        })
+    }
+}
+
+impl Transform for Sampler {
+    fn transform(&self, record: Record) -> Option<Record> {
+        if self.filter(&record) {
+            Some(record)
+        } else {
+            None
         }
     }
 }

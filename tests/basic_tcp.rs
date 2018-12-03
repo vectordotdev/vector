@@ -8,16 +8,9 @@ extern crate tokio;
 
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Sink, Stream};
-use regex::RegexSet;
-use router::{
-    sinks::{self, SinkFactory},
-    sources::{self, SourceFactory},
-    topology::TopologyBuilder,
-    transforms,
-};
+use router::{sinks, sources, topology::TopologyBuilder, transforms};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use stream_cancel::Tripwire;
 use tokio::codec::{BytesCodec, FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -65,25 +58,24 @@ fn test_pipe() {
 
 #[test]
 fn test_sample() {
-    let (trigger, tripwire) = Tripwire::new();
-
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
-    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let empty: &[&str] = &[];
-    let sampler = transforms::Sampler::new(10, RegexSet::new(empty).unwrap());
-    let server = splunk_out.and_then(|sink| {
-        splunk_in
-            .filter(move |r| sampler.filter(r))
-            .forward(sink)
-            .map(|_| ())
-    });
+    let mut topology = TopologyBuilder::new();
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr, "in");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr, "out");
+    topology.add_transform::<transforms::Sampler>(
+        transforms::SamplerConfig {
+            rate: 10,
+            pass_list: vec![],
+        },
+        "sampler",
+    );
+    topology.connect("in", "sampler");
+    topology.connect("sampler", "out");
+    let (server, trigger) = topology.build();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 

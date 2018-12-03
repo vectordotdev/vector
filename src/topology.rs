@@ -5,11 +5,13 @@ use sinks;
 use sources;
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
+use transforms;
 use Record;
 
 pub struct TopologyBuilder {
     sources: HashMap<String, sources::Source>,
     sinks: HashMap<String, sinks::RouterSinkFuture>,
+    transforms: HashMap<String, Box<dyn transforms::Transform>>,
     connections: HashMap<String, Vec<String>>,
     tripwire: Tripwire,
     trigger: Trigger,
@@ -23,6 +25,7 @@ impl TopologyBuilder {
         Self {
             sources: HashMap::new(),
             sinks: HashMap::new(),
+            transforms: HashMap::new(),
             connections: HashMap::new(),
             trigger,
             tripwire,
@@ -49,7 +52,18 @@ impl TopologyBuilder {
         }
     }
 
-    // TODO: transforms
+    pub fn add_transform<Factory: transforms::TransformFactory>(
+        &mut self,
+        config: Factory::Config,
+        name: &str,
+    ) {
+        let transform = Factory::build(config);
+        let existing = self.transforms.insert(name.to_owned(), transform);
+        // TODO: need to ensure this also doesn't overlap with sources or sinks
+        if existing.is_some() {
+            panic!("Multiple transforms with same name: {}", name);
+        }
+    }
 
     pub fn connect(&mut self, in_name: &str, out_name: &str) {
         self.connections
@@ -58,16 +72,30 @@ impl TopologyBuilder {
             .push(out_name.to_owned());
     }
 
-    // TODO: warn/error on unconnected elements
+    // Each sink sets up a multi-producer channel that it reads from. Each source writes to the channel
+    // for each of the sinks it's connected to. Transforms work like a combination source/sink; they have
+    // a channel for accepting records, which are then transformed and sent downstream to the connected sinks.
+    // All of these are joined into a single future that drives work on the entire topology.
     pub fn build(mut self) -> (impl Future<Item = (), Error = ()>, Trigger) {
         let mut to_join: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![];
 
         let mut txs = HashMap::new();
 
+        let sink_map_err = |e| error!("sender error: {:?}", e);
+
+        for (name, transform) in self.transforms.into_iter() {
+            let (tx, rx) = futures::sync::mpsc::channel(0);
+
+            txs.insert(name.clone(), tx.sink_map_err(sink_map_err));
+
+            let rx = rx.filter_map(move |r| transform.transform(r));
+            self.sources.insert(name, Box::new(rx));
+        }
+
         for (name, sink) in self.sinks.into_iter() {
             let (tx, rx) = futures::sync::mpsc::channel(0);
 
-            txs.insert(name, tx.sink_map_err(|e| error!("sender error: {:?}", e)));
+            txs.insert(name, tx.sink_map_err(sink_map_err));
 
             let sink_fut = sink
                 .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
@@ -76,6 +104,7 @@ impl TopologyBuilder {
             to_join.push(Box::new(sink_fut));
         }
 
+        // TODO: warn/error on unconnected elements
         for (in_, outs) in self.connections {
             let mut outs = outs
                 .into_iter()
