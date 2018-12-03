@@ -12,6 +12,7 @@ use regex::RegexSet;
 use router::{
     sinks::{self, SinkFactory},
     sources::{self, SourceFactory},
+    topology::TopologyBuilder,
     transforms,
 };
 use std::net::SocketAddr;
@@ -30,18 +31,16 @@ fn next_addr() -> SocketAddr {
 
 #[test]
 fn test_pipe() {
-    let (trigger, tripwire) = Tripwire::new();
-
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
-    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let server = splunk_out.and_then(|sink| splunk_in.forward(sink).map(|_| ()));
+    let mut topology = TopologyBuilder::new();
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr, "in");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr, "out");
+    topology.connect("in", "out");
+    let (server, trigger) = topology.build();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -121,21 +120,19 @@ fn test_sample() {
 
 #[test]
 fn test_merge() {
-    let (trigger, tripwire) = Tripwire::new();
-
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
     let in_addr2 = next_addr();
     let out_addr = next_addr();
 
-    let splunk_in1 = sources::splunk::SplunkSource::build(in_addr1, tripwire.clone());
-    let splunk_in2 = sources::splunk::SplunkSource::build(in_addr2, tripwire.clone());
-    let splunk_out = sinks::splunk::SplunkSink::build(out_addr)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let server =
-        splunk_out.and_then(|sink| splunk_in1.select(splunk_in2).forward(sink).map(|_| ()));
+    let mut topology = TopologyBuilder::new();
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr1, "in1");
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr2, "in2");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr, "out");
+    topology.connect("in1", "out");
+    topology.connect("in2", "out");
+    let (server, trigger) = topology.build();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -180,24 +177,19 @@ fn test_merge() {
 
 #[test]
 fn test_fork() {
-    let (trigger, tripwire) = Tripwire::new();
-
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
     let out_addr1 = next_addr();
     let out_addr2 = next_addr();
 
-    let splunk_in = sources::splunk::SplunkSource::build(in_addr, tripwire);
-    let splunk_out1 = sinks::splunk::SplunkSink::build(out_addr1)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let splunk_out2 = sinks::splunk::SplunkSink::build(out_addr2)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let server = splunk_out1
-        .join(splunk_out2)
-        .and_then(|(sink1, sink2)| splunk_in.forward(sink1.fanout(sink2)).map(|_| ()));
+    let mut topology = TopologyBuilder::new();
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr, "in");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr1, "out1");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr2, "out2");
+    topology.connect("in", "out1");
+    topology.connect("in", "out2");
+    let (server, trigger) = topology.build();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -226,8 +218,6 @@ fn test_fork() {
 
 #[test]
 fn test_merge_and_fork() {
-    let (trigger, tripwire) = Tripwire::new();
-
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
@@ -235,31 +225,17 @@ fn test_merge_and_fork() {
     let out_addr1 = next_addr();
     let out_addr2 = next_addr();
 
-    let splunk_in1 = sources::splunk::SplunkSource::build(in_addr1, tripwire.clone());
-    let splunk_in2 = sources::splunk::SplunkSource::build(in_addr2, tripwire.clone());
-    let splunk_out1 = sinks::splunk::SplunkSink::build(out_addr1)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let splunk_out2 = sinks::splunk::SplunkSink::build(out_addr2)
-        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
-        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
-    let server = splunk_out1
-        .join(splunk_out2)
-        .and_then(|(sink1, sink2)| {
-            // out1 receives both in1 and in2
-            // out2 receives in2 only
-
-            let (sink1_tx, sink1_rx) = futures::sync::mpsc::channel(0);
-            let sink1_tx = sink1_tx.sink_map_err(|e| panic!("{:?}", e));
-
-            let futures: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![
-                Box::new(splunk_in1.forward(sink1_tx.clone()).map(|_| ())),
-                Box::new(splunk_in2.forward(sink1_tx.clone().fanout(sink2)).map(|_| ())),
-                Box::new(sink1_rx.forward(sink1).map(|_| ())),
-            ];
-
-            futures::future::join_all(futures.into_iter()).map(|_| ())
-        });
+    // out1 receives both in1 and in2
+    // out2 receives in2 only
+    let mut topology = TopologyBuilder::new();
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr1, "in1");
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr2, "in2");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr1, "out1");
+    topology.add_sink::<sinks::splunk::SplunkSink>(out_addr2, "out2");
+    topology.connect("in1", "out1");
+    topology.connect("in2", "out1");
+    topology.connect("in2", "out2");
+    let (server, trigger) = topology.build();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -304,7 +280,6 @@ fn test_merge_and_fork() {
     }
     assert_eq!(input_lines1.next(), None);
     assert_eq!(input_lines2.next(), None);
-
 }
 
 fn random_lines() -> impl Iterator<Item = String> {

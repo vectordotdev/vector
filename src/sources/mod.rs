@@ -7,7 +7,7 @@ use Record;
 
 pub mod splunk;
 
-type Source = Box<dyn Stream<Item = Record, Error = ()> + Send>;
+pub type Source = Box<dyn Stream<Item = Record, Error = ()> + Send>;
 
 pub trait SourceFactory {
     type Config;

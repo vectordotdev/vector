@@ -15,6 +15,7 @@ extern crate uuid;
 
 pub mod sinks;
 pub mod sources;
+pub mod topology;
 pub mod transforms;
 
 #[derive(PartialEq, Debug, Clone)]
