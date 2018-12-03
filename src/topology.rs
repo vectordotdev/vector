@@ -98,7 +98,6 @@ impl TopologyBuilder {
             txs.insert(name, tx.sink_map_err(sink_map_err));
 
             let sink_fut = sink
-                .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
                 .map_err(|e| error!("error creating sender: {:?}", e))
                 .and_then(|sink| rx.forward(sink).map(|_| ()));
             to_join.push(Box::new(sink_fut));
