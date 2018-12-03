@@ -1,10 +1,10 @@
 use chrono::{Date, Utc};
-use futures::{try_ready, Async, AsyncSink, Future, Sink, Stream};
+use futures::{future, try_ready, Async, AsyncSink, Future, Sink, Stream};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client, Request, Uri,
 };
-use log::info;
+use log::{error, info};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{marker::PhantomData, mem};
@@ -12,7 +12,7 @@ use tokio::executor::DefaultExecutor;
 use uuid::Uuid;
 use Record;
 
-pub trait Document {
+pub trait Document: Send {
     type Body: Serialize;
 
     fn app_id(&self) -> &str;
@@ -27,7 +27,7 @@ pub trait Document {
 }
 
 // for testing
-impl<T: Serialize> Document for T {
+impl<T: Serialize + Send> Document for T {
     type Body = serde_json::Value;
 
     fn app_id(&self) -> &str {
@@ -225,5 +225,15 @@ impl<T: Document> Sink for ElasticseachSink<T> {
                 }
             }
         }
+    }
+}
+
+impl super::SinkFactory for ElasticseachSink<Record> {
+    type Config = ();
+
+    fn build(_config: Self::Config) -> super::RouterSinkFuture {
+        let sink: super::RouterSink =
+            Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)));
+        Box::new(future::lazy(|| future::ok(sink)))
     }
 }

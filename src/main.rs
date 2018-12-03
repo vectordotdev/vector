@@ -31,8 +31,8 @@ fn main() {
     // TODO: actually switch between configurations in a reasonable way (separate binaries?)
     if false {
         // ES Writer topology
-
-        rt.spawn(es_writer(in_addr, tripwire));
+        let (server, _trigger) = es_writer(in_addr);
+        rt.spawn(server);
     } else {
         // Comcast topology + input and harness
         let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
@@ -87,14 +87,14 @@ fn main() {
     info!("prom output:\n{}", String::from_utf8(buf).unwrap());
 }
 
-fn es_writer(in_addr: SocketAddr, exit: Tripwire) -> impl Future<Item = (), Error = ()> {
-    let counter = register_counter!("input_lines", "Lines ingested").unwrap();
-    let splunk_in =
-        sources::splunk::SplunkSource::build(in_addr, exit).inspect(move |_| counter.inc());
+fn es_writer(in_addr: SocketAddr) -> (impl Future<Item = (), Error = ()>, Trigger) {
+    let mut topology = TopologyBuilder::new();
 
-    let sink = sinks::elasticsearch::ElasticseachSink::new()
-        .sink_map_err(|e| error!("es sink error: {:?}", e));
-    sink.send_all(splunk_in).map(|_| info!("done!"))
+    topology.add_source::<sources::splunk::SplunkSource>(in_addr, "in");
+    topology.add_sink::<sinks::elasticsearch::ElasticseachSink<router::Record>>((), "out");
+    topology.connect("in", "out");
+
+    topology.build()
 }
 
 // the server topology we'd actally use for the comcast use case
