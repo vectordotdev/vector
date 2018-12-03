@@ -1,10 +1,11 @@
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 // TODO: The DefaultHasher algorithm is liable to change across rust versions, so if we want
 // long term consistency, this should be set to something more stable. It also currently
 // uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
 // but is slightly slower than some alternatives (which might matter for this use case).
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
+use std::sync::Arc;
 use Record;
 
 pub struct Sampler {
@@ -31,10 +32,50 @@ impl Sampler {
     }
 }
 
+pub struct RegexParser {
+    regex: Regex,
+    tag_name: Arc<String>, // Arc to avoid cloning the tag name for each record
+}
+
+impl RegexParser {
+    pub fn new(regex: Regex, tag_name: &str) -> Self {
+        Self {
+            regex,
+            tag_name: Arc::new(tag_name.to_owned()),
+        }
+    }
+
+    pub fn apply(&self, mut record: Record) -> Record {
+        if let Some(match_) = self.regex.captures(&record.line).and_then(|c| c.get(1)) {
+            record
+                .custom
+                .insert(Arc::clone(&self.tag_name), match_.as_str().to_owned());
+        }
+
+        record
+    }
+}
+
+pub struct TagFilter {
+    tag_name: String,
+    value: String,
+}
+
+impl TagFilter {
+    pub fn new(tag_name: String, value: String) -> Self {
+        Self { tag_name, value }
+    }
+
+    pub fn filter(&self, record: &Record) -> bool {
+        record.custom.get(&self.tag_name) == Some(&self.value)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::Sampler;
-    use regex::RegexSet;
+    use super::{RegexParser, Sampler};
+    use regex::{Regex, RegexSet};
+    use std::sync::Arc;
     use Record;
 
     #[test]
@@ -73,6 +114,26 @@ mod test {
         let iterations = 0..1000;
         let total_passed = iterations.filter(|_| sampler.filter(&record)).count();
         assert_eq!(total_passed, 1000);
+    }
+
+    #[test]
+    fn regex_parser_adds_parsed_field_to_record() {
+        let record = Record::new_from_line("status=1234".to_string());
+        let parser = RegexParser::new(Regex::new(r"status=(\d+)").unwrap(), "status");
+
+        let record = parser.apply(record);
+
+        assert_eq!(record.custom[&Arc::new("status".to_owned())], "1234");
+    }
+
+    #[test]
+    fn regex_parser_doesnt_do_anything_if_no_match() {
+        let record = Record::new_from_line("asdf1234".to_string());
+        let parser = RegexParser::new(Regex::new(r"status=(\d+)").unwrap(), "status");
+
+        let record = parser.apply(record);
+
+        assert_eq!(record.custom.get(&Arc::new("status".to_owned())), None);
     }
 
     fn random_records(n: usize) -> Vec<Record> {
