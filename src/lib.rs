@@ -10,6 +10,7 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 extern crate stream_cancel;
+extern crate string_cache;
 extern crate tokio;
 extern crate tokio_fs;
 extern crate tokio_retry;

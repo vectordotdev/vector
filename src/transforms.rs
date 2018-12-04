@@ -5,7 +5,7 @@ use regex::{Regex, RegexSet};
 // but is slightly slower than some alternatives (which might matter for this use case).
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
-use std::sync::Arc;
+use string_cache::DefaultAtom as Atom;
 use Record;
 
 pub struct Sampler {
@@ -34,14 +34,14 @@ impl Sampler {
 
 pub struct RegexParser {
     regex: Regex,
-    tag_name: Arc<String>, // Arc to avoid cloning the tag name for each record
+    tag_name: Atom,
 }
 
 impl RegexParser {
     pub fn new(regex: Regex, tag_name: &str) -> Self {
         Self {
             regex,
-            tag_name: Arc::new(tag_name.to_owned()),
+            tag_name: tag_name.into(),
         }
     }
 
@@ -49,7 +49,7 @@ impl RegexParser {
         if let Some(match_) = self.regex.captures(&record.line).and_then(|c| c.get(1)) {
             record
                 .custom
-                .insert(Arc::clone(&self.tag_name), match_.as_str().to_owned());
+                .insert(self.tag_name.clone(), match_.as_str().to_owned());
         }
 
         record
@@ -57,13 +57,16 @@ impl RegexParser {
 }
 
 pub struct TagFilter {
-    tag_name: String,
+    tag_name: Atom,
     value: String,
 }
 
 impl TagFilter {
     pub fn new(tag_name: String, value: String) -> Self {
-        Self { tag_name, value }
+        Self {
+            tag_name: tag_name.into(),
+            value,
+        }
     }
 
     pub fn filter(&self, record: &Record) -> bool {
@@ -123,7 +126,7 @@ mod test {
 
         let record = parser.apply(record);
 
-        assert_eq!(record.custom[&Arc::new("status".to_owned())], "1234");
+        assert_eq!(record.custom[&"status".into()], "1234");
     }
 
     #[test]
@@ -133,7 +136,7 @@ mod test {
 
         let record = parser.apply(record);
 
-        assert_eq!(record.custom.get(&Arc::new("status".to_owned())), None);
+        assert_eq!(record.custom.get(&"status".into()), None);
     }
 
     fn random_records(n: usize) -> Vec<Record> {
