@@ -76,48 +76,68 @@ impl TopologyBuilder {
     // for each of the sinks it's connected to. Transforms work like a combination source/sink; they have
     // a channel for accepting records, which are then transformed and sent downstream to the connected sinks.
     // All of these are joined into a single future that drives work on the entire topology.
-    pub fn build(mut self) -> (impl Future<Item = (), Error = ()>, Trigger) {
-        let mut to_join: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![];
+    pub fn build(self) -> (impl Future<Item = (), Error = ()>, Trigger) {
+        let TopologyBuilder {
+            trigger,
+            sinks,
+            sources,
+            transforms,
+            mut connections,
+            ..
+        } = self;
 
-        let mut txs = HashMap::new();
+        let lazy = future::lazy(move || {
+            let mut txs = HashMap::new();
 
-        let sink_map_err = |e| error!("sender error: {:?}", e);
+            let sink_map_err = |e| error!("sender error: {:?}", e);
 
-        for (name, transform) in self.transforms.into_iter() {
-            let (tx, rx) = futures::sync::mpsc::channel(0);
+            for (name, sink) in sinks.into_iter() {
+                let (tx, rx) = futures::sync::mpsc::channel(0);
 
-            txs.insert(name.clone(), tx.sink_map_err(sink_map_err));
+                txs.insert(name, tx.sink_map_err(sink_map_err));
 
-            let rx = rx.filter_map(move |r| transform.transform(r));
-            self.sources.insert(name, Box::new(rx));
-        }
+                let sink_task = sink
+                    .map_err(|e| error!("error creating sender: {:?}", e))
+                    .and_then(|sink| rx.forward(sink).map(|_| ()));
 
-        for (name, sink) in self.sinks.into_iter() {
-            let (tx, rx) = futures::sync::mpsc::channel(0);
+                tokio::spawn(sink_task);
+            }
 
-            txs.insert(name, tx.sink_map_err(sink_map_err));
+            let mut transform_rxs = vec![];
 
-            let sink_fut = sink
-                .map_err(|e| error!("error creating sender: {:?}", e))
-                .and_then(|sink| rx.forward(sink).map(|_| ()));
-            to_join.push(Box::new(sink_fut));
-        }
+            for (name, transform) in transforms.into_iter() {
+                let (tx, rx) = futures::sync::mpsc::channel(0);
 
-        // TODO: warn/error on unconnected elements
-        for (in_, outs) in self.connections {
-            let mut outs = outs
-                .into_iter()
-                .map(|out_name| Box::new(txs[&out_name].clone()));
-            let first_out = outs.next().unwrap();
-            let out: Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> =
-                outs.fold(first_out, |a, b| Box::new(a.fanout(b)));
+                txs.insert(name.clone(), tx.sink_map_err(sink_map_err));
 
-            let in_ = self.sources.remove(&in_).unwrap();
+                let rx = rx.filter_map(move |r| transform.transform(r));
+                transform_rxs.push((name, rx));
+            }
 
-            let fut = in_.forward(out).map(|_| ());
-            to_join.push(Box::new(fut));
-        }
+            let mut outs = |name| -> Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> {
+                let out_names = connections.remove(&name).unwrap();
+                let mut outs = out_names
+                    .into_iter()
+                    .map(|out_name| Box::new(txs[&out_name].clone()));
+                let first_out = outs.next().unwrap();
+                let out: Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> =
+                    outs.fold(first_out, |a, b| Box::new(a.fanout(b)));
 
-        (future::join_all(to_join).map(|_| ()), self.trigger)
+                out
+            };
+
+            for (name, rx) in transform_rxs.into_iter() {
+                let transform_task = rx.forward(outs(name)).map(|_| ());
+                tokio::spawn(transform_task);
+            }
+
+            for (name, stream) in sources.into_iter() {
+                let source_task = stream.forward(outs(name)).map(|_| ());
+                tokio::spawn(source_task);
+            }
+            future::ok(())
+        });
+
+        (lazy, trigger)
     }
 }
