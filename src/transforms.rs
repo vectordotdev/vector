@@ -34,22 +34,22 @@ impl Sampler {
 
 pub struct RegexParser {
     regex: Regex,
-    tag_name: Atom,
 }
 
 impl RegexParser {
-    pub fn new(regex: Regex, tag_name: &str) -> Self {
-        Self {
-            regex,
-            tag_name: tag_name.into(),
-        }
+    pub fn new(regex: Regex) -> Self {
+        Self { regex }
     }
 
     pub fn apply(&self, mut record: Record) -> Record {
-        if let Some(match_) = self.regex.captures(&record.line).and_then(|c| c.get(1)) {
-            record
-                .custom
-                .insert(self.tag_name.clone(), match_.as_str().to_owned());
+        if let Some(captures) = self.regex.captures(&record.line) {
+            for name in self.regex.capture_names().filter_map(|c| c) {
+                if let Some(capture) = captures.name(name) {
+                    record
+                        .custom
+                        .insert(name.into(), capture.as_str().to_owned());
+                }
+            }
         }
 
         record
@@ -121,18 +121,20 @@ mod test {
 
     #[test]
     fn regex_parser_adds_parsed_field_to_record() {
-        let record = Record::new_from_line("status=1234".to_string());
-        let parser = RegexParser::new(Regex::new(r"status=(\d+)").unwrap(), "status");
+        let record = Record::new_from_line("status=1234 time=5678".to_string());
+        let parser =
+            RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
         let record = parser.apply(record);
 
         assert_eq!(record.custom[&"status".into()], "1234");
+        assert_eq!(record.custom[&"time".into()], "5678");
     }
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
         let record = Record::new_from_line("asdf1234".to_string());
-        let parser = RegexParser::new(Regex::new(r"status=(\d+)").unwrap(), "status");
+        let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
         let record = parser.apply(record);
 

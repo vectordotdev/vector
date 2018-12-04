@@ -127,7 +127,7 @@ fn test_parse() {
         .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
         .map_err(|e| panic!("error creating tcp sink: {:?}", e));
 
-    let parser = transforms::RegexParser::new(Regex::new(r"status=(\d+)").unwrap(), "status");
+    let parser = transforms::RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
     let filter = transforms::TagFilter::new("status".to_string(), "404".to_string());
 
     let server = splunk_out.and_then(|sink| {
