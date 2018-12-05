@@ -8,7 +8,7 @@ extern crate tokio;
 
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Sink, Stream};
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -113,6 +113,55 @@ fn test_sample() {
             .next();
         assert_eq!(Some(output_line), next_line);
     }
+}
+
+#[test]
+fn test_parse() {
+    let (trigger, tripwire) = Tripwire::new();
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
+
+    let splunk_in = sources::splunk::raw_tcp(in_addr, tripwire);
+    let splunk_out = sinks::splunk::raw_tcp(out_addr)
+        .map(|sink| sink.sink_map_err(|e| panic!("tcp sink error: {:?}", e)))
+        .map_err(|e| panic!("error creating tcp sink: {:?}", e));
+
+    let parser = transforms::RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
+    let filter = transforms::FieldFilter::new("status".to_string(), "404".to_string());
+
+    let server = splunk_out.and_then(|sink| {
+        splunk_in
+            .map(move |r| parser.apply(r))
+            .filter(move |r| filter.filter(r))
+            .forward(sink)
+            .map(|_| ())
+    });
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let output_lines = receive_lines(&out_addr, &rt.executor());
+
+    rt.spawn(server);
+    // Wait for server to accept traffic
+    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+    let input_lines = vec![
+        "good status=200",
+        "missing status=404",
+        "none foo=bar",
+        "blank status=",
+    ].into_iter()
+    .map(str::to_owned);
+    let send = send_lines(in_addr, input_lines.clone().into_iter());
+    rt.block_on(send).unwrap();
+
+    // Shut down server
+    drop(trigger);
+
+    rt.shutdown_on_idle().wait().unwrap();
+    let output_lines = output_lines.wait().unwrap();
+    assert_eq!(output_lines, vec!["missing status=404".to_owned()]);
 }
 
 #[test]
