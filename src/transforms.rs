@@ -56,21 +56,21 @@ impl RegexParser {
     }
 }
 
-pub struct TagFilter {
-    tag_name: Atom,
+pub struct FieldFilter {
+    field_name: Atom,
     value: String,
 }
 
-impl TagFilter {
-    pub fn new(tag_name: String, value: String) -> Self {
+impl FieldFilter {
+    pub fn new(field_name: String, value: String) -> Self {
         Self {
-            tag_name: tag_name.into(),
+            field_name: field_name.into(),
             value,
         }
     }
 
     pub fn filter(&self, record: &Record) -> bool {
-        record.custom.get(&self.tag_name) == Some(&self.value)
+        record.custom.get(&self.field_name) == Some(&self.value)
     }
 }
 
