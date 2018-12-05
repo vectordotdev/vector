@@ -1,7 +1,6 @@
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use log::{error, info};
 use std::net::SocketAddr;
-use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     self,
     codec::{FramedRead, LinesCodec},
@@ -14,39 +13,32 @@ pub struct SplunkSource;
 impl super::SourceFactory for SplunkSource {
     type Config = SocketAddr;
 
-    fn build(addr: SocketAddr, exit: Tripwire) -> super::Source {
-        // TODO: buf size?
-        Box::new(
-            future::lazy(move || {
-                let (tx, rx) = mpsc::channel(1000);
-                let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
+    fn build(
+        addr: SocketAddr,
+        out: mpsc::Sender<Record>,
+    ) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
-                info!("listening on {:?}", listener.local_addr());
+        Box::new(future::lazy(move || {
+            let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
 
-                let server = listener
-                    .incoming()
-                    .take_until(exit)
-                    .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-                    .for_each(move |socket| {
-                        let tx = tx.clone();
+            info!("listening on {:?}", listener.local_addr());
 
-                        let lines_in =
-                            FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
-                                .map(Record::new_from_line)
-                                .map_err(|e| error!("error reading line: {:?}", e));
+            listener
+                .incoming()
+                .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+                .for_each(move |socket| {
+                    let out = out.clone();
 
-                        let handler = tx
-                            .sink_map_err(|e| error!("error sending line: {:?}", e))
-                            .send_all(lines_in)
-                            .map(|_| info!("finished sending"));
+                    let lines_in =
+                        FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
+                            .map(Record::new_from_line)
+                            .map_err(|e| error!("error reading line: {:?}", e));
 
-                        tokio::spawn(handler)
-                    });
+                    let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(server);
-
-                Ok(rx)
-            }).flatten_stream(),
-        )
+                    tokio::spawn(handler)
+                })
+        }))
     }
 }

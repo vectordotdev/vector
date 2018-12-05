@@ -1,5 +1,5 @@
 use futures::prelude::*;
-use futures::{future, Future};
+use futures::{future, sync::mpsc, Future};
 use log::error;
 use sinks;
 use sources;
@@ -9,36 +9,34 @@ use transforms;
 use Record;
 
 pub struct TopologyBuilder {
-    sources: HashMap<String, sources::Source>,
+    sources: HashMap<
+        String,
+        Box<dyn Fn(mpsc::Sender<Record>) -> Box<dyn Future<Item = (), Error = ()> + Send> + Send>,
+    >,
     sinks: HashMap<String, sinks::RouterSinkFuture>,
     transforms: HashMap<String, Box<dyn transforms::Transform>>,
     connections: HashMap<String, Vec<String>>,
-    tripwire: Tripwire,
-    trigger: Trigger,
 }
 
 // TODO: Better error handling
 impl TopologyBuilder {
     pub fn new() -> Self {
-        let (trigger, tripwire) = Tripwire::new();
-
         Self {
             sources: HashMap::new(),
             sinks: HashMap::new(),
             transforms: HashMap::new(),
             connections: HashMap::new(),
-            trigger,
-            tripwire,
         }
     }
 
-    pub fn add_source<Factory: sources::SourceFactory>(
+    pub fn add_source<Factory: sources::SourceFactory + 'static>(
         &mut self,
         config: Factory::Config,
         name: &str,
     ) {
-        let source = Factory::build(config, self.tripwire.clone());
-        let existing = self.sources.insert(name.to_owned(), source);
+        let curry = move |out: mpsc::Sender<Record>| Factory::build(config.clone(), out);
+
+        let existing = self.sources.insert(name.to_owned(), Box::new(curry));
         if existing.is_some() {
             panic!("Multiple sources with same name: {}", name);
         }
@@ -75,23 +73,15 @@ impl TopologyBuilder {
     // Each sink sets up a multi-producer channel that it reads from. Each source writes to the channel
     // for each of the sinks it's connected to. Transforms work like a combination source/sink; they have
     // a channel for accepting records, which are then transformed and sent downstream to the connected sinks.
-    // All of these are joined into a single future that drives work on the entire topology.
     pub fn build(self) -> (impl Future<Item = (), Error = ()>, Trigger) {
-        let TopologyBuilder {
-            trigger,
-            sinks,
-            sources,
-            transforms,
-            mut connections,
-            ..
-        } = self;
+        let (trigger, tripwire) = Tripwire::new();
 
         let lazy = future::lazy(move || {
             let mut txs = HashMap::new();
 
             let sink_map_err = |e| error!("sender error: {:?}", e);
 
-            for (name, sink) in sinks.into_iter() {
+            for (name, sink) in self.sinks.into_iter() {
                 let (tx, rx) = futures::sync::mpsc::channel(0);
 
                 txs.insert(name, tx.sink_map_err(sink_map_err));
@@ -105,7 +95,7 @@ impl TopologyBuilder {
 
             let mut transform_rxs = vec![];
 
-            for (name, transform) in transforms.into_iter() {
+            for (name, transform) in self.transforms.into_iter() {
                 let (tx, rx) = futures::sync::mpsc::channel(0);
 
                 txs.insert(name.clone(), tx.sink_map_err(sink_map_err));
@@ -114,11 +104,12 @@ impl TopologyBuilder {
                 transform_rxs.push((name, rx));
             }
 
-            let mut outs = |name| -> Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> {
-                let out_names = connections.remove(&name).unwrap();
+            let connections = &self.connections;
+            let outs = |name| -> Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> {
+                let out_names = connections.get(&name).unwrap();
                 let mut outs = out_names
-                    .into_iter()
-                    .map(|out_name| Box::new(txs[&out_name].clone()));
+                    .iter()
+                    .map(|ref out_name| Box::new(txs[*out_name].clone()));
                 let first_out = outs.next().unwrap();
                 let out: Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> =
                     outs.fold(first_out, |a, b| Box::new(a.fanout(b)));
@@ -131,10 +122,20 @@ impl TopologyBuilder {
                 tokio::spawn(transform_task);
             }
 
-            for (name, stream) in sources.into_iter() {
-                let source_task = stream.forward(outs(name)).map(|_| ());
-                tokio::spawn(source_task);
+            let servers = self.sources.iter().map(|(name, source)| {
+                let (tx, rx) = futures::sync::mpsc::channel(1000);
+
+                let pump_task = rx.forward(outs(name.clone())).map(|_| ());
+                tokio::spawn(pump_task);
+
+                source(tx)
+            });
+
+            for server in servers {
+                let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+                tokio::spawn(server);
             }
+
             future::ok(())
         });
 

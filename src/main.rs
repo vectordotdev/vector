@@ -55,18 +55,27 @@ fn main() {
                 drop(harness_trigger);
             });
 
-        // build up a thing that accept the data our server forwards upstream
-        let counter =
-            register_counter!("receiver_lines", "Lines received at forwarding destination")
-                .unwrap();
-        let receiver =
-            sources::splunk::SplunkSource::build(out_addr, tripwire).fold((), move |(), _line| {
+        let receiver = {
+            let counter =
+                register_counter!("receiver_lines", "Lines received at forwarding destination")
+                    .unwrap();
+            let (tx, rx) = futures::sync::mpsc::channel(10);
+
+            rt.spawn(rx.for_each(move |_| {
                 counter.inc();
                 Ok(())
-            });
+            }));
+
+            sources::splunk::SplunkSource::build(out_addr, tx)
+        };
 
         info!("starting receiver");
-        rt.spawn(receiver);
+        rt.spawn(
+            receiver
+                .select(tripwire.clone())
+                .map(|_| ())
+                .map_err(|_| ()),
+        );
 
         info!("starting server");
         rt.spawn(server);

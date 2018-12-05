@@ -1,18 +1,18 @@
-use futures::Stream;
+use futures::{sync::mpsc, Future, Stream};
 use log::error;
-use stream_cancel::Tripwire;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncRead;
 use Record;
 
 pub mod splunk;
 
-pub type Source = Box<dyn Stream<Item = Record, Error = ()> + Send>;
-
 pub trait SourceFactory {
-    type Config;
+    type Config: Clone + Send;
 
-    fn build(config: Self::Config, exit: Tripwire) -> Source;
+    fn build(
+        config: Self::Config,
+        out: mpsc::Sender<Record>,
+    ) -> Box<dyn Future<Item = (), Error = ()> + Send>;
 }
 
 pub fn reader_source<T: AsyncRead>(inner: T) -> impl Stream<Item = Record, Error = ()> {
