@@ -11,7 +11,7 @@ use log::{error, info};
 use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};
 use router::{sinks, sources, topology};
 use std::net::SocketAddr;
-use stream_cancel::{Trigger, Tripwire};
+use stream_cancel::Tripwire;
 use tokio::fs::File;
 
 fn main() {
@@ -26,12 +26,19 @@ fn main() {
     // TODO: actually switch between configurations in a reasonable way (separate binaries?)
     if false {
         // ES Writer topology
-        let (server, _trigger) = es_writer(in_addr);
+        let config: router::topology::Config =
+            serde_json::from_reader(std::fs::File::open("configs/es_writer.json").unwrap())
+                .unwrap();
+        let (server, server_trigger) = topology::build(config);
+        std::mem::forget(server_trigger);
         rt.spawn(server);
     } else {
         // Comcast topology + input and harness
+        let config: router::topology::Config =
+            serde_json::from_reader(std::fs::File::open("configs/comcast.json").unwrap()).unwrap();
+        let (server, server_trigger) = topology::build(config);
+
         let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
-        let (server, server_trigger) = comcast(in_addr, out_addr);
 
         // build up a thing that will pipe some sample data at our server
         let input = File::open("sample.log")
@@ -89,34 +96,4 @@ fn main() {
     let metrics_families = prometheus::gather();
     encoder.encode(&metrics_families, &mut buf).unwrap();
     info!("prom output:\n{}", String::from_utf8(buf).unwrap());
-}
-
-fn es_writer(in_addr: SocketAddr) -> (impl Future<Item = (), Error = ()>, Trigger) {
-    let mut topology = topology::config::Config::empty();
-    topology.add_source("in", topology::config::Source::Splunk { address: in_addr });
-    topology.add_sink("out", &["in"], topology::config::Sink::Elasticsearch);
-    topology::build(topology)
-}
-
-// the server topology we'd actally use for the comcast use case
-fn comcast(
-    in_addr: SocketAddr,
-    out_addr: SocketAddr,
-) -> (impl Future<Item = (), Error = ()>, Trigger) {
-    let mut topology = topology::config::Config::empty();
-    topology.add_source("in", topology::config::Source::Splunk { address: in_addr });
-    topology.add_transform(
-        "sampler",
-        &["in"],
-        topology::config::Transform::Sampler {
-            rate: 10,
-            pass_list: vec![],
-        },
-    );
-    topology.add_sink(
-        "out",
-        &["sampler"],
-        topology::config::Sink::Splunk { address: out_addr },
-    );
-    topology::build(topology)
 }
