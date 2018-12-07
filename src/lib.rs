@@ -33,7 +33,8 @@ pub fn setup_logger() {
                 record.level(),
                 message
             ))
-        }).level(log::LevelFilter::Info)
+        })
+        .level(log::LevelFilter::Info)
         .chain(std::io::stderr())
         .apply()
         .unwrap();

@@ -151,7 +151,8 @@ fn test_parse() {
         "missing status=404",
         "none foo=bar",
         "blank status=",
-    ].into_iter()
+    ]
+    .into_iter()
     .map(str::to_owned);
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();

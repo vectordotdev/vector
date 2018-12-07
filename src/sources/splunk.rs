@@ -39,5 +39,6 @@ pub fn raw_tcp(addr: SocketAddr, exit: Tripwire) -> impl Stream<Item = Record, E
         tokio::spawn(server);
 
         Ok(rx)
-    }).flatten_stream()
+    })
+    .flatten_stream()
 }

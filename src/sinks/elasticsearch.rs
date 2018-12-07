@@ -155,12 +155,14 @@ impl<T: Document> ElasticseachSink<T> {
                     let (parts, body) = response.into_parts();
                     info!("got response headers! status code {:?}", parts.status);
                     body.concat2().map(|body| (parts, body))
-                }).map_err(|e| format!("request error: {:?}", e))
+                })
+                .map_err(|e| format!("request error: {:?}", e))
                 .and_then(|(parts, body)| {
                     parse::<BulkErrorsResponse>()
                         .from_reader(parts.status.as_u16(), body.as_ref())
                         .map_err(|e| format!("response error: {:?}", e))
-                }).and_then(|response| {
+                })
+                .and_then(|response| {
                     // TODO: use the response to build a new body for retries that include
                     // only the failed items
                     if response.is_err() {
@@ -170,7 +172,8 @@ impl<T: Document> ElasticseachSink<T> {
                         Ok(())
                     }
                 })
-        }).map_err(|e| match e {
+        })
+        .map_err(|e| match e {
             tokio_retry::Error::OperationError(e) => {
                 format!("retry limited exhausted, dropping request: {}", e)
             }

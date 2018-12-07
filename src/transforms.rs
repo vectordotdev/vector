@@ -149,6 +149,7 @@ mod test {
             .map(|_| {
                 let line = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
                 Record::new_from_line(line)
-            }).collect()
+            })
+            .collect()
     }
 }
