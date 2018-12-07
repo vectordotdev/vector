@@ -1,0 +1,23 @@
+{
+  "sources": {
+    "in": {
+      "type": "splunk",
+      "address": "127.0.0.1:1235"
+    }
+  },
+  "transforms": {
+    "sampler": {
+      "type": "sampler",
+      "inputs": ["in"],
+      "rate": 10,
+      "pass_list": []
+    }
+  },
+  "sinks": {
+    "out": {
+      "type": "splunk",
+      "inputs": ["sampler"],
+      "address": "127.0.0.1:9999"
+    }
+  }
+}
