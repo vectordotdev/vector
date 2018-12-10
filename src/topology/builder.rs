@@ -14,6 +14,8 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
     let (trigger, tripwire) = Tripwire::new();
 
     let lazy = future::lazy(move || {
+        let mut tasks: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![];
+
         // Maps the name of an upstream component to the input channels of its
         // downstream components.
         let mut connections: HashMap<String, sinks::RouterSink> = HashMap::new();
@@ -48,7 +50,7 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
                     .map_err(|e| error!("error creating sender: {:?}", e))
                     .and_then(|sink| rx.forward(sink).map(|_| ()));
 
-                tokio::spawn(sink_task);
+                tasks.push(Box::new(sink_task));
             }
 
             // For each transform, set up an inbound channel (like the sinks above).
@@ -75,7 +77,8 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
                 .filter_map(move |r| transform.transform(r))
                 .forward(outputs)
                 .map(|_| ());
-            tokio::spawn(transform_task);
+
+            tasks.push(Box::new(transform_task));
         }
 
         // For each source, set up a channel to aggregate all of its handlers together,
@@ -86,14 +89,14 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
 
             let outputs = connections.remove(&name).unwrap();
             let pump_task = rx.forward(outputs).map(|_| ());
-            tokio::spawn(pump_task);
+            tasks.push(Box::new(pump_task));
 
             let server = build_source(source, tx);
             let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
-            tokio::spawn(server);
+            tasks.push(Box::new(server));
         }
 
-        future::ok(())
+        futures::future::join_all(tasks).map(|_| ())
     });
 
     (lazy, trigger)
