@@ -26,3 +26,8 @@ string_cache = "0.7.3"
 
 [dev-dependencies]
 approx = "0.3.0"
+criterion = "0.2.5"
+
+[[bench]]
+name = "bench"
+harness = false
