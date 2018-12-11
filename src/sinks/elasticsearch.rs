@@ -17,7 +17,7 @@ use tokio_retry::{
     Retry,
 };
 use uuid::Uuid;
-use crate::Record;
+use crate::record::Record;
 
 pub trait Document {
     type Body: Serialize;
