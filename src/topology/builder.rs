@@ -18,50 +18,46 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
         // downstream components.
         let mut connections: HashMap<String, sinks::RouterSink> = HashMap::new();
 
-        // TODO: NLL might let us remove this extra block
-        let transform_rxs;
-        {
-            // Creates a channel for a downstream component, and adds it to the set
-            // of outbound channels for each of its inputs.
-            let mut add_connections = |inputs: Vec<String>| -> mpsc::Receiver<Record> {
-                let (tx, rx) = futures::sync::mpsc::channel(100);
-                let tx = tx.sink_map_err(|e| error!("sender error: {:?}", e));
+        // Creates a channel for a downstream component, and adds it to the set
+        // of outbound channels for each of its inputs.
+        let mut add_connections = |inputs: Vec<String>| -> mpsc::Receiver<Record> {
+            let (tx, rx) = futures::sync::mpsc::channel(100);
+            let tx = tx.sink_map_err(|e| error!("sender error: {:?}", e));
 
-                for input in inputs {
-                    if let Some(existing) = connections.remove(&input) {
-                        let new = existing.fanout(tx.clone());
-                        connections.insert(input, Box::new(new));
-                    } else {
-                        connections.insert(input, Box::new(tx.clone()));
-                    }
+            for input in inputs {
+                if let Some(existing) = connections.remove(&input) {
+                    let new = existing.fanout(tx.clone());
+                    connections.insert(input, Box::new(new));
+                } else {
+                    connections.insert(input, Box::new(tx.clone()));
                 }
-
-                rx
-            };
-
-            // For each sink, set up its inbound channel and spawn a task that pumps
-            // from that channel into the sink.
-            for (_name, sink) in config.sinks.into_iter() {
-                let rx = add_connections(sink.inputs);
-
-                let sink_task = build_sink(sink.inner)
-                    .map_err(|e| error!("error creating sender: {:?}", e))
-                    .and_then(|sink| rx.forward(sink).map(|_| ()));
-
-                tokio::spawn(sink_task);
             }
 
-            // For each transform, set up an inbound channel (like the sinks above).
-            transform_rxs = config
-                .transforms
-                .into_iter()
-                .map(|(name, outer)| {
-                    let rx = add_connections(outer.inputs);
+            rx
+        };
 
-                    (name, outer.inner, rx)
-                })
-                .collect::<Vec<_>>();
+        // For each sink, set up its inbound channel and spawn a task that pumps
+        // from that channel into the sink.
+        for (_name, sink) in config.sinks.into_iter() {
+            let rx = add_connections(sink.inputs);
+
+            let sink_task = build_sink(sink.inner)
+                .map_err(|e| error!("error creating sender: {:?}", e))
+                .and_then(|sink| rx.forward(sink).map(|_| ()));
+
+            tokio::spawn(sink_task);
         }
+
+        // For each transform, set up an inbound channel (like the sinks above).
+        let transform_rxs = config
+            .transforms
+            .into_iter()
+            .map(|(name, outer)| {
+                let rx = add_connections(outer.inputs);
+
+                (name, outer.inner, rx)
+            })
+            .collect::<Vec<_>>();
 
         // For each transform, spawn a task that reads from its inbound channel,
         // transforms the record, and then sends the transformed record to each downstream
