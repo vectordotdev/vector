@@ -6,7 +6,7 @@ use tokio::{
     codec::{FramedRead, LinesCodec},
     net::TcpListener,
 };
-use Record;
+use crate::Record;
 
 pub fn raw_tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));

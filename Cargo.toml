@@ -2,6 +2,7 @@
 name = "router"
 version = "0.1.0"
 authors = ["Luke Steensen <luke.steensen@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 fern = "0.5.6"

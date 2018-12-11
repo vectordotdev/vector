@@ -2,7 +2,7 @@ use futures::{Future, Stream};
 use log::error;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncRead;
-use Record;
+use crate::Record;
 
 pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
 
