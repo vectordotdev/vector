@@ -1,10 +1,3 @@
-extern crate approx;
-extern crate criterion;
-extern crate futures;
-extern crate rand;
-extern crate router;
-extern crate tokio;
-
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::{__assert_approx, assert_relative_eq, relative_eq};

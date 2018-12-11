@@ -1,12 +1,3 @@
-extern crate approx;
-extern crate futures;
-extern crate rand;
-extern crate router;
-extern crate serde;
-extern crate serde_json;
-extern crate stream_cancel;
-extern crate tokio;
-
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Sink, Stream};
 use router::topology::{self, config};

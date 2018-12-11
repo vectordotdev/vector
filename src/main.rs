@@ -1,11 +1,3 @@
-extern crate futures;
-extern crate log;
-extern crate prometheus;
-extern crate regex;
-extern crate router;
-extern crate stream_cancel;
-extern crate tokio;
-
 use futures::{Future, Sink, Stream};
 use log::{error, info};
 use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};

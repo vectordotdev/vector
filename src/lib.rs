@@ -1,22 +1,3 @@
-extern crate bytes;
-extern crate chrono;
-extern crate elastic_responses;
-extern crate fern;
-extern crate futures;
-extern crate hyper;
-extern crate log;
-extern crate rand;
-extern crate regex;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
-extern crate stream_cancel;
-extern crate string_cache;
-extern crate tokio;
-extern crate tokio_fs;
-extern crate tokio_retry;
-extern crate uuid;
-
 pub mod record;
 pub mod sinks;
 pub mod sources;
