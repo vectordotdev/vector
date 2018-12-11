@@ -24,7 +24,7 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
             // Creates a channel for a downstream component, and adds it to the set
             // of outbound channels for each of its inputs.
             let mut add_connections = |inputs: Vec<String>| -> mpsc::Receiver<Record> {
-                let (tx, rx) = futures::sync::mpsc::channel(0);
+                let (tx, rx) = futures::sync::mpsc::channel(100);
                 let tx = tx.sink_map_err(|e| error!("sender error: {:?}", e));
 
                 for input in inputs {
