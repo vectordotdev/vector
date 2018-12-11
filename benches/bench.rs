@@ -548,11 +548,9 @@ fn send_lines(
                 .forward(out)
                 .map(|(_source, sink)| sink)
                 .and_then(|sink| {
-                    // This waits for FIN from the server so we don't start shutting it down before it's fully received the test data
                     let socket = sink.into_inner().into_inner();
-                    socket.shutdown(std::net::Shutdown::Write).unwrap();
-                    FramedRead::new(socket, BytesCodec::new())
-                        .for_each(|_| Ok(()))
+                    tokio::io::shutdown(socket)
+                        .map(|_| ())
                         .map_err(|e| panic!("{:}", e))
                 })
         })
