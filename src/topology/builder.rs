@@ -1,14 +1,11 @@
 use super::config;
+use crate::{record::Record, sinks, sources, transforms};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
 use log::error;
 use regex::{Regex, RegexSet};
-use crate::sinks;
-use crate::sources;
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
-use crate::transforms;
-use crate::Record;
 
 pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trigger) {
     let (trigger, tripwire) = Tripwire::new();

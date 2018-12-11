@@ -6,7 +6,7 @@ use regex::{Regex, RegexSet};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;
-use crate::Record;
+use crate::record::Record;
 
 pub trait Transform: Sync + Send {
     fn transform(&self, record: Record) -> Option<Record>;
@@ -100,7 +100,7 @@ impl Transform for FieldFilter {
 mod test {
     use super::{RegexParser, Sampler, Transform};
     use regex::{Regex, RegexSet};
-    use crate::Record;
+    use crate::record::Record;
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
