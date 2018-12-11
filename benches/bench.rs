@@ -24,15 +24,14 @@ fn next_addr() -> SocketAddr {
 }
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
-    let line_size: usize = 100;
-
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    const num_lines: usize = 100_000;
+    const line_size: usize = 100;
 
     c.bench(
         "pipe",
-        Benchmark::new("pipe", move |b| {
+        Benchmark::new("dynamic", |b| {
+            let in_addr = next_addr();
+            let out_addr = next_addr();
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
@@ -43,6 +42,95 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
+
+                    rt.spawn(server);
+                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+                    (rt, trigger, output_lines)
+                },
+                |(mut rt, trigger, output_lines)| {
+                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
+                    rt.block_on(send).unwrap();
+
+                    drop(trigger);
+
+                    rt.shutdown_on_idle().wait().unwrap();
+                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                },
+            );
+        }).with_function("static", |b| {
+            let in_addr = next_addr();
+            let out_addr = next_addr();
+            b.iter_with_setup(
+                || {
+                    let (trigger, tripwire) = stream_cancel::Tripwire::new();
+
+                    let (tx, rx) = futures::sync::mpsc::channel(1000);
+
+                    let source = router::sources::splunk::raw_tcp(in_addr, tx);
+                    let server = source.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+
+                    let sink = router::sinks::splunk::raw_tcp(out_addr);
+                    let sink_pump = sink.and_then(|sink| rx.forward(sink).map(|_| ()));
+
+
+                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+                    let output_lines = count_lines(&out_addr, &rt.executor());
+
+                    rt.spawn(sink_pump);
+                    rt.spawn(server);
+                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+                    (rt, trigger, output_lines)
+                },
+                |(mut rt, trigger, output_lines)| {
+                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
+                    rt.block_on(send).unwrap();
+
+                    drop(trigger);
+
+                    rt.shutdown_on_idle().wait().unwrap();
+                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                },
+            );
+
+        }).with_function("ultra_static", |b| {
+            let in_addr = next_addr();
+            let out_addr = next_addr();
+            b.iter_with_setup(
+                || {
+                    let (trigger, tripwire) = stream_cancel::Tripwire::new();
+
+                    // let source = router::sources::splunk::raw_tcp(in_addr, tx);
+                    // let server = source.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+
+                    // let sink = router::sinks::splunk::raw_tcp(out_addr);
+                    // let sink_pump = sink.and_then(|sink| rx.forward(sink).map(|_| ()));
+
+
+                    let server = future::lazy(move || {
+                        let listener = TcpListener::bind(&in_addr).expect("failed to bind to listener socket");
+
+                        listener
+                            .incoming()
+                            .map_err(|e| ())
+                            .for_each(move |socket| {
+                                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
+                                    .map(router::Record::new_from_line)
+                                    .map_err(|e| ());
+
+                                let sink = router::sinks::splunk::raw_tcp(out_addr);
+                                let handler = sink.and_then(|sink| lines_in.forward(sink).map(|_| ()));
+
+                                tokio::spawn(handler)
+                            })
+                    });
+                    let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+
+                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+                    let output_lines = count_lines2(&out_addr, &rt.executor());
 
                     rt.spawn(server);
                     while let Err(_) = std::net::TcpStream::connect(in_addr) {}
@@ -510,12 +598,12 @@ fn benchmark_complex(c: &mut Criterion) {
 criterion_group!(
     benches,
     benchmark_simple_pipe,
-    benchmark_simple_pipe_with_tiny_lines,
-    benchmark_simple_pipe_with_huge_lines,
-    benchmark_simple_pipe_with_many_writers,
-    benchmark_interconnected,
-    benchmark_transforms,
-    benchmark_complex,
+    // benchmark_simple_pipe_with_tiny_lines,
+    // benchmark_simple_pipe_with_huge_lines,
+    // benchmark_simple_pipe_with_many_writers,
+    // benchmark_interconnected,
+    // benchmark_transforms,
+    // benchmark_complex,
 );
 criterion_main!(benches);
 
@@ -567,6 +655,23 @@ fn count_lines(
     let lines = listener
         .incoming()
         .take(1)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .flatten()
+        .map_err(|e| panic!("{:?}", e))
+        .fold(0, |n, _| future::ok(n + 1));
+
+    futures::sync::oneshot::spawn(lines, executor)
+}
+
+fn count_lines2(
+    addr: &SocketAddr,
+    executor: &tokio::runtime::TaskExecutor,
+) -> impl Future<Item = usize, Error = ()> {
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let lines = listener
+        .incoming()
+        .take(2)
         .map(|socket| FramedRead::new(socket, LinesCodec::new()))
         .flatten()
         .map_err(|e| panic!("{:?}", e))
