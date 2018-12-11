@@ -23,7 +23,7 @@ pub mod sources;
 pub mod topology;
 pub mod transforms;
 
-pub use record::Record;
+pub use crate::record::Record;
 
 pub fn setup_logger() {
     fern::Dispatch::new()

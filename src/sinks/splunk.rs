@@ -5,7 +5,7 @@ use log::error;
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
 
-use Record;
+use crate::Record;
 
 pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
     // lazy so that we don't actually try to connect until the future is polled
