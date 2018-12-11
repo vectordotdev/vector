@@ -82,7 +82,7 @@ impl Document for Record {
     }
 }
 
-pub struct ElasticseachSink<T: Document> {
+pub struct ElasticseachSink<T> {
     client: Client<HttpConnector, Body>,
     buffer: Vec<u8>,
     buffer_limit: usize,
@@ -111,7 +111,7 @@ impl<T: Document> ElasticseachSink<T> {
     }
 
     // TODO: do better than string errors
-    fn add_to_buffer(&mut self, msg: T) -> Result<(), String> {
+    fn add_to_buffer(&mut self, msg: &T) -> Result<(), String> {
         let action = json!({
             "index": {
                 "_index": msg.index(),
@@ -201,7 +201,7 @@ impl<T: Document> Sink for ElasticseachSink<T> {
             }
         }
 
-        self.add_to_buffer(item)?;
+        self.add_to_buffer(&item)?;
         Ok(AsyncSink::Ready)
     }
 
