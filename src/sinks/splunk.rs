@@ -1,5 +1,8 @@
-use futures::{future, Future, Sink, Stream};
-use hyper::{Body, Client, Request, Uri};
+use futures::{future, try_ready, Async, AsyncSink, Future, Sink};
+use hyper::{
+    client::{HttpConnector, ResponseFuture},
+    Body, Client, Request, Uri,
+};
 use hyper_tls::HttpsConnector;
 use log::error;
 use serde_json::json;
@@ -25,44 +28,80 @@ pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
     }))
 }
 
-pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
-    Box::new(future::lazy(|| {
-        let (tx, rx) = futures::sync::mpsc::channel(1000);
-        let tx = tx.sink_map_err(|e| panic!("{:?}", e));
+struct Hec {
+    client: Client<HttpsConnector<HttpConnector>, Body>,
+    in_flight_request: Option<ResponseFuture>,
 
+    token: String,
+    host: String,
+}
+
+impl Hec {
+    pub fn new(token: String, host: String) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
-
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
 
-        let pump_task = rx
-            .for_each(move |record: Record| {
-                let body = json!({
-                    "event": record.line,
-                });
-                let body = serde_json::to_vec(&body).unwrap();
+        Self {
+            client,
+            token,
+            host,
+            in_flight_request: None,
+        }
+    }
+}
 
-                let uri = format!("{}/services/collector/event", host);
-                let uri: Uri = uri.parse().unwrap();
+pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
+    let sink: super::RouterSink = Box::new(Hec::new(token, host));
+    Box::new(future::ok(sink))
+}
 
-                let request = Request::post(uri)
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", format!("Splunk {}", token))
-                    .body(body.into())
-                    .unwrap();
+impl Sink for Hec {
+    type SinkItem = Record;
+    type SinkError = ();
 
-                client
-                    .request(request)
-                    .map_err(|e| panic!("{:?}", e))
-                    // .map(|response| println!("{:?}", response))
-                    .map(|_| ())
-            })
-            .map_err(|e| panic!("{:?}", e));
-        tokio::spawn(pump_task);
+    fn start_send(
+        &mut self,
+        record: Self::SinkItem,
+    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+        if self.in_flight_request.is_some() {
+            return Ok(AsyncSink::NotReady(record));
+        } else {
+            let body = json!({
+                "event": record.line,
+            });
+            let body = serde_json::to_vec(&body).unwrap();
 
-        let x: super::RouterSink = Box::new(tx);
+            let uri = format!("{}/services/collector/event", self.host);
+            let uri: Uri = uri.parse().unwrap();
 
-        future::ok(x)
-    }))
+            let request = Request::post(uri)
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Splunk {}", self.token))
+                .body(body.into())
+                .unwrap();
+
+            let request = self.client.request(request);
+
+            self.in_flight_request = Some(request);
+
+            Ok(AsyncSink::Ready)
+        }
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
+        loop {
+            if let Some(ref mut in_flight_request) = self.in_flight_request {
+                let _response =
+                    try_ready!(in_flight_request.poll().map_err(|e| error!("err: {}", e)));
+
+                // TODO: retry on errors
+
+                self.in_flight_request = None;
+            } else {
+                return Ok(Async::Ready(()));
+            }
+        }
+    }
 }
