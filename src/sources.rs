@@ -1,8 +1,8 @@
+use crate::record::Record;
 use futures::{Future, Stream};
 use log::error;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::io::AsyncRead;
-use crate::record::Record;
 
 pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
 

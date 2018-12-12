@@ -1,3 +1,4 @@
+use crate::record::Record;
 use chrono::{Date, Utc};
 use elastic_responses::{bulk::BulkErrorsResponse, parse};
 use futures::{
@@ -17,7 +18,6 @@ use tokio_retry::{
     Retry,
 };
 use uuid::Uuid;
-use crate::record::Record;
 
 pub trait Document {
     type Body: Serialize;

@@ -3,10 +3,10 @@ use regex::{Regex, RegexSet};
 // long term consistency, this should be set to something more stable. It also currently
 // uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
 // but is slightly slower than some alternatives (which might matter for this use case).
+use crate::record::Record;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;
-use crate::record::Record;
 
 pub trait Transform: Sync + Send {
     fn transform(&self, record: Record) -> Option<Record>;
@@ -99,8 +99,8 @@ impl Transform for FieldFilter {
 #[cfg(test)]
 mod test {
     use super::{RegexParser, Sampler, Transform};
-    use regex::{Regex, RegexSet};
     use crate::record::Record;
+    use regex::{Regex, RegexSet};
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {

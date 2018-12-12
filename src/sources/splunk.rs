@@ -1,3 +1,4 @@
+use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use log::{error, info};
 use std::net::SocketAddr;
@@ -6,7 +7,6 @@ use tokio::{
     codec::{FramedRead, LinesCodec},
     net::TcpListener,
 };
-use crate::record::Record;
 
 pub fn raw_tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
