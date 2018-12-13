@@ -3,9 +3,9 @@ use string_cache::DefaultAtom as Atom;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Record {
-    pub(crate) line: String,
-    pub(crate) timestamp: chrono::DateTime<chrono::Utc>,
-    pub(crate) custom: HashMap<Atom, String>,
+    pub line: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub custom: HashMap<Atom, String>,
 }
 
 impl Record {
