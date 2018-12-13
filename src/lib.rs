@@ -3,6 +3,7 @@
 pub mod record;
 pub mod sinks;
 pub mod sources;
+pub mod test_util;
 pub mod topology;
 pub mod transforms;
 
