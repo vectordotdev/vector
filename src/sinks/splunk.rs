@@ -43,6 +43,7 @@ pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
     .with(move |record: Record| {
         let body = json!({
             "event": record.line,
+            "fields": record.custom,
         });
         let body = serde_json::to_vec(&body).unwrap();
         Ok(body)
