@@ -100,6 +100,38 @@ fn test_custom_fields() {
     assert_eq!("hello", entry["asdf"].as_str().unwrap());
 }
 
+#[test]
+fn test_hostname() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+
+    let message = random_string();
+    let mut record = Record::new_from_line(message.clone());
+    record.custom.insert("asdf".into(), "hello".to_owned());
+    record.host = Some("example.com:1234".to_owned());
+
+    let pump = sink.and_then(|sink| sink.send(record));
+
+    rt.block_on(pump).unwrap();
+
+    let entry = (0..20)
+        .find_map(|_| {
+            recent_entries()
+                .into_iter()
+                .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                .or_else(|| {
+                    ::std::thread::sleep(std::time::Duration::from_millis(100));
+                    None
+                })
+        })
+        .expect("Didn't find event in Splunk");
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("hello", entry["asdf"].as_str().unwrap());
+    assert_eq!("example.com:1234", entry["host"].as_str().unwrap());
+}
+
 fn recent_entries() -> Vec<JsonValue> {
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
@@ -114,6 +146,7 @@ fn recent_entries() -> Vec<JsonValue> {
             ("exec_mode", "oneshot"),
             ("f", "_raw"),
             ("f", "asdf"),
+            ("f", "host"),
         ])
         .basic_auth("admin", Some("password"))
         .send()
