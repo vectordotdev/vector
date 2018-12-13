@@ -35,14 +35,17 @@ impl Sink for HttpSink {
         request: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         if self.in_flight_request.is_some() {
-            return Ok(AsyncSink::NotReady(request));
-        } else {
-            let request = self.client.request(request);
-
-            self.in_flight_request = Some(request);
-
-            Ok(AsyncSink::Ready)
+            self.poll_complete()?;
+            if self.in_flight_request.is_some() {
+                return Ok(AsyncSink::NotReady(request));
+            }
         }
+
+        let request = self.client.request(request);
+
+        self.in_flight_request = Some(request);
+
+        Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
