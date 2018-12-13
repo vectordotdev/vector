@@ -2,6 +2,7 @@ use futures::{Future, Sink};
 
 pub mod elasticsearch;
 pub mod splunk;
+mod util;
 
 use crate::record::Record;
 
