@@ -1,4 +1,4 @@
-use futures::{Future, Sink, Stream};
+use futures::{Future, Sink};
 use router::{sinks, Record};
 use serde_json::Value as JsonValue;
 
