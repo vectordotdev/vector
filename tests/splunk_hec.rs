@@ -41,7 +41,10 @@ fn test_insert_many() {
     let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
 
     let messages = (0..10).map(|_| random_string()).collect::<Vec<_>>();
-    let records = messages.iter().map(|l| Record::new_from_line(l.clone())).collect::<Vec<_>>();
+    let records = messages
+        .iter()
+        .map(|l| Record::new_from_line(l.clone()))
+        .collect::<Vec<_>>();
 
     let pump = sink.and_then(|sink| sink.send_all(futures::stream::iter_ok(records)));
 
@@ -52,12 +55,14 @@ fn test_insert_many() {
         let entries = recent_entries();
 
         found_all = messages.iter().all(|message| {
-            entries.iter().any(|entry| {
-                entry["_raw"].as_str().unwrap() == message
-            })
+            entries
+                .iter()
+                .any(|entry| entry["_raw"].as_str().unwrap() == message)
         });
 
-        if found_all { break; }
+        if found_all {
+            break;
+        }
 
         ::std::thread::sleep(std::time::Duration::from_millis(100));
     }
