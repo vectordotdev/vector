@@ -11,9 +11,9 @@ fn test_insert_message_into_splunk() {
     let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
 
     let message = random_string();
-    let message2 = message.clone();
+    let record = Record::new_from_line(message.clone());
 
-    let pump = sink.and_then(|sink| sink.send(Record::new_from_line(message2)));
+    let pump = sink.and_then(|sink| sink.send(record));
 
     rt.block_on(pump).unwrap();
 
@@ -32,6 +32,37 @@ fn test_insert_message_into_splunk() {
         .expect("Didn't find event in Splunk");
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
+}
+
+#[test]
+fn test_insert_many() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+
+    let messages = (0..10).map(|_| random_string()).collect::<Vec<_>>();
+    let records = messages.iter().map(|l| Record::new_from_line(l.clone())).collect::<Vec<_>>();
+
+    let pump = sink.and_then(|sink| sink.send_all(futures::stream::iter_ok(records)));
+
+    rt.block_on(pump).unwrap();
+
+    let mut found_all = false;
+    for _ in 0..20 {
+        let entries = recent_entries();
+
+        found_all = messages.iter().all(|message| {
+            entries.iter().any(|entry| {
+                entry["_raw"].as_str().unwrap() == message
+            })
+        });
+
+        if found_all { break; }
+
+        ::std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    assert!(found_all);
 }
 
 fn recent_entries() -> Vec<JsonValue> {
