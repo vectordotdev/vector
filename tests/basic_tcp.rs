@@ -4,7 +4,7 @@ use router::topology::{self, config};
 use serde_json::json;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::codec::{BytesCodec, FramedRead, FramedWrite, LinesCodec};
+use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
