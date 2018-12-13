@@ -6,6 +6,7 @@ pub struct Record {
     pub line: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub custom: HashMap<Atom, String>,
+    pub host: Option<String>,
 }
 
 impl Record {
@@ -14,6 +15,7 @@ impl Record {
             line,
             timestamp: chrono::Utc::now(),
             custom: HashMap::new(),
+            host: None,
         }
     }
 }
