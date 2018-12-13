@@ -28,16 +28,13 @@ pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
     }))
 }
 
-struct Hec {
+struct HttpSink {
     client: Client<HttpsConnector<HttpConnector>, Body>,
     in_flight_request: Option<ResponseFuture>,
-
-    token: String,
-    host: String,
 }
 
-impl Hec {
-    pub fn new(token: String, host: String) -> Self {
+impl HttpSink {
+    pub fn new() -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
@@ -45,43 +42,22 @@ impl Hec {
 
         Self {
             client,
-            token,
-            host,
             in_flight_request: None,
         }
     }
 }
 
-pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
-    let sink: super::RouterSink = Box::new(Hec::new(token, host));
-    Box::new(future::ok(sink))
-}
-
-impl Sink for Hec {
-    type SinkItem = Record;
+impl Sink for HttpSink {
+    type SinkItem = Request<Body>;
     type SinkError = ();
 
     fn start_send(
         &mut self,
-        record: Self::SinkItem,
+        request: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         if self.in_flight_request.is_some() {
-            return Ok(AsyncSink::NotReady(record));
+            return Ok(AsyncSink::NotReady(request));
         } else {
-            let body = json!({
-                "event": record.line,
-            });
-            let body = serde_json::to_vec(&body).unwrap();
-
-            let uri = format!("{}/services/collector/event", self.host);
-            let uri: Uri = uri.parse().unwrap();
-
-            let request = Request::post(uri)
-                .header("Content-Type", "application/json")
-                .header("Authorization", format!("Splunk {}", self.token))
-                .body(body.into())
-                .unwrap();
-
             let request = self.client.request(request);
 
             self.in_flight_request = Some(request);
@@ -104,4 +80,30 @@ impl Sink for Hec {
             }
         }
     }
+}
+
+pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
+    let sink = HttpSink::new()
+        .with(move |body: Vec<u8>| {
+            let uri = format!("{}/services/collector/event", host);
+            let uri: Uri = uri.parse().unwrap();
+
+            let request = Request::post(uri)
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Splunk {}", token))
+                .body(body.into())
+                .unwrap();
+
+            Ok(request)
+        })
+        .with(move |record: Record| {
+            let body = json!({
+                "event": record.line,
+            });
+            let body = serde_json::to_vec(&body).unwrap();
+            Ok(body)
+        });
+
+    let sink: super::RouterSink = Box::new(sink);
+    Box::new(future::ok(sink))
 }
