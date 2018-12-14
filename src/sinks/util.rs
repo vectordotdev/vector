@@ -126,6 +126,14 @@ impl<S: Sink<SinkItem = Vec<u8>>> Sink for SizeBuffered<S> {
     }
 }
 
+pub trait SinkExt: Sink<SinkItem = Vec<u8>> + Sized {
+    fn size_buffered(self, limit: usize) -> SizeBuffered<Self> {
+        SizeBuffered::new(self, limit)
+    }
+}
+
+impl<S> SinkExt for S where S: Sink<SinkItem = Vec<u8>> + Sized {}
+
 #[cfg(test)]
 mod test {
     use super::SizeBuffered;
