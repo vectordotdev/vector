@@ -21,24 +21,19 @@ impl Sampler {
     pub fn new(rate: u64, pass_list: RegexSet) -> Self {
         Self { rate, pass_list }
     }
-
-    // TODO: annotate record with current sampling rate
-    pub fn filter(&self, record: &Record) -> bool {
-        if self.pass_list.is_match(&record.line) {
-            true
-        } else {
-            let mut hasher = DefaultHasher::new();
-            hasher.write(record.line.as_bytes());
-            let hash = hasher.finish();
-
-            hash % self.rate == 0
-        }
-    }
 }
 
 impl Transform for Sampler {
     fn transform(&self, record: Record) -> Option<Record> {
-        if self.filter(&record) {
+        if self.pass_list.is_match(&record.line) {
+            return Some(record);
+        }
+
+        let mut hasher = DefaultHasher::new();
+        hasher.write(record.line.as_bytes());
+        let hash = hasher.finish();
+
+        if hash % self.rate == 0 {
             Some(record)
         } else {
             None
@@ -107,8 +102,8 @@ mod test {
         let records = random_records(1000);
         let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
         let total_passed = records
-            .iter()
-            .filter(|record| sampler.filter(record))
+            .into_iter()
+            .filter_map(|record| sampler.transform(record))
             .count();
         assert!(total_passed > 400);
         assert!(total_passed < 600);
@@ -116,8 +111,8 @@ mod test {
         let records = random_records(1000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let total_passed = records
-            .iter()
-            .filter(|record| sampler.filter(record))
+            .into_iter()
+            .filter_map(|record| sampler.transform(record))
             .count();
         assert!(total_passed > 30);
         assert!(total_passed < 50);
@@ -129,12 +124,13 @@ mod test {
         let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
 
         let first_run = records
-            .iter()
-            .filter(|record| sampler.filter(record))
+            .clone()
+            .into_iter()
+            .filter_map(|record| sampler.transform(record))
             .collect::<Vec<_>>();
         let second_run = records
-            .iter()
-            .filter(|record| sampler.filter(record))
+            .into_iter()
+            .filter_map(|record| sampler.transform(record))
             .collect::<Vec<_>>();
 
         assert_eq!(first_run, second_run);
@@ -145,7 +141,9 @@ mod test {
         let record = Record::new_from_line("i am important".to_string());
         let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
-        let total_passed = iterations.filter(|_| sampler.filter(&record)).count();
+        let total_passed = iterations
+            .filter_map(|_| sampler.transform(record.clone()))
+            .count();
         assert_eq!(total_passed, 1000);
     }
 
