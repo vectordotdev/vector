@@ -82,7 +82,7 @@ impl Document for Record {
     }
 }
 
-pub struct ElasticseachSink<T> {
+pub struct ElasticsearchSink<T> {
     client: Client<HttpConnector, Body>,
     buffer: Vec<u8>,
     buffer_limit: usize,
@@ -92,7 +92,7 @@ pub struct ElasticseachSink<T> {
     _pd: PhantomData<T>,
 }
 
-impl<T: Document> ElasticseachSink<T> {
+impl<T: Document> ElasticsearchSink<T> {
     pub fn new() -> Self {
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
@@ -185,7 +185,7 @@ impl<T: Document> ElasticseachSink<T> {
     }
 }
 
-impl<T: Document> Sink for ElasticseachSink<T> {
+impl<T: Document> Sink for ElasticsearchSink<T> {
     type SinkItem = T;
     type SinkError = String; // TODO: better than string errors
 
@@ -247,7 +247,7 @@ impl<T: Document> Sink for ElasticseachSink<T> {
     }
 }
 
-impl ElasticseachSink<Record> {
+impl ElasticsearchSink<Record> {
     pub fn build() -> super::RouterSinkFuture {
         let sink: super::RouterSink =
             Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)));

@@ -95,7 +95,7 @@ pub fn build(config: super::Config) -> (impl Future<Item = (), Error = ()>, Trig
 fn build_sink(sink: config::Sink) -> sinks::RouterSinkFuture {
     match sink {
         config::Sink::Splunk { address } => sinks::splunk::raw_tcp(address),
-        config::Sink::Elasticsearch => sinks::elasticsearch::ElasticseachSink::build(),
+        config::Sink::Elasticsearch => sinks::elasticsearch::ElasticsearchSink::build(),
     }
 }
 
