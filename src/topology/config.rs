@@ -48,7 +48,7 @@ pub struct TransformOuter {
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 pub enum Transform {
-    Sampler { rate: u8, pass_list: Vec<String> },
+    Sampler { rate: u64, pass_list: Vec<String> },
     RegexParser { regex: String },
     FieldFilter { field: String, value: String },
 }
