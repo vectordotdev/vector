@@ -26,7 +26,7 @@ pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
 }
 
 pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
-    let sink = util::HttpSink::new()
+    let sink = util::http::HttpSink::new()
         .with(move |body: Vec<u8>| {
             let uri = format!("{}/services/collector/event", host);
             let uri: Uri = uri.parse().unwrap();
