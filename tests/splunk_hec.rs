@@ -2,13 +2,14 @@ use futures::{Future, Sink};
 use router::{sinks, Record};
 use serde_json::Value as JsonValue;
 
-const TOKEN: &str = "7b440750-defd-4a64-8306-14027bd89368";
+const USERNAME: &str = "admin";
+const PASSWORD: &str = "password";
 
 #[test]
 fn test_insert_message_into_splunk() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+    let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
     let message = random_string();
     let record = Record::new_from_line(message.clone());
@@ -38,7 +39,7 @@ fn test_insert_message_into_splunk() {
 fn test_insert_many() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+    let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
     let messages = (0..10).map(|_| random_string()).collect::<Vec<_>>();
     let records = messages
@@ -74,7 +75,7 @@ fn test_insert_many() {
 fn test_custom_fields() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+    let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
     let message = random_string();
     let mut record = Record::new_from_line(message.clone());
@@ -104,7 +105,7 @@ fn test_custom_fields() {
 fn test_hostname() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let sink = sinks::splunk::hec(TOKEN.to_owned(), "http://localhost:8088".to_string());
+    let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
     let message = random_string();
     let mut record = Record::new_from_line(message.clone());
@@ -148,7 +149,7 @@ fn recent_entries() -> Vec<JsonValue> {
             ("f", "asdf"),
             ("f", "host"),
         ])
-        .basic_auth("admin", Some("password"))
+        .basic_auth(USERNAME, Some(PASSWORD))
         .send()
         .unwrap();
     let json: JsonValue = res.json().unwrap();
@@ -164,4 +165,29 @@ fn random_string() -> String {
         .sample_iter(&Alphanumeric)
         .take(100)
         .collect::<String>()
+}
+
+fn get_token() -> String {
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+
+    let mut res = client
+        .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
+        .basic_auth(USERNAME, Some(PASSWORD))
+        .send()
+        .unwrap();
+
+    let json: JsonValue = res.json().unwrap();
+    let entries = json["entry"].as_array().unwrap().clone();
+
+    if entries.is_empty() {
+        // TODO: create one automatically
+        panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
+    }
+
+    let token = entries[0]["content"]["token"].as_str().unwrap().to_owned();
+
+    token
 }
