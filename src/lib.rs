@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
+
 pub mod record;
 pub mod sinks;
 pub mod sources;
