@@ -24,7 +24,7 @@ impl Sampler {
 }
 
 impl Transform for Sampler {
-    fn transform(&self, record: Record) -> Option<Record> {
+    fn transform(&self, mut record: Record) -> Option<Record> {
         if self.pass_list.is_match(&record.line) {
             return Some(record);
         }
@@ -34,6 +34,10 @@ impl Transform for Sampler {
         let hash = hasher.finish();
 
         if hash % self.rate == 0 {
+            record
+                .custom
+                .insert(Atom::from("sample_rate"), self.rate.to_string());
+
             Some(record)
         } else {
             None
@@ -96,6 +100,7 @@ mod test {
     use super::{RegexParser, Sampler, Transform};
     use crate::record::Record;
     use regex::{Regex, RegexSet};
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
@@ -145,6 +150,31 @@ mod test {
             .filter_map(|_| sampler.transform(record.clone()))
             .count();
         assert_eq!(total_passed, 1000);
+    }
+
+    #[test]
+    fn sampler_adds_sampling_rate_to_record() {
+        let records = random_records(100);
+        let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
+        let passing = records
+            .into_iter()
+            .find_map(|record| sampler.transform(record))
+            .unwrap();
+        assert_eq!(passing.custom[&Atom::from("sample_rate")], "10");
+
+        let records = random_records(100);
+        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let passing = records
+            .into_iter()
+            .find_map(|record| sampler.transform(record))
+            .unwrap();
+        assert_eq!(passing.custom[&Atom::from("sample_rate")], "25");
+
+        // If the record passed the regex check, don't include the sampling rate
+        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let record = Record::new_from_line("nananana".to_string());
+        let passing = sampler.transform(record).unwrap();
+        assert!(!passing.custom.contains_key(&Atom::from("sample_rate")));
     }
 
     #[test]
