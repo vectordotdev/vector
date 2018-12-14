@@ -13,12 +13,12 @@ pub trait Transform: Sync + Send {
 }
 
 pub struct Sampler {
-    rate: u8,
+    rate: u64,
     pass_list: RegexSet,
 }
 
 impl Sampler {
-    pub fn new(rate: u8, pass_list: RegexSet) -> Self {
+    pub fn new(rate: u64, pass_list: RegexSet) -> Self {
         Self { rate, pass_list }
     }
 
@@ -31,7 +31,7 @@ impl Sampler {
             hasher.write(record.line.as_bytes());
             let hash = hasher.finish();
 
-            hash % 100 < self.rate.into()
+            hash % self.rate == 0
         }
     }
 }
@@ -105,19 +105,28 @@ mod test {
     #[test]
     fn samples_at_roughly_the_configured_rate() {
         let records = random_records(1000);
-        let sampler = Sampler::new(50, RegexSet::new(&["na"]).unwrap());
+        let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
         let total_passed = records
             .iter()
             .filter(|record| sampler.filter(record))
             .count();
         assert!(total_passed > 400);
         assert!(total_passed < 600);
+
+        let records = random_records(1000);
+        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let total_passed = records
+            .iter()
+            .filter(|record| sampler.filter(record))
+            .count();
+        assert!(total_passed > 30);
+        assert!(total_passed < 50);
     }
 
     #[test]
     fn consistely_samples_the_same_records() {
         let records = random_records(1000);
-        let sampler = Sampler::new(50, RegexSet::new(&["na"]).unwrap());
+        let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
 
         let first_run = records
             .iter()
