@@ -1,4 +1,5 @@
 use super::util;
+use super::util::SinkExt;
 use futures::{future, Future, Sink};
 use hyper::{Request, Uri};
 use log::error;
@@ -25,8 +26,8 @@ pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
 }
 
 pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
-    let sink = util::SizeBuffered::new(
-        util::HttpSink::new().with(move |body: Vec<u8>| {
+    let sink = util::HttpSink::new()
+        .with(move |body: Vec<u8>| {
             let uri = format!("{}/services/collector/event", host);
             let uri: Uri = uri.parse().unwrap();
 
@@ -37,20 +38,19 @@ pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
                 .unwrap();
 
             Ok(request)
-        }),
-        2 * 1024 * 1024,
-    )
-    .with(move |record: Record| {
-        let mut body = json!({
-            "event": record.line,
-            "fields": record.custom,
+        })
+        .size_buffered(2 * 1024 * 1024)
+        .with(move |record: Record| {
+            let mut body = json!({
+                "event": record.line,
+                "fields": record.custom,
+            });
+            if let Some(host) = record.host {
+                body["host"] = json!(host);
+            }
+            let body = serde_json::to_vec(&body).unwrap();
+            Ok(body)
         });
-        if let Some(host) = record.host {
-            body["host"] = json!(host);
-        }
-        let body = serde_json::to_vec(&body).unwrap();
-        Ok(body)
-    });
 
     let sink: super::RouterSink = Box::new(sink);
     Box::new(future::ok(sink))
