@@ -34,3 +34,6 @@ reqwest = "0.9.5"
 [[bench]]
 name = "bench"
 harness = false
+
+[features]
+"splunk-integration-tests" = []
