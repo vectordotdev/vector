@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
 
+#[cfg_attr(not(feature = "splunk-integration-tests"), ignore)]
 #[test]
 fn test_insert_message_into_splunk() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -35,6 +36,7 @@ fn test_insert_message_into_splunk() {
     assert_eq!(message, entry["_raw"].as_str().unwrap());
 }
 
+#[cfg_attr(not(feature = "splunk-integration-tests"), ignore)]
 #[test]
 fn test_insert_many() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -71,6 +73,7 @@ fn test_insert_many() {
     assert!(found_all);
 }
 
+#[cfg_attr(not(feature = "splunk-integration-tests"), ignore)]
 #[test]
 fn test_custom_fields() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -101,6 +104,7 @@ fn test_custom_fields() {
     assert_eq!("hello", entry["asdf"].as_str().unwrap());
 }
 
+#[cfg_attr(not(feature = "splunk-integration-tests"), ignore)]
 #[test]
 fn test_hostname() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
