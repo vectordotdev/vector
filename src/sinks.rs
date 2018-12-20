@@ -1,6 +1,7 @@
 use futures::{Future, Sink};
 
 pub mod elasticsearch;
+pub mod s3;
 pub mod splunk;
 pub mod util;
 

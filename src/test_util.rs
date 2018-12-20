@@ -35,3 +35,22 @@ pub fn send_lines(
                 })
         })
 }
+
+pub fn random_string(len: usize) -> String {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .collect::<String>()
+}
+
+pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
+    use rand::distributions::Alphanumeric;
+    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
+
+    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+
+    std::iter::repeat(()).map(move |_| rng.sample_iter(&Alphanumeric).take(len).collect::<String>())
+}
