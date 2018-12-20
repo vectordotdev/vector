@@ -1,6 +1,6 @@
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Stream};
-use router::test_util::{next_addr, send_lines};
+use router::test_util::{next_addr, random_lines, send_lines};
 use router::topology::{self, config};
 use serde_json::json;
 use std::net::SocketAddr;
@@ -27,7 +27,7 @@ fn test_pipe() {
     // Wait for server to accept traffic
     while let Err(_) = std::net::TcpStream::connect(in_addr) {}
 
-    let input_lines = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 
@@ -72,7 +72,7 @@ fn test_sample() {
     // Wait for server to accept traffic
     while let Err(_) = std::net::TcpStream::connect(in_addr) {}
 
-    let input_lines = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 
@@ -180,8 +180,8 @@ fn test_merge() {
     while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
     while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
 
-    let input_lines1 = random_lines().take(num_lines).collect::<Vec<_>>();
-    let input_lines2 = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
     let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
     let send = send1.join(send2);
@@ -235,7 +235,7 @@ fn test_fork() {
     // Wait for server to accept traffic
     while let Err(_) = std::net::TcpStream::connect(in_addr) {}
 
-    let input_lines = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 
@@ -287,8 +287,8 @@ fn test_merge_and_fork() {
     while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
     while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
 
-    let input_lines1 = random_lines().take(num_lines).collect::<Vec<_>>();
-    let input_lines2 = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
     let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
     let send = send1.join(send2);
@@ -374,8 +374,8 @@ fn test_merge_and_fork_json() {
     while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
     while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
 
-    let input_lines1 = random_lines().take(num_lines).collect::<Vec<_>>();
-    let input_lines2 = random_lines().take(num_lines).collect::<Vec<_>>();
+    let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
     let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
     let send = send1.join(send2);
@@ -407,15 +407,6 @@ fn test_merge_and_fork_json() {
     }
     assert_eq!(input_lines1.next(), None);
     assert_eq!(input_lines2.next(), None);
-}
-
-fn random_lines() -> impl Iterator<Item = String> {
-    use rand::distributions::Alphanumeric;
-    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
-    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
-
-    std::iter::repeat(()).map(move |_| rng.sample_iter(&Alphanumeric).take(100).collect::<String>())
 }
 
 fn receive_lines(
