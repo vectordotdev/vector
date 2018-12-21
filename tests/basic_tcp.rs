@@ -16,7 +16,11 @@ fn test_pipe() {
 
     let mut topology = config::Config::empty();
     topology.add_source("in", config::Source::Splunk { address: in_addr });
-    topology.add_sink("out", &["in"], config::Sink::Splunk { address: out_addr });
+    topology.add_sink(
+        "out",
+        &["in"],
+        config::Sink::SplunkTcp { address: out_addr },
+    );
     let (server, trigger) = topology::build(topology);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -60,7 +64,7 @@ fn test_sample() {
     topology.add_sink(
         "out",
         &["sampler"],
-        config::Sink::Splunk { address: out_addr },
+        config::Sink::SplunkTcp { address: out_addr },
     );
     let (server, trigger) = topology::build(topology);
 
@@ -122,7 +126,7 @@ fn test_parse() {
     topology.add_sink(
         "out",
         &["filter"],
-        config::Sink::Splunk { address: out_addr },
+        config::Sink::SplunkTcp { address: out_addr },
     );
     let (server, trigger) = topology::build(topology);
 
@@ -167,7 +171,7 @@ fn test_merge() {
     topology.add_sink(
         "out",
         &["in1", "in2"],
-        config::Sink::Splunk { address: out_addr },
+        config::Sink::SplunkTcp { address: out_addr },
     );
     let (server, trigger) = topology::build(topology);
 
@@ -222,8 +226,16 @@ fn test_fork() {
 
     let mut topology = config::Config::empty();
     topology.add_source("in", config::Source::Splunk { address: in_addr });
-    topology.add_sink("out1", &["in"], config::Sink::Splunk { address: out_addr1 });
-    topology.add_sink("out2", &["in"], config::Sink::Splunk { address: out_addr2 });
+    topology.add_sink(
+        "out1",
+        &["in"],
+        config::Sink::SplunkTcp { address: out_addr1 },
+    );
+    topology.add_sink(
+        "out2",
+        &["in"],
+        config::Sink::SplunkTcp { address: out_addr2 },
+    );
     let (server, trigger) = topology::build(topology);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -268,12 +280,12 @@ fn test_merge_and_fork() {
     topology.add_sink(
         "out1",
         &["in1", "in2"],
-        config::Sink::Splunk { address: out_addr1 },
+        config::Sink::SplunkTcp { address: out_addr1 },
     );
     topology.add_sink(
         "out2",
         &["in2"],
-        config::Sink::Splunk { address: out_addr2 },
+        config::Sink::SplunkTcp { address: out_addr2 },
     );
     let (server, trigger) = topology::build(topology);
 
@@ -346,12 +358,12 @@ fn test_merge_and_fork_json() {
         },
         "sinks": {
             "out1": {
-                "type": "splunk",
+                "type": "splunk_tcp",
                 "address": out_addr1,
                 "inputs": ["in1", "in2"],
             },
             "out2": {
-                "type": "splunk",
+                "type": "splunk_tcp",
                 "address": out_addr2,
                 "inputs": ["in2"],
             },
