@@ -2,3 +2,5 @@
 **/*.rs.bk
 logs*/
 sample.log
+.envrc
+miniodat
