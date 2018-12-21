@@ -15,7 +15,7 @@
   },
   "sinks": {
     "out": {
-      "type": "splunk",
+      "type": "splunk_tcp",
       "inputs": ["sampler"],
       "address": "127.0.0.1:9999"
     }

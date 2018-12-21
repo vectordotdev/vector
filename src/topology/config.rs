@@ -32,7 +32,8 @@ pub struct SinkOuter {
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 pub enum Sink {
-    Splunk { address: std::net::SocketAddr },
+    SplunkTcp { address: std::net::SocketAddr },
+    SplunkHec { token: String, host: String },
     Elasticsearch,
 }
 
