@@ -6,8 +6,6 @@ use rusoto_core::region::Region;
 use rusoto_s3::{S3Client, S3};
 use std::io::{BufRead, BufReader};
 
-const ACCESS_KEY: &str = "DUMW7A4DJNEIX5QSNW8Y";
-const SECRET_KEY: &str = "JxJx+Vt3pCnd3yBRkGyqRlIB3PMyuywAEWHgXfb+";
 const BUCKET: &str = "router-tests";
 
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
@@ -216,12 +214,7 @@ fn client() -> S3Client {
         endpoint: "http://localhost:9000".to_owned(),
     };
 
-    let provider = rusoto_credential::StaticProvider::new_minimal(
-        ACCESS_KEY.to_string(),
-        SECRET_KEY.to_string(),
-    );
-    let dispatched = rusoto_core::request::HttpClient::new().unwrap();
-    S3Client::new_with(dispatched, provider, region)
+    S3Client::new(region)
 }
 
 fn ensure_bucket(client: &S3Client) {
