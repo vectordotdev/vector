@@ -7,33 +7,34 @@ use std::io::Write;
 use std::mem;
 
 pub struct S3Sink {
-    client: S3Client,
     buffer: Buffer,
-    cutoff_size: usize,
     in_flight: Option<RusotoFuture<PutObjectOutput, PutObjectError>>,
-    prefix: String,
-    bucket: String,
+    config: S3SinkConfig,
+}
+
+pub struct S3SinkConfig {
+    pub buffer_size: usize,
+    pub key_prefix: String,
+    pub bucket: String,
+    pub client: S3Client,
+    pub gzip: bool,
 }
 
 impl S3Sink {
     fn send_request(&mut self) {
-        let new_buffer = Buffer::fresh(self.buffer.is_gzip());
+        let new_buffer = Buffer::fresh(self.config.gzip);
         let body = mem::replace(&mut self.buffer, new_buffer);
         let body = body.finalize();
 
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-        let extension = if self.buffer.is_gzip() {
-            ".log.gz"
-        } else {
-            ".log"
-        };
+        let extension = if self.config.gzip { ".log.gz" } else { ".log" };
 
         let request = PutObjectRequest {
             body: Some(body.into()),
-            bucket: self.bucket.clone(),
-            key: format!("{}{}{}", self.prefix, filename, extension),
-            content_encoding: if self.buffer.is_gzip() {
+            bucket: self.config.bucket.clone(),
+            key: format!("{}{}{}", self.config.key_prefix, filename, extension),
+            content_encoding: if self.config.gzip {
                 Some("gzip".to_string())
             } else {
                 None
@@ -41,13 +42,17 @@ impl S3Sink {
             ..Default::default()
         };
 
-        let response = self.client.put_object(request);
+        let response = self.config.client.put_object(request);
         assert!(self.in_flight.is_none());
         self.in_flight = Some(response);
     }
 
+    fn buffer_full(&self) -> bool {
+        self.buffer.size() >= self.config.buffer_size
+    }
+
     fn full(&self) -> bool {
-        self.buffer.size() >= self.cutoff_size && self.in_flight.is_some()
+        self.buffer_full() && self.in_flight.is_some()
     }
 }
 
@@ -70,7 +75,7 @@ impl Sink for S3Sink {
         self.buffer.push(&item.line.into_bytes());
         self.buffer.push(b"\n");
 
-        if self.buffer.size() >= self.cutoff_size {
+        if self.buffer_full() {
             self.poll_complete()?;
         }
 
@@ -84,14 +89,14 @@ impl Sink for S3Sink {
                     Err(e) => panic!("{:?}", e),
                     Ok(Async::Ready(_)) => self.in_flight = None,
                     Ok(Async::NotReady) => {
-                        if self.buffer.size() < self.cutoff_size {
-                            return Ok(Async::Ready(()));
-                        } else {
+                        if self.buffer_full() {
                             return Ok(Async::NotReady);
+                        } else {
+                            return Ok(Async::Ready(()));
                         }
                     }
                 }
-            } else if self.buffer.size() >= self.cutoff_size {
+            } else if self.buffer_full() {
                 self.send_request();
             } else {
                 return Ok(Async::Ready(()));
@@ -118,22 +123,13 @@ impl Sink for S3Sink {
     }
 }
 
-pub fn new(
-    client: S3Client,
-    prefix: String,
-    cutoff_size: usize,
-    bucket: String,
-    gzip: bool,
-) -> super::RouterSinkFuture {
-    let buffer = Buffer::fresh(gzip);
+pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
+    let buffer = Buffer::fresh(config.gzip);
 
     let sink = S3Sink {
-        client,
         buffer,
-        cutoff_size,
         in_flight: None,
-        prefix,
-        bucket,
+        config,
     };
 
     let sink: super::RouterSink = Box::new(sink);
@@ -151,13 +147,6 @@ impl Buffer {
             Buffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
         } else {
             Buffer::Plain(Vec::new())
-        }
-    }
-
-    fn is_gzip(&self) -> bool {
-        match self {
-            Buffer::Plain(_) => false,
-            Buffer::Gzip(_) => true,
         }
     }
 

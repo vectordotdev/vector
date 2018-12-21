@@ -1,5 +1,6 @@
 use flate2::read::GzDecoder;
 use futures::{stream, Future, Sink};
+use router::sinks::s3::S3SinkConfig;
 use router::test_util::{random_lines, random_string};
 use router::{sinks, Record};
 use rusoto_core::region::Region;
@@ -11,16 +12,9 @@ const BUCKET: &str = "router-tests";
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
 #[test]
 fn test_insert_message_into_s3() {
-    ensure_bucket(&client());
-
-    let prefix = random_string(10) + "/";
-    let sink = sinks::s3::new(
-        client(),
-        prefix.clone(),
-        2 * 1024 * 1024,
-        BUCKET.to_string(),
-        false,
-    );
+    let config = config();
+    let prefix = config.key_prefix.clone();
+    let sink = sinks::s3::new(config);
 
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
     let records = lines
@@ -43,8 +37,6 @@ fn test_insert_message_into_s3() {
         })
         .sync()
         .unwrap();
-
-    println!("{:?}", list_res);
 
     let keys = list_res
         .contents
@@ -81,8 +73,12 @@ fn test_insert_message_into_s3() {
 fn test_rotate_files_after_the_buffer_size_is_reached() {
     ensure_bucket(&client());
 
-    let prefix = random_string(10) + "/";
-    let sink = sinks::s3::new(client(), prefix.clone(), 1000, BUCKET.to_string(), false);
+    let config = S3SinkConfig {
+        buffer_size: 1000,
+        ..config()
+    };
+    let prefix = config.key_prefix.clone();
+    let sink = sinks::s3::new(config);
 
     let lines = random_lines(100).take(30).collect::<Vec<_>>();
     let records = lines
@@ -145,8 +141,13 @@ fn test_rotate_files_after_the_buffer_size_is_reached() {
 fn test_gzip() {
     ensure_bucket(&client());
 
-    let prefix = random_string(10) + "/";
-    let sink = sinks::s3::new(client(), prefix.clone(), 1000, BUCKET.to_string(), true);
+    let config = S3SinkConfig {
+        buffer_size: 1000,
+        gzip: true,
+        ..config()
+    };
+    let prefix = config.key_prefix.clone();
+    let sink = sinks::s3::new(config);
 
     let lines = random_lines(100).take(500).collect::<Vec<_>>();
     let records = lines
@@ -215,6 +216,18 @@ fn client() -> S3Client {
     };
 
     S3Client::new(region)
+}
+
+fn config() -> S3SinkConfig {
+    ensure_bucket(&client());
+
+    S3SinkConfig {
+        client: client(),
+        key_prefix: random_string(10) + "/",
+        buffer_size: 2 * 1024 * 1024,
+        bucket: BUCKET.to_string(),
+        gzip: false,
+    }
 }
 
 fn ensure_bucket(client: &S3Client) {

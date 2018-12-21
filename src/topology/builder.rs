@@ -97,6 +97,43 @@ fn build_sink(sink: config::Sink) -> sinks::RouterSinkFuture {
         config::Sink::SplunkTcp { address } => sinks::splunk::raw_tcp(address),
         config::Sink::SplunkHec { token, host } => sinks::splunk::hec(token, host),
         config::Sink::Elasticsearch => sinks::elasticsearch::ElasticsearchSink::build(),
+        config::Sink::S3 {
+            bucket,
+            key_prefix,
+            region,
+            endpoint,
+            buffer_size,
+            gzip,
+        } => {
+            use rusoto_core::region::Region;
+            use rusoto_s3::S3Client;
+
+            let region = if region.is_some() && endpoint.is_some() {
+                panic!("Can't set both region and endpoint");
+            } else if let Some(region) = region {
+                let region: Region = region.parse().unwrap();
+                region
+            } else if let Some(endpoint) = endpoint {
+                Region::Custom {
+                    name: "custom".to_owned(),
+                    endpoint: endpoint,
+                }
+            } else {
+                panic!("Must set region or endpoint");
+            };
+
+            let client = S3Client::new(region);
+
+            let config = sinks::s3::S3SinkConfig {
+                client,
+                gzip,
+                buffer_size,
+                key_prefix,
+                bucket,
+            };
+
+            sinks::s3::new(config)
+        }
     }
 }
 
