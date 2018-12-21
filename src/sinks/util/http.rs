@@ -7,7 +7,6 @@ use hyper_tls::HttpsConnector;
 use log::error;
 use tokio::executor::DefaultExecutor;
 
-
 pub struct HttpSink {
     client: Client<HttpsConnector<HttpConnector>, Body>,
     in_flight_request: Option<ResponseFuture>,
@@ -67,22 +66,22 @@ impl Sink for HttpSink {
 
 #[cfg(test)]
 mod test {
-    use hyper::{Request, Body, Response, Server, Uri};
     use super::HttpSink;
-    use futures::{Sink,Future,Stream};
+    use futures::{Future, Sink, Stream};
     use hyper::service::service_fn;
+    use hyper::{Body, Request, Response, Server, Uri};
 
     #[test]
     fn it_makes_http_requests() {
         let addr = crate::test_util::next_addr();
-        let uri = format!("http://{}:{}/", addr.ip(), addr.port()).parse::<Uri>().unwrap();
-
+        let uri = format!("http://{}:{}/", addr.ip(), addr.port())
+            .parse::<Uri>()
+            .unwrap();
 
         let request = Request::post(uri).body(Body::from("hello")).unwrap();
         let sink = HttpSink::new();
 
         let req = sink.send(request);
-
 
         let (tx, rx) = futures::sync::mpsc::channel(10);
 
@@ -108,7 +107,6 @@ mod test {
             .serve(new_service)
             .map_err(|e| eprintln!("server error: {}", e));
 
-
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
@@ -116,7 +114,6 @@ mod test {
         rt.block_on(req).unwrap();
 
         rt.shutdown_now();
-
 
         let (body, _rest) = rx.into_future().wait().unwrap();
         assert_eq!(body.unwrap().unwrap(), "hello");

@@ -67,7 +67,6 @@ mod test {
     }
 }
 
-
 pub struct SizeBuffered<S: Sink<SinkItem = Vec<u8>>> {
     inner: S,
     buffer: Vec<u8>,

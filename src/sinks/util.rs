@@ -1,5 +1,5 @@
-mod size_buffered;
 pub mod http;
+mod size_buffered;
 
 use futures::Sink;
 
