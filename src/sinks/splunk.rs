@@ -33,13 +33,14 @@ pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
 
             let request = Request::post(uri)
                 .header("Content-Type", "application/json")
+                .header("Content-Encoding", "gzip")
                 .header("Authorization", format!("Splunk {}", token))
                 .body(body.into())
                 .unwrap();
 
             Ok(request)
         })
-        .size_buffered(2 * 1024 * 1024)
+        .size_buffered(2 * 1024 * 1024, true)
         .with(move |record: Record| {
             let mut body = json!({
                 "event": record.line,

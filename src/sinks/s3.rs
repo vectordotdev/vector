@@ -1,10 +1,8 @@
 use crate::record::Record;
-use flate2::write::GzEncoder;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
-use std::io::Write;
-use std::mem;
+use crate::sinks::util::size_buffered::Buffer;
 
 pub struct S3Sink {
     buffer: Buffer,
@@ -22,9 +20,7 @@ pub struct S3SinkConfig {
 
 impl S3Sink {
     fn send_request(&mut self) {
-        let new_buffer = Buffer::fresh(self.config.gzip);
-        let body = mem::replace(&mut self.buffer, new_buffer);
-        let body = body.finalize();
+        let body = self.buffer.get_and_reset();
 
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
@@ -124,7 +120,7 @@ impl Sink for S3Sink {
 }
 
 pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
-    let buffer = Buffer::fresh(config.gzip);
+    let buffer = Buffer::new(config.gzip);
 
     let sink = S3Sink {
         buffer,
@@ -134,53 +130,4 @@ pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
 
     let sink: super::RouterSink = Box::new(sink);
     Box::new(future::ok(sink))
-}
-
-enum Buffer {
-    Plain(Vec<u8>),
-    Gzip(GzEncoder<Vec<u8>>),
-}
-
-impl Buffer {
-    fn fresh(gzip: bool) -> Self {
-        if gzip {
-            Buffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
-        } else {
-            Buffer::Plain(Vec::new())
-        }
-    }
-
-    fn finalize(self) -> Vec<u8> {
-        match self {
-            Buffer::Plain(inner) => inner,
-            Buffer::Gzip(inner) => inner
-                .finish()
-                .expect("This can't fail because the inner writer is a Vec"),
-        }
-    }
-
-    fn push(&mut self, input: &[u8]) {
-        match self {
-            Buffer::Plain(inner) => {
-                inner.extend_from_slice(input);
-            }
-            Buffer::Gzip(inner) => {
-                inner.write_all(input).unwrap();
-            }
-        }
-    }
-
-    fn size(&self) -> usize {
-        match self {
-            Buffer::Plain(inner) => inner.len(),
-            Buffer::Gzip(inner) => inner.get_ref().len(),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            Buffer::Plain(inner) => inner.is_empty(),
-            Buffer::Gzip(inner) => inner.get_ref().is_empty(),
-        }
-    }
 }
