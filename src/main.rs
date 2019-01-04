@@ -1,91 +1,49 @@
-use futures::{Future, Sink, Stream};
-use log::{error, info};
-use prometheus::{opts, register_counter, Encoder, TextEncoder, __register_counter};
-use router::{sinks, sources, topology};
-use std::net::SocketAddr;
-use stream_cancel::Tripwire;
-use tokio::fs::File;
+use clap::{App, Arg};
+use futures::{Future, Stream};
+use log::info;
+use router::topology;
+use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 
 fn main() {
     router::setup_logger();
 
-    let in_addr: SocketAddr = "127.0.0.1:1235".parse().unwrap();
-    let (harness_trigger, tripwire) = Tripwire::new();
+    let app = App::new("Router").version("1.0").author("timber.io").arg(
+        Arg::with_name("config")
+            .short("c")
+            .long("config")
+            .value_name("FILE")
+            .help("Sets a custom config file")
+            .required(true)
+            .takes_value(true),
+    );
+    let matches = app.get_matches();
 
-    info!("starting runtime");
+    let config = matches.value_of("config").unwrap();
+    let config: router::topology::Config =
+        serde_json::from_reader(std::fs::File::open(config).unwrap()).unwrap();
+
+    let (server, server_trigger) = topology::build(config);
+
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    // TODO: actually switch between configurations in a reasonable way (separate binaries?)
-    if false {
-        // ES Writer topology
-        let config: router::topology::Config =
-            serde_json::from_reader(std::fs::File::open("configs/es_writer.json").unwrap())
-                .unwrap();
-        let (server, server_trigger) = topology::build(config);
-        std::mem::forget(server_trigger);
-        rt.spawn(server);
+    rt.spawn(server);
+
+    let signals = vec![SIGINT, SIGTERM, SIGQUIT]
+        .into_iter()
+        .map(|sig| Signal::new(sig).flatten_stream().into_future());
+    let signals = futures::future::select_ok(signals);
+
+    let (signal, _) = rt.block_on(signals).ok().unwrap();
+    let signal = signal.0.unwrap();
+
+    if signal == SIGINT || signal == SIGTERM {
+        info!("Shutting down");
+        drop(server_trigger);
+        rt.shutdown_on_idle().wait().unwrap();
+    } else if signal == SIGQUIT {
+        info!("Shutting down immediately");
+        rt.shutdown_now().wait().unwrap();
     } else {
-        // Comcast topology + input and harness
-        let config: router::topology::Config =
-            serde_json::from_reader(std::fs::File::open("configs/comcast.json").unwrap()).unwrap();
-        let (server, server_trigger) = topology::build(config);
-
-        let out_addr: SocketAddr = "127.0.0.1:9999".parse().unwrap();
-
-        // build up a thing that will pipe some sample data at our server
-        let input = File::open("sample.log")
-            .map_err(|e| error!("error opening file: {:?}", e))
-            .map(sources::reader_source)
-            .flatten_stream();
-        let sender = sinks::splunk::raw_tcp(in_addr)
-            .map(|sink| sink.sink_map_err(|e| error!("sender error: {:?}", e)))
-            .map_err(|e| error!("error creating sender: {:?}", e));
-        let counter = register_counter!("sender_lines", "Lines sent from harness").unwrap();
-        let sender_task = sender
-            .and_then(|sink| input.inspect(move |_| counter.inc()).forward(sink))
-            .map(|_| {
-                info!("done sending test input!");
-                drop(server_trigger);
-                drop(harness_trigger);
-            });
-
-        let receiver = {
-            let counter =
-                register_counter!("receiver_lines", "Lines received at forwarding destination")
-                    .unwrap();
-            let (tx, rx) = futures::sync::mpsc::channel(10);
-
-            rt.spawn(rx.for_each(move |_| {
-                counter.inc();
-                Ok(())
-            }));
-
-            sources::splunk::raw_tcp(out_addr, tx)
-        };
-
-        info!("starting receiver");
-        rt.spawn(
-            receiver
-                .select(tripwire.clone())
-                .map(|_| ())
-                .map_err(|_| ()),
-        );
-
-        info!("starting server");
-        rt.spawn(server);
-        // wait for the server to come up before trying to send to it
-        while let Err(_) = std::net::TcpStream::connect(in_addr) {}
-
-        info!("starting sender");
-        rt.block_on(sender_task).unwrap();
-        info!("sender finished!");
+        unreachable!();
     }
-
-    rt.shutdown_on_idle().wait().unwrap();
-
-    let mut buf = Vec::new();
-    let encoder = TextEncoder::new();
-    let metrics_families = prometheus::gather();
-    encoder.encode(&metrics_families, &mut buf).unwrap();
-    info!("prom output:\n{}", String::from_utf8(buf).unwrap());
 }
