@@ -1,8 +1,8 @@
 use crate::record::Record;
+use crate::sinks::util::size_buffered::Buffer;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
-use crate::sinks::util::size_buffered::Buffer;
 
 pub struct S3Sink {
     buffer: Buffer,

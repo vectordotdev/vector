@@ -1,7 +1,7 @@
-use futures::{try_ready, Async, AsyncSink, Sink};
-use std::mem;
 use flate2::write::GzEncoder;
+use futures::{try_ready, Async, AsyncSink, Sink};
 use std::io::Write;
+use std::mem;
 
 #[cfg(test)]
 mod test {
@@ -75,7 +75,10 @@ mod test {
 
         let buffered = SizeBuffered::new(vec![], 1000, true);
 
-        let input = std::iter::repeat(b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()).take(100_000);
+        let input = std::iter::repeat(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
+        )
+        .take(100_000);
 
         let (buffered, _) = buffered
             .send_all(futures::stream::iter_ok(input))
@@ -89,13 +92,17 @@ mod test {
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];
-            GzDecoder::new(batch.as_slice()).read_to_end(&mut decompressed).unwrap();
+            GzDecoder::new(batch.as_slice())
+                .read_to_end(&mut decompressed)
+                .unwrap();
             decompressed
         });
 
-        assert!(
-            decompressed.eq(std::iter::repeat(b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()).take(100_000).flatten())
-        );
+        assert!(decompressed.eq(std::iter::repeat(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()
+        )
+        .take(100_000)
+        .flatten()));
     }
 }
 
@@ -178,8 +185,13 @@ impl Buffer {
         match self {
             Buffer::Plain(ref mut inner) => mem::replace(inner, Vec::new()),
             Buffer::Gzip(ref mut inner) => {
-                let inner = mem::replace(inner, GzEncoder::new(Vec::new(), flate2::Compression::default()));
-                inner.finish().expect("This can't fail because the inner writer is a Vec")
+                let inner = mem::replace(
+                    inner,
+                    GzEncoder::new(Vec::new(), flate2::Compression::default()),
+                );
+                inner
+                    .finish()
+                    .expect("This can't fail because the inner writer is a Vec")
             }
         }
     }
