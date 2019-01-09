@@ -1,15 +1,15 @@
+use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
-use std::collections::HashMap;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
-    pub sources: HashMap<String, Source>,
-    pub sinks: HashMap<String, SinkOuter>,
+    pub sources: IndexMap<String, Source>,
+    pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
-    pub transforms: HashMap<String, TransformOuter>,
+    pub transforms: IndexMap<String, TransformOuter>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
@@ -20,14 +20,14 @@ pub enum Source {
     },
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Sink,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
@@ -51,14 +51,14 @@ pub enum Sink {
     Elasticsearch,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Transform,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
@@ -72,9 +72,9 @@ pub enum Transform {
 impl Config {
     pub fn empty() -> Self {
         Self {
-            sources: HashMap::new(),
-            sinks: HashMap::new(),
-            transforms: HashMap::new(),
+            sources: IndexMap::new(),
+            sinks: IndexMap::new(),
+            transforms: IndexMap::new(),
         }
     }
 
@@ -100,5 +100,9 @@ impl Config {
         };
 
         self.transforms.insert(name.to_string(), transform);
+    }
+
+    pub fn load(input: impl std::io::Read) -> Result<Self, Vec<String>> {
+        serde_json::from_reader::<_, Self>(input).map_err(|e| vec![e.to_string()])
     }
 }

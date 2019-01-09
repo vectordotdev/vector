@@ -10,7 +10,7 @@
       "type": "sampler",
       "inputs": ["in"],
       "rate": 10,
-      "pass_list": []
+      "pass_list": ["error"]
     }
   },
   "sinks": {

@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
-use log::info;
+use log::{error, info};
 use router::topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 
@@ -19,10 +19,26 @@ fn main() {
     let matches = app.get_matches();
 
     let config = matches.value_of("config").unwrap();
-    let config: router::topology::Config =
-        serde_json::from_reader(std::fs::File::open(config).unwrap()).unwrap();
 
-    let (server, server_trigger) = topology::build(config);
+    let config = router::topology::Config::load(std::fs::File::open(config).unwrap());
+
+    let topology = config.and_then(topology::build);
+
+    let (server, server_trigger) = match topology {
+        Ok((server, server_trigger, warnings)) => {
+            for warning in warnings {
+                error!("Configuration warning: {}", warning);
+            }
+
+            (server, server_trigger)
+        }
+        Err(errors) => {
+            for error in errors {
+                error!("Configuration error: {}", error);
+            }
+            return;
+        }
+    };
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
