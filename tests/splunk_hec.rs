@@ -137,6 +137,47 @@ fn test_hostname() {
     assert_eq!("example.com:1234", entry["host"].as_str().unwrap());
 }
 
+#[cfg_attr(not(feature = "splunk-integration-tests"), ignore)]
+#[test]
+fn test_healthcheck() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    // OK
+    {
+        let healthcheck =
+            sinks::splunk::hec_healthcheck(get_token(), "http://localhost:8088".to_string());
+        rt.block_on(healthcheck).unwrap();
+    }
+
+    // Server not listening at address
+    {
+        let healthcheck =
+            sinks::splunk::hec_healthcheck(get_token(), "http://localhost:1111".to_string());
+        assert_eq!(
+            rt.block_on(healthcheck).unwrap_err(),
+            "an error occurred trying to connect: Connection refused (os error 111)"
+        );
+    }
+
+    // Invalid token
+    // The HEC REST docs claim that the healthcheck endpoint will validate the auth token,
+    // but my local testing server returns 200 even with a bad token.
+    {
+        // let healthcheck = sinks::splunk::hec_healthcheck("asdf".to_string(), "http://localhost:8088".to_string());
+        // assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid HEC token");
+    }
+
+    // Unhealthy server
+    {
+        let healthcheck =
+            sinks::splunk::hec_healthcheck(get_token(), "http://503.returnco.de".to_string());
+        assert_eq!(
+            rt.block_on(healthcheck).unwrap_err(),
+            "HEC is unhealthy, queues are full"
+        );
+    }
+}
+
 fn recent_entries() -> Vec<JsonValue> {
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)

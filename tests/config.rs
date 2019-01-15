@@ -3,7 +3,7 @@ use router::topology::{self, Config};
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     Config::load(config.as_bytes())
         .and_then(|c| topology::build(c))
-        .map(|(_, _, warnings)| warnings)
+        .map(|(_server, _trigger, _healthcheck, warnings)| warnings)
 }
 
 #[test]

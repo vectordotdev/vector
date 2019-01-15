@@ -10,6 +10,8 @@ use crate::record::Record;
 pub type RouterSink = Box<dyn Sink<SinkItem = Record, SinkError = ()> + 'static + Send>;
 pub type RouterSinkFuture = Box<dyn Future<Item = RouterSink, Error = ()> + Send>;
 
+pub type Healthcheck = Box<dyn Future<Item = (), Error = String> + Send>;
+
 pub struct BlackHole;
 
 impl Sink for BlackHole {

@@ -21,7 +21,7 @@ fn test_pipe() {
         &["in"],
         config::Sink::SplunkTcp { address: out_addr },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -66,7 +66,7 @@ fn test_sample() {
         &["sampler"],
         config::Sink::SplunkTcp { address: out_addr },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -128,7 +128,7 @@ fn test_parse() {
         &["filter"],
         config::Sink::SplunkTcp { address: out_addr },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -173,7 +173,7 @@ fn test_merge() {
         &["in1", "in2"],
         config::Sink::SplunkTcp { address: out_addr },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -236,7 +236,7 @@ fn test_fork() {
         &["in"],
         config::Sink::SplunkTcp { address: out_addr2 },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -287,7 +287,7 @@ fn test_merge_and_fork() {
         &["in2"],
         config::Sink::SplunkTcp { address: out_addr2 },
     );
-    let (server, trigger, _warnings) = topology::build(topology).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -374,7 +374,7 @@ fn test_merge_and_fork_json() {
     println!("{}", config);
     let config: topology::Config = serde_json::from_str(&config).unwrap();
 
-    let (server, trigger, _warnings) = topology::build(config).unwrap();
+    let (server, trigger, _healthcheck, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -419,6 +419,22 @@ fn test_merge_and_fork_json() {
     }
     assert_eq!(input_lines1.next(), None);
     assert_eq!(input_lines2.next(), None);
+}
+
+#[test]
+fn test_healthcheck() {
+    let addr = next_addr();
+
+    let _listener = TcpListener::bind(&addr).unwrap();
+
+    let healthcheck = router::sinks::splunk::tcp_healthcheck(addr);
+
+    assert!(healthcheck.wait().is_ok());
+
+    let bad_addr = next_addr();
+    let bad_healthcheck = router::sinks::splunk::tcp_healthcheck(bad_addr);
+
+    assert!(bad_healthcheck.wait().is_err());
 }
 
 fn receive_lines(
