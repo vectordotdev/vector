@@ -180,7 +180,7 @@ fn build_sink(sink: config::Sink) -> Result<sinks::RouterSinkFuture, String> {
             } else if let Some(endpoint) = endpoint {
                 Region::Custom {
                     name: "custom".to_owned(),
-                    endpoint: endpoint,
+                    endpoint,
                 }
             } else {
                 return Err("Must set 'region' or 'endpoint'".to_string());

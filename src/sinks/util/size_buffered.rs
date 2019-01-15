@@ -132,7 +132,7 @@ impl<S: Sink<SinkItem = Vec<u8>>> Sink for SizeBuffered<S> {
 
     fn start_send(
         &mut self,
-        mut item: Self::SinkItem,
+        item: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         if self.buffer.size() >= self.buffer_limit {
             self.poll_complete()?;
@@ -142,7 +142,7 @@ impl<S: Sink<SinkItem = Vec<u8>>> Sink for SizeBuffered<S> {
             }
         }
 
-        self.buffer.push(&mut item);
+        self.buffer.push(&item);
 
         Ok(AsyncSink::Ready)
     }
