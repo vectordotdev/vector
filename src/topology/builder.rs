@@ -2,15 +2,24 @@ use super::config;
 use crate::{record::Record, sinks, sources, transforms};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
-use log::error;
+use log::{error, info};
 use regex::{Regex, RegexSet};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
 pub fn build(
     config: super::Config,
-) -> Result<(impl Future<Item = (), Error = ()>, Trigger, Vec<String>), Vec<String>> {
+) -> Result<
+    (
+        impl Future<Item = (), Error = ()>,
+        Trigger,
+        impl Future<Item = (), Error = ()>,
+        Vec<String>,
+    ),
+    Vec<String>,
+> {
     let mut tasks: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![];
+    let mut healthcheck_tasks = vec![];
     let mut errors = vec![];
     let mut warnings = vec![];
 
@@ -62,7 +71,13 @@ pub fn build(
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
             }
-            Ok(sink) => {
+            Ok((sink, healthcheck)) => {
+                let name2 = name.clone();
+                let healthcheck_task = healthcheck
+                    .map(move |_| info!("Healthcheck for {}: Ok", name))
+                    .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name2, err));
+                healthcheck_tasks.push(healthcheck_task);
+
                 let sink_task = sink
                     .map_err(|e| error!("error creating sender: {:?}", e))
                     .and_then(|sink| rx.forward(sink).map(|_| ()));
@@ -151,17 +166,28 @@ pub fn build(
             future::ok(())
         });
 
-        Ok((lazy, trigger, warnings))
+        let healthchecks = futures::future::join_all(healthcheck_tasks).map(|_| ());
+
+        Ok((lazy, trigger, healthchecks, warnings))
     } else {
         Err(errors)
     }
 }
 
-fn build_sink(sink: config::Sink) -> Result<sinks::RouterSinkFuture, String> {
+fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSinkFuture, sinks::Healthcheck), String> {
     match sink {
-        config::Sink::SplunkTcp { address } => Ok(sinks::splunk::raw_tcp(address)),
-        config::Sink::SplunkHec { token, host } => Ok(sinks::splunk::hec(token, host)),
-        config::Sink::Elasticsearch => Ok(sinks::elasticsearch::ElasticsearchSink::build()),
+        config::Sink::SplunkTcp { address } => Ok((
+            sinks::splunk::raw_tcp(address),
+            sinks::splunk::tcp_healthcheck(address),
+        )),
+        config::Sink::SplunkHec { token, host } => Ok((
+            sinks::splunk::hec(token.clone(), host.clone()),
+            sinks::splunk::hec_healthcheck(token, host),
+        )),
+        config::Sink::Elasticsearch => Ok((
+            sinks::elasticsearch::ElasticsearchSink::build(),
+            sinks::elasticsearch::ElasticsearchSink::healthcheck(),
+        )),
         config::Sink::S3 {
             bucket,
             key_prefix,
@@ -186,17 +212,28 @@ fn build_sink(sink: config::Sink) -> Result<sinks::RouterSinkFuture, String> {
                 return Err("Must set 'region' or 'endpoint'".to_string());
             };
 
-            let client = S3Client::new(region);
-
+            let client = S3Client::new(region.clone());
             let config = sinks::s3::S3SinkConfig {
                 client,
+                gzip,
+                buffer_size,
+                key_prefix: key_prefix.clone(),
+                bucket: bucket.clone(),
+            };
+
+            let healthcheck_client = S3Client::new(region);
+            let healthcheck_config = sinks::s3::S3SinkConfig {
+                client: healthcheck_client,
                 gzip,
                 buffer_size,
                 key_prefix,
                 bucket,
             };
 
-            Ok(sinks::s3::new(config))
+            Ok((
+                sinks::s3::new(config),
+                sinks::s3::healthcheck(healthcheck_config),
+            ))
         }
     }
 }

@@ -7,15 +7,21 @@ use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 fn main() {
     router::setup_logger();
 
-    let app = App::new("Router").version("1.0").author("timber.io").arg(
-        Arg::with_name("config")
-            .short("c")
-            .long("config")
-            .value_name("FILE")
-            .help("Sets a custom config file")
-            .required(true)
-            .takes_value(true),
-    );
+    let app = App::new("Router").version("1.0").author("timber.io")
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .required(true)
+                .takes_value(true),
+        ).arg(
+            Arg::with_name("require-healthy")
+                .short("r")
+                .long("require-healthy")
+                .help("Causes router to immediate exit on startup if any sinks having failing healthchecks")
+        );
     let matches = app.get_matches();
 
     let config = matches.value_of("config").unwrap();
@@ -24,13 +30,13 @@ fn main() {
 
     let topology = config.and_then(topology::build);
 
-    let (server, server_trigger) = match topology {
-        Ok((server, server_trigger, warnings)) => {
+    let (server, server_trigger, healthchecks) = match topology {
+        Ok((server, server_trigger, healthchecks, warnings)) => {
             for warning in warnings {
                 error!("Configuration warning: {}", warning);
             }
 
-            (server, server_trigger)
+            (server, server_trigger, healthchecks)
         }
         Err(errors) => {
             for error in errors {
@@ -41,6 +47,19 @@ fn main() {
     };
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    if matches.is_present("require-healthy") {
+        let success = rt.block_on(healthchecks);
+
+        if success.is_ok() {
+            info!("All healthchecks passed");
+        } else {
+            error!("Sinks unhealthy; shutting down");
+            std::process::exit(1);
+        }
+    } else {
+        rt.spawn(healthchecks);
+    }
 
     rt.spawn(server);
 

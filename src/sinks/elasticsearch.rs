@@ -253,4 +253,27 @@ impl ElasticsearchSink<Record> {
             Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)));
         Box::new(future::lazy(|| future::ok(sink)))
     }
+
+    pub fn healthcheck() -> super::Healthcheck {
+        let client: Client<_, Body> = Client::builder()
+            .executor(DefaultExecutor::current())
+            .build_http();
+
+        let uri: Uri = "http://localhost:9200/_cluster/health".parse().unwrap();
+
+        let request = Request::post(uri).body(Body::empty()).unwrap();
+
+        let healthcheck = client
+            .request(request)
+            .map_err(|err| err.to_string())
+            .and_then(|response| {
+                if response.status() == hyper::StatusCode::OK {
+                    Ok(())
+                } else {
+                    Err(format!("Unexpected status: {}", response.status()))
+                }
+            });
+
+        Box::new(healthcheck)
+    }
 }

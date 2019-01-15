@@ -209,6 +209,47 @@ fn test_gzip() {
     assert_eq!(lines, response_lines);
 }
 
+#[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
+#[test]
+fn test_healthchecks() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    // OK
+    {
+        let healthcheck = sinks::s3::healthcheck(config());
+        rt.block_on(healthcheck).unwrap();
+    }
+
+    // Bad credentials
+    {
+        let credentials =
+            rusoto_credential::StaticProvider::new_minimal("asdf".to_string(), "1234".to_string());
+
+        let dispatcher = rusoto_core::request::HttpClient::new().unwrap();
+
+        let region = Region::Custom {
+            name: "minio".to_owned(),
+            endpoint: "http://localhost:9000".to_owned(),
+        };
+
+        let client = S3Client::new_with(dispatcher, credentials, region);
+
+        let config = S3SinkConfig { client, ..config() };
+        let healthcheck = sinks::s3::healthcheck(config);
+        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid credentials")
+    }
+
+    // Inaccessible bucket
+    {
+        let config = S3SinkConfig {
+            bucket: "asdflkjadskdaadsfadf".to_string(),
+            ..config()
+        };
+        let healthcheck = sinks::s3::healthcheck(config);
+        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
+    }
+}
+
 fn client() -> S3Client {
     let region = Region::Custom {
         name: "minio".to_owned(),

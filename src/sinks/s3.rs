@@ -131,3 +131,24 @@ pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
     let sink: super::RouterSink = Box::new(sink);
     Box::new(future::ok(sink))
 }
+
+pub fn healthcheck(config: S3SinkConfig) -> super::Healthcheck {
+    use rusoto_s3::{HeadBucketError, HeadBucketRequest};
+
+    let request = HeadBucketRequest {
+        bucket: config.bucket,
+    };
+
+    let response = config.client.head_bucket(request);
+
+    let healthcheck = response.map_err(|err| match err {
+        HeadBucketError::Unknown(response) => match response.status {
+            http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
+            http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
+            status => format!("Unknown error: Status code: {}", status),
+        },
+        err => err.to_string(),
+    });
+
+    Box::new(healthcheck)
+}
