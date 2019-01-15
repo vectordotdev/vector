@@ -3,109 +3,6 @@ use futures::{try_ready, Async, AsyncSink, Sink};
 use std::io::Write;
 use std::mem;
 
-#[cfg(test)]
-mod test {
-    use super::SizeBuffered;
-    use futures::{Future, Sink};
-    use std::io::Read;
-
-    #[test]
-    fn size_buffered_buffers_messages_until_limit() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let input = (0..22).map(|i| vec![i]).collect::<Vec<_>>();
-        let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
-            .wait()
-            .unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(
-            output,
-            vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-                vec![20, 21]
-            ]
-        );
-    }
-
-    #[test]
-    fn size_buffered_doesnt_buffer_if_its_flushed() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let buffered = buffered.send(vec![0]).wait().unwrap();
-        let buffered = buffered.send(vec![1]).wait().unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(output, vec![vec![0], vec![1],]);
-    }
-
-    #[test]
-    fn size_buffered_allows_the_final_item_to_exceed_the_buffer_size() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let input = vec![
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            vec![9, 10, 11],
-            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-            vec![24],
-        ];
-        let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
-            .wait()
-            .unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(
-            output,
-            vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-                vec![24],
-            ]
-        );
-    }
-
-    #[test]
-    fn gzip() {
-        use flate2::read::GzDecoder;
-
-        let buffered = SizeBuffered::new(vec![], 1000, true);
-
-        let input = std::iter::repeat(
-            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
-        )
-        .take(100_000);
-
-        let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
-            .wait()
-            .unwrap();
-
-        let output = buffered.into_inner();
-
-        assert!(output.len() > 1);
-        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 50_000);
-
-        let decompressed = output.into_iter().flat_map(|batch| {
-            let mut decompressed = vec![];
-            GzDecoder::new(batch.as_slice())
-                .read_to_end(&mut decompressed)
-                .unwrap();
-            decompressed
-        });
-
-        assert!(decompressed.eq(std::iter::repeat(
-            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()
-        )
-        .take(100_000)
-        .flatten()));
-    }
-}
-
 pub struct SizeBuffered<S: Sink<SinkItem = Vec<u8>>> {
     inner: S,
     buffer: Buffer,
@@ -222,5 +119,108 @@ impl Buffer {
             Buffer::Plain(inner) => inner.is_empty(),
             Buffer::Gzip(inner) => inner.get_ref().is_empty(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::SizeBuffered;
+    use futures::{Future, Sink};
+    use std::io::Read;
+
+    #[test]
+    fn size_buffered_buffers_messages_until_limit() {
+        let buffered = SizeBuffered::new(vec![], 10, false);
+
+        let input = (0..22).map(|i| vec![i]).collect::<Vec<_>>();
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered.into_inner();
+        assert_eq!(
+            output,
+            vec![
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                vec![20, 21]
+            ]
+        );
+    }
+
+    #[test]
+    fn size_buffered_doesnt_buffer_if_its_flushed() {
+        let buffered = SizeBuffered::new(vec![], 10, false);
+
+        let buffered = buffered.send(vec![0]).wait().unwrap();
+        let buffered = buffered.send(vec![1]).wait().unwrap();
+
+        let output = buffered.into_inner();
+        assert_eq!(output, vec![vec![0], vec![1],]);
+    }
+
+    #[test]
+    fn size_buffered_allows_the_final_item_to_exceed_the_buffer_size() {
+        let buffered = SizeBuffered::new(vec![], 10, false);
+
+        let input = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 7, 8],
+            vec![9, 10, 11],
+            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+            vec![24],
+        ];
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered.into_inner();
+        assert_eq!(
+            output,
+            vec![
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+                vec![24],
+            ]
+        );
+    }
+
+    #[test]
+    fn gzip() {
+        use flate2::read::GzDecoder;
+
+        let buffered = SizeBuffered::new(vec![], 1000, true);
+
+        let input = std::iter::repeat(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
+        )
+        .take(100_000);
+
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered.into_inner();
+
+        assert!(output.len() > 1);
+        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 50_000);
+
+        let decompressed = output.into_iter().flat_map(|batch| {
+            let mut decompressed = vec![];
+            GzDecoder::new(batch.as_slice())
+                .read_to_end(&mut decompressed)
+                .unwrap();
+            decompressed
+        });
+
+        assert!(decompressed.eq(std::iter::repeat(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()
+        )
+        .take(100_000)
+        .flatten()));
     }
 }
