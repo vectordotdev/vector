@@ -22,7 +22,7 @@ fn test_insert_message_into_s3() {
         .map(|line| Record::new_from_line(line.clone()))
         .collect::<Vec<_>>();
 
-    let pump = sink.and_then(|sink| sink.send_all(stream::iter_ok(records.into_iter())));
+    let pump = sink.send_all(stream::iter_ok(records.into_iter()));
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let (mut sink, _) = rt.block_on(pump).unwrap();
@@ -86,7 +86,7 @@ fn test_rotate_files_after_the_buffer_size_is_reached() {
         .map(|line| Record::new_from_line(line.clone()))
         .collect::<Vec<_>>();
 
-    let pump = sink.and_then(|sink| sink.send_all(stream::iter_ok(records.into_iter())));
+    let pump = sink.send_all(stream::iter_ok(records.into_iter()));
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let (mut sink, _) = rt.block_on(pump).unwrap();
@@ -155,7 +155,7 @@ fn test_gzip() {
         .map(|line| Record::new_from_line(line.clone()))
         .collect::<Vec<_>>();
 
-    let pump = sink.and_then(|sink| sink.send_all(stream::iter_ok(records.into_iter())));
+    let pump = sink.send_all(stream::iter_ok(records.into_iter()));
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let (mut sink, _) = rt.block_on(pump).unwrap();

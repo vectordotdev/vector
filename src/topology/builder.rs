@@ -78,9 +78,7 @@ pub fn build(
                     .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name2, err));
                 healthcheck_tasks.push(healthcheck_task);
 
-                let sink_task = sink
-                    .map_err(|e| error!("error creating sender: {:?}", e))
-                    .and_then(|sink| rx.forward(sink).map(|_| ()));
+                let sink_task = rx.forward(sink).map(|_| ());
 
                 tasks.push(Box::new(sink_task));
             }
@@ -174,7 +172,7 @@ pub fn build(
     }
 }
 
-fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSinkFuture, sinks::Healthcheck), String> {
+fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
     match sink {
         config::Sink::SplunkTcp { address } => Ok((
             sinks::splunk::raw_tcp(address),

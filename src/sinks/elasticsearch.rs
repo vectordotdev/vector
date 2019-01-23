@@ -2,7 +2,6 @@ use crate::record::Record;
 use chrono::{Date, Utc};
 use elastic_responses::{bulk::BulkErrorsResponse, parse};
 use futures::{
-    future,
     stream::FuturesUnordered,
     sync::oneshot::{self, SpawnHandle},
     Async, AsyncSink, Future, Sink, Stream,
@@ -248,10 +247,8 @@ impl<T: Document> Sink for ElasticsearchSink<T> {
 }
 
 impl ElasticsearchSink<Record> {
-    pub fn build() -> super::RouterSinkFuture {
-        let sink: super::RouterSink =
-            Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)));
-        Box::new(future::lazy(|| future::ok(sink)))
+    pub fn build() -> super::RouterSink {
+        Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)))
     }
 
     pub fn healthcheck() -> super::Healthcheck {
