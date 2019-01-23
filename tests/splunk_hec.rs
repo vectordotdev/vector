@@ -15,7 +15,7 @@ fn test_insert_message_into_splunk() {
     let message = random_string();
     let record = Record::new_from_line(message.clone());
 
-    let pump = sink.and_then(|sink| sink.send(record));
+    let pump = sink.send(record);
 
     rt.block_on(pump).unwrap();
 
@@ -49,7 +49,7 @@ fn test_insert_many() {
         .map(|l| Record::new_from_line(l.clone()))
         .collect::<Vec<_>>();
 
-    let pump = sink.and_then(|sink| sink.send_all(futures::stream::iter_ok(records)));
+    let pump = sink.send_all(futures::stream::iter_ok(records));
 
     rt.block_on(pump).unwrap();
 
@@ -84,7 +84,7 @@ fn test_custom_fields() {
     let mut record = Record::new_from_line(message.clone());
     record.custom.insert("asdf".into(), "hello".to_owned());
 
-    let pump = sink.and_then(|sink| sink.send(record));
+    let pump = sink.send(record);
 
     rt.block_on(pump).unwrap();
 
@@ -116,7 +116,7 @@ fn test_hostname() {
     record.custom.insert("asdf".into(), "hello".to_owned());
     record.host = Some("example.com:1234".to_owned());
 
-    let pump = sink.and_then(|sink| sink.send(record));
+    let pump = sink.send(record);
 
     rt.block_on(pump).unwrap();
 

@@ -1,6 +1,6 @@
 use crate::record::Record;
 use crate::sinks::util::size_buffered::Buffer;
-use futures::{future, Async, AsyncSink, Future, Sink};
+use futures::{Async, AsyncSink, Future, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 
@@ -119,7 +119,7 @@ impl Sink for S3Sink {
     }
 }
 
-pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
+pub fn new(config: S3SinkConfig) -> super::RouterSink {
     let buffer = Buffer::new(config.gzip);
 
     let sink = S3Sink {
@@ -128,8 +128,7 @@ pub fn new(config: S3SinkConfig) -> super::RouterSinkFuture {
         config,
     };
 
-    let sink: super::RouterSink = Box::new(sink);
-    Box::new(future::ok(sink))
+    Box::new(sink)
 }
 
 pub fn healthcheck(config: S3SinkConfig) -> super::Healthcheck {

@@ -1,6 +1,6 @@
 use super::util;
 use super::util::SinkExt;
-use futures::{future, Async, AsyncSink, Future, Sink};
+use futures::{Async, AsyncSink, Future, Sink};
 use hyper::{Request, Uri};
 use log::error;
 use serde_json::json;
@@ -99,10 +99,8 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
-    let sink: super::RouterSink =
-        Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.line)));
-    Box::new(future::ok(sink))
+pub fn raw_tcp(addr: SocketAddr) -> super::RouterSink {
+    Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.line)))
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
@@ -113,7 +111,7 @@ pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     Box::new(check)
 }
 
-pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
+pub fn hec(token: String, host: String) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
         .with(move |body: Vec<u8>| {
             let uri = format!("{}/services/collector/event", host);
@@ -141,8 +139,7 @@ pub fn hec(token: String, host: String) -> super::RouterSinkFuture {
             Ok(body)
         });
 
-    let sink: super::RouterSink = Box::new(sink);
-    Box::new(future::ok(sink))
+    Box::new(sink)
 }
 
 pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
