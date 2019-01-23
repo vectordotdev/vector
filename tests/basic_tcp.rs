@@ -4,6 +4,7 @@ use router::test_util::{next_addr, random_lines, send_lines};
 use router::topology::{self, config};
 use serde_json::json;
 use std::net::SocketAddr;
+use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 
@@ -419,6 +420,56 @@ fn test_merge_and_fork_json() {
     }
     assert_eq!(input_lines1.next(), None);
     assert_eq!(input_lines2.next(), None);
+}
+
+#[test]
+fn test_reconnect() {
+    let num_lines: usize = 1000;
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
+
+    let mut topology = config::Config::empty();
+    topology.add_source("in", config::Source::Splunk { address: in_addr });
+    topology.add_sink(
+        "out",
+        &["in"],
+        config::Sink::SplunkTcp { address: out_addr },
+    );
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let output_rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (output_trigger, output_tripwire) = Tripwire::new();
+    let output_listener = TcpListener::bind(&out_addr).unwrap();
+    let output_lines = output_listener
+        .incoming()
+        .take_until(output_tripwire)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()).take(1))
+        .flatten()
+        .map_err(|e| panic!("{:?}", e))
+        .collect();
+    let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
+
+    rt.spawn(server);
+    // Wait for server to accept traffic
+    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    let send = send_lines(in_addr, input_lines.clone().into_iter());
+    rt.block_on(send).unwrap();
+
+    // Shut down server and wait for it to fully flush
+    drop(trigger);
+    rt.shutdown_on_idle().wait().unwrap();
+
+    drop(output_trigger);
+    output_rt.shutdown_on_idle().wait().unwrap();
+
+    let output_lines = output_lines.wait().unwrap();
+    assert!(num_lines >= 2);
+    assert!(output_lines.iter().all(|line| input_lines.contains(line)))
 }
 
 #[test]
