@@ -1,12 +1,12 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
-use futures::{future, Future, Sink, Stream};
+use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines};
 use router::topology::{self, config};
 use std::net::SocketAddr;
-use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::codec::{FramedRead, LinesCodec};
+use tokio::net::TcpListener;
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -22,8 +22,13 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                 || {
                     let mut topology = config::Config::empty();
                     topology.add_source("in", config::Source::Splunk { address: in_addr });
-                    topology.add_sink("out", &["in"], config::Sink::Splunk { address: out_addr });
-                    let (server, trigger) = topology::build(topology);
+                    topology.add_sink(
+                        "out",
+                        &["in"],
+                        config::Sink::SplunkTcp { address: out_addr },
+                    );
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -65,8 +70,13 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                 || {
                     let mut topology = config::Config::empty();
                     topology.add_source("in", config::Source::Splunk { address: in_addr });
-                    topology.add_sink("out", &["in"], config::Sink::Splunk { address: out_addr });
-                    let (server, trigger) = topology::build(topology);
+                    topology.add_sink(
+                        "out",
+                        &["in"],
+                        config::Sink::SplunkTcp { address: out_addr },
+                    );
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -108,8 +118,13 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                 || {
                     let mut topology = config::Config::empty();
                     topology.add_source("in", config::Source::Splunk { address: in_addr });
-                    topology.add_sink("out", &["in"], config::Sink::Splunk { address: out_addr });
-                    let (server, trigger) = topology::build(topology);
+                    topology.add_sink(
+                        "out",
+                        &["in"],
+                        config::Sink::SplunkTcp { address: out_addr },
+                    );
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -152,8 +167,13 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                 || {
                     let mut topology = config::Config::empty();
                     topology.add_source("in", config::Source::Splunk { address: in_addr });
-                    topology.add_sink("out", &["in"], config::Sink::Splunk { address: out_addr });
-                    let (server, trigger) = topology::build(topology);
+                    topology.add_sink(
+                        "out",
+                        &["in"],
+                        config::Sink::SplunkTcp { address: out_addr },
+                    );
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -209,14 +229,15 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     topology.add_sink(
                         "out1",
                         &["in1", "in2"],
-                        config::Sink::Splunk { address: out_addr1 },
+                        config::Sink::SplunkTcp { address: out_addr1 },
                     );
                     topology.add_sink(
                         "out2",
                         &["in1", "in2"],
-                        config::Sink::Splunk { address: out_addr2 },
+                        config::Sink::SplunkTcp { address: out_addr2 },
                     );
-                    let (server, trigger) = topology::build(topology);
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -281,9 +302,10 @@ fn benchmark_transforms(c: &mut Criterion) {
                     topology.add_sink(
                         "out",
                         &["filter"],
-                        config::Sink::Splunk { address: out_addr },
+                        config::Sink::SplunkTcp { address: out_addr },
                     );
-                    let (server, trigger) = topology::build(topology);
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
@@ -378,39 +400,40 @@ fn benchmark_complex(c: &mut Criterion) {
                     topology.add_sink(
                         "out_all",
                         &["parser"],
-                        config::Sink::Splunk {
+                        config::Sink::SplunkTcp {
                             address: out_addr_all,
                         },
                     );
                     topology.add_sink(
                         "out_sampled",
                         &["sampler"],
-                        config::Sink::Splunk {
+                        config::Sink::SplunkTcp {
                             address: out_addr_sampled,
                         },
                     );
                     topology.add_sink(
                         "out_200",
                         &["filter_200"],
-                        config::Sink::Splunk {
+                        config::Sink::SplunkTcp {
                             address: out_addr_200,
                         },
                     );
                     topology.add_sink(
                         "out_404",
                         &["filter_404"],
-                        config::Sink::Splunk {
+                        config::Sink::SplunkTcp {
                             address: out_addr_404,
                         },
                     );
                     topology.add_sink(
                         "out_500",
                         &["filter_500"],
-                        config::Sink::Splunk {
+                        config::Sink::SplunkTcp {
                             address: out_addr_500,
                         },
                     );
-                    let (server, trigger) = topology::build(topology);
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines_all = count_lines(&out_addr_all, &rt.executor());
