@@ -1,6 +1,6 @@
 use super::util;
 use super::util::SinkExt;
-use futures::{future, Future, Sink};
+use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::{Request, Uri};
 use log::error;
 use serde_json::json;
@@ -10,19 +10,99 @@ use tokio::net::TcpStream;
 
 use crate::record::Record;
 
+struct TcpSink {
+    addr: SocketAddr,
+    state: TcpSinkState,
+}
+
+enum TcpSinkState {
+    Disconnected,
+    Connecting(tokio::net::tcp::ConnectFuture),
+    Connected(FramedWrite<TcpStream, LinesCodec>),
+}
+
+impl TcpSink {
+    pub fn new(addr: SocketAddr) -> Self {
+        Self {
+            addr: addr,
+            state: TcpSinkState::Disconnected,
+        }
+    }
+
+    fn connection(&mut self) -> Option<&mut FramedWrite<TcpStream, LinesCodec>> {
+        loop {
+            match self.state {
+                TcpSinkState::Disconnected => {
+                    self.state = TcpSinkState::Connecting(TcpStream::connect(&self.addr));
+                }
+                TcpSinkState::Connecting(ref mut connect_future) => {
+                    match connect_future.poll() {
+                        Ok(Async::Ready(socket)) => {
+                            self.state = TcpSinkState::Connected(FramedWrite::new(
+                                socket,
+                                LinesCodec::new(),
+                            ));
+                        }
+                        Ok(Async::NotReady) => {
+                            return None;
+                        }
+                        Err(err) => {
+                            // TODO: add backoff
+                            error!("Error connecting to {}: {}", self.addr, err);
+                            self.state = TcpSinkState::Disconnected;
+                        }
+                    }
+                }
+                TcpSinkState::Connected(ref mut connection) => {
+                    return Some(connection);
+                }
+            }
+        }
+    }
+}
+
+impl Sink for TcpSink {
+    type SinkItem = String;
+    type SinkError = ();
+
+    fn start_send(
+        &mut self,
+        line: Self::SinkItem,
+    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+        if let Some(connection) = self.connection() {
+            match connection.start_send(line) {
+                Err(err) => {
+                    error!("Error in connection {}: {}", self.addr, err);
+                    self.state = TcpSinkState::Disconnected;
+                    Ok(AsyncSink::Ready)
+                }
+                Ok(ok) => Ok(ok),
+            }
+        } else {
+            Ok(AsyncSink::NotReady(line))
+        }
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
+        if let Some(connection) = self.connection() {
+            match connection.poll_complete() {
+                Err(err) => {
+                    error!("Error in connection {}: {}", self.addr, err);
+                    self.state = TcpSinkState::Disconnected;
+                    Ok(Async::Ready(()))
+                }
+                Ok(ok) => Ok(ok),
+            }
+        } else {
+            Ok(Async::NotReady)
+        }
+    }
+}
+
 pub fn raw_tcp(addr: SocketAddr) -> super::RouterSinkFuture {
-    // lazy so that we don't actually try to connect until the future is polled
-    Box::new(future::lazy(move || {
-        TcpStream::connect(&addr)
-            .map(|socket| -> super::RouterSink {
-                Box::new(
-                    FramedWrite::new(socket, LinesCodec::new())
-                        .sink_map_err(|e| error!("splunk sink error: {:?}", e))
-                        .with(|record: Record| Ok(record.line)),
-                )
-            })
-            .map_err(|e| error!("error opening splunk sink: {:?}", e))
-    }))
+    let sink: super::RouterSink =
+        Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.line)));
+    Box::new(future::ok(sink))
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
