@@ -1,5 +1,5 @@
 use flate2::read::GzDecoder;
-use futures::{stream, Future, Sink};
+use futures::{stream, Sink};
 use router::sinks::s3::S3SinkConfig;
 use router::test_util::{random_lines, random_string};
 use router::{sinks, Record};
