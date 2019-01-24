@@ -1,4 +1,3 @@
-use super::config;
 use crate::{record::Record, sinks};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
@@ -66,7 +65,7 @@ pub fn build(
         }
         let rx = add_connections(sink.inputs);
 
-        match build_sink(sink.inner) {
+        match sink.inner.build() {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
             }
@@ -168,69 +167,5 @@ pub fn build(
         Ok((lazy, trigger, healthchecks, warnings))
     } else {
         Err(errors)
-    }
-}
-
-fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
-    match sink {
-        config::Sink::SplunkTcp { address } => Ok((
-            sinks::splunk::raw_tcp(address),
-            sinks::splunk::tcp_healthcheck(address),
-        )),
-        config::Sink::SplunkHec { token, host } => Ok((
-            sinks::splunk::hec(token.clone(), host.clone()),
-            sinks::splunk::hec_healthcheck(token, host),
-        )),
-        config::Sink::Elasticsearch => Ok((
-            sinks::elasticsearch::ElasticsearchSink::build(),
-            sinks::elasticsearch::ElasticsearchSink::healthcheck(),
-        )),
-        config::Sink::S3 {
-            bucket,
-            key_prefix,
-            region,
-            endpoint,
-            buffer_size,
-            gzip,
-        } => {
-            use rusoto_core::region::Region;
-            use rusoto_s3::S3Client;
-
-            let region = if region.is_some() && endpoint.is_some() {
-                return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
-            } else if let Some(region) = region {
-                region.parse::<Region>().map_err(|e| e.to_string())?
-            } else if let Some(endpoint) = endpoint {
-                Region::Custom {
-                    name: "custom".to_owned(),
-                    endpoint,
-                }
-            } else {
-                return Err("Must set 'region' or 'endpoint'".to_string());
-            };
-
-            let client = S3Client::new(region.clone());
-            let config = sinks::s3::S3SinkConfig {
-                client,
-                gzip,
-                buffer_size,
-                key_prefix: key_prefix.clone(),
-                bucket: bucket.clone(),
-            };
-
-            let healthcheck_client = S3Client::new(region);
-            let healthcheck_config = sinks::s3::S3SinkConfig {
-                client: healthcheck_client,
-                gzip,
-                buffer_size,
-                key_prefix,
-                bucket,
-            };
-
-            Ok((
-                sinks::s3::new(config),
-                sinks::s3::healthcheck(healthcheck_config),
-            ))
-        }
     }
 }

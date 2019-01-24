@@ -3,12 +3,26 @@ use super::util::SinkExt;
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink};
 use hyper::{Request, Uri};
 use log::error;
+use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::net::SocketAddr;
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
 
 use crate::record::Record;
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TcpSinkConfig {
+    pub address: std::net::SocketAddr,
+}
+
+#[typetag::serde(name = "splunk_tcp")]
+impl crate::topology::config::SinkConfig for TcpSinkConfig {
+    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((raw_tcp(self.address), tcp_healthcheck(self.address)))
+    }
+}
 
 struct TcpSink {
     addr: SocketAddr,
@@ -107,6 +121,23 @@ pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
         .map_err(|err| err.to_string());
 
     Box::new(check)
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct HecSinkConfig {
+    pub token: String,
+    pub host: String,
+}
+
+#[typetag::serde(name = "splunk_hec")]
+impl crate::topology::config::SinkConfig for HecSinkConfig {
+    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((
+            hec(self.token.clone(), self.host.clone()),
+            hec_healthcheck(self.token.clone(), self.host.clone()),
+        ))
+    }
 }
 
 pub fn hec(token: String, host: String) -> super::RouterSink {
