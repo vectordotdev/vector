@@ -3,6 +3,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines};
+use router::{sources, sinks, transforms};
 use router::topology::{self, config};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
@@ -21,11 +22,11 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", config::Source::Splunk { address: in_addr });
+                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
-                        config::Sink::SplunkTcp { address: out_addr },
+                        sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -69,11 +70,11 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", config::Source::Splunk { address: in_addr });
+                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
-                        config::Sink::SplunkTcp { address: out_addr },
+                        sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -117,11 +118,11 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", config::Source::Splunk { address: in_addr });
+                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
-                        config::Sink::SplunkTcp { address: out_addr },
+                        sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -166,11 +167,11 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", config::Source::Splunk { address: in_addr });
+                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
-                        config::Sink::SplunkTcp { address: out_addr },
+                        sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -224,17 +225,17 @@ fn benchmark_interconnected(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in1", config::Source::Splunk { address: in_addr1 });
-                    topology.add_source("in2", config::Source::Splunk { address: in_addr2 });
+                    topology.add_source("in1", sources::splunk::TcpConfig { address: in_addr1 });
+                    topology.add_source("in2", sources::splunk::TcpConfig { address: in_addr2 });
                     topology.add_sink(
                         "out1",
                         &["in1", "in2"],
-                        config::Sink::SplunkTcp { address: out_addr1 },
+                        sinks::splunk::TcpSinkConfig { address: out_addr1 },
                     );
                     topology.add_sink(
                         "out2",
                         &["in1", "in2"],
-                        config::Sink::SplunkTcp { address: out_addr2 },
+                        sinks::splunk::TcpSinkConfig { address: out_addr2 },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -283,18 +284,18 @@ fn benchmark_transforms(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", config::Source::Splunk { address: in_addr });
+                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
                     topology.add_transform(
                         "parser",
                         &["in"],
-                        config::Transform::RegexParser {
+                        transforms::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
                     topology.add_transform(
                         "filter",
                         &["parser"],
-                        config::Transform::FieldFilter {
+                        transforms::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "404".to_string(),
                         },
@@ -302,7 +303,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     topology.add_sink(
                         "out",
                         &["filter"],
-                        config::Sink::SplunkTcp { address: out_addr },
+                        sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -356,19 +357,19 @@ fn benchmark_complex(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in1", config::Source::Splunk { address: in_addr1 });
-                    topology.add_source("in2", config::Source::Splunk { address: in_addr2 });
+                    topology.add_source("in1", sources::splunk::TcpConfig { address: in_addr1 });
+                    topology.add_source("in2", sources::splunk::TcpConfig { address: in_addr2 });
                     topology.add_transform(
                         "parser",
                         &["in1", "in2"],
-                        config::Transform::RegexParser {
+                        transforms::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
                     topology.add_transform(
                         "filter_200",
                         &["parser"],
-                        config::Transform::FieldFilter {
+                        transforms::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "200".to_string(),
                         },
@@ -376,7 +377,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     topology.add_transform(
                         "filter_404",
                         &["parser"],
-                        config::Transform::FieldFilter {
+                        transforms::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "404".to_string(),
                         },
@@ -384,7 +385,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     topology.add_transform(
                         "filter_500",
                         &["parser"],
-                        config::Transform::FieldFilter {
+                        transforms::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "500".to_string(),
                         },
@@ -392,7 +393,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     topology.add_transform(
                         "sampler",
                         &["parser"],
-                        config::Transform::Sampler {
+                        transforms::SamplerConfig {
                             rate: 10,
                             pass_list: vec![],
                         },
@@ -400,35 +401,35 @@ fn benchmark_complex(c: &mut Criterion) {
                     topology.add_sink(
                         "out_all",
                         &["parser"],
-                        config::Sink::SplunkTcp {
+                        sinks::splunk::TcpSinkConfig {
                             address: out_addr_all,
                         },
                     );
                     topology.add_sink(
                         "out_sampled",
                         &["sampler"],
-                        config::Sink::SplunkTcp {
+                        sinks::splunk::TcpSinkConfig {
                             address: out_addr_sampled,
                         },
                     );
                     topology.add_sink(
                         "out_200",
                         &["filter_200"],
-                        config::Sink::SplunkTcp {
+                        sinks::splunk::TcpSinkConfig {
                             address: out_addr_200,
                         },
                     );
                     topology.add_sink(
                         "out_404",
                         &["filter_404"],
-                        config::Sink::SplunkTcp {
+                        sinks::splunk::TcpSinkConfig {
                             address: out_addr_404,
                         },
                     );
                     topology.add_sink(
                         "out_500",
                         &["filter_500"],
-                        config::Sink::SplunkTcp {
+                        sinks::splunk::TcpSinkConfig {
                             address: out_addr_500,
                         },
                     );
