@@ -1,6 +1,7 @@
 use crate::record::Record;
 use crate::sinks::util::size_buffered::Buffer;
 use futures::{Async, AsyncSink, Future, Sink};
+use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde_derive::{Deserialize, Serialize};
@@ -34,41 +35,36 @@ pub struct S3SinkConfig2 {
 #[typetag::serde(name = "s3")]
 impl crate::topology::config::SinkConfig for S3SinkConfig2 {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        use rusoto_core::region::Region;
-        use rusoto_s3::S3Client;
+        Ok((new(self.config()?), healthcheck(self.config()?)))
+    }
+}
 
-        let region = if self.region.is_some() && self.endpoint.is_some() {
+impl S3SinkConfig2 {
+    fn region(&self) -> Result<Region, String> {
+        if self.region.is_some() && self.endpoint.is_some() {
             return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
         } else if let Some(region) = &self.region {
-            region.parse::<Region>().map_err(|e| e.to_string())?
+            region.parse::<Region>().map_err(|e| e.to_string())
         } else if let Some(endpoint) = &self.endpoint {
-            Region::Custom {
+            Ok(Region::Custom {
                 name: "custom".to_owned(),
                 endpoint: endpoint.clone(),
-            }
+            })
         } else {
             return Err("Must set 'region' or 'endpoint'".to_string());
-        };
+        }
+    }
 
-        let client = S3Client::new(region.clone());
-        let config = S3SinkConfig {
-            client,
+    fn config(&self) -> Result<S3SinkConfig, String> {
+        let region = self.region()?;
+
+        Ok(S3SinkConfig {
+            client: rusoto_s3::S3Client::new(region),
             gzip: self.gzip,
             buffer_size: self.buffer_size,
             key_prefix: self.key_prefix.clone(),
             bucket: self.bucket.clone(),
-        };
-
-        let healthcheck_client = S3Client::new(region);
-        let healthcheck_config = S3SinkConfig {
-            client: healthcheck_client,
-            gzip: self.gzip,
-            buffer_size: self.buffer_size,
-            key_prefix: self.key_prefix.clone(),
-            bucket: self.bucket.clone(),
-        };
-
-        Ok((new(config), healthcheck(healthcheck_config)))
+        })
     }
 }
 
