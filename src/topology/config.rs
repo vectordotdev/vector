@@ -1,4 +1,4 @@
-use crate::{record::Record, sources, transforms};
+use crate::{record::Record, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
@@ -20,31 +20,12 @@ pub trait SourceConfig: core::fmt::Debug {
 pub struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Sink,
+    pub inner: Box<SinkConfig>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Sink {
-    SplunkTcp {
-        address: std::net::SocketAddr,
-    },
-    SplunkHec {
-        token: String,
-        host: String,
-    },
-    S3 {
-        bucket: String,
-        key_prefix: String,
-        region: Option<String>,
-        endpoint: Option<String>,
-        buffer_size: usize,
-        gzip: bool,
-        // TODO: access key and secret token (if the rusoto provider chain stuff isn't good enough)
-    },
-    Elasticsearch,
+#[typetag::serde(tag = "type")]
+pub trait SinkConfig: core::fmt::Debug {
+    fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 }
 
 #[derive(Deserialize, Debug)]
@@ -73,10 +54,10 @@ impl Config {
         self.sources.insert(name.to_string(), Box::new(source));
     }
 
-    pub fn add_sink(&mut self, name: &str, inputs: &[&str], sink: Sink) {
+    pub fn add_sink<S: SinkConfig + 'static>(&mut self, name: &str, inputs: &[&str], sink: S) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
-            inner: sink,
+            inner: Box::new(sink),
             inputs,
         };
 

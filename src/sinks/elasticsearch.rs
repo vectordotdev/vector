@@ -8,7 +8,7 @@ use futures::{
 };
 use hyper::{client::HttpConnector, Body, Client, Request, Uri};
 use log::{error, info};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{marker::PhantomData, mem};
 use tokio::executor::DefaultExecutor;
@@ -243,6 +243,17 @@ impl<T: Document> Sink for ElasticsearchSink<T> {
                 panic!("this should only be possible if in_flight_limit < 1, which is broken")
             }
         }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ElasticSearchConfig;
+
+#[typetag::serde(name = "elasticsearch")]
+impl crate::topology::config::SinkConfig for ElasticSearchConfig {
+    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((ElasticsearchSink::build(), ElasticsearchSink::healthcheck()))
     }
 }
 
