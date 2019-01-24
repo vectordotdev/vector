@@ -1,6 +1,6 @@
 use super::util;
 use super::util::SinkExt;
-use futures::{Async, AsyncSink, Future, Sink};
+use futures::{Async, AsyncSink, Future, Sink, Poll, try_ready};
 use hyper::{Request, Uri};
 use log::error;
 use serde_json::json;
@@ -29,7 +29,7 @@ impl TcpSink {
         }
     }
 
-    fn connection(&mut self) -> Async<&mut FramedWrite<TcpStream, LinesCodec>> {
+    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, LinesCodec>, ()> {
         loop {
             match self.state {
                 TcpSinkState::Disconnected => {
@@ -44,7 +44,7 @@ impl TcpSink {
                             ));
                         }
                         Ok(Async::NotReady) => {
-                            return Async::NotReady;
+                            return Ok(Async::NotReady);
                         }
                         Err(err) => {
                             // TODO: add backoff
@@ -54,7 +54,7 @@ impl TcpSink {
                     }
                 }
                 TcpSinkState::Connected(ref mut connection) => {
-                    return Async::Ready(connection);
+                    return Ok(Async::Ready(connection));
                 }
             }
         }
@@ -69,8 +69,8 @@ impl Sink for TcpSink {
         &mut self,
         line: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        match self.connection() {
-            Async::Ready(connection) => match connection.start_send(line) {
+        match self.poll_connection() {
+            Ok(Async::Ready(connection)) => match connection.start_send(line) {
                 Err(err) => {
                     error!("Error in connection {}: {}", self.addr, err);
                     self.state = TcpSinkState::Disconnected;
@@ -78,21 +78,21 @@ impl Sink for TcpSink {
                 }
                 Ok(ok) => Ok(ok),
             },
-            Async::NotReady => Ok(AsyncSink::NotReady(line)),
+            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
+            Err(_) => unreachable!(),
         }
     }
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        match self.connection() {
-            Async::Ready(connection) => match connection.poll_complete() {
-                Err(err) => {
-                    error!("Error in connection {}: {}", self.addr, err);
-                    self.state = TcpSinkState::Disconnected;
-                    Ok(Async::Ready(()))
-                }
-                Ok(ok) => Ok(ok),
+        let connection = try_ready!(self.poll_connection());
+
+        match connection.poll_complete() {
+            Err(err) => {
+                error!("Error in connection {}: {}", self.addr, err);
+                self.state = TcpSinkState::Disconnected;
+                Ok(Async::Ready(()))
             }
-            Async::NotReady => Ok(Async::NotReady),
+            Ok(ok) => Ok(ok),
         }
     }
 }
