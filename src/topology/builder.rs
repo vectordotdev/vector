@@ -1,9 +1,8 @@
 use super::config;
-use crate::{record::Record, sinks, transforms};
+use crate::{record::Record, sinks};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
 use log::{error, info};
-use regex::{Regex, RegexSet};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
@@ -113,7 +112,7 @@ pub fn build(
     // This needs to be a separate loop from the one above to make sure that all of the
     // connection outputs are set up before the inputs start using them.
     for (name, transform, rx) in transform_rxs.into_iter() {
-        match build_transform(transform) {
+        match transform.build() {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
             }
@@ -232,24 +231,6 @@ fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSink, sinks::Healthche
                 sinks::s3::new(config),
                 sinks::s3::healthcheck(healthcheck_config),
             ))
-        }
-    }
-}
-
-fn build_transform(transform: config::Transform) -> Result<Box<dyn transforms::Transform>, String> {
-    match transform {
-        config::Transform::Sampler { rate, pass_list } => RegexSet::new(pass_list)
-            .map_err(|err| err.to_string())
-            .map::<Box<dyn transforms::Transform>, _>(|regex_set| {
-                Box::new(transforms::Sampler::new(rate, regex_set))
-            }),
-        config::Transform::RegexParser { regex } => Regex::new(&regex)
-            .map_err(|err| err.to_string())
-            .map::<Box<dyn transforms::Transform>, _>(|r| {
-                Box::new(transforms::RegexParser::new(r))
-            }),
-        config::Transform::FieldFilter { field, value } => {
-            Ok(Box::new(transforms::FieldFilter::new(field, value)))
         }
     }
 }

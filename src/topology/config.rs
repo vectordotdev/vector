@@ -1,4 +1,4 @@
-use crate::{record::Record, sources};
+use crate::{record::Record, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
@@ -51,17 +51,12 @@ pub enum Sink {
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Transform,
+    pub inner: Box<TransformConfig>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Transform {
-    Sampler { rate: u64, pass_list: Vec<String> },
-    RegexParser { regex: String },
-    FieldFilter { field: String, value: String },
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: core::fmt::Debug {
+    fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
 }
 
 // Helper methods for programming contstruction during tests
@@ -88,10 +83,15 @@ impl Config {
         self.sinks.insert(name.to_string(), sink);
     }
 
-    pub fn add_transform(&mut self, name: &str, inputs: &[&str], transform: Transform) {
+    pub fn add_transform<T: TransformConfig + 'static>(
+        &mut self,
+        name: &str,
+        inputs: &[&str],
+        transform: T,
+    ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let transform = TransformOuter {
-            inner: transform,
+            inner: Box::new(transform),
             inputs,
         };
 

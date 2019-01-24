@@ -1,8 +1,8 @@
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{Future, Stream};
-use router::sources;
 use router::test_util::{next_addr, random_lines, send_lines};
 use router::topology::{self, config};
+use router::{sources, transforms};
 use serde_json::json;
 use std::net::SocketAddr;
 use stream_cancel::{StreamExt, Tripwire};
@@ -58,7 +58,7 @@ fn test_sample() {
     topology.add_transform(
         "sampler",
         &["in"],
-        config::Transform::Sampler {
+        transforms::SamplerConfig {
             rate: 10,
             pass_list: vec![],
         },
@@ -113,14 +113,14 @@ fn test_parse() {
     topology.add_transform(
         "parser",
         &["in"],
-        config::Transform::RegexParser {
+        transforms::RegexParserConfig {
             regex: r"status=(?P<status>\d+)".to_string(),
         },
     );
     topology.add_transform(
         "filter",
         &["parser"],
-        config::Transform::FieldFilter {
+        transforms::FieldFilterConfig {
             field: "status".to_string(),
             value: "404".to_string(),
         },
