@@ -1,5 +1,5 @@
 use super::config;
-use crate::{record::Record, sinks, sources, transforms};
+use crate::{record::Record, sinks, transforms};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
 use log::{error, info};
@@ -144,7 +144,7 @@ pub fn build(
         let pump_task = rx.forward(outputs).map(|_| ());
         tasks.push(Box::new(pump_task));
 
-        match build_source(source, tx) {
+        match source.build(tx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
             }
@@ -233,15 +233,6 @@ fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSink, sinks::Healthche
                 sinks::s3::healthcheck(healthcheck_config),
             ))
         }
-    }
-}
-
-fn build_source(
-    source: config::Source,
-    out: mpsc::Sender<Record>,
-) -> Result<sources::Source, String> {
-    match source {
-        config::Source::Splunk { address } => Ok(sources::splunk::raw_tcp(address, out)),
     }
 }
 

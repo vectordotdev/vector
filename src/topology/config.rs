@@ -1,23 +1,19 @@
+use crate::{record::Record, sources};
+use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    pub sources: IndexMap<String, Source>,
+    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Source {
-    Splunk {
-        // TODO: this should only be port
-        address: std::net::SocketAddr,
-    },
+#[typetag::serde(tag = "type")]
+pub trait SourceConfig: core::fmt::Debug {
+    fn build(&self, out: mpsc::Sender<Record>) -> Result<sources::Source, String>;
 }
 
 #[derive(Deserialize, Debug)]
@@ -78,8 +74,8 @@ impl Config {
         }
     }
 
-    pub fn add_source(&mut self, name: &str, source: Source) {
-        self.sources.insert(name.to_string(), source);
+    pub fn add_source<S: SourceConfig + 'static>(&mut self, name: &str, source: S) {
+        self.sources.insert(name.to_string(), Box::new(source));
     }
 
     pub fn add_sink(&mut self, name: &str, inputs: &[&str], sink: Sink) {
