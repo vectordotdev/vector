@@ -79,8 +79,7 @@ fn missing_key() {
     )
     .unwrap_err();
 
-    // TODO: This message isn't quite right, as it references the outside of "in"
-    assert_eq!(err, vec!["missing field `address` at line 7 column 11"]);
+    assert_eq!(err, vec!["missing field `address` at line 6 column 13"]);
 }
 
 #[test]
