@@ -9,10 +9,10 @@ use serde_derive::{Deserialize, Serialize};
 pub struct S3Sink {
     buffer: Buffer,
     in_flight: Option<RusotoFuture<PutObjectOutput, PutObjectError>>,
-    config: S3SinkConfig,
+    config: S3SinkInnerConfig,
 }
 
-pub struct S3SinkConfig {
+pub struct S3SinkInnerConfig {
     pub buffer_size: usize,
     pub key_prefix: String,
     pub bucket: String,
@@ -22,7 +22,7 @@ pub struct S3SinkConfig {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct S3SinkConfig2 {
+pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
     pub region: Option<String>,
@@ -33,13 +33,13 @@ pub struct S3SinkConfig2 {
 }
 
 #[typetag::serde(name = "s3")]
-impl crate::topology::config::SinkConfig for S3SinkConfig2 {
+impl crate::topology::config::SinkConfig for S3SinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         Ok((new(self.config()?), healthcheck(self.config()?)))
     }
 }
 
-impl S3SinkConfig2 {
+impl S3SinkConfig {
     fn region(&self) -> Result<Region, String> {
         if self.region.is_some() && self.endpoint.is_some() {
             return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
@@ -55,10 +55,10 @@ impl S3SinkConfig2 {
         }
     }
 
-    fn config(&self) -> Result<S3SinkConfig, String> {
+    fn config(&self) -> Result<S3SinkInnerConfig, String> {
         let region = self.region()?;
 
-        Ok(S3SinkConfig {
+        Ok(S3SinkInnerConfig {
             client: rusoto_s3::S3Client::new(region),
             gzip: self.gzip,
             buffer_size: self.buffer_size,
@@ -169,7 +169,7 @@ impl Sink for S3Sink {
     }
 }
 
-pub fn new(config: S3SinkConfig) -> super::RouterSink {
+pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let buffer = Buffer::new(config.gzip);
 
     let sink = S3Sink {
@@ -181,7 +181,7 @@ pub fn new(config: S3SinkConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-pub fn healthcheck(config: S3SinkConfig) -> super::Healthcheck {
+pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
     use rusoto_s3::{HeadBucketError, HeadBucketRequest};
 
     let request = HeadBucketRequest {
