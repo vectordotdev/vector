@@ -1,6 +1,6 @@
 use super::util;
 use super::util::SinkExt;
-use futures::{Async, AsyncSink, Future, Sink, Poll, try_ready};
+use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink};
 use hyper::{Request, Uri};
 use log::error;
 use serde_json::json;
