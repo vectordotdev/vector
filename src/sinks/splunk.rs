@@ -5,20 +5,27 @@ use hyper::{Request, Uri};
 use log::error;
 use serde_json::json;
 use std::net::SocketAddr;
+use std::time::{Duration, Instant};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
 
 use crate::record::Record;
 
+// TODO: make configurable
+const INITIAL_BACKOFF_DELAY: Duration = Duration::from_millis(500);
+const BACKOFF_MULTIPLIER: f64 = 1.5;
+
 struct TcpSink {
     addr: SocketAddr,
     state: TcpSinkState,
+    next_backoff_delay: Duration,
 }
 
 enum TcpSinkState {
     Disconnected,
     Connecting(tokio::net::tcp::ConnectFuture),
     Connected(FramedWrite<TcpStream, LinesCodec>),
+    Backoff(tokio::timer::Delay),
 }
 
 impl TcpSink {
@@ -26,6 +33,7 @@ impl TcpSink {
         Self {
             addr: addr,
             state: TcpSinkState::Disconnected,
+            next_backoff_delay: INITIAL_BACKOFF_DELAY,
         }
     }
 
@@ -35,6 +43,14 @@ impl TcpSink {
                 TcpSinkState::Disconnected => {
                     self.state = TcpSinkState::Connecting(TcpStream::connect(&self.addr));
                 }
+                TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
+                    Err(err) => unreachable!(err),
+                    Ok(Async::Ready(())) => {
+                        self.state = TcpSinkState::Disconnected;
+                    }
+                },
                 TcpSinkState::Connecting(ref mut connect_future) => {
                     match connect_future.poll() {
                         Ok(Async::Ready(socket)) => {
@@ -42,14 +58,29 @@ impl TcpSink {
                                 socket,
                                 LinesCodec::new(),
                             ));
+                            self.next_backoff_delay = INITIAL_BACKOFF_DELAY;
                         }
                         Ok(Async::NotReady) => {
                             return Ok(Async::NotReady);
                         }
                         Err(err) => {
-                            // TODO: add backoff
                             error!("Error connecting to {}: {}", self.addr, err);
-                            self.state = TcpSinkState::Disconnected;
+                            let delay =
+                                tokio::timer::Delay::new(Instant::now() + self.next_backoff_delay);
+                            self.state = TcpSinkState::Backoff(delay);
+
+                            {
+                                // TODO: replace with mul_f64 once duration_float is stable.
+                                // https://github.com/rust-lang/rust/issues/54361
+                                let secs = self.next_backoff_delay.as_secs();
+                                let nanos = self.next_backoff_delay.subsec_nanos();
+                                let delay = secs as f64 + nanos as f64 / 1_000_000_000f64;
+                                let new_delay = delay * BACKOFF_MULTIPLIER;
+                                self.next_backoff_delay = Duration::new(
+                                    new_delay as u64,
+                                    (new_delay.fract() * 1_000_000_000f64) as u32,
+                                );
+                            }
                         }
                     }
                 }
