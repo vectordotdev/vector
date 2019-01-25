@@ -98,6 +98,12 @@ impl Sink for TcpSink {
     }
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
+        // Stream::forward will immediately poll_complete the sink it's forwarding to,
+        // but we don't want to connect before the first record actually comes through.
+        if let TcpSinkState::Disconnected = self.state {
+            return Ok(Async::Ready(()));
+        }
+
         let connection = try_ready!(self.poll_connection());
 
         match connection.poll_complete() {
