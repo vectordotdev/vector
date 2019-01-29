@@ -1274,6 +1274,7 @@ dependencies = [
  "tokio-fs 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-retry 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-signal 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1840,6 +1841,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "serde 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2247,6 +2256,7 @@ dependencies = [
 "checksum tokio-timer 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "3a52f00c97fedb6d535d27f65cccb7181c8dd4c6edc3eda9ea93f6d45d05168e"
 "checksum tokio-udp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "da941144b816d0dcda4db3a1ba87596e4df5e860a72b70783fe435891f80601c"
 "checksum tokio-uds 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "df195376b43508f01570bacc73e13a1de0854dc59e79d1ec09913e8db6dd2a70"
+"checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "204be70778085341a7d3a0e8bb7330dd237ac5b7ea3eb29d1c201fa713510b43"
