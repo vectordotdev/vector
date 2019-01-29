@@ -8,131 +8,113 @@ fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
 
 #[test]
 fn happy_path() {
-    let topology = load(
+    load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "transforms": {
-            "sampler": {
-              "type": "sampler",
-              "inputs": ["in"],
-              "rate": 10,
-              "pass_list": ["error"]
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "splunk_tcp",
-              "inputs": ["sampler"],
-              "address": "127.0.0.1:9999"
-            }
-          }
-        }
-      "#,
-    );
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
 
-    assert!(topology.is_ok());
+        [transforms.sampler]
+        type = "sampler"
+        inputs = ["in"]
+        rate = 10
+        pass_list = ["error"]
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = ["sampler"]
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .unwrap();
+
+    load(
+        r#"
+        [sources]
+        in = {type = "splunk", address = "127.0.0.1:1235"}
+
+        [transforms]
+        sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
+
+        [sinks]
+        out = {type = "splunk_tcp", inputs = ["sampler"], address = "127.0.0.1:9999"}
+      "#,
+    )
+    .unwrap();
 }
 
 #[test]
 fn early_eof() {
-    let err = load(r#"{"asdf": "#).unwrap_err();
+    let err = load("[sinks]\n[sin").unwrap_err();
 
-    assert_eq!(err, vec!["EOF while parsing a value at line 1 column 9"]);
+    assert_eq!(err, vec!["expected a right bracket, found eof at line 2"]);
 }
 
 #[test]
 fn bad_syntax() {
     let err = load(r#"{{{"#).unwrap_err();
 
-    assert_eq!(err.len(), 1);
-    assert_eq!(err[0], "key must be a string at line 1 column 2");
-
-    let err = load(r#"{"trailing": "comma",}"#).unwrap_err();
-
-    assert_eq!(err, vec!["trailing comma at line 1 column 22"]);
+    assert_eq!(
+        err,
+        vec!["expected a table key, found a left brace at line 1"]
+    );
 }
 
 #[test]
 fn missing_key() {
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk"
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "elasticsearch",
-              "inputs": ["in"]
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = ["in"]
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `address` at line 6 column 13"]);
+    assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
 }
 
 #[test]
 fn bad_type() {
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "jabberwocky",
-              "inputs": ["in"]
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1234"
+
+        [sinks.out]
+        type = "jabberwocky"
+        inputs = ["in"]
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["unknown variant `jabberwocky`, expected one of `elasticsearch`, `s3`, `splunk_hec`, `splunk_tcp` at line 13 column 13"]);
+    assert_eq!(err, vec!["unknown variant `jabberwocky`, expected one of `elasticsearch`, `s3`, `splunk_hec`, `splunk_tcp` for key `sinks.out`"]);
 }
 
 #[test]
 fn nonexistant_input() {
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "transforms": {
-            "sampler": {
-              "type": "sampler",
-              "inputs": ["qwerty"],
-              "rate": 10,
-              "pass_list": []
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "elasticsearch",
-              "inputs": ["asdf"]
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
+
+        [transforms.sampler]
+        type = "sampler"
+        inputs = ["qwerty"]
+        rate = 10
+        pass_list = ["error"]
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = ["asdf"]
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
@@ -150,28 +132,20 @@ fn nonexistant_input() {
 fn bad_regex() {
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "transforms": {
-            "sampler": {
-              "type": "sampler",
-              "inputs": ["in"],
-              "rate": 10,
-              "pass_list": ["(["]
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "elasticsearch",
-              "inputs": ["sampler"]
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
+
+        [transforms.sampler]
+        type = "sampler"
+        inputs = ["in"]
+        rate = 10
+        pass_list = ["(["]
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = ["sampler"]
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
@@ -180,27 +154,19 @@ fn bad_regex() {
 
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "transforms": {
-            "parser": {
-              "type": "regex_parser",
-              "inputs": ["in"],
-              "regex": "(["
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "elasticsearch",
-              "inputs": ["parser"]
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
+
+        [transforms.parser]
+        type = "regex_parser"
+        inputs = ["in"]
+        regex = "(["
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = ["parser"]
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
@@ -212,43 +178,36 @@ fn bad_regex() {
 fn bad_s3_region() {
     let err = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "sinks": {
-            "out1": {
-              "type": "s3",
-              "inputs": ["in"],
-              "buffer_size": 100000,
-              "gzip": true,
-              "bucket": "asdf",
-              "key_prefix": "logs/"
-            },
-            "out2": {
-              "type": "s3",
-              "inputs": ["in"],
-              "buffer_size": 100000,
-              "gzip": true,
-              "bucket": "asdf",
-              "key_prefix": "logs/",
-              "region": "moonbase-alpha"
-            },
-            "out3": {
-              "type": "s3",
-              "inputs": ["in"],
-              "buffer_size": 100000,
-              "gzip": true,
-              "bucket": "asdf",
-              "key_prefix": "logs/",
-              "region": "us-east-1",
-              "endpoint": "http://example.com/"
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
+
+        [sinks.out1]
+        type = "s3"
+        inputs = ["in"]
+        buffer_size = 100000
+        gzip = true
+        bucket = "asdf"
+        key_prefix = "logs/"
+
+        [sinks.out2]
+        type = "s3"
+        inputs = ["in"]
+        buffer_size = 100000
+        gzip = true
+        bucket = "asdf"
+        key_prefix = "logs/"
+        region = "moonbase-alpha"
+
+        [sinks.out3]
+        type = "s3"
+        inputs = ["in"]
+        buffer_size = 100000
+        gzip = true
+        bucket = "asdf"
+        key_prefix = "logs/"
+        region = "us-east-1"
+        endpoint = "https://example.com"
       "#,
     )
     .unwrap_err();
@@ -267,29 +226,20 @@ fn bad_s3_region() {
 fn warnings() {
     let warnings = load(
         r#"
-        {
-          "sources": {
-            "in": {
-              "type": "splunk",
-              "address": "127.0.0.1:1235"
-            }
-          },
-          "transforms": {
-            "sampler": {
-              "type": "sampler",
-              "inputs": [],
-              "rate": 10,
-              "pass_list": ["error"]
-            }
-          },
-          "sinks": {
-            "out": {
-              "type": "splunk_tcp",
-              "inputs": [],
-              "address": "127.0.0.1:9999"
-            }
-          }
-        }
+        [sources.in]
+        type = "splunk"
+        address = "127.0.0.1:1235"
+
+        [transforms.sampler]
+        type = "sampler"
+        inputs = []
+        rate = 10
+        pass_list = ["error"]
+
+        [sinks.out]
+        type = "splunk_tcp"
+        inputs = []
+        address = "127.0.0.1:9999"
       "#,
     )
     .unwrap();

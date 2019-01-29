@@ -79,7 +79,12 @@ impl Config {
         self.transforms.insert(name.to_string(), transform);
     }
 
-    pub fn load(input: impl std::io::Read) -> Result<Self, Vec<String>> {
-        serde_json::from_reader::<_, Self>(input).map_err(|e| vec![e.to_string()])
+    pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
+        let mut source_string = String::new();
+        input
+            .read_to_string(&mut source_string)
+            .map_err(|e| vec![e.to_string()])?;
+
+        toml::from_str(&source_string).map_err(|e| vec![e.to_string()])
     }
 }
