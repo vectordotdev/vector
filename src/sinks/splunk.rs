@@ -8,17 +8,14 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
+use tokio_retry::strategy::ExponentialBackoff;
 
 use crate::record::Record;
-
-// TODO: make configurable
-const INITIAL_BACKOFF_DELAY: Duration = Duration::from_millis(500);
-const BACKOFF_MULTIPLIER: f64 = 1.5;
 
 struct TcpSink {
     addr: SocketAddr,
     state: TcpSinkState,
-    next_backoff_delay: Duration,
+    backoff: ExponentialBackoff,
 }
 
 enum TcpSinkState {
@@ -33,8 +30,15 @@ impl TcpSink {
         Self {
             addr: addr,
             state: TcpSinkState::Disconnected,
-            next_backoff_delay: INITIAL_BACKOFF_DELAY,
+            backoff: Self::fresh_backoff(),
         }
+    }
+
+    fn fresh_backoff() -> ExponentialBackoff {
+        // TODO: make configurable
+        ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60))
     }
 
     fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, LinesCodec>, ()> {
@@ -51,39 +55,22 @@ impl TcpSink {
                         self.state = TcpSinkState::Disconnected;
                     }
                 },
-                TcpSinkState::Connecting(ref mut connect_future) => {
-                    match connect_future.poll() {
-                        Ok(Async::Ready(socket)) => {
-                            self.state = TcpSinkState::Connected(FramedWrite::new(
-                                socket,
-                                LinesCodec::new(),
-                            ));
-                            self.next_backoff_delay = INITIAL_BACKOFF_DELAY;
-                        }
-                        Ok(Async::NotReady) => {
-                            return Ok(Async::NotReady);
-                        }
-                        Err(err) => {
-                            error!("Error connecting to {}: {}", self.addr, err);
-                            let delay =
-                                tokio::timer::Delay::new(Instant::now() + self.next_backoff_delay);
-                            self.state = TcpSinkState::Backoff(delay);
-
-                            {
-                                // TODO: replace with mul_f64 once duration_float is stable.
-                                // https://github.com/rust-lang/rust/issues/54361
-                                let secs = self.next_backoff_delay.as_secs();
-                                let nanos = self.next_backoff_delay.subsec_nanos();
-                                let delay = secs as f64 + nanos as f64 / 1_000_000_000f64;
-                                let new_delay = delay * BACKOFF_MULTIPLIER;
-                                self.next_backoff_delay = Duration::new(
-                                    new_delay as u64,
-                                    (new_delay.fract() * 1_000_000_000f64) as u32,
-                                );
-                            }
-                        }
+                TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
+                    Ok(Async::Ready(socket)) => {
+                        self.state =
+                            TcpSinkState::Connected(FramedWrite::new(socket, LinesCodec::new()));
+                        self.backoff = Self::fresh_backoff();
                     }
-                }
+                    Ok(Async::NotReady) => {
+                        return Ok(Async::NotReady);
+                    }
+                    Err(err) => {
+                        error!("Error connecting to {}: {}", self.addr, err);
+                        let delay =
+                            tokio::timer::Delay::new(Instant::now() + self.backoff.next().unwrap());
+                        self.state = TcpSinkState::Backoff(delay);
+                    }
+                },
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }
