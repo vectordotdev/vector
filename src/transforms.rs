@@ -4,12 +4,29 @@ use regex::{Regex, RegexSet};
 // uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
 // but is slightly slower than some alternatives (which might matter for this use case).
 use crate::record::Record;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;
 
 pub trait Transform: Sync + Send {
     fn transform(&self, record: Record) -> Option<Record>;
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct SamplerConfig {
+    pub rate: u64,
+    pub pass_list: Vec<String>,
+}
+
+#[typetag::serde(name = "sampler")]
+impl crate::topology::config::TransformConfig for SamplerConfig {
+    fn build(&self) -> Result<Box<dyn Transform>, String> {
+        RegexSet::new(&self.pass_list)
+            .map_err(|err| err.to_string())
+            .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
+    }
 }
 
 pub struct Sampler {
@@ -45,6 +62,21 @@ impl Transform for Sampler {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct RegexParserConfig {
+    pub regex: String,
+}
+
+#[typetag::serde(name = "regex_parser")]
+impl crate::topology::config::TransformConfig for RegexParserConfig {
+    fn build(&self) -> Result<Box<dyn Transform>, String> {
+        Regex::new(&self.regex)
+            .map_err(|err| err.to_string())
+            .map::<Box<dyn Transform>, _>(|r| Box::new(RegexParser::new(r)))
+    }
+}
+
 pub struct RegexParser {
     regex: Regex,
 }
@@ -68,6 +100,23 @@ impl Transform for RegexParser {
         }
 
         Some(record)
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct FieldFilterConfig {
+    pub field: String,
+    pub value: String,
+}
+
+#[typetag::serde(name = "field_filter")]
+impl crate::topology::config::TransformConfig for FieldFilterConfig {
+    fn build(&self) -> Result<Box<dyn Transform>, String> {
+        Ok(Box::new(FieldFilter::new(
+            self.field.clone(),
+            self.value.clone(),
+        )))
     }
 }
 

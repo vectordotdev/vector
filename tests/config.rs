@@ -79,8 +79,7 @@ fn missing_key() {
     )
     .unwrap_err();
 
-    // TODO: This message isn't quite right, as it references the outside of "in"
-    assert_eq!(err, vec!["missing field `address` at line 7 column 11"]);
+    assert_eq!(err, vec!["missing field `address` at line 6 column 13"]);
 }
 
 #[test]
@@ -105,7 +104,7 @@ fn bad_type() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["unknown variant `jabberwocky`, expected one of `splunk_tcp`, `splunk_hec`, `s3`, `elasticsearch` at line 13 column 13"]);
+    assert_eq!(err, vec!["unknown variant `jabberwocky`, expected one of `elasticsearch`, `s3`, `splunk_hec`, `splunk_tcp` at line 13 column 13"]);
 }
 
 #[test]

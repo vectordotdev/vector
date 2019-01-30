@@ -1,6 +1,6 @@
 use flate2::read::GzDecoder;
 use futures::{stream, Sink};
-use router::sinks::s3::S3SinkConfig;
+use router::sinks::s3::S3SinkInnerConfig;
 use router::test_util::{random_lines, random_string};
 use router::{sinks, Record};
 use rusoto_core::region::Region;
@@ -73,7 +73,7 @@ fn test_insert_message_into_s3() {
 fn test_rotate_files_after_the_buffer_size_is_reached() {
     ensure_bucket(&client());
 
-    let config = S3SinkConfig {
+    let config = S3SinkInnerConfig {
         buffer_size: 1000,
         ..config()
     };
@@ -141,7 +141,7 @@ fn test_rotate_files_after_the_buffer_size_is_reached() {
 fn test_gzip() {
     ensure_bucket(&client());
 
-    let config = S3SinkConfig {
+    let config = S3SinkInnerConfig {
         buffer_size: 1000,
         gzip: true,
         ..config()
@@ -234,14 +234,14 @@ fn test_healthchecks() {
 
         let client = S3Client::new_with(dispatcher, credentials, region);
 
-        let config = S3SinkConfig { client, ..config() };
+        let config = S3SinkInnerConfig { client, ..config() };
         let healthcheck = sinks::s3::healthcheck(config);
         assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid credentials")
     }
 
     // Inaccessible bucket
     {
-        let config = S3SinkConfig {
+        let config = S3SinkInnerConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config()
         };
@@ -259,10 +259,10 @@ fn client() -> S3Client {
     S3Client::new(region)
 }
 
-fn config() -> S3SinkConfig {
+fn config() -> S3SinkInnerConfig {
     ensure_bucket(&client());
 
-    S3SinkConfig {
+    S3SinkInnerConfig {
         client: client(),
         key_prefix: random_string(10) + "/",
         buffer_size: 2 * 1024 * 1024,

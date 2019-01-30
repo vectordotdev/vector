@@ -1,12 +1,27 @@
 use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use log::{error, info};
+use serde_derive::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::{
     self,
     codec::{FramedRead, LinesCodec},
     net::TcpListener,
 };
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TcpConfig {
+    // TODO: this should only be port
+    pub address: std::net::SocketAddr,
+}
+
+#[typetag::serde(name = "splunk")]
+impl crate::topology::config::SourceConfig for TcpConfig {
+    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+        Ok(raw_tcp(self.address, out))
+    }
+}
 
 pub fn raw_tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));

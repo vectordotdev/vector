@@ -1,9 +1,7 @@
-use super::config;
-use crate::{record::Record, sinks, sources, transforms};
+use crate::{record::Record, sinks};
 use futures::prelude::*;
 use futures::{future, sync::mpsc, Future};
 use log::{error, info};
-use regex::{Regex, RegexSet};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
@@ -67,7 +65,7 @@ pub fn build(
         }
         let rx = add_connections(sink.inputs);
 
-        match build_sink(sink.inner) {
+        match sink.inner.build() {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
             }
@@ -113,7 +111,7 @@ pub fn build(
     // This needs to be a separate loop from the one above to make sure that all of the
     // connection outputs are set up before the inputs start using them.
     for (name, transform, rx) in transform_rxs.into_iter() {
-        match build_transform(transform) {
+        match transform.build() {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
             }
@@ -144,7 +142,7 @@ pub fn build(
         let pump_task = rx.forward(outputs).map(|_| ());
         tasks.push(Box::new(pump_task));
 
-        match build_source(source, tx) {
+        match source.build(tx) {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
             }
@@ -169,96 +167,5 @@ pub fn build(
         Ok((lazy, trigger, healthchecks, warnings))
     } else {
         Err(errors)
-    }
-}
-
-fn build_sink(sink: config::Sink) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
-    match sink {
-        config::Sink::SplunkTcp { address } => Ok((
-            sinks::splunk::raw_tcp(address),
-            sinks::splunk::tcp_healthcheck(address),
-        )),
-        config::Sink::SplunkHec { token, host } => Ok((
-            sinks::splunk::hec(token.clone(), host.clone()),
-            sinks::splunk::hec_healthcheck(token, host),
-        )),
-        config::Sink::Elasticsearch => Ok((
-            sinks::elasticsearch::ElasticsearchSink::build(),
-            sinks::elasticsearch::ElasticsearchSink::healthcheck(),
-        )),
-        config::Sink::S3 {
-            bucket,
-            key_prefix,
-            region,
-            endpoint,
-            buffer_size,
-            gzip,
-        } => {
-            use rusoto_core::region::Region;
-            use rusoto_s3::S3Client;
-
-            let region = if region.is_some() && endpoint.is_some() {
-                return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
-            } else if let Some(region) = region {
-                region.parse::<Region>().map_err(|e| e.to_string())?
-            } else if let Some(endpoint) = endpoint {
-                Region::Custom {
-                    name: "custom".to_owned(),
-                    endpoint,
-                }
-            } else {
-                return Err("Must set 'region' or 'endpoint'".to_string());
-            };
-
-            let client = S3Client::new(region.clone());
-            let config = sinks::s3::S3SinkConfig {
-                client,
-                gzip,
-                buffer_size,
-                key_prefix: key_prefix.clone(),
-                bucket: bucket.clone(),
-            };
-
-            let healthcheck_client = S3Client::new(region);
-            let healthcheck_config = sinks::s3::S3SinkConfig {
-                client: healthcheck_client,
-                gzip,
-                buffer_size,
-                key_prefix,
-                bucket,
-            };
-
-            Ok((
-                sinks::s3::new(config),
-                sinks::s3::healthcheck(healthcheck_config),
-            ))
-        }
-    }
-}
-
-fn build_source(
-    source: config::Source,
-    out: mpsc::Sender<Record>,
-) -> Result<sources::Source, String> {
-    match source {
-        config::Source::Splunk { address } => Ok(sources::splunk::raw_tcp(address, out)),
-    }
-}
-
-fn build_transform(transform: config::Transform) -> Result<Box<dyn transforms::Transform>, String> {
-    match transform {
-        config::Transform::Sampler { rate, pass_list } => RegexSet::new(pass_list)
-            .map_err(|err| err.to_string())
-            .map::<Box<dyn transforms::Transform>, _>(|regex_set| {
-                Box::new(transforms::Sampler::new(rate, regex_set))
-            }),
-        config::Transform::RegexParser { regex } => Regex::new(&regex)
-            .map_err(|err| err.to_string())
-            .map::<Box<dyn transforms::Transform>, _>(|r| {
-                Box::new(transforms::RegexParser::new(r))
-            }),
-        config::Transform::FieldFilter { field, value } => {
-            Ok(Box::new(transforms::FieldFilter::new(field, value)))
-        }
     }
 }

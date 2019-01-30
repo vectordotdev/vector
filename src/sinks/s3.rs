@@ -1,21 +1,71 @@
 use crate::record::Record;
 use crate::sinks::util::size_buffered::Buffer;
 use futures::{Async, AsyncSink, Future, Sink};
+use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
+use serde_derive::{Deserialize, Serialize};
 
 pub struct S3Sink {
     buffer: Buffer,
     in_flight: Option<RusotoFuture<PutObjectOutput, PutObjectError>>,
-    config: S3SinkConfig,
+    config: S3SinkInnerConfig,
 }
 
-pub struct S3SinkConfig {
+pub struct S3SinkInnerConfig {
     pub buffer_size: usize,
     pub key_prefix: String,
     pub bucket: String,
     pub client: S3Client,
     pub gzip: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct S3SinkConfig {
+    pub bucket: String,
+    pub key_prefix: String,
+    pub region: Option<String>,
+    pub endpoint: Option<String>,
+    pub buffer_size: usize,
+    pub gzip: bool,
+    // TODO: access key and secret token (if the rusoto provider chain stuff isn't good enough)
+}
+
+#[typetag::serde(name = "s3")]
+impl crate::topology::config::SinkConfig for S3SinkConfig {
+    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((new(self.config()?), healthcheck(self.config()?)))
+    }
+}
+
+impl S3SinkConfig {
+    fn region(&self) -> Result<Region, String> {
+        if self.region.is_some() && self.endpoint.is_some() {
+            return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
+        } else if let Some(region) = &self.region {
+            region.parse::<Region>().map_err(|e| e.to_string())
+        } else if let Some(endpoint) = &self.endpoint {
+            Ok(Region::Custom {
+                name: "custom".to_owned(),
+                endpoint: endpoint.clone(),
+            })
+        } else {
+            return Err("Must set 'region' or 'endpoint'".to_string());
+        }
+    }
+
+    fn config(&self) -> Result<S3SinkInnerConfig, String> {
+        let region = self.region()?;
+
+        Ok(S3SinkInnerConfig {
+            client: rusoto_s3::S3Client::new(region),
+            gzip: self.gzip,
+            buffer_size: self.buffer_size,
+            key_prefix: self.key_prefix.clone(),
+            bucket: self.bucket.clone(),
+        })
+    }
 }
 
 impl S3Sink {
@@ -119,7 +169,7 @@ impl Sink for S3Sink {
     }
 }
 
-pub fn new(config: S3SinkConfig) -> super::RouterSink {
+pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let buffer = Buffer::new(config.gzip);
 
     let sink = S3Sink {
@@ -131,7 +181,7 @@ pub fn new(config: S3SinkConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-pub fn healthcheck(config: S3SinkConfig) -> super::Healthcheck {
+pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
     use rusoto_s3::{HeadBucketError, HeadBucketRequest};
 
     let request = HeadBucketRequest {

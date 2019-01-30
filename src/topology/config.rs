@@ -1,71 +1,43 @@
+use crate::{record::Record, sinks, sources, transforms};
+use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    pub sources: IndexMap<String, Source>,
+    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Source {
-    Splunk {
-        // TODO: this should only be port
-        address: std::net::SocketAddr,
-    },
+#[typetag::serde(tag = "type")]
+pub trait SourceConfig: core::fmt::Debug {
+    fn build(&self, out: mpsc::Sender<Record>) -> Result<sources::Source, String>;
 }
 
 #[derive(Deserialize, Debug)]
 pub struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Sink,
+    pub inner: Box<SinkConfig>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Sink {
-    SplunkTcp {
-        address: std::net::SocketAddr,
-    },
-    SplunkHec {
-        token: String,
-        host: String,
-    },
-    S3 {
-        bucket: String,
-        key_prefix: String,
-        region: Option<String>,
-        endpoint: Option<String>,
-        buffer_size: usize,
-        gzip: bool,
-        // TODO: access key and secret token (if the rusoto provider chain stuff isn't good enough)
-    },
-    Elasticsearch,
+#[typetag::serde(tag = "type")]
+pub trait SinkConfig: core::fmt::Debug {
+    fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 }
 
 #[derive(Deserialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Transform,
+    pub inner: Box<TransformConfig>,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-#[serde(deny_unknown_fields)]
-pub enum Transform {
-    Sampler { rate: u64, pass_list: Vec<String> },
-    RegexParser { regex: String },
-    FieldFilter { field: String, value: String },
+#[typetag::serde(tag = "type")]
+pub trait TransformConfig: core::fmt::Debug {
+    fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
 }
 
 // Helper methods for programming contstruction during tests
@@ -78,24 +50,29 @@ impl Config {
         }
     }
 
-    pub fn add_source(&mut self, name: &str, source: Source) {
-        self.sources.insert(name.to_string(), source);
+    pub fn add_source<S: SourceConfig + 'static>(&mut self, name: &str, source: S) {
+        self.sources.insert(name.to_string(), Box::new(source));
     }
 
-    pub fn add_sink(&mut self, name: &str, inputs: &[&str], sink: Sink) {
+    pub fn add_sink<S: SinkConfig + 'static>(&mut self, name: &str, inputs: &[&str], sink: S) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
-            inner: sink,
+            inner: Box::new(sink),
             inputs,
         };
 
         self.sinks.insert(name.to_string(), sink);
     }
 
-    pub fn add_transform(&mut self, name: &str, inputs: &[&str], transform: Transform) {
+    pub fn add_transform<T: TransformConfig + 'static>(
+        &mut self,
+        name: &str,
+        inputs: &[&str],
+        transform: T,
+    ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let transform = TransformOuter {
-            inner: transform,
+            inner: Box::new(transform),
             inputs,
         };
 

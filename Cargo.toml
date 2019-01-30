@@ -33,6 +33,7 @@ clap = "2.32.0"
 tokio-signal = "0.2.7"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
+typetag = "0.1"
 
 [dev-dependencies]
 approx = "0.3.0"
