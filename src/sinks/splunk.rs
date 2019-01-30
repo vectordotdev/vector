@@ -6,8 +6,10 @@ use log::error;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::json;
 use std::net::SocketAddr;
+use std::time::{Duration, Instant};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
+use tokio_retry::strategy::ExponentialBackoff;
 
 use crate::record::Record;
 
@@ -27,12 +29,14 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
 struct TcpSink {
     addr: SocketAddr,
     state: TcpSinkState,
+    backoff: ExponentialBackoff,
 }
 
 enum TcpSinkState {
     Disconnected,
     Connecting(tokio::net::tcp::ConnectFuture),
     Connected(FramedWrite<TcpStream, LinesCodec>),
+    Backoff(tokio::timer::Delay),
 }
 
 impl TcpSink {
@@ -40,7 +44,15 @@ impl TcpSink {
         Self {
             addr: addr,
             state: TcpSinkState::Disconnected,
+            backoff: Self::fresh_backoff(),
         }
+    }
+
+    fn fresh_backoff() -> ExponentialBackoff {
+        // TODO: make configurable
+        ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60))
     }
 
     fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, LinesCodec>, ()> {
@@ -49,24 +61,30 @@ impl TcpSink {
                 TcpSinkState::Disconnected => {
                     self.state = TcpSinkState::Connecting(TcpStream::connect(&self.addr));
                 }
-                TcpSinkState::Connecting(ref mut connect_future) => {
-                    match connect_future.poll() {
-                        Ok(Async::Ready(socket)) => {
-                            self.state = TcpSinkState::Connected(FramedWrite::new(
-                                socket,
-                                LinesCodec::new(),
-                            ));
-                        }
-                        Ok(Async::NotReady) => {
-                            return Ok(Async::NotReady);
-                        }
-                        Err(err) => {
-                            // TODO: add backoff
-                            error!("Error connecting to {}: {}", self.addr, err);
-                            self.state = TcpSinkState::Disconnected;
-                        }
+                TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
+                    Err(err) => unreachable!(err),
+                    Ok(Async::Ready(())) => {
+                        self.state = TcpSinkState::Disconnected;
                     }
-                }
+                },
+                TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
+                    Ok(Async::Ready(socket)) => {
+                        self.state =
+                            TcpSinkState::Connected(FramedWrite::new(socket, LinesCodec::new()));
+                        self.backoff = Self::fresh_backoff();
+                    }
+                    Ok(Async::NotReady) => {
+                        return Ok(Async::NotReady);
+                    }
+                    Err(err) => {
+                        error!("Error connecting to {}: {}", self.addr, err);
+                        let delay =
+                            tokio::timer::Delay::new(Instant::now() + self.backoff.next().unwrap());
+                        self.state = TcpSinkState::Backoff(delay);
+                    }
+                },
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }
