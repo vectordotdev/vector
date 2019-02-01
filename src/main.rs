@@ -63,18 +63,31 @@ fn main() {
 
     rt.spawn(server);
 
-    let signals = vec![SIGINT, SIGTERM, SIGQUIT]
-        .into_iter()
-        .map(|sig| Signal::new(sig).flatten_stream().into_future());
-    let signals = futures::future::select_ok(signals);
+    let sigint = Signal::new(SIGINT).flatten_stream();
+    let sigterm = Signal::new(SIGTERM).flatten_stream();
+    let sigquit = Signal::new(SIGQUIT).flatten_stream();
 
-    let (signal, _) = rt.block_on(signals).ok().unwrap();
-    let signal = signal.0.unwrap();
+    let signals = sigint.select(sigterm.select(sigquit));
+
+    let (signal, signals) = rt.block_on(signals.into_future()).ok().unwrap();
+    let signal = signal.unwrap();
 
     if signal == SIGINT || signal == SIGTERM {
+        use futures::future::Either;
+
         info!("Shutting down");
         drop(server_trigger);
-        rt.shutdown_on_idle().wait().unwrap();
+
+        let shutdown = rt.shutdown_on_idle();
+
+        match shutdown.select2(signals.into_future()).wait() {
+            Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
+            Ok(Either::B(_)) => {
+                info!("Shutting down immediately");
+                // Dropping the shutdown future will immediately shut the server down
+            }
+            Err(_) => unreachable!(),
+        }
     } else if signal == SIGQUIT {
         info!("Shutting down immediately");
         rt.shutdown_now().wait().unwrap();
