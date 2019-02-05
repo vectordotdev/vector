@@ -1,15 +1,11 @@
-// use crate::metric;
-// use crate::source;
 use crate::file_watcher::FileWatcher;
-// use crate::source::internal::report_full_telemetry;
-// use crate::util;
-// use crate::util::send;
 use glob::glob;
 use mio;
 use std::mem;
 use std::path::PathBuf;
-use std::str;
 use std::time;
+use std::sync::mpsc::Sender;
+use std::collections::HashMap;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -26,7 +22,7 @@ pub struct FileServer {
 }
 
 /// The configuration struct for `FileServer`.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct FileServerConfig {
     /// The path that `FileServer` will watch. Globs are allowed and
     /// `FileServer` will watch multiple files.
@@ -64,9 +60,9 @@ impl Default for FileServerConfig {
 ///
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
-impl source::Source<FileServerConfig> for FileServer {
+impl FileServer {
     /// Make a FileServer
-    fn init(config: FileServerConfig) -> Self {
+    pub fn init(config: FileServerConfig) -> Self {
         let pattern = config.path.expect("must specify a 'path' for FileServer");
         FileServer {
             pattern: pattern,
@@ -74,11 +70,11 @@ impl source::Source<FileServerConfig> for FileServer {
         }
     }
 
-    fn run(self, mut chans: util::Channel, poller: mio::Poll) {
+    pub fn run(self, chans: Sender<(String, String)>, poller: mio::Poll) {
         let mut buffer = String::new();
 
-        let mut fp_map: util::HashMap<PathBuf, FileWatcher> = Default::default();
-        let mut fp_map_alt: util::HashMap<PathBuf, FileWatcher> = Default::default();
+        let mut fp_map: HashMap<PathBuf, FileWatcher> = Default::default();
+        let mut fp_map_alt: HashMap<PathBuf, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
@@ -108,10 +104,7 @@ impl source::Source<FileServerConfig> for FileServer {
                 while let Ok(sz) = watcher.read_line(&mut buffer) {
                     if sz > 0 {
                         bytes_read += sz;
-                        lines.push(metric::LogLine::new(
-                            path.to_str().expect("not a valid path"),
-                            &buffer,
-                        ));
+                        lines.push((buffer.clone(), path.to_str().expect("not a valid path").to_owned()));
                         buffer.clear();
                     } else {
                         break;
@@ -120,14 +113,6 @@ impl source::Source<FileServerConfig> for FileServer {
                         break;
                     }
                 }
-                report_full_telemetry(
-                    "cernan.sources.file.bytes_read",
-                    bytes_read as f64,
-                    Some(vec![(
-                        "file_path",
-                        path.to_str().expect("not a valid path"),
-                    )]),
-                );
                 // A FileWatcher is dead when the underlying file has
                 // disappeared. If the FileWatcher is dead we don't stick it in
                 // the fp_map_alt and deallocate it.
@@ -137,7 +122,10 @@ impl source::Source<FileServerConfig> for FileServer {
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
             }
             for l in lines.drain(..) {
-                send(&mut chans, metric::Event::new_log(l));
+                if let Err(_) = chans.send(l) {
+                    return;
+                }
+                // send(&mut chans, metric::Event::new_log(l));
             }
             // We've drained the live FileWatchers into fp_map_alt in the line
             // polling loop. Now we swapped them back to fp_map so next time we
@@ -169,7 +157,6 @@ impl source::Source<FileServerConfig> for FileServer {
                     // File server doesn't poll for anything other than SYSTEM events.
                     // As currently there are no system events other than SHUTDOWN,
                     // we immediately exit.
-                    send(&mut chans, metric::Event::Shutdown);
                     return;
                 }
             }

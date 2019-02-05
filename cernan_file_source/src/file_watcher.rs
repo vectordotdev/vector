@@ -1,4 +1,3 @@
-use crate::source::internal::report_full_telemetry;
 use std::fs;
 use std::io;
 use std::io::BufRead;
@@ -89,15 +88,6 @@ impl FileWatcher {
                 // ID the file will have been deleted. This is that branch.
                 self.file_id = None;
                 self.reader = None;
-            } else {
-                report_full_telemetry(
-                    "cernan.sources.file.switch",
-                    1.0,
-                    Some(vec![(
-                        "file_path",
-                        self.path.to_str().expect("could not make path"),
-                    )]),
-                );
             }
         } else {
             self.reader = None;
@@ -146,14 +136,6 @@ impl FileWatcher {
             let current_size = reader.get_ref().metadata().unwrap().size();
             if self.previous_size > current_size {
                 assert!(reader.seek(io::SeekFrom::Start(0)).is_ok());
-                report_full_telemetry(
-                    "cernan.sources.file.truncation",
-                    (self.previous_size - current_size) as f64,
-                    Some(vec![(
-                        "file_path",
-                        self.path.to_str().expect("could not make path"),
-                    )]),
-                );
             }
             self.previous_size = current_size;
             // match here on error, if metadata doesn't match up open_at_start

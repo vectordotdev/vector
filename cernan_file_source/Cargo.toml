@@ -10,3 +10,4 @@ mio = "0.6.11"
 
 [dev-dependencies]
 tempdir = "0.3"
+quickcheck = "0.6"

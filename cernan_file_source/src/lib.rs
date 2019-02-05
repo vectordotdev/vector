@@ -9,7 +9,6 @@ mod test {
 
     use self::file_watcher::FileWatcher;
     use super::*;
-    use crate::time;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
     use std::fs;
     use std::io::Write;
@@ -234,7 +233,7 @@ mod test {
                     assert_eq!(cur_file_id, fp_id);
                     assert!(path.exists());
                 }
-                FWAction::Pause(ps) => time::delay(ps),
+                FWAction::Pause(ps) => delay(ps),
                 FWAction::Exit => break,
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
@@ -318,7 +317,7 @@ mod test {
                     break;
                 }
                 FWAction::TruncateFile => {}
-                FWAction::Pause(ps) => time::delay(ps),
+                FWAction::Pause(ps) => delay(ps),
                 FWAction::Exit => break,
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
@@ -399,5 +398,23 @@ mod test {
             .tests(10000)
             .max_tests(100000)
             .quickcheck(inner as fn(Vec<FWAction>) -> TestResult);
+    }
+
+    #[inline]
+    pub fn delay(attempts: u32) {
+        let delay = match attempts {
+            0 => return,
+            1 => 1,
+            2 => 4,
+            3 => 8,
+            4 => 16,
+            5 => 32,
+            6 => 64,
+            7 => 128,
+            8 => 256,
+            _ => 512,
+        };
+        let sleep_time = std::time::Duration::from_millis(delay as u64);
+        std::thread::sleep(sleep_time);
     }
 }
