@@ -1,0 +1,12 @@
+[package]
+name = "cernan_file_source"
+version = "0.1.0"
+authors = ["Timber.io <devs@timber.io>"]
+edition = "2018"
+
+[dependencies]
+glob = "0.2.11"
+mio = "0.6.11"
+
+[dev-dependencies]
+tempdir = "0.3"
