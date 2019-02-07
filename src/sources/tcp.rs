@@ -13,16 +13,31 @@ use tokio::{
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
     pub address: std::net::SocketAddr,
+    #[serde(default = "default_max_length")]
+    pub max_length: usize,
+}
+
+fn default_max_length() -> usize {
+    100 * 1024
+}
+
+impl TcpConfig {
+    pub fn new(addr: std::net::SocketAddr) -> Self {
+        Self {
+            address: addr,
+            max_length: default_max_length(),
+        }
+    }
 }
 
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
-        Ok(tcp(self.address, out))
+        Ok(tcp(self.address, self.max_length, out))
     }
 }
 
-pub fn tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -38,7 +53,7 @@ pub fn tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
 
                 let out = out.clone();
 
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(100 * 1024))
+                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .map(Record::new_from_line)
                     .map(move |mut record| {
                         record.host = host.clone();
@@ -65,7 +80,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::tcp(addr, tx);
+        let server = super::tcp(addr, super::default_max_length(), tx);
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         while let Err(_) = std::net::TcpStream::connect(addr) {}
@@ -75,5 +90,26 @@ mod test {
 
         let record = rx.wait().next().unwrap().unwrap();
         assert_eq!(record.host, Some("127.0.0.1".to_owned()));
+    }
+
+    #[test]
+    fn it_defaults_max_length() {
+        let with: super::TcpConfig = toml::from_str(
+            r#"
+            address = "127.0.0.1:1234"
+            max_length = 19
+            "#,
+        )
+        .unwrap();
+
+        let without: super::TcpConfig = toml::from_str(
+            r#"
+            address = "127.0.0.1:1234"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(with.max_length, 19);
+        assert_eq!(without.max_length, super::default_max_length());
     }
 }

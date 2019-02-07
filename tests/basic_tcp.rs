@@ -17,7 +17,7 @@ fn test_pipe() {
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     topology.add_sink(
         "out",
         &["in"],
@@ -54,7 +54,7 @@ fn test_sample() {
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     topology.add_transform(
         "sampler",
         &["in"],
@@ -109,7 +109,7 @@ fn test_parse() {
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     topology.add_transform(
         "parser",
         &["in"],
@@ -168,8 +168,8 @@ fn test_merge() {
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in1", sources::tcp::TcpConfig { address: in_addr1 });
-    topology.add_source("in2", sources::tcp::TcpConfig { address: in_addr2 });
+    topology.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+    topology.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
     topology.add_sink(
         "out",
         &["in1", "in2"],
@@ -227,7 +227,7 @@ fn test_fork() {
     let out_addr2 = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     topology.add_sink(
         "out1",
         &["in"],
@@ -277,8 +277,8 @@ fn test_merge_and_fork() {
     // out1 receives both in1 and in2
     // out2 receives in2 only
     let mut topology = config::Config::empty();
-    topology.add_source("in1", sources::tcp::TcpConfig { address: in_addr1 });
-    topology.add_source("in2", sources::tcp::TcpConfig { address: in_addr2 });
+    topology.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+    topology.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
     topology.add_sink(
         "out1",
         &["in1", "in2"],
@@ -431,7 +431,7 @@ fn test_reconnect() {
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     topology.add_sink(
         "out",
         &["in"],
