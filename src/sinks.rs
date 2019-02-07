@@ -1,5 +1,6 @@
 use futures::{Async, AsyncSink, Future, Sink};
 
+pub mod console;
 pub mod elasticsearch;
 pub mod prometheus;
 pub mod s3;
