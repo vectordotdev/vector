@@ -35,11 +35,13 @@ indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
+cernan_file_source = { path = "cernan_file_source" }
 
 [dev-dependencies]
 approx = "0.3.0"
 criterion = "0.2.5"
 reqwest = "0.9.5"
+tempfile = "3.0.6"
 
 [[bench]]
 name = "bench"

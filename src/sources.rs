@@ -6,6 +6,7 @@ use tokio::io::AsyncRead;
 
 pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
 
+pub mod file;
 pub mod splunk;
 
 pub fn reader_source<T: AsyncRead>(inner: T) -> impl Stream<Item = Record, Error = ()> {

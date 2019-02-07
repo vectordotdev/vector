@@ -1,4 +1,4 @@
-mod file_server;
+pub mod file_server;
 mod file_watcher;
 
 pub use self::file_server::{FileServer, FileServerConfig};

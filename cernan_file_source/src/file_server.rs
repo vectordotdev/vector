@@ -1,11 +1,11 @@
 use crate::file_watcher::FileWatcher;
 use glob::glob;
-use mio;
 use std::mem;
 use std::path::PathBuf;
 use std::time;
-use std::sync::mpsc::Sender;
 use std::collections::HashMap;
+use futures::{stream, Stream, Future, Sink};
+use std::sync::mpsc::RecvTimeoutError;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -70,7 +70,7 @@ impl FileServer {
         }
     }
 
-    pub fn run(self, chans: Sender<(String, String)>, poller: mio::Poll) {
+    pub fn run(self, mut chans: impl Sink<SinkItem=(String, String), SinkError=()>, shutdown: std::sync::mpsc::Receiver<()>) {
         let mut buffer = String::new();
 
         let mut fp_map: HashMap<PathBuf, FileWatcher> = Default::default();
@@ -121,11 +121,10 @@ impl FileServer {
                 }
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
             }
-            for l in lines.drain(..) {
-                if let Err(_) = chans.send(l) {
-                    return;
-                }
-                // send(&mut chans, metric::Event::new_log(l));
+
+            match stream::iter_ok::<_, ()>(lines.drain(..)).forward(chans).wait() {
+                Ok((_, sink)) => chans = sink,
+                Err(_) => unreachable!(),
             }
             // We've drained the live FileWatchers into fp_map_alt in the line
             // polling loop. Now we swapped them back to fp_map so next time we
@@ -146,19 +145,11 @@ impl FileServer {
                 backoff_cap = 1;
             }
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
-            let mut events = mio::Events::with_capacity(1024);
-            match poller.poll(
-                &mut events,
-                Some(time::Duration::from_millis(backoff as u64)),
-            ) {
-                Err(e) => panic!(format!("Failed during poll {:?}", e)),
-                Ok(0) => {}
-                Ok(_num_events) => {
-                    // File server doesn't poll for anything other than SYSTEM events.
-                    // As currently there are no system events other than SHUTDOWN,
-                    // we immediately exit.
-                    return;
-                }
+
+            match shutdown.recv_timeout(time::Duration::from_millis(backoff as u64)) {
+                Ok(()) => unreachable!(), // The sender should never actually send
+                Err(RecvTimeoutError::Timeout) => {},
+                Err(RecvTimeoutError::Disconnected) => return,
             }
         }
     }
