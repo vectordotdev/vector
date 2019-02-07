@@ -3,8 +3,8 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use approx::{__assert_approx, assert_relative_eq, relative_eq};
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines};
-use router::{sources, sinks, transforms};
 use router::topology::{self, config};
+use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
@@ -22,7 +22,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
+                    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
@@ -70,7 +70,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
+                    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
@@ -118,7 +118,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
+                    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
@@ -167,7 +167,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
+                    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
                     topology.add_sink(
                         "out",
                         &["in"],
@@ -225,8 +225,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in1", sources::splunk::TcpConfig { address: in_addr1 });
-                    topology.add_source("in2", sources::splunk::TcpConfig { address: in_addr2 });
+                    topology.add_source("in1", sources::tcp::TcpConfig { address: in_addr1 });
+                    topology.add_source("in2", sources::tcp::TcpConfig { address: in_addr2 });
                     topology.add_sink(
                         "out1",
                         &["in1", "in2"],
@@ -284,7 +284,7 @@ fn benchmark_transforms(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in", sources::splunk::TcpConfig { address: in_addr });
+                    topology.add_source("in", sources::tcp::TcpConfig { address: in_addr });
                     topology.add_transform(
                         "parser",
                         &["in"],
@@ -357,8 +357,8 @@ fn benchmark_complex(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
-                    topology.add_source("in1", sources::splunk::TcpConfig { address: in_addr1 });
-                    topology.add_source("in2", sources::splunk::TcpConfig { address: in_addr2 });
+                    topology.add_source("in1", sources::tcp::TcpConfig { address: in_addr1 });
+                    topology.add_source("in2", sources::tcp::TcpConfig { address: in_addr2 });
                     topology.add_transform(
                         "parser",
                         &["in1", "in2"],

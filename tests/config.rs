@@ -11,7 +11,7 @@ fn happy_path() {
     load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -31,7 +31,7 @@ fn happy_path() {
     load(
         r#"
         [sources]
-        in = {type = "splunk", address = "127.0.0.1:1235"}
+        in = {type = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
         sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
@@ -65,7 +65,7 @@ fn missing_key() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
 
         [sinks.out]
         type = "splunk_tcp"
@@ -83,7 +83,7 @@ fn bad_type() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1234"
 
         [sinks.out]
@@ -102,7 +102,7 @@ fn nonexistant_input() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -133,7 +133,7 @@ fn bad_regex() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]
@@ -155,7 +155,7 @@ fn bad_regex() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.parser]
@@ -179,7 +179,7 @@ fn bad_s3_region() {
     let err = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [sinks.out1]
@@ -227,7 +227,7 @@ fn warnings() {
     let warnings = load(
         r#"
         [sources.in]
-        type = "splunk"
+        type = "tcp"
         address = "127.0.0.1:1235"
 
         [transforms.sampler]

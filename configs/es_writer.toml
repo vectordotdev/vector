@@ -1,5 +1,5 @@
 [sources.in]
-type = "splunk"
+type = "tcp"
 address = "127.0.0.1:1235"
 
 [sinks.out]

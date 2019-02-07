@@ -12,18 +12,17 @@ use tokio::{
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
-    // TODO: this should only be port
     pub address: std::net::SocketAddr,
 }
 
-#[typetag::serde(name = "splunk")]
+#[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
-        Ok(raw_tcp(self.address, out))
+        Ok(tcp(self.address, out))
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -66,7 +65,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::raw_tcp(addr, tx);
+        let server = super::tcp(addr, tx);
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         while let Err(_) = std::net::TcpStream::connect(addr) {}
