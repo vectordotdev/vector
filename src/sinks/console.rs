@@ -11,9 +11,16 @@ pub enum Target {
     Stderr,
 }
 
+impl Default for Target {
+    fn default() -> Self {
+        Target::Stdout
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
+    #[serde(default)]
     pub target: Target,
 }
 
