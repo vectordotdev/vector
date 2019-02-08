@@ -12,7 +12,7 @@ fn happy_path() {
 
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
-        path: dir.path().join("*"),
+        include: vec![dir.path().join("*")],
     };
 
     let source = file::file_source(&config, tx);
@@ -63,7 +63,7 @@ fn truncate() {
 
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
-        path: dir.path().join("*"),
+        include: vec![dir.path().join("*")],
     };
     let source = file::file_source(&config, tx);
 
@@ -122,7 +122,7 @@ fn rotate() {
 
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
-        path: dir.path().join("*"),
+        include: vec![dir.path().join("*")],
     };
     let source = file::file_source(&config, tx);
 
@@ -173,6 +173,56 @@ fn rotate() {
             pre_rot = false;
         }
     }
+}
+
+#[test]
+fn multiple_paths() {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (trigger, tripwire) = Tripwire::new();
+
+    let dir = tempdir().unwrap();
+    let config = file::FileConfig {
+        include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
+    };
+
+    let source = file::file_source(&config, tx);
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+    let path1 = dir.path().join("a.txt");
+    let path2 = dir.path().join("b.txt");
+    let path3 = dir.path().join("a.log");
+    let n = 5;
+    let mut file1 = File::create(&path1).unwrap();
+    let mut file2 = File::create(&path2).unwrap();
+    let mut file3 = File::create(&path3).unwrap();
+
+    sleep(); // The files must be observed at their original lengths before writing to them
+
+    for i in 0..n {
+        writeln!(&mut file1, "1 {}", i).unwrap();
+        writeln!(&mut file2, "2 {}", i).unwrap();
+        writeln!(&mut file3, "3 {}", i).unwrap();
+    }
+
+    let received = rx.take(n * 3).collect().wait().unwrap();
+    drop(trigger);
+    rt.shutdown_on_idle().wait().unwrap();
+
+    let mut is = [0; 3];
+
+    for record in received {
+        let mut split = record.line.split(" ");
+        let file = split.next().unwrap().parse::<usize>().unwrap() - 1;
+        let i = split.next().unwrap().parse::<usize>().unwrap();
+
+        assert_eq!(is[file], i);
+        is[file] += 1;
+    }
+
+    assert_eq!(is, [n as usize; 3]);
 }
 
 fn sleep() {

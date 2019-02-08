@@ -7,7 +7,7 @@ use std::thread;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
-    pub path: PathBuf,
+    pub include: Vec<PathBuf>,
 }
 
 #[typetag::serde(name = "file")]
@@ -22,7 +22,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let cernan_server = cernan_file_source::file_server::FileServer {
-        path: config.path.clone(),
+        include: config.include.clone(),
         max_read_bytes: 2048,
     };
 
