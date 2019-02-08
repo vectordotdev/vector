@@ -17,34 +17,8 @@ use std::sync::mpsc::RecvTimeoutError;
 /// exist at cernan startup. `FileServer` will discover new files which match
 /// its path in at most 60 seconds.
 pub struct FileServer {
-    pattern: PathBuf,
-    max_read_bytes: usize,
-}
-
-/// The configuration struct for `FileServer`.
-#[derive(Clone, Debug)]
-pub struct FileServerConfig {
-    /// The path that `FileServer` will watch. Globs are allowed and
-    /// `FileServer` will watch multiple files.
-    pub path: Option<PathBuf>,
-    /// The maximum number of bytes to read from a file before switching to a
-    /// new file.
+    pub path: PathBuf,
     pub max_read_bytes: usize,
-    /// The forwards which `FileServer` will obey.
-    pub forwards: Vec<String>,
-    /// The configured name of FileServer.
-    pub config_path: Option<String>,
-}
-
-impl Default for FileServerConfig {
-    fn default() -> Self {
-        FileServerConfig {
-            path: None,
-            max_read_bytes: 2048,
-            forwards: Vec::default(),
-            config_path: None,
-        }
-    }
 }
 
 /// `FileServer` as Source
@@ -61,15 +35,6 @@ impl Default for FileServerConfig {
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
 impl FileServer {
-    /// Make a FileServer
-    pub fn init(config: FileServerConfig) -> Self {
-        let pattern = config.path.expect("must specify a 'path' for FileServer");
-        FileServer {
-            pattern: pattern,
-            max_read_bytes: config.max_read_bytes,
-        }
-    }
-
     pub fn run(self, mut chans: impl Sink<SinkItem=(String, String), SinkError=()>, shutdown: std::sync::mpsc::Receiver<()>) {
         let mut buffer = String::new();
 
@@ -88,7 +53,7 @@ impl FileServer {
         loop {
             let mut global_bytes_read: usize = 0;
             // glob poll
-            for entry in glob(self.pattern.to_str().expect("no ability to glob"))
+            for entry in glob(self.path.to_str().expect("no ability to glob"))
                 .expect("Failed to read glob pattern")
             {
                 if let Ok(path) = entry {
