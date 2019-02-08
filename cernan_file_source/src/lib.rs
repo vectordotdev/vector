@@ -1,7 +1,7 @@
 pub mod file_server;
 mod file_watcher;
 
-pub use self::file_server::{FileServer, FileServerConfig};
+pub use self::file_server::FileServer;
 
 #[cfg(test)]
 mod test {

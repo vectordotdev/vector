@@ -11,7 +11,11 @@ fn happy_path() {
     let (trigger, tripwire) = Tripwire::new();
 
     let dir = tempdir().unwrap();
-    let source = file::file_source(dir.path().join("*"), tx);
+    let config = file::FileConfig {
+        path: dir.path().join("*"),
+    };
+
+    let source = file::file_source(&config, tx);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -58,7 +62,10 @@ fn truncate() {
     let (trigger, tripwire) = Tripwire::new();
 
     let dir = tempdir().unwrap();
-    let source = file::file_source(dir.path().join("*"), tx);
+    let config = file::FileConfig {
+        path: dir.path().join("*"),
+    };
+    let source = file::file_source(&config, tx);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -114,7 +121,10 @@ fn rotate() {
     let (trigger, tripwire) = Tripwire::new();
 
     let dir = tempdir().unwrap();
-    let source = file::file_source(dir.path().join("*"), tx);
+    let config = file::FileConfig {
+        path: dir.path().join("*"),
+    };
+    let source = file::file_source(&config, tx);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
