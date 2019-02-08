@@ -94,7 +94,8 @@ fn bad_type() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["unknown variant `jabberwocky`, expected one of `elasticsearch`, `s3`, `splunk_hec`, `splunk_tcp` for key `sinks.out`"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].starts_with("unknown variant `jabberwocky`, expected one of "));
 }
 
 #[test]
