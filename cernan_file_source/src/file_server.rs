@@ -17,7 +17,7 @@ use std::sync::mpsc::RecvTimeoutError;
 /// exist at cernan startup. `FileServer` will discover new files which match
 /// its path in at most 60 seconds.
 pub struct FileServer {
-    pub path: PathBuf,
+    pub include: Vec<PathBuf>,
     pub max_read_bytes: usize,
 }
 
@@ -53,14 +53,16 @@ impl FileServer {
         loop {
             let mut global_bytes_read: usize = 0;
             // glob poll
-            for entry in glob(self.path.to_str().expect("no ability to glob"))
-                .expect("Failed to read glob pattern")
-            {
-                if let Ok(path) = entry {
-                    let entry = fp_map.entry(path.clone());
-                    if let Ok(fw) = FileWatcher::new(&path) {
-                        entry.or_insert(fw);
-                    };
+            for path in &self.include {
+                for entry in glob(path.to_str().expect("no ability to glob"))
+                    .expect("Failed to read glob pattern")
+                {
+                    if let Ok(path) = entry {
+                        let entry = fp_map.entry(path.clone());
+                        if let Ok(fw) = FileWatcher::new(&path) {
+                            entry.or_insert(fw);
+                        };
+                    }
                 }
             }
             // line polling
