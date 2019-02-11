@@ -11,6 +11,7 @@ pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
     pub context_key: Option<String>,
+    pub start_at_beginning: bool,
 }
 
 impl Default for FileConfig {
@@ -19,6 +20,7 @@ impl Default for FileConfig {
             include: vec![],
             exclude: vec![],
             context_key: Some("file".to_string()),
+            start_at_beginning: false,
         }
     }
 }
@@ -38,6 +40,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         include: config.include.clone(),
         exclude: config.exclude.clone(),
         max_read_bytes: 2048,
+        start_at_beginning: config.start_at_beginning,
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
