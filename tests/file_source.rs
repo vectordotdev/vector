@@ -234,6 +234,90 @@ fn multiple_paths() {
     assert_eq!(is, [n as usize; 3]);
 }
 
+#[test]
+fn context_key() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    // Default
+    {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "hello").unwrap();
+
+        let received = rx.into_future().wait().unwrap().0.unwrap();
+        assert_eq!(received.custom[&"file".into()], path.to_str().unwrap());
+    }
+
+    // Custom
+    {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            context_key: Some("source".to_string()),
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "hello").unwrap();
+
+        let received = rx.into_future().wait().unwrap().0.unwrap();
+        assert_eq!(received.custom[&"source".into()], path.to_str().unwrap());
+    }
+
+    // Hidden
+    {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            context_key: None,
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "hello").unwrap();
+
+        let received = rx.into_future().wait().unwrap().0.unwrap();
+        assert!(received.custom.is_empty());
+    }
+
+    drop(trigger);
+    rt.shutdown_on_idle().wait().unwrap();
+}
+
 fn sleep() {
     std::thread::sleep(std::time::Duration::from_millis(20));
 }
