@@ -5,9 +5,19 @@ use std::path::PathBuf;
 use std::thread;
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
+    pub exclude: Vec<PathBuf>,
+}
+
+impl Default for FileConfig {
+    fn default() -> Self {
+        Self {
+            include: vec![],
+            exclude: vec![],
+        }
+    }
 }
 
 #[typetag::serde(name = "file")]
@@ -23,6 +33,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
 
     let cernan_server = cernan_file_source::file_server::FileServer {
         include: config.include.clone(),
+        exclude: config.exclude.clone(),
         max_read_bytes: 2048,
     };
 
