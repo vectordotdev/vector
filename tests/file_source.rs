@@ -13,6 +13,7 @@ fn happy_path() {
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
         include: vec![dir.path().join("*")],
+        ..Default::default()
     };
 
     let source = file::file_source(&config, tx);
@@ -64,6 +65,7 @@ fn truncate() {
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
         include: vec![dir.path().join("*")],
+        ..Default::default()
     };
     let source = file::file_source(&config, tx);
 
@@ -123,6 +125,7 @@ fn rotate() {
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
         include: vec![dir.path().join("*")],
+        ..Default::default()
     };
     let source = file::file_source(&config, tx);
 
@@ -183,6 +186,8 @@ fn multiple_paths() {
     let dir = tempdir().unwrap();
     let config = file::FileConfig {
         include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
+        exclude: vec![dir.path().join("a.*.txt")],
+        ..Default::default()
     };
 
     let source = file::file_source(&config, tx);
@@ -194,10 +199,12 @@ fn multiple_paths() {
     let path1 = dir.path().join("a.txt");
     let path2 = dir.path().join("b.txt");
     let path3 = dir.path().join("a.log");
+    let path4 = dir.path().join("a.ignore.txt");
     let n = 5;
     let mut file1 = File::create(&path1).unwrap();
     let mut file2 = File::create(&path2).unwrap();
     let mut file3 = File::create(&path3).unwrap();
+    let mut file4 = File::create(&path4).unwrap();
 
     sleep(); // The files must be observed at their original lengths before writing to them
 
@@ -205,6 +212,7 @@ fn multiple_paths() {
         writeln!(&mut file1, "1 {}", i).unwrap();
         writeln!(&mut file2, "2 {}", i).unwrap();
         writeln!(&mut file3, "3 {}", i).unwrap();
+        writeln!(&mut file4, "4 {}", i).unwrap();
     }
 
     let received = rx.take(n * 3).collect().wait().unwrap();
@@ -215,11 +223,12 @@ fn multiple_paths() {
 
     for record in received {
         let mut split = record.line.split(" ");
-        let file = split.next().unwrap().parse::<usize>().unwrap() - 1;
+        let file = split.next().unwrap().parse::<usize>().unwrap();
+        assert_ne!(file, 4);
         let i = split.next().unwrap().parse::<usize>().unwrap();
 
-        assert_eq!(is[file], i);
-        is[file] += 1;
+        assert_eq!(is[file - 1], i);
+        is[file - 1] += 1;
     }
 
     assert_eq!(is, [n as usize; 3]);

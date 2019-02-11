@@ -1,5 +1,5 @@
 use crate::file_watcher::FileWatcher;
-use glob::glob;
+use glob::{glob,Pattern};
 use std::mem;
 use std::path::PathBuf;
 use std::time;
@@ -18,6 +18,7 @@ use std::sync::mpsc::RecvTimeoutError;
 /// its path in at most 60 seconds.
 pub struct FileServer {
     pub include: Vec<PathBuf>,
+    pub exclude: Vec<PathBuf>,
     pub max_read_bytes: usize,
 }
 
@@ -53,11 +54,16 @@ impl FileServer {
         loop {
             let mut global_bytes_read: usize = 0;
             // glob poll
+            let exclude_patterns = self.exclude.iter().map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap()).collect::<Vec<_>>();
             for path in &self.include {
                 for entry in glob(path.to_str().expect("no ability to glob"))
                     .expect("Failed to read glob pattern")
                 {
                     if let Ok(path) = entry {
+                        if exclude_patterns.iter().any(|e| e.matches(path.to_str().unwrap())) {
+                            continue;
+                        }
+
                         let entry = fp_map.entry(path.clone());
                         if let Ok(fw) = FileWatcher::new(&path) {
                             entry.or_insert(fw);
@@ -91,7 +97,7 @@ impl FileServer {
 
             match stream::iter_ok::<_, ()>(lines.drain(..)).forward(chans).wait() {
                 Ok((_, sink)) => chans = sink,
-                Err(_) => unreachable!(),
+                Err(_) => unreachable!("Output channel is closed"),
             }
             // We've drained the live FileWatchers into fp_map_alt in the line
             // polling loop. Now we swapped them back to fp_map so next time we
