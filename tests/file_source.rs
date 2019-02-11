@@ -318,6 +318,69 @@ fn context_key() {
     rt.shutdown_on_idle().wait().unwrap();
 }
 
+#[test]
+fn start_position() {
+    // Default (start from end)
+    {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "first line").unwrap();
+        sleep();
+        writeln!(&mut file, "second line").unwrap();
+        sleep();
+
+        drop(trigger);
+        let received = rx.collect().wait().unwrap();
+        let lines = received.into_iter().map(|r| r.line).collect::<Vec<_>>();
+        assert_eq!(lines, vec!["second line"]);
+    }
+
+    // Start from beginning
+    {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "first line").unwrap();
+        sleep();
+        writeln!(&mut file, "second line").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        let received = rx.collect().wait().unwrap();
+        let lines = received.into_iter().map(|r| r.line).collect::<Vec<_>>();
+        assert_eq!(lines, vec!["first line", "second line"]);
+    }
+}
+
 fn sleep() {
     std::thread::sleep(std::time::Duration::from_millis(20));
 }

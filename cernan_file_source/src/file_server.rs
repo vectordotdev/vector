@@ -20,6 +20,7 @@ pub struct FileServer {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
     pub max_read_bytes: usize,
+    pub start_at_beginning: bool,
 }
 
 /// `FileServer` as Source
@@ -65,7 +66,7 @@ impl FileServer {
                         }
 
                         let entry = fp_map.entry(path.clone());
-                        if let Ok(fw) = FileWatcher::new(&path) {
+                        if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning) {
                             entry.or_insert(fw);
                         };
                     }
