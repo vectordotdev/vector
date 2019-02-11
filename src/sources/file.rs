@@ -3,12 +3,14 @@ use futures::{future, sync::mpsc, Future, Sink};
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::thread;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
+    pub context_key: Option<String>,
 }
 
 impl Default for FileConfig {
@@ -16,6 +18,7 @@ impl Default for FileConfig {
         Self {
             include: vec![],
             exclude: vec![],
+            context_key: Some("file".to_string()),
         }
     }
 }
@@ -37,9 +40,13 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         max_read_bytes: 2048,
     };
 
-    let out = out.sink_map_err(|_| ()).with(|(line, file)| {
+    let context_key = config.context_key.clone().map(Atom::from);
+
+    let out = out.sink_map_err(|_| ()).with(move |(line, file)| {
         let mut record = Record::new_from_line(line);
-        record.custom.insert("file".into(), file);
+        if let Some(ref context_key) = context_key {
+            record.custom.insert(context_key.clone(), file);
+        }
         future::ok(record)
     });
 
