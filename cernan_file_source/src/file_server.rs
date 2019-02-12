@@ -21,6 +21,7 @@ pub struct FileServer {
     pub exclude: Vec<PathBuf>,
     pub max_read_bytes: usize,
     pub start_at_beginning: bool,
+    pub ignore_before: Option<time::SystemTime>,
 }
 
 /// `FileServer` as Source
@@ -66,7 +67,7 @@ impl FileServer {
                         }
 
                         if !fp_map.contains_key(&path) {
-                            if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning) {
+                            if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning, self.ignore_before) {
                                 fp_map.insert(path, fw);
                             };
                         }

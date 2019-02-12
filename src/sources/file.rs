@@ -3,6 +3,7 @@ use futures::{future, sync::mpsc, Future, Sink};
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::thread;
+use std::time::{Duration, SystemTime};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -12,6 +13,7 @@ pub struct FileConfig {
     pub exclude: Vec<PathBuf>,
     pub context_key: Option<String>,
     pub start_at_beginning: bool,
+    pub ignore_older: Option<u64>,
 }
 
 impl Default for FileConfig {
@@ -21,6 +23,7 @@ impl Default for FileConfig {
             exclude: vec![],
             context_key: Some("file".to_string()),
             start_at_beginning: false,
+            ignore_older: None,
         }
     }
 }
@@ -36,11 +39,16 @@ impl crate::topology::config::SourceConfig for FileConfig {
 pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
+    let ignore_before = config
+        .ignore_older
+        .map(|secs| SystemTime::now() - Duration::from_secs(secs));
+
     let cernan_server = cernan_file_source::file_server::FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
         max_read_bytes: 2048,
         start_at_beginning: config.start_at_beginning,
+        ignore_before,
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
