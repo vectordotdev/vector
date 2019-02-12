@@ -379,6 +379,85 @@ fn start_position() {
         let lines = received.into_iter().map(|r| r.line).collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
+
+    // Start from beginning (but ignore old files)
+    {
+        use std::os::unix::io::AsRawFd;
+        use std::time::{Duration, SystemTime};
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            ignore_older: Some(1000),
+            ..Default::default()
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let after_path = dir.path().join("after");
+        let mut after_file = File::create(&after_path).unwrap();
+        let before_path = dir.path().join("before");
+        let mut before_file = File::create(&before_path).unwrap();
+
+        writeln!(&mut after_file, "first line").unwrap();
+        writeln!(&mut before_file, "first line").unwrap();
+
+        {
+            // Set the modified times
+            let before = SystemTime::now() - Duration::from_secs(1010);
+            let after = SystemTime::now() - Duration::from_secs(990);
+
+            let before_time = libc::timeval {
+                tv_sec: before
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as _,
+                tv_usec: 0,
+            };
+            let before_times = [before_time, before_time];
+
+            let after_time = libc::timeval {
+                tv_sec: after
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as _,
+                tv_usec: 0,
+            };
+            let after_times = [after_time, after_time];
+
+            unsafe {
+                libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
+                libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+            }
+        }
+
+        sleep();
+        writeln!(&mut after_file, "second line").unwrap();
+        writeln!(&mut before_file, "second line").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        let received = rx.collect().wait().unwrap();
+        let before_lines = received
+            .iter()
+            .filter(|r| r.custom[&"file".into()].ends_with("before"))
+            .map(|r| r.line.clone())
+            .collect::<Vec<_>>();
+        let after_lines = received
+            .iter()
+            .filter(|r| r.custom[&"file".into()].ends_with("after"))
+            .map(|r| r.line.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(before_lines, vec!["second line"]);
+        assert_eq!(after_lines, vec!["first line", "second line"]);
+    }
 }
 
 fn sleep() {
