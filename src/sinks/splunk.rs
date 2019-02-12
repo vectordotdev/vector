@@ -42,7 +42,7 @@ enum TcpSinkState {
 impl TcpSink {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
-            addr: addr,
+            addr,
             state: TcpSinkState::Disconnected,
             backoff: Self::fresh_backoff(),
         }

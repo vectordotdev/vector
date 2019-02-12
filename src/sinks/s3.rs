@@ -42,7 +42,7 @@ impl crate::topology::config::SinkConfig for S3SinkConfig {
 impl S3SinkConfig {
     fn region(&self) -> Result<Region, String> {
         if self.region.is_some() && self.endpoint.is_some() {
-            return Err("Only one of 'region' or 'endpoint' can be specified".to_string());
+            Err("Only one of 'region' or 'endpoint' can be specified".to_string())
         } else if let Some(region) = &self.region {
             region.parse::<Region>().map_err(|e| e.to_string())
         } else if let Some(endpoint) = &self.endpoint {
@@ -51,7 +51,7 @@ impl S3SinkConfig {
                 endpoint: endpoint.clone(),
             })
         } else {
-            return Err("Must set 'region' or 'endpoint'".to_string());
+            Err("Must set 'region' or 'endpoint'".to_string())
         }
     }
 
