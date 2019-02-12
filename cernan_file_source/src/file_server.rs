@@ -65,10 +65,11 @@ impl FileServer {
                             continue;
                         }
 
-                        let entry = fp_map.entry(path.clone());
-                        if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning) {
-                            entry.or_insert(fw);
-                        };
+                        if !fp_map.contains_key(&path) {
+                            if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning) {
+                                fp_map.insert(path, fw);
+                            };
+                        }
                     }
                 }
             }
