@@ -36,6 +36,9 @@ http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
 cernan_file_source = { path = "cernan_file_source" }
+syslog_rfc5424 = "0.6.1"
+tokio-uds = "0.2.5"
+derive_is_enum_variant = "0.1.1"
 
 [dev-dependencies]
 approx = "0.3.0"
