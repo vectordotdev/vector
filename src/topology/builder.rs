@@ -1,6 +1,6 @@
-use crate::{record::Record, sinks};
+use crate::{buffers, sinks};
 use futures::prelude::*;
-use futures::{future, sync::mpsc, Future};
+use futures::{future, Future};
 use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
@@ -33,20 +33,15 @@ pub fn build(
 
     // Creates a channel for a downstream component, and adds it to the set
     // of outbound channels for each of its inputs.
-    let mut add_connections = |inputs: Vec<String>| -> mpsc::Receiver<Record> {
-        let (tx, rx) = futures::sync::mpsc::channel(100);
-        let tx = tx.sink_map_err(|e| error!("sender error: {:?}", e));
-
+    let mut add_connections = |inputs: Vec<String>, bic: buffers::BufferInputCloner| {
         for input in inputs {
             if let Some(existing) = connections.remove(&input) {
-                let new = existing.fanout(tx.clone());
+                let new = existing.fanout(bic.get());
                 connections.insert(input, Box::new(new));
             } else {
-                connections.insert(input, Box::new(tx.clone()));
+                connections.insert(input, bic.get());
             }
         }
-
-        rx
     };
 
     // For each sink, set up its inbound channel and spawn a task that pumps
@@ -63,7 +58,18 @@ pub fn build(
         if sink.inputs.is_empty() {
             warnings.push(format!("Sink \"{}\" has no inputs", name));
         }
-        let rx = add_connections(sink.inputs);
+
+        let buffer = sink.buffer.build(&config.data_dir, &name);
+
+        let (tx, rx) = match buffer {
+            Err(error) => {
+                errors.push(format!("Sink \"{}\": {}", name, error));
+                continue;
+            }
+            Ok(buffer) => buffer,
+        };
+
+        add_connections(sink.inputs, tx);
 
         match sink.inner.build() {
             Err(error) => {
@@ -99,7 +105,8 @@ pub fn build(
             if outer.inputs.is_empty() {
                 warnings.push(format!("Transform \"{}\" has no inputs", name));
             }
-            let rx = add_connections(outer.inputs);
+            let (tx, rx) = futures::sync::mpsc::channel(100);
+            add_connections(outer.inputs, buffers::BufferInputCloner::Memory(tx));
 
             (name, outer.inner, rx)
         })

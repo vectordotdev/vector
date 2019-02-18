@@ -36,6 +36,9 @@ http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
 cernan_file_source = { path = "cernan_file_source" }
+leveldb = "0.8.4"
+db-key = "0.0.5"
+tokio-threadpool = "0.1.8"
 
 [dev-dependencies]
 approx = "0.3.0"
