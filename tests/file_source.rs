@@ -461,5 +461,5 @@ fn start_position() {
 }
 
 fn sleep() {
-    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::thread::sleep(std::time::Duration::from_millis(50));
 }
