@@ -74,6 +74,9 @@ impl Sink for Writer {
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
         // TODO: should we periodically flush after N records are in the write batch?
+        // This doesn't write all the way through to disk and doesn't need to be wrapped
+        // with `blocking`. (It does get written to a memory mapped table that will be
+        // flushed even in the case of a process crash.)
         self.db
             .write(WriteOptions::new(), &self.writebatch)
             .unwrap();
@@ -113,6 +116,8 @@ impl Stream for Reader {
             self.advance = false;
         }
 
+        // If there's no value at offset, we return NotReady and rely on Writer
+        // using notifier to wake this task up after the next write.
         self.notifier.register();
 
         // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
