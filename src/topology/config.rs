@@ -2,9 +2,12 @@ use crate::{record::Record, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde_derive::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
+    #[serde(default)]
+    pub data_dir: Option<PathBuf>,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
@@ -18,6 +21,8 @@ pub trait SourceConfig: core::fmt::Debug {
 
 #[derive(Deserialize, Debug)]
 pub struct SinkOuter {
+    #[serde(default)]
+    pub buffer: crate::buffers::BufferConfig,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<SinkConfig>,
@@ -44,6 +49,7 @@ pub trait TransformConfig: core::fmt::Debug {
 impl Config {
     pub fn empty() -> Self {
         Self {
+            data_dir: None,
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
@@ -57,6 +63,7 @@ impl Config {
     pub fn add_sink<S: SinkConfig + 'static>(&mut self, name: &str, inputs: &[&str], sink: S) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
+            buffer: Default::default(),
             inner: Box::new(sink),
             inputs,
         };

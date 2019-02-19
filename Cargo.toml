@@ -39,6 +39,9 @@ cernan_file_source = { path = "cernan_file_source" }
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
+leveldb = "0.8.4"
+db-key = "0.0.5"
+tokio-threadpool = "0.1.8"
 
 [dev-dependencies]
 approx = "0.3.0"
