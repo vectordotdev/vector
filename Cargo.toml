@@ -45,6 +45,7 @@ approx = "0.3.0"
 criterion = "0.2.5"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
+libc = "0.2.43"
 
 [[bench]]
 name = "bench"

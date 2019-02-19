@@ -1,5 +1,5 @@
 use crate::file_watcher::FileWatcher;
-use glob::glob;
+use glob::{glob,Pattern};
 use std::mem;
 use std::path::PathBuf;
 use std::time;
@@ -17,34 +17,11 @@ use std::sync::mpsc::RecvTimeoutError;
 /// exist at cernan startup. `FileServer` will discover new files which match
 /// its path in at most 60 seconds.
 pub struct FileServer {
-    pattern: PathBuf,
-    max_read_bytes: usize,
-}
-
-/// The configuration struct for `FileServer`.
-#[derive(Clone, Debug)]
-pub struct FileServerConfig {
-    /// The path that `FileServer` will watch. Globs are allowed and
-    /// `FileServer` will watch multiple files.
-    pub path: Option<PathBuf>,
-    /// The maximum number of bytes to read from a file before switching to a
-    /// new file.
+    pub include: Vec<PathBuf>,
+    pub exclude: Vec<PathBuf>,
     pub max_read_bytes: usize,
-    /// The forwards which `FileServer` will obey.
-    pub forwards: Vec<String>,
-    /// The configured name of FileServer.
-    pub config_path: Option<String>,
-}
-
-impl Default for FileServerConfig {
-    fn default() -> Self {
-        FileServerConfig {
-            path: None,
-            max_read_bytes: 2048,
-            forwards: Vec::default(),
-            config_path: None,
-        }
-    }
+    pub start_at_beginning: bool,
+    pub ignore_before: Option<time::SystemTime>,
 }
 
 /// `FileServer` as Source
@@ -61,15 +38,6 @@ impl Default for FileServerConfig {
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
 impl FileServer {
-    /// Make a FileServer
-    pub fn init(config: FileServerConfig) -> Self {
-        let pattern = config.path.expect("must specify a 'path' for FileServer");
-        FileServer {
-            pattern: pattern,
-            max_read_bytes: config.max_read_bytes,
-        }
-    }
-
     pub fn run(self, mut chans: impl Sink<SinkItem=(String, String), SinkError=()>, shutdown: std::sync::mpsc::Receiver<()>) {
         let mut buffer = String::new();
 
@@ -88,14 +56,22 @@ impl FileServer {
         loop {
             let mut global_bytes_read: usize = 0;
             // glob poll
-            for entry in glob(self.pattern.to_str().expect("no ability to glob"))
-                .expect("Failed to read glob pattern")
-            {
-                if let Ok(path) = entry {
-                    let entry = fp_map.entry(path.clone());
-                    if let Ok(fw) = FileWatcher::new(&path) {
-                        entry.or_insert(fw);
-                    };
+            let exclude_patterns = self.exclude.iter().map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap()).collect::<Vec<_>>();
+            for path in &self.include {
+                for entry in glob(path.to_str().expect("no ability to glob"))
+                    .expect("Failed to read glob pattern")
+                {
+                    if let Ok(path) = entry {
+                        if exclude_patterns.iter().any(|e| e.matches(path.to_str().unwrap())) {
+                            continue;
+                        }
+
+                        if !fp_map.contains_key(&path) {
+                            if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning, self.ignore_before) {
+                                fp_map.insert(path, fw);
+                            };
+                        }
+                    }
                 }
             }
             // line polling
@@ -124,7 +100,7 @@ impl FileServer {
 
             match stream::iter_ok::<_, ()>(lines.drain(..)).forward(chans).wait() {
                 Ok((_, sink)) => chans = sink,
-                Err(_) => unreachable!(),
+                Err(_) => unreachable!("Output channel is closed"),
             }
             // We've drained the live FileWatchers into fp_map_alt in the line
             // polling loop. Now we swapped them back to fp_map so next time we

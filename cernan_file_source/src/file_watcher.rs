@@ -4,6 +4,7 @@ use std::io::BufRead;
 use std::io::Seek;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
+use std::time;
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
@@ -41,14 +42,21 @@ impl FileWatcher {
     /// The input path will be used by `FileWatcher` to prime its state
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by cernan.
-    pub fn new(path: &PathBuf) -> io::Result<FileWatcher> {
+    pub fn new(path: &PathBuf, start_at_beginning: bool, ignore_before: Option<time::SystemTime>) -> io::Result<FileWatcher> {
         match fs::File::open(&path) {
             Ok(f) => {
                 let metadata = f.metadata()?;
                 let dev = metadata.dev();
                 let ino = metadata.ino();
                 let mut rdr = io::BufReader::new(f);
-                assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());
+
+                let too_old = if let (Some(ignore_before), Ok(mtime)) = (ignore_before, metadata.modified()) {
+                    mtime < ignore_before
+                } else { false };
+
+                if !start_at_beginning || too_old {
+                    assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());
+                }
                 Ok(FileWatcher {
                     path: path.clone(),
                     reader: Some(rdr),
