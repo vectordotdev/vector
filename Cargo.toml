@@ -39,6 +39,12 @@ cernan_file_source = { path = "cernan_file_source" }
 leveldb = "0.8.4"
 db-key = "0.0.5"
 tokio-threadpool = "0.1.8"
+prost = "0.4.0"
+prost-derive = "0.4.0"
+prost-types = "0.4.0"
+
+[build-dependencies]
+prost-build = "0.4.0"
 
 [dev-dependencies]
 approx = "0.3.0"
