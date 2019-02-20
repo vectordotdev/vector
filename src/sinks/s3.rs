@@ -103,12 +103,12 @@ impl S3Sink {
 }
 
 impl Sink for S3Sink {
-    type SinkItem = Record;
+    type SinkItem = (usize, Record);
     type SinkError = ();
 
     fn start_send(
         &mut self,
-        item: Self::SinkItem,
+        (record_id, item): Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         if self.full() {
             self.poll_complete()?;
@@ -117,6 +117,8 @@ impl Sink for S3Sink {
                 return Ok(AsyncSink::NotReady(item));
             }
         }
+
+        self.in_flight_records.push(record_id);
 
         self.buffer.push(&item.line.into_bytes());
         self.buffer.push(b"\n");
@@ -133,7 +135,12 @@ impl Sink for S3Sink {
             if let Some(ref mut in_flight) = self.in_flight {
                 match in_flight.poll() {
                     Err(e) => panic!("{:?}", e),
-                    Ok(Async::Ready(_)) => self.in_flight = None,
+                    Ok(Async::Ready(_)) => {
+                        for record_id in self.in_flight_records {
+                            ack_chan.unbounded_send(record_id);
+                        }
+                        self.in_flight = None;
+                    }
                     Ok(Async::NotReady) => {
                         if self.buffer_full() {
                             return Ok(Async::NotReady);

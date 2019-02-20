@@ -1,5 +1,5 @@
 use crate::record::{proto, Record};
-use futures::{task::AtomicTask, Async, AsyncSink, Poll, Sink, Stream};
+use futures::{task::AtomicTask, Async, AsyncSink, Poll, Sink, Stream, sync::mpsc};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     iterator::{Iterable, LevelDBIterator},
@@ -101,13 +101,26 @@ pub struct Reader {
     offset: usize,
     notifier: Arc<AtomicTask>,
     advance: bool,
+    ack_chan: mpsc::UnboundedReceiver<usize>,
 }
 
 impl Stream for Reader {
-    type Item = Record;
+    type Item = (usize, Record);
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        {
+            let mut delete_batch = Writebatch::new();
+
+            while let Ok(Async::Ready(Some(ack_offset))) = self.ack_chan.poll() {
+                delete_batch.delete(Key(ack_offset));
+            }
+
+            self.db
+                .write(WriteOptions::new(), &delete_batch)
+                .unwrap();
+        }
+
         // If the previous call to `poll` succeeded, `forward` won't call `poll` again
         // until the sink has accepted the write.
         if self.advance {
@@ -133,9 +146,10 @@ impl Stream for Reader {
             match proto::Record::decode(value) {
                 Ok(record) => {
                     let record = Record::from(record);
-                    self.advance = true;
+                    let record_offset = self.offset;
+                    self.offset += 1;
 
-                    Ok(Async::Ready(Some(record)))
+                    Ok(Async::Ready(Some((record_offset, record))))
                 }
                 Err(err) => {
                     error!("Error deserializing proto: {:?}", err);

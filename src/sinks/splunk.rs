@@ -136,7 +136,9 @@ impl Sink for TcpSink {
 }
 
 pub fn raw_tcp(addr: SocketAddr) -> super::RouterSink {
-    Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.line)))
+    Box::new(TcpSink::new(addr)
+             .simple_ack(ack_chan)
+             .with(|record: Record| Ok(record.line)))
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {

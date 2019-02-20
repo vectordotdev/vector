@@ -1,5 +1,5 @@
 use crate::record::Record;
-use futures::{future, Sink};
+use futures::{future, Sink, sync::mpsc};
 use serde_derive::{Deserialize, Serialize};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::io;
@@ -26,7 +26,7 @@ pub struct ConsoleSinkConfig {
 
 #[typetag::serde(name = "console")]
 impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, ack_chan: mpsc::UnboundedSender<usize>) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
             Target::Stdout => Box::new(io::stdout()),
             Target::Stderr => Box::new(io::stderr()),
@@ -34,6 +34,7 @@ impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
 
         let sink = FramedWrite::new(output, LinesCodec::new())
             .sink_map_err(|_| ())
+            .simple_ack(ack_chan)
             .with(|record: Record| Ok(record.line));
 
         Ok((Box::new(sink), Box::new(future::ok(()))))

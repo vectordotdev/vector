@@ -61,7 +61,7 @@ pub fn build(
 
         let buffer = sink.buffer.build(&config.data_dir, &name);
 
-        let (tx, rx) = match buffer {
+        let (tx, rx, ack_chan) = match buffer {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;
@@ -71,7 +71,7 @@ pub fn build(
 
         add_connections(sink.inputs, tx);
 
-        match sink.inner.build() {
+        match sink.inner.build(ack_chan) {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
             }

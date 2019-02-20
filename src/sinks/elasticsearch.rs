@@ -163,6 +163,9 @@ impl<T: Document> ElasticsearchSink<T> {
                         .map_err(|e| format!("response error: {:?}", e))
                 })
                 .and_then(|response| {
+                    for record_id in records_that_succeeded(response) {
+                        ack_chan.unbounded_send(record_id);
+                    }
                     // TODO: use the response to build a new body for retries that include
                     // only the failed items
                     if response.is_err() {

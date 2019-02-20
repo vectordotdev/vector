@@ -30,7 +30,7 @@ pub struct SinkOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug {
-    fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
+    fn build(&self, ack_chan: mpsc::UnboundedSender<usize>) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 }
 
 #[derive(Deserialize, Debug)]
