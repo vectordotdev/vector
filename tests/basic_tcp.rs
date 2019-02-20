@@ -1,4 +1,4 @@
-use approx::{__assert_approx, assert_relative_eq, relative_eq};
+use approx::assert_relative_eq;
 use futures::{Future, Stream};
 use router::test_util::{next_addr, random_lines, send_lines};
 use router::topology::{self, config};

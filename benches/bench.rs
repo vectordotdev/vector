@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
-use approx::{__assert_approx, assert_relative_eq, relative_eq};
+use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines};
 use router::topology::{self, config};
