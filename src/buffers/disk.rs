@@ -1,4 +1,4 @@
-use crate::record::Record;
+use crate::record::{proto, Record};
 use futures::{task::AtomicTask, Async, AsyncSink, Poll, Sink, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -7,6 +7,8 @@ use leveldb::database::{
     options::{Options, ReadOptions, WriteOptions},
     Database,
 };
+use log::error;
+use prost::Message;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -62,12 +64,12 @@ impl Sink for Writer {
         &mut self,
         record: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        let line = record.line;
-        let value = line.as_bytes();
+        let mut value = vec![];
+        proto::Record::from(record).encode(&mut value).unwrap(); // This will not error when writing to a Vec
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
-        self.writebatch.put(Key(key), value);
+        self.writebatch.put(Key(key), &value);
 
         Ok(AsyncSink::Ready)
     }
@@ -128,12 +130,19 @@ impl Stream for Reader {
         .unwrap();
 
         if let Async::Ready(Some(value)) = next {
-            // TODO: round trip the original record with protobuf
-            let line = String::from_utf8(value).unwrap();
-            let record = Record::new_from_line(line);
-            self.advance = true;
+            match proto::Record::decode(value) {
+                Ok(record) => {
+                    let record = Record::from(record);
+                    self.advance = true;
 
-            Ok(Async::Ready(Some(record)))
+                    Ok(Async::Ready(Some(record)))
+                }
+                Err(err) => {
+                    error!("Error deserializing proto: {:?}", err);
+                    debug_assert!(false);
+                    self.poll()
+                }
+            }
         } else if Arc::strong_count(&self.db) == 1 {
             // There are no writers left
             Ok(Async::Ready(None))
