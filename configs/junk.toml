@@ -9,6 +9,6 @@ rate = 10
 pass_list = ["error"]
 
 [sinks.out]
-type = "splunk_tcp"
+type = "tcp"
 inputs = ["sampler"]
 address = "127.0.0.1:9999"

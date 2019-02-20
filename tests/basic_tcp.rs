@@ -21,7 +21,7 @@ fn test_pipe() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -66,7 +66,7 @@ fn test_sample() {
     topology.add_sink(
         "out",
         &["sampler"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -128,7 +128,7 @@ fn test_parse() {
     topology.add_sink(
         "out",
         &["filter"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -173,7 +173,7 @@ fn test_merge() {
     topology.add_sink(
         "out",
         &["in1", "in2"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -231,12 +231,12 @@ fn test_fork() {
     topology.add_sink(
         "out1",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr1 },
+        sinks::tcp::TcpSinkConfig { address: out_addr1 },
     );
     topology.add_sink(
         "out2",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr2 },
+        sinks::tcp::TcpSinkConfig { address: out_addr2 },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -282,12 +282,12 @@ fn test_merge_and_fork() {
     topology.add_sink(
         "out1",
         &["in1", "in2"],
-        sinks::splunk::TcpSinkConfig { address: out_addr1 },
+        sinks::tcp::TcpSinkConfig { address: out_addr1 },
     );
     topology.add_sink(
         "out2",
         &["in2"],
-        sinks::splunk::TcpSinkConfig { address: out_addr2 },
+        sinks::tcp::TcpSinkConfig { address: out_addr2 },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -360,12 +360,12 @@ fn test_merge_and_fork_json() {
         },
         "sinks": {
             "out1": {
-                "type": "splunk_tcp",
+                "type": "tcp",
                 "address": out_addr1,
                 "inputs": ["in1", "in2"],
             },
             "out2": {
-                "type": "splunk_tcp",
+                "type": "tcp",
                 "address": out_addr2,
                 "inputs": ["in2"],
             },
@@ -435,7 +435,7 @@ fn test_reconnect() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -479,12 +479,12 @@ fn test_healthcheck() {
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck = router::sinks::splunk::tcp_healthcheck(addr);
+    let healthcheck = router::sinks::tcp::tcp_healthcheck(addr);
 
     assert!(healthcheck.wait().is_ok());
 
     let bad_addr = next_addr();
-    let bad_healthcheck = router::sinks::splunk::tcp_healthcheck(bad_addr);
+    let bad_healthcheck = router::sinks::tcp::tcp_healthcheck(bad_addr);
 
     assert!(bad_healthcheck.wait().is_err());
 }

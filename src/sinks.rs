@@ -5,6 +5,7 @@ pub mod elasticsearch;
 pub mod prometheus;
 pub mod s3;
 pub mod splunk;
+pub mod tcp;
 pub mod util;
 
 use crate::record::Record;

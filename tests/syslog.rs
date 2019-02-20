@@ -23,7 +23,7 @@ fn test_tcp_syslog() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -66,7 +66,7 @@ fn test_udp_syslog() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 
@@ -117,7 +117,7 @@ fn test_unix_stream_syslog() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
 

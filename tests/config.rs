@@ -21,7 +21,7 @@ fn happy_path() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = ["sampler"]
         address = "127.0.0.1:9999"
       "#,
@@ -37,7 +37,7 @@ fn happy_path() {
         sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
 
         [sinks]
-        out = {type = "splunk_tcp", inputs = ["sampler"], address = "127.0.0.1:9999"}
+        out = {type = "tcp", inputs = ["sampler"], address = "127.0.0.1:9999"}
       "#,
     )
     .unwrap();
@@ -68,7 +68,7 @@ fn missing_key() {
         type = "tcp"
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = ["in"]
         address = "127.0.0.1:9999"
       "#,
@@ -113,7 +113,7 @@ fn nonexistant_input() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = ["asdf"]
         address = "127.0.0.1:9999"
       "#,
@@ -144,7 +144,7 @@ fn bad_regex() {
         pass_list = ["(["]
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = ["sampler"]
         address = "127.0.0.1:9999"
       "#,
@@ -165,7 +165,7 @@ fn bad_regex() {
         regex = "(["
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = ["parser"]
         address = "127.0.0.1:9999"
       "#,
@@ -238,7 +238,7 @@ fn warnings() {
         pass_list = ["error"]
 
         [sinks.out]
-        type = "splunk_tcp"
+        type = "tcp"
         inputs = []
         address = "127.0.0.1:9999"
       "#,

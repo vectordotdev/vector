@@ -22,7 +22,7 @@ fn test_buffering() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     topology.sinks["out"].buffer = BufferConfig::Disk {};
     topology.data_dir = Some(data_dir.clone());
@@ -47,7 +47,7 @@ fn test_buffering() {
     topology.add_sink(
         "out",
         &["in"],
-        sinks::splunk::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     topology.sinks["out"].buffer = BufferConfig::Disk {};
     topology.data_dir = Some(data_dir);
