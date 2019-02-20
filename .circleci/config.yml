@@ -1,0 +1,80 @@
+version: 2
+
+jobs:
+  rustfmt:
+    docker:
+      - image: rust:latest
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: project-cache
+      - run:
+          name: Check formatting
+          command: |
+            rustup component add rustfmt
+            rustfmt --version
+            cargo fmt -- --check
+      - save_cache:
+          key: project-cache
+          paths:
+            - "~/.cargo"
+            - "./target"
+            
+  build-stable:
+    docker:
+      - image: rust:latest
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: project-cache
+      - run:
+          name: Install leveldb deps
+          command: |
+            apt-get update
+            apt-get -y install libleveldb-dev libsnappy-dev
+      - run:
+          name: Build
+          environment:
+            RUSTFLAGS: "-D warnings"
+          command: |
+            cargo build --all --all-features
+      - save_cache:
+          key: project-cache
+          paths:
+            - "~/.cargo"
+            - "./target"
+
+  test-stable:
+    resource_class: large
+    docker:
+      - image: rust:latest
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: project-cache
+      - run:
+          name: Install leveldb deps
+          command: |
+            apt-get update
+            apt-get -y install libleveldb-dev libsnappy-dev
+      - run:
+          name: Test
+          command: |
+            cargo test --all
+      - save_cache:
+          key: project-cache
+          paths:
+            - "~/.cargo"
+            - "./target"
+
+workflows:
+  version: 2
+
+  test:
+    jobs:
+      - rustfmt
+      - build-stable
+      - test-stable

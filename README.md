@@ -17,7 +17,7 @@ My normal development flow goes roughly as follows:
 1. `cargo check` as I'm making changes (using `cargo-watch` in a tmux pane makes
    this very convenient)
 
-2. `cargo test` to check that unit tests are all passing
+2. `cargo test && cargo test --features flaky` to check that unit tests are all passing
 
 3. `cargo run` to execute the higher-level test harness that's currently the
    main binary

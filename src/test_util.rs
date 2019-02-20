@@ -26,13 +26,11 @@ pub fn send_lines(
 
             lines
                 .forward(out)
-                .map(|(_source, sink)| sink)
-                .and_then(|sink| {
+                .and_then(|(_source, sink)| {
                     let socket = sink.into_inner().into_inner();
-                    tokio::io::shutdown(socket)
-                        .map(|_| ())
-                        .map_err(|e| panic!("{:}", e))
+                    tokio::io::shutdown(socket).map_err(|e| panic!("{:}", e))
                 })
+                .map(|_| ())
         })
 }
 
