@@ -9,6 +9,8 @@ use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 
+mod buffering;
+
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
     let line_size: usize = 100;
@@ -580,7 +582,10 @@ criterion_group!(
     benchmark_transforms,
     benchmark_complex,
 );
-criterion_main!(benches);
+criterion_main!(
+    benches,
+    buffering::buffers,
+);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;
