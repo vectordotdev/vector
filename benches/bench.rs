@@ -582,10 +582,7 @@ criterion_group!(
     benchmark_transforms,
     benchmark_complex,
 );
-criterion_main!(
-    benches,
-    buffering::buffers,
-);
+criterion_main!(benches, buffering::buffers);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;

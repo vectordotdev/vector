@@ -3,11 +3,11 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines};
 use router::topology::{self, config};
-use router::{sinks, sources, buffers::BufferConfig};
+use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
+use tempfile::tempdir;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
-use tempfile::tempdir;
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -60,7 +60,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
-        }).with_function("on-disk", move |b| {
+        })
+        .with_function("on-disk", move |b| {
             b.iter_with_setup(
                 || {
                     let mut topology = config::Config::empty();
@@ -76,7 +77,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::splunk::TcpSinkConfig { address: out_addr },
                     );
-                    topology.sinks["out"].buffer = BufferConfig::Disk{};
+                    topology.sinks["out"].buffer = BufferConfig::Disk {};
                     topology.data_dir = Some(data_dir.clone());
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
@@ -107,10 +108,7 @@ fn benchmark_buffers(c: &mut Criterion) {
     );
 }
 
-criterion_group!(
-    buffers,
-    benchmark_buffers,
-);
+criterion_group!(buffers, benchmark_buffers);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;
