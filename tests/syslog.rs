@@ -1,3 +1,5 @@
+#![cfg(feature = "flaky")]
+
 use futures::{Future, Sink, Stream};
 use router::test_util::{next_addr, random_lines, send_lines};
 use router::topology::{self, config};

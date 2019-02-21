@@ -151,6 +151,7 @@ mod test {
     use regex::{Regex, RegexSet};
     use string_cache::DefaultAtom as Atom;
 
+    #[cfg(feature = "flaky")]
     #[test]
     fn samples_at_roughly_the_configured_rate() {
         let records = random_records(1000);
