@@ -40,6 +40,7 @@ pub struct Writer {
     offset: Arc<AtomicUsize>,
     notifier: Arc<AtomicTask>,
     writebatch: Writebatch<Key>,
+    batch_size: usize,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -52,6 +53,7 @@ impl Clone for Writer {
             offset: Arc::clone(&self.offset),
             notifier: Arc::clone(&self.notifier),
             writebatch: Writebatch::new(),
+            batch_size: 0,
         }
     }
 }
@@ -70,27 +72,44 @@ impl Sink for Writer {
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
         self.writebatch.put(Key(key), &value);
+        self.batch_size += 1;
+
+        if self.batch_size >= 100 {
+            self.poll_complete()?;
+        }
 
         Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        // TODO: should we periodically flush after N records are in the write batch?
         // This doesn't write all the way through to disk and doesn't need to be wrapped
         // with `blocking`. (It does get written to a memory mapped table that will be
         // flushed even in the case of a process crash.)
-        self.db
-            .write(WriteOptions::new(), &self.writebatch)
-            .unwrap();
-        self.writebatch = Writebatch::new();
-        self.notifier.notify();
+        if self.batch_size > 0 {
+            self.write_batch();
+        }
 
         Ok(Async::Ready(()))
     }
 }
 
+impl Writer {
+    fn write_batch(&mut self) {
+        self.db
+            .write(WriteOptions::new(), &self.writebatch)
+            .unwrap();
+        self.writebatch = Writebatch::new();
+        self.batch_size = 0;
+        self.notifier.notify();
+    }
+}
+
 impl Drop for Writer {
     fn drop(&mut self) {
+        if self.batch_size > 0 {
+            self.write_batch();
+        }
+
         // We need to wake up the reader so it can return None if there are no more writers
         self.notifier.notify();
     }
@@ -205,6 +224,7 @@ pub fn open(path: &std::path::Path) -> (Writer, Reader) {
         notifier: Arc::clone(&notifier),
         offset: Arc::new(AtomicUsize::new(tail)),
         writebatch: Writebatch::new(),
+        batch_size: 0,
     };
     let reader = Reader {
         db: Arc::clone(&db),
