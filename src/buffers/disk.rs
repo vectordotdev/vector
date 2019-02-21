@@ -101,7 +101,12 @@ pub struct Reader {
     offset: usize,
     notifier: Arc<AtomicTask>,
     advance: bool,
+    delete_batch: Writebatch<Key>,
+    batch_size: usize,
 }
+
+// Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
+unsafe impl Send for Reader {}
 
 impl Stream for Reader {
     type Item = Record;
@@ -111,11 +116,14 @@ impl Stream for Reader {
         // If the previous call to `poll` succeeded, `forward` won't call `poll` again
         // until the sink has accepted the write.
         if self.advance {
-            self.db
-                .delete(WriteOptions::new(), Key(self.offset))
-                .unwrap();
+            self.delete_batch.delete(Key(self.offset));
+            self.batch_size += 1;
             self.offset += 1;
             self.advance = false;
+        }
+
+        if self.batch_size >= 10000 {
+            self.delete_batch();
         }
 
         // If there's no value at offset, we return NotReady and rely on Writer
@@ -147,8 +155,30 @@ impl Stream for Reader {
             // There are no writers left
             Ok(Async::Ready(None))
         } else {
+            if self.batch_size > 0 {
+                self.delete_batch();
+            }
+
             Ok(Async::NotReady)
         }
+    }
+}
+
+impl Drop for Reader {
+    fn drop(&mut self) {
+        if self.batch_size > 0 {
+            self.delete_batch();
+        }
+    }
+}
+
+impl Reader {
+    fn delete_batch(&mut self) {
+        self.db
+            .write(WriteOptions::new(), &self.delete_batch)
+            .unwrap();
+        self.delete_batch = Writebatch::new();
+        self.batch_size = 0;
     }
 }
 
@@ -181,6 +211,8 @@ pub fn open(path: &std::path::Path) -> (Writer, Reader) {
         notifier: Arc::clone(&notifier),
         offset: head,
         advance: false,
+        delete_batch: Writebatch::new(),
+        batch_size: 0,
     };
 
     (writer, reader)
