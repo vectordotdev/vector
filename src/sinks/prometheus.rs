@@ -3,7 +3,7 @@ use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
 use prometheus::{Counter, Encoder, Registry, TextEncoder};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};

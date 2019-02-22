@@ -1,6 +1,6 @@
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink};
 use log::error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::codec::{FramedWrite, LinesCodec};

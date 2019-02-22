@@ -2,7 +2,7 @@ use super::util;
 use super::util::SinkExt;
 use futures::{Future, Sink};
 use hyper::{Request, Uri};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::record::Record;

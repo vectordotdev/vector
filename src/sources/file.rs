@@ -1,6 +1,6 @@
 use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};

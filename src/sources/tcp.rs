@@ -1,7 +1,7 @@
 use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use log::{error, info};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::{
     self,
