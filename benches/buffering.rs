@@ -77,7 +77,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    topology.sinks["out"].buffer = BufferConfig::Disk {};
+                    topology.sinks["out"].buffer = BufferConfig::Disk {
+                        max_size: 1_000_000,
+                    };
                     topology.data_dir = Some(data_dir.clone());
                     let (server, trigger, _healthchecks, _warnings) =
                         topology::build(topology).unwrap();
