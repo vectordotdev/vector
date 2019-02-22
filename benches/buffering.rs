@@ -35,7 +35,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     topology.add_sink(
                         "out",
                         &["in"],
-                        sinks::splunk::TcpSinkConfig { address: out_addr },
+                        sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
                     topology.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
                     let (server, trigger, _healthchecks, _warnings) =
@@ -75,7 +75,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     topology.add_sink(
                         "out",
                         &["in"],
-                        sinks::splunk::TcpSinkConfig { address: out_addr },
+                        sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
                     topology.sinks["out"].buffer = BufferConfig::Disk {};
                     topology.data_dir = Some(data_dir.clone());
