@@ -9,12 +9,8 @@ mod disk;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type")]
 pub enum BufferConfig {
-    Memory {
-        num_items: usize,
-    },
-    Disk {
-        // TODO: max_size
-    },
+    Memory { num_items: usize },
+    Disk { max_size: usize },
 }
 
 impl Default for BufferConfig {
@@ -58,13 +54,13 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx))
             }
-            BufferConfig::Disk {} => {
+            BufferConfig::Disk { max_size } => {
                 let path = data_dir
                     .as_ref()
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .join(format!("{}_buffer", sink_name));
 
-                let (tx, rx) = disk::open(&path);
+                let (tx, rx) = disk::open(&path, *max_size);
                 let tx = BufferInputCloner::Disk(tx);
                 let rx = Box::new(rx);
                 Ok((tx, rx))

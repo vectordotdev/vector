@@ -38,9 +38,12 @@ impl db_key::Key for Key {
 pub struct Writer {
     db: Arc<Database<Key>>,
     offset: Arc<AtomicUsize>,
-    notifier: Arc<AtomicTask>,
+    write_notifier: Arc<AtomicTask>,
+    delete_notifier: Arc<AtomicTask>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
+    max_size: usize,
+    current_size: Arc<AtomicUsize>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -51,9 +54,12 @@ impl Clone for Writer {
         Self {
             db: Arc::clone(&self.db),
             offset: Arc::clone(&self.offset),
-            notifier: Arc::clone(&self.notifier),
+            write_notifier: Arc::clone(&self.write_notifier),
+            delete_notifier: Arc::clone(&self.delete_notifier),
             writebatch: Writebatch::new(),
             batch_size: 0,
+            max_size: self.max_size,
+            current_size: Arc::clone(&self.current_size),
         }
     }
 }
@@ -68,6 +74,17 @@ impl Sink for Writer {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         let mut value = vec![];
         proto::Record::from(record).encode(&mut value).unwrap(); // This will not error when writing to a Vec
+        let record_size = value.len();
+
+        self.delete_notifier.register();
+        if self.current_size.fetch_add(record_size, Ordering::Relaxed) > self.max_size {
+            self.current_size.fetch_sub(record_size, Ordering::Relaxed);
+
+            self.poll_complete()?;
+
+            let record = proto::Record::decode(value).unwrap().into();
+            return Ok(AsyncSink::NotReady(record));
+        }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
@@ -100,7 +117,7 @@ impl Writer {
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
-        self.notifier.notify();
+        self.write_notifier.notify();
     }
 }
 
@@ -111,17 +128,19 @@ impl Drop for Writer {
         }
 
         // We need to wake up the reader so it can return None if there are no more writers
-        self.notifier.notify();
+        self.write_notifier.notify();
     }
 }
 
 pub struct Reader {
     db: Arc<Database<Key>>,
     offset: usize,
-    notifier: Arc<AtomicTask>,
+    write_notifier: Arc<AtomicTask>,
+    delete_notifier: Arc<AtomicTask>,
     advance: bool,
     delete_batch: Writebatch<Key>,
     batch_size: usize,
+    current_size: Arc<AtomicUsize>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -146,8 +165,8 @@ impl Stream for Reader {
         }
 
         // If there's no value at offset, we return NotReady and rely on Writer
-        // using notifier to wake this task up after the next write.
-        self.notifier.register();
+        // using write_notifier to wake this task up after the next write.
+        self.write_notifier.register();
 
         // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
         // the app), this will have to go to disk.
@@ -157,6 +176,8 @@ impl Stream for Reader {
         .unwrap();
 
         if let Async::Ready(Some(value)) = next {
+            self.current_size.fetch_sub(value.len(), Ordering::Relaxed);
+
             match proto::Record::decode(value) {
                 Ok(record) => {
                     let record = Record::from(record);
@@ -196,12 +217,13 @@ impl Reader {
         self.db
             .write(WriteOptions::new(), &self.delete_batch)
             .unwrap();
+        self.delete_notifier.notify();
         self.delete_batch = Writebatch::new();
         self.batch_size = 0;
     }
 }
 
-pub fn open(path: &std::path::Path) -> (Writer, Reader) {
+pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
     let mut options = Options::new();
     options.create_if_missing = true;
 
@@ -217,22 +239,31 @@ pub fn open(path: &std::path::Path) -> (Writer, Reader) {
         tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
     }
 
-    let notifier = Arc::new(AtomicTask::new());
+    let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
+    let current_size = Arc::new(AtomicUsize::new(initial_size));
+
+    let write_notifier = Arc::new(AtomicTask::new());
+    let delete_notifier = Arc::new(AtomicTask::new());
 
     let writer = Writer {
         db: Arc::clone(&db),
-        notifier: Arc::clone(&notifier),
+        write_notifier: Arc::clone(&write_notifier),
+        delete_notifier: Arc::clone(&delete_notifier),
         offset: Arc::new(AtomicUsize::new(tail)),
         writebatch: Writebatch::new(),
         batch_size: 0,
+        max_size,
+        current_size: Arc::clone(&current_size),
     };
     let reader = Reader {
         db: Arc::clone(&db),
-        notifier: Arc::clone(&notifier),
+        write_notifier: Arc::clone(&write_notifier),
+        delete_notifier: Arc::clone(&delete_notifier),
         offset: head,
         advance: false,
         delete_batch: Writebatch::new(),
         batch_size: 0,
+        current_size,
     };
 
     (writer, reader)
