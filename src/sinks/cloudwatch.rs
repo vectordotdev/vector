@@ -44,7 +44,6 @@ enum Error {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
     NoStreamsFound,
-    NoToken,
 }
 
 #[typetag::serde(name = "cloudwatch")]
@@ -56,63 +55,6 @@ impl crate::topology::config::SinkConfig for CloudwatchSinkConfig {
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
-}
-
-fn healthcheck(config: CloudwatchSinkConfig) -> impl Future<Item = (), Error = String> {
-    let region = config
-        .region
-        .clone()
-        .expect("Must set a region for Cloudwatch")
-        .parse::<Region>()
-        .map_err(|e| format!("Region Not Valid: {}", e));
-
-    let region = match region {
-        Ok(region) => region,
-        Err(e) => return Either::A(future::err(e)),
-    };
-
-    let client = CloudWatchLogsClient::new(region);
-
-    let request = DescribeLogStreamsRequest {
-        limit: Some(1),
-        log_group_name: config.group_name.clone(),
-        log_stream_name_prefix: Some(config.stream_name.clone()),
-        ..Default::default()
-    };
-
-    let expected_stream = config.stream_name.clone();
-
-    let fut = client
-        .describe_log_streams(request)
-        .map_err(|e| format!("DescribeLogStreams failed: {}", e))
-        .and_then(|response| {
-            response
-                .log_streams
-                .ok_or_else(|| "No streams found".to_owned())
-        })
-        .and_then(|streams| {
-            streams
-                .into_iter()
-                .next()
-                .ok_or_else(|| "No streams found".to_owned())
-        })
-        .and_then(|stream| {
-            stream
-                .log_stream_name
-                .ok_or_else(|| "No stream name found but found a stream".to_owned())
-        })
-        .and_then(move |stream_name| {
-            if stream_name == expected_stream {
-                Ok(())
-            } else {
-                Err(format!(
-                    "Stream returned is not the same as the one passed in got: {}, expected: {}",
-                    stream_name, expected_stream
-                ))
-            }
-        });
-
-    Either::B(fut)
 }
 
 impl CloudwatchSink {
@@ -179,12 +121,13 @@ impl Sink for CloudwatchSink {
                     );
 
                     self.in_flight = Some(fut);
-                    return Ok(Async::NotReady);
+                    continue;
                 } else {
                     // check timer here???
                     // Buffer isnt full and there isn't an inflight request
                     if !self.buffer.empty() {
                         // Buffer isnt empty, isnt full and there is no inflight
+                        return Ok(Async::NotReady);
                     } else {
                         return Ok(Async::Ready(()));
                     }
@@ -250,6 +193,7 @@ impl Future for RequestFuture {
         loop {
             match self.state {
                 State::Put(ref mut fut) => {
+                    // TODO(lucio): invesitgate failure cases on rejected logs
                     let response = try_ready!(fut.poll());
 
                     return Ok(Async::Ready(response.next_sequence_token));
@@ -258,14 +202,14 @@ impl Future for RequestFuture {
                     let response = try_ready!(fut.poll());
 
                     // TODO(lucio): verify if this is the right approach
-                    let _stream = response
+                    let stream = response
                         .log_streams
                         .ok_or(Error::NoStreamsFound)?
                         .into_iter()
                         .next()
                         .ok_or(Error::NoStreamsFound)?;
 
-                    let token = response.next_token.ok_or(Error::NoToken)?;
+                    let token = stream.upload_sequence_token;
 
                     let log_events = self
                         .log_events
@@ -276,7 +220,7 @@ impl Future for RequestFuture {
                         log_events,
                         log_group_name: self.group_name.clone(),
                         log_stream_name: self.stream_name.clone(),
-                        sequence_token: Some(token),
+                        sequence_token: token,
                     };
 
                     let fut = self.client.put_log_events(request);
@@ -289,11 +233,68 @@ impl Future for RequestFuture {
     }
 }
 
+fn healthcheck(config: CloudwatchSinkConfig) -> impl Future<Item = (), Error = String> {
+    let region = config
+        .region
+        .clone()
+        .expect("Must set a region for Cloudwatch")
+        .parse::<Region>()
+        .map_err(|e| format!("Region Not Valid: {}", e));
+
+    let region = match region {
+        Ok(region) => region,
+        Err(e) => return Either::A(future::err(e)),
+    };
+
+    let client = CloudWatchLogsClient::new(region);
+
+    let request = DescribeLogStreamsRequest {
+        limit: Some(1),
+        log_group_name: config.group_name.clone(),
+        log_stream_name_prefix: Some(config.stream_name.clone()),
+        ..Default::default()
+    };
+
+    let expected_stream = config.stream_name.clone();
+
+    let fut = client
+        .describe_log_streams(request)
+        .map_err(|e| format!("DescribeLogStreams failed: {}", e))
+        .and_then(|response| {
+            response
+                .log_streams
+                .ok_or_else(|| "No streams found".to_owned())
+        })
+        .and_then(|streams| {
+            streams
+                .into_iter()
+                .next()
+                .ok_or_else(|| "No streams found".to_owned())
+        })
+        .and_then(|stream| {
+            stream
+                .log_stream_name
+                .ok_or_else(|| "No stream name found but found a stream".to_owned())
+        })
+        .and_then(move |stream_name| {
+            if stream_name == expected_stream {
+                Ok(())
+            } else {
+                Err(format!(
+                    "Stream returned is not the same as the one passed in got: {}, expected: {}",
+                    stream_name, expected_stream
+                ))
+            }
+        });
+
+    Either::B(fut)
+}
+
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
         InputLogEvent {
             message: record.line,
-            timestamp: record.timestamp.timestamp(),
+            timestamp: record.timestamp.timestamp_millis(),
         }
     }
 }
@@ -315,7 +316,10 @@ pub struct Buffer<T> {
     size: usize,
 }
 
-impl<T> Buffer<T> {
+impl<T> Buffer<T>
+where
+    T: std::fmt::Debug,
+{
     pub fn new(size: usize) -> Self {
         Buffer {
             inner: Vec::new(),

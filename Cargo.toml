@@ -63,4 +63,5 @@ harness = false
 [features]
 "splunk-integration-tests" = []
 "s3-integration-tests" = []
+"cloudwatch-integration-tests" = []
 "flaky" = []

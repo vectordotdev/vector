@@ -52,3 +52,14 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
 
     std::iter::repeat(()).map(move |_| rng.sample_iter(&Alphanumeric).take(len).collect::<String>())
 }
+
+pub fn block_on<F, R, E>(future: F) -> Result<R, E>
+where
+    F: Send + 'static + Future<Item = R, Error = E>,
+    R: Send + 'static,
+    E: Send + 'static,
+{
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(future)
+}
