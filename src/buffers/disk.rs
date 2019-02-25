@@ -1,5 +1,9 @@
 use crate::record::{proto, Record};
-use futures::{task::AtomicTask, Async, AsyncSink, Poll, Sink, Stream};
+use futures::{
+    sync::mpsc,
+    task::{self, AtomicTask, Task},
+    Async, AsyncSink, Poll, Sink, Stream,
+};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     iterator::{Iterable, LevelDBIterator},
@@ -39,7 +43,7 @@ pub struct Writer {
     db: Arc<Database<Key>>,
     offset: Arc<AtomicUsize>,
     write_notifier: Arc<AtomicTask>,
-    delete_notifier: Arc<AtomicTask>,
+    delete_notify_tx: mpsc::UnboundedSender<Task>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
     max_size: usize,
@@ -55,7 +59,7 @@ impl Clone for Writer {
             db: Arc::clone(&self.db),
             offset: Arc::clone(&self.offset),
             write_notifier: Arc::clone(&self.write_notifier),
-            delete_notifier: Arc::clone(&self.delete_notifier),
+            delete_notify_tx: self.delete_notify_tx.clone(),
             writebatch: Writebatch::new(),
             batch_size: 0,
             max_size: self.max_size,
@@ -76,8 +80,11 @@ impl Sink for Writer {
         proto::Record::from(record).encode(&mut value).unwrap(); // This will not error when writing to a Vec
         let record_size = value.len();
 
-        self.delete_notifier.register();
         if self.current_size.fetch_add(record_size, Ordering::Relaxed) > self.max_size {
+            self.delete_notify_tx
+                .unbounded_send(task::current())
+                .unwrap();
+
             self.current_size.fetch_sub(record_size, Ordering::Relaxed);
 
             self.poll_complete()?;
@@ -136,7 +143,7 @@ pub struct Reader {
     db: Arc<Database<Key>>,
     offset: usize,
     write_notifier: Arc<AtomicTask>,
-    delete_notifier: Arc<AtomicTask>,
+    delete_notify_rx: mpsc::UnboundedReceiver<Task>,
     advance: bool,
     delete_batch: Writebatch<Key>,
     batch_size: usize,
@@ -195,9 +202,7 @@ impl Stream for Reader {
             // There are no writers left
             Ok(Async::Ready(None))
         } else {
-            if self.batch_size > 0 {
-                self.delete_batch();
-            }
+            self.delete_batch();
 
             Ok(Async::NotReady)
         }
@@ -206,20 +211,23 @@ impl Stream for Reader {
 
 impl Drop for Reader {
     fn drop(&mut self) {
-        if self.batch_size > 0 {
-            self.delete_batch();
-        }
+        self.delete_batch();
     }
 }
 
 impl Reader {
     fn delete_batch(&mut self) {
-        self.db
-            .write(WriteOptions::new(), &self.delete_batch)
-            .unwrap();
-        self.delete_notifier.notify();
-        self.delete_batch = Writebatch::new();
-        self.batch_size = 0;
+        if self.batch_size > 0 {
+            self.db
+                .write(WriteOptions::new(), &self.delete_batch)
+                .unwrap();
+            self.delete_batch = Writebatch::new();
+            self.batch_size = 0;
+        }
+
+        while let Ok(Async::Ready(Some(task))) = self.delete_notify_rx.poll() {
+            task.notify();
+        }
     }
 }
 
@@ -243,12 +251,13 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
     let current_size = Arc::new(AtomicUsize::new(initial_size));
 
     let write_notifier = Arc::new(AtomicTask::new());
-    let delete_notifier = Arc::new(AtomicTask::new());
+
+    let (delete_notify_tx, delete_notify_rx) = mpsc::unbounded();
 
     let writer = Writer {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
-        delete_notifier: Arc::clone(&delete_notifier),
+        delete_notify_tx,
         offset: Arc::new(AtomicUsize::new(tail)),
         writebatch: Writebatch::new(),
         batch_size: 0,
@@ -258,7 +267,7 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
     let reader = Reader {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
-        delete_notifier: Arc::clone(&delete_notifier),
+        delete_notify_rx,
         offset: head,
         advance: false,
         delete_batch: Writebatch::new(),

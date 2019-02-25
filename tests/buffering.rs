@@ -150,14 +150,16 @@ fn test_max_size_resume() {
     let line_size = 1000;
     let max_size = num_lines * line_size / 2;
 
-    let in_addr = next_addr();
+    let in_addr1 = next_addr();
+    let in_addr2 = next_addr();
     let out_addr = next_addr();
 
     let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    topology.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+    topology.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
     topology.add_sink(
         "out",
-        &["in"],
+        &["in1", "in2"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
     topology.sinks["out"].buffer = BufferConfig::Disk { max_size };
@@ -167,14 +169,17 @@ fn test_max_size_resume() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.spawn(server);
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
+    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
 
     // Send all of the input lines _before_ the output sink is ready. This causes the writers to stop
     // writing to the on-disk buffer, and once the output sink is available and the size of the buffer
     // begins to decrease, they should starting writing again.
-    let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+    let input_lines1 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
+    let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
+    let input_lines2 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
+    let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
+    rt.block_on(send1.join(send2)).unwrap();
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -185,8 +190,7 @@ fn test_max_size_resume() {
     rt.shutdown_on_idle().wait().unwrap();
 
     let output_lines = output_lines.wait().unwrap();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
+    assert_eq!(num_lines * 2, output_lines.len());
 }
 
 fn receive_lines(
