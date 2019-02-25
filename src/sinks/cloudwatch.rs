@@ -110,7 +110,7 @@ impl CloudwatchLogsSink {
 
                     let token = stream.upload_sequence_token;
 
-                    let fut = self.client.put_logs(token);
+                    let fut = self.put_logs(token);
                     self.state = State::Put(fut);
                     continue;
                 }
