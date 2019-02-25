@@ -15,7 +15,7 @@ fn test_insert_cloudwatch_log_event() {
     let config = CloudwatchSinkConfig {
         stream_name: STREAM_NAME.into(),
         group_name: GROUP_NAME.into(),
-        region: Some("us-east-1".into()),
+        region: "us-east-1".into(),
         buffer_size: 1,
     };
 

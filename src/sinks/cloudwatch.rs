@@ -1,6 +1,5 @@
 use crate::record::Record;
-use futures::future::{self, Either};
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
@@ -8,35 +7,28 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 pub struct CloudwatchSink {
     buffer: Buffer<InputLogEvent>,
     stream_token: Option<String>,
-    in_flight: Option<RequestFuture>,
-    client: Arc<CloudWatchLogsClient>,
+    client: CloudWatchLogsClient,
     config: CloudwatchSinkConfig,
+    state: State,
+    log_events: Option<Vec<InputLogEvent>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CloudwatchSinkConfig {
     pub stream_name: String,
     pub group_name: String,
-    pub region: Option<String>,
+    pub region: String,
     pub buffer_size: usize,
-}
-
-struct RequestFuture {
-    client: Arc<CloudWatchLogsClient>,
-    log_events: Option<Vec<InputLogEvent>>,
-    state: State,
-    stream_name: String,
-    group_name: String,
 }
 
 enum State {
     Describe(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
     Put(RusotoFuture<PutLogEventsResponse, PutLogEventsError>),
+    Buffering,
 }
 
 #[derive(Debug)]
@@ -53,27 +45,97 @@ impl crate::topology::config::SinkConfig for CloudwatchSinkConfig {
             .map_err(|e| format!("Failed to create CloudwatchSink: {}", e))?;
         let healthcheck = healthcheck(self.clone());
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((Box::new(sink), healthcheck))
     }
 }
 
 impl CloudwatchSink {
     pub fn new(config: CloudwatchSinkConfig) -> Result<Self, ParseRegionError> {
         let buffer = Buffer::new(config.buffer_size);
-        let region = config
-            .region
-            .clone()
-            .expect("Must set a region for Cloudwatch")
-            .parse::<Region>()?;
-        let client = Arc::new(CloudWatchLogsClient::new(region));
+        let region = config.region.clone().parse::<Region>()?;
+        let client = CloudWatchLogsClient::new(region);
 
         Ok(CloudwatchSink {
             buffer,
             client,
             config,
+            state: State::Buffering,
             stream_token: None,
-            in_flight: None,
+            log_events: None,
         })
+    }
+
+    fn send_request(&mut self, log_events: Vec<InputLogEvent>) {
+        if let Some(token) = self.stream_token.take() {
+            // If we already have a next_token then we can send the logs
+            let request = PutLogEventsRequest {
+                log_events,
+                log_group_name: self.config.group_name.clone(),
+                log_stream_name: self.config.stream_name.clone(),
+                sequence_token: Some(token),
+            };
+
+            let fut = self.client.put_log_events(request);
+
+            self.state = State::Put(fut);
+        } else {
+            // We have no next_token so lets fetch it first then send the logs
+            let request = DescribeLogStreamsRequest {
+                limit: Some(1),
+                log_group_name: self.config.group_name.clone(),
+                log_stream_name_prefix: Some(self.config.stream_name.clone()),
+                ..Default::default()
+            };
+
+            let fut = self.client.describe_log_streams(request);
+
+            self.log_events = Some(log_events);
+            self.state = State::Describe(fut);
+        }
+    }
+
+    fn poll_request(&mut self) -> Poll<(), Error> {
+        loop {
+            match self.state {
+                State::Put(ref mut fut) => {
+                    // TODO(lucio): invesitgate failure cases on rejected logs
+                    let response = try_ready!(fut.poll());
+
+                    self.stream_token = response.next_sequence_token;
+                    return Ok(().into());
+                }
+                State::Describe(ref mut fut) => {
+                    let response = try_ready!(fut.poll());
+
+                    let stream = response
+                        .log_streams
+                        .ok_or(Error::NoStreamsFound)?
+                        .into_iter()
+                        .next()
+                        .ok_or(Error::NoStreamsFound)?;
+
+                    let token = stream.upload_sequence_token;
+
+                    let log_events = self
+                        .log_events
+                        .take()
+                        .expect("Describe events was sent twice! this is a bug");
+
+                    let request = PutLogEventsRequest {
+                        log_events,
+                        log_group_name: self.config.group_name.clone(),
+                        log_stream_name: self.config.stream_name.clone(),
+                        sequence_token: token,
+                    };
+
+                    let fut = self.client.put_log_events(request);
+
+                    self.state = State::Put(fut);
+                    continue;
+                }
+                State::Buffering => unreachable!("This is a bug!"),
+            }
+        }
     }
 }
 
@@ -101,131 +163,30 @@ impl Sink for CloudwatchSink {
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         loop {
-            if let Some(ref mut fut) = self.in_flight {
-                match fut.poll() {
-                    Ok(Async::Ready(token)) => {
-                        self.in_flight = None;
-                        self.stream_token = token;
-                    }
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Err(e) => panic!("Error sending logs to cloudwatch: {:?}", e),
-                }
-            } else {
-                if self.buffer.full() {
-                    let fut = RequestFuture::new(
-                        self.client.clone(),
-                        self.config.group_name.clone(),
-                        self.config.stream_name.clone(),
-                        self.stream_token.clone(),
-                        self.buffer.flush(),
-                    );
-
-                    self.in_flight = Some(fut);
-                    continue;
-                } else {
-                    // check timer here???
-                    // Buffer isnt full and there isn't an inflight request
-                    if !self.buffer.empty() {
-                        // Buffer isnt empty, isnt full and there is no inflight
-                        return Ok(Async::NotReady);
-                    } else {
-                        return Ok(Async::Ready(()));
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl RequestFuture {
-    pub fn new(
-        client: Arc<CloudWatchLogsClient>,
-        group_name: String,
-        stream_name: String,
-        next_token: Option<String>,
-        log_events: Vec<InputLogEvent>,
-    ) -> Self {
-        if let Some(token) = next_token {
-            // If we already have a next_token then we can send the logs
-            let request = PutLogEventsRequest {
-                log_events,
-                log_group_name: group_name.clone(),
-                log_stream_name: stream_name.clone(),
-                sequence_token: Some(token),
-            };
-
-            let fut = client.put_log_events(request);
-
-            RequestFuture {
-                client,
-                log_events: None,
-                group_name,
-                stream_name,
-                state: State::Put(fut),
-            }
-        } else {
-            // We have no next_token so lets fetch it first then send the logs
-            let request = DescribeLogStreamsRequest {
-                limit: Some(1),
-                log_group_name: group_name.clone(),
-                log_stream_name_prefix: Some(stream_name.clone()),
-                ..Default::default()
-            };
-
-            let fut = client.describe_log_streams(request);
-
-            RequestFuture {
-                client,
-                log_events: Some(log_events),
-                group_name,
-                stream_name,
-                state: State::Describe(fut),
-            }
-        }
-    }
-}
-
-impl Future for RequestFuture {
-    type Item = Option<String>;
-    type Error = Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        loop {
             match self.state {
-                State::Put(ref mut fut) => {
-                    // TODO(lucio): invesitgate failure cases on rejected logs
-                    let response = try_ready!(fut.poll());
-
-                    return Ok(Async::Ready(response.next_sequence_token));
+                State::Buffering => {
+                    if self.buffer.full() {
+                        let log_events = self.buffer.flush();
+                        self.send_request(log_events);
+                        continue;
+                    } else {
+                        // check timer here???
+                        // Buffer isnt full and there isn't an inflight request
+                        if !self.buffer.empty() {
+                            // Buffer isnt empty, isnt full and there is no inflight
+                            return Ok(Async::NotReady);
+                        } else {
+                            return Ok(Async::Ready(()));
+                        }
+                    }
                 }
-                State::Describe(ref mut fut) => {
-                    let response = try_ready!(fut.poll());
 
-                    // TODO(lucio): verify if this is the right approach
-                    let stream = response
-                        .log_streams
-                        .ok_or(Error::NoStreamsFound)?
-                        .into_iter()
-                        .next()
-                        .ok_or(Error::NoStreamsFound)?;
+                State::Describe(_) | State::Put(_) => {
+                    try_ready!(self
+                        .poll_request()
+                        .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
 
-                    let token = stream.upload_sequence_token;
-
-                    let log_events = self
-                        .log_events
-                        .take()
-                        .expect("Describe events was sent twice! this is a bug");
-
-                    let request = PutLogEventsRequest {
-                        log_events,
-                        log_group_name: self.group_name.clone(),
-                        log_stream_name: self.stream_name.clone(),
-                        sequence_token: token,
-                    };
-
-                    let fut = self.client.put_log_events(request);
-
-                    self.state = State::Put(fut);
+                    self.state = State::Buffering;
                     continue;
                 }
             }
@@ -233,17 +194,16 @@ impl Future for RequestFuture {
     }
 }
 
-fn healthcheck(config: CloudwatchSinkConfig) -> impl Future<Item = (), Error = String> {
+fn healthcheck(config: CloudwatchSinkConfig) -> super::Healthcheck {
     let region = config
         .region
         .clone()
-        .expect("Must set a region for Cloudwatch")
         .parse::<Region>()
         .map_err(|e| format!("Region Not Valid: {}", e));
 
     let region = match region {
         Ok(region) => region,
-        Err(e) => return Either::A(future::err(e)),
+        Err(e) => return Box::new(future::err(e)),
     };
 
     let client = CloudWatchLogsClient::new(region);
@@ -287,7 +247,7 @@ fn healthcheck(config: CloudwatchSinkConfig) -> impl Future<Item = (), Error = S
             }
         });
 
-    Either::B(fut)
+    Box::new(fut)
 }
 
 impl From<Record> for InputLogEvent {
