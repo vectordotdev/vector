@@ -5,6 +5,7 @@ use futures::{
 };
 use leveldb::database::{
     batch::{Batch, Writebatch},
+    compaction::Compaction,
     iterator::{Iterable, LevelDBIterator},
     kv::KV,
     options::{Options, ReadOptions, WriteOptions},
@@ -221,6 +222,9 @@ impl Reader {
             self.db
                 .write(WriteOptions::new(), &self.delete_batch)
                 .unwrap();
+
+            self.db.compact(&Key(0), &Key(self.offset));
+
             self.delete_batch = Writebatch::new();
             self.batch_size = 0;
         }
