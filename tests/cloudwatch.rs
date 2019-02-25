@@ -16,14 +16,14 @@ fn test_insert_cloudwatch_log_event() {
         stream_name: STREAM_NAME.into(),
         group_name: GROUP_NAME.into(),
         region: "us-east-1".into(),
-        buffer_size: 1,
+        buffer_size: 2,
     };
 
     let sink = CloudwatchSink::new(config).unwrap();
 
     let timestamp = chrono::Utc::now();
 
-    let lines = random_lines(100).take(10).collect::<Vec<_>>();
+    let lines = random_lines(100).take(11).collect::<Vec<_>>();
     let records = lines
         .iter()
         .map(|line| Record::new_from_line(line.clone()))
@@ -48,5 +48,5 @@ fn test_insert_cloudwatch_log_event() {
 
     let events = response.events.unwrap();
 
-    assert_eq!(events.len(), 10);
+    assert_eq!(events.len(), 11);
 }

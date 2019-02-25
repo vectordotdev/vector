@@ -14,7 +14,6 @@ pub struct CloudwatchSink {
     client: CloudWatchLogsClient,
     config: CloudwatchSinkConfig,
     state: State,
-    log_events: Option<Vec<InputLogEvent>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -61,13 +60,13 @@ impl CloudwatchSink {
             config,
             state: State::Buffering,
             stream_token: None,
-            log_events: None,
         })
     }
 
-    fn send_request(&mut self, log_events: Vec<InputLogEvent>) {
+    fn send_request(&mut self) {
         if let Some(token) = self.stream_token.take() {
             // If we already have a next_token then we can send the logs
+            let log_events = self.buffer.flush();
             let request = PutLogEventsRequest {
                 log_events,
                 log_group_name: self.config.group_name.clone(),
@@ -89,7 +88,6 @@ impl CloudwatchSink {
 
             let fut = self.client.describe_log_streams(request);
 
-            self.log_events = Some(log_events);
             self.state = State::Describe(fut);
         }
     }
@@ -116,10 +114,7 @@ impl CloudwatchSink {
 
                     let token = stream.upload_sequence_token;
 
-                    let log_events = self
-                        .log_events
-                        .take()
-                        .expect("Describe events was sent twice! this is a bug");
+                    let log_events = self.buffer.flush();
 
                     let request = PutLogEventsRequest {
                         log_events,
@@ -166,15 +161,16 @@ impl Sink for CloudwatchSink {
             match self.state {
                 State::Buffering => {
                     if self.buffer.full() {
-                        let log_events = self.buffer.flush();
-                        self.send_request(log_events);
+                        self.send_request();
                         continue;
                     } else {
                         // check timer here???
                         // Buffer isnt full and there isn't an inflight request
                         if !self.buffer.empty() {
                             // Buffer isnt empty, isnt full and there is no inflight
-                            return Ok(Async::NotReady);
+                            // so lets take the rest of the buffer and send it.
+                            self.send_request();
+                            continue;
                         } else {
                             return Ok(Async::Ready(()));
                         }
