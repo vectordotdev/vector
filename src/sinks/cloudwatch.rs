@@ -37,7 +37,7 @@ enum Error {
     NoStreamsFound,
 }
 
-#[typetag::serde(name = "cloudwatch")]
+#[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = CloudwatchLogsSink::new(self.clone())
@@ -110,17 +110,7 @@ impl CloudwatchLogsSink {
 
                     let token = stream.upload_sequence_token;
 
-                    let log_events = self.buffer.flush();
-
-                    let request = PutLogEventsRequest {
-                        log_events,
-                        log_group_name: self.config.group_name.clone(),
-                        log_stream_name: self.config.stream_name.clone(),
-                        sequence_token: token,
-                    };
-
-                    let fut = self.client.put_log_events(request);
-
+                    let fut = self.client.put_logs(token);
                     self.state = State::Put(fut);
                     continue;
                 }
