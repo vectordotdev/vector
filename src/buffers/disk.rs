@@ -1,6 +1,5 @@
 use crate::record::{proto, Record};
 use futures::{
-    sync::mpsc,
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
 };
@@ -15,7 +14,7 @@ use log::error;
 use prost::Message;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -43,7 +42,7 @@ pub struct Writer {
     db: Arc<Database<Key>>,
     offset: Arc<AtomicUsize>,
     write_notifier: Arc<AtomicTask>,
-    delete_notify_tx: mpsc::UnboundedSender<Task>,
+    blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
     max_size: usize,
@@ -59,7 +58,7 @@ impl Clone for Writer {
             db: Arc::clone(&self.db),
             offset: Arc::clone(&self.offset),
             write_notifier: Arc::clone(&self.write_notifier),
-            delete_notify_tx: self.delete_notify_tx.clone(),
+            blocked_write_tasks: Arc::clone(&self.blocked_write_tasks),
             writebatch: Writebatch::new(),
             batch_size: 0,
             max_size: self.max_size,
@@ -81,9 +80,10 @@ impl Sink for Writer {
         let record_size = value.len();
 
         if self.current_size.fetch_add(record_size, Ordering::Relaxed) > self.max_size {
-            self.delete_notify_tx
-                .unbounded_send(task::current())
-                .unwrap();
+            self.blocked_write_tasks
+                .lock()
+                .unwrap()
+                .push(task::current());
 
             self.current_size.fetch_sub(record_size, Ordering::Relaxed);
 
@@ -143,7 +143,7 @@ pub struct Reader {
     db: Arc<Database<Key>>,
     offset: usize,
     write_notifier: Arc<AtomicTask>,
-    delete_notify_rx: mpsc::UnboundedReceiver<Task>,
+    blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
     advance: bool,
     delete_batch: Writebatch<Key>,
     batch_size: usize,
@@ -225,7 +225,7 @@ impl Reader {
             self.batch_size = 0;
         }
 
-        while let Ok(Async::Ready(Some(task))) = self.delete_notify_rx.poll() {
+        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
             task.notify();
         }
     }
@@ -252,12 +252,12 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
 
     let write_notifier = Arc::new(AtomicTask::new());
 
-    let (delete_notify_tx, delete_notify_rx) = mpsc::unbounded();
+    let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 
     let writer = Writer {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
-        delete_notify_tx,
+        blocked_write_tasks: Arc::clone(&blocked_write_tasks),
         offset: Arc::new(AtomicUsize::new(tail)),
         writebatch: Writebatch::new(),
         batch_size: 0,
@@ -267,7 +267,7 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
     let reader = Reader {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
-        delete_notify_rx,
+        blocked_write_tasks,
         offset: head,
         advance: false,
         delete_batch: Writebatch::new(),
