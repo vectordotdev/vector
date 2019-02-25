@@ -1,7 +1,7 @@
 #![cfg(feature = "cloudwatch-integration-tests")]
 
 use futures::{future::poll_fn, stream, Sink};
-use router::sinks::cloudwatch::{CloudwatchSink, CloudwatchSinkConfig};
+use router::sinks::cloudwatch::{CloudwatchLogsSink, CloudwatchLogsSinkConfig};
 use router::test_util::{block_on, random_lines};
 use router::Record;
 use rusoto_core::Region;
@@ -12,14 +12,14 @@ const GROUP_NAME: &'static str = "router";
 
 #[test]
 fn test_insert_cloudwatch_log_event() {
-    let config = CloudwatchSinkConfig {
+    let config = CloudwatchLogsSinkConfig {
         stream_name: STREAM_NAME.into(),
         group_name: GROUP_NAME.into(),
         region: "us-east-1".into(),
         buffer_size: 2,
     };
 
-    let sink = CloudwatchSink::new(config).unwrap();
+    let sink = CloudwatchLogsSink::new(config).unwrap();
 
     let timestamp = chrono::Utc::now();
 

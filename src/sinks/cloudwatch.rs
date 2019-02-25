@@ -8,16 +8,16 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 
-pub struct CloudwatchSink {
+pub struct CloudwatchLogsSink {
     buffer: Buffer<InputLogEvent>,
     stream_token: Option<String>,
     client: CloudWatchLogsClient,
-    config: CloudwatchSinkConfig,
+    config: CloudwatchLogsSinkConfig,
     state: State,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CloudwatchSinkConfig {
+pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
     pub region: String,
@@ -38,23 +38,23 @@ enum Error {
 }
 
 #[typetag::serde(name = "cloudwatch")]
-impl crate::topology::config::SinkConfig for CloudwatchSinkConfig {
+impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = CloudwatchSink::new(self.clone())
-            .map_err(|e| format!("Failed to create CloudwatchSink: {}", e))?;
+        let sink = CloudwatchLogsSink::new(self.clone())
+            .map_err(|e| format!("Failed to create CloudwatchLogsSink: {}", e))?;
         let healthcheck = healthcheck(self.clone());
 
         Ok((Box::new(sink), healthcheck))
     }
 }
 
-impl CloudwatchSink {
-    pub fn new(config: CloudwatchSinkConfig) -> Result<Self, ParseRegionError> {
+impl CloudwatchLogsSink {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
         let buffer = Buffer::new(config.buffer_size);
         let region = config.region.clone().parse::<Region>()?;
         let client = CloudWatchLogsClient::new(region);
 
-        Ok(CloudwatchSink {
+        Ok(CloudwatchLogsSink {
             buffer,
             client,
             config,
@@ -134,7 +134,7 @@ impl CloudwatchSink {
     }
 }
 
-impl Sink for CloudwatchSink {
+impl Sink for CloudwatchLogsSink {
     type SinkItem = Record;
     type SinkError = ();
 
@@ -190,7 +190,7 @@ impl Sink for CloudwatchSink {
     }
 }
 
-fn healthcheck(config: CloudwatchSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
     let region = config
         .region
         .clone()
