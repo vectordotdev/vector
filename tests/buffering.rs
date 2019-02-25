@@ -9,7 +9,8 @@ use tokio::net::TcpListener;
 
 #[test]
 fn test_buffering() {
-    let data_dir = tempdir().unwrap().into_path();
+    let data_dir = tempdir().unwrap();
+    let data_dir = data_dir.path().to_path_buf();
 
     let num_lines: usize = 10;
 
@@ -79,7 +80,8 @@ fn test_buffering() {
 
 #[test]
 fn test_max_size() {
-    let data_dir = tempdir().unwrap().into_path();
+    let data_dir = tempdir().unwrap();
+    let data_dir = data_dir.path().to_path_buf();
 
     let num_lines: usize = 1000;
     let line_size = 1000;
@@ -144,7 +146,8 @@ fn test_max_size() {
 
 #[test]
 fn test_max_size_resume() {
-    let data_dir = tempdir().unwrap().into_path();
+    let data_dir = tempdir().unwrap();
+    let data_dir = data_dir.path().to_path_buf();
 
     let num_lines: usize = 1000;
     let line_size = 1000;
