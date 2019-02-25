@@ -196,6 +196,100 @@ fn test_max_size_resume() {
     assert_eq!(num_lines * 2, output_lines.len());
 }
 
+#[test]
+fn test_reclaim_disk_space() {
+    let data_dir = tempdir().unwrap();
+    let data_dir = data_dir.path().to_path_buf();
+
+    let num_lines: usize = 10_000;
+    let line_size = 1000;
+
+    let in_addr = next_addr();
+    let out_addr = next_addr();
+
+    // Run router while sink server is not running, and then shut it down abruptly
+    let mut topology = config::Config::empty();
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    topology.add_sink(
+        "out",
+        &["in"],
+        sinks::tcp::TcpSinkConfig { address: out_addr },
+    );
+    topology.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 1_000_000_000,
+    };
+    topology.data_dir = Some(data_dir.clone());
+    let (server, _trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.spawn(server);
+    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+    let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
+    let send = send_lines(in_addr, input_lines.clone().into_iter());
+    rt.block_on(send).unwrap();
+
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    rt.shutdown_now().wait().unwrap();
+
+    let before_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|m| m.len())
+        .sum();
+
+    // Start sink server, then run router again. It should send all of the lines from the first run.
+    let mut topology = config::Config::empty();
+    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    topology.add_sink(
+        "out",
+        &["in"],
+        sinks::tcp::TcpSinkConfig { address: out_addr },
+    );
+    topology.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 1_000_000_000,
+    };
+    topology.data_dir = Some(data_dir.clone());
+    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let output_lines = receive_lines(&out_addr, &rt.executor());
+
+    rt.spawn(server);
+
+    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+    let input_lines2 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
+    let send = send_lines(in_addr, input_lines2.clone().into_iter());
+    rt.block_on(send).unwrap();
+
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    drop(trigger);
+
+    rt.shutdown_on_idle().wait().unwrap();
+
+    let output_lines = output_lines.wait().unwrap();
+    assert_eq!(num_lines * 2 - 1, output_lines.len());
+    assert_eq!(&input_lines[1..], &output_lines[..num_lines - 1]);
+    assert_eq!(input_lines2, &output_lines[num_lines - 1..]);
+
+    let after_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|m| m.len())
+        .sum();
+
+    assert!(after_disk_size < before_disk_size);
+}
+
 fn receive_lines(
     addr: &SocketAddr,
     executor: &tokio::runtime::TaskExecutor,

@@ -56,6 +56,7 @@ criterion = "0.2.5"
 reqwest = "0.9.5"
 tempfile = "3.0.6"
 libc = "0.2.43"
+walkdir = "2.2.7"
 
 [[bench]]
 name = "bench"

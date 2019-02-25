@@ -18,6 +18,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
+    let data_dir2 = data_dir.clone();
 
     c.bench(
         "buffers",
@@ -100,6 +101,47 @@ fn benchmark_buffers(c: &mut Criterion) {
                     drop(trigger);
 
                     shutdown_on_idle(rt);
+                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                },
+            );
+        })
+        .with_function("on-disk (low limit)", move |b| {
+            b.iter_with_setup(
+                || {
+                    let mut topology = config::Config::empty();
+                    topology.add_source(
+                        "in",
+                        sources::tcp::TcpConfig {
+                            address: in_addr,
+                            max_length: 102400,
+                        },
+                    );
+                    topology.add_sink(
+                        "out",
+                        &["in"],
+                        sinks::tcp::TcpSinkConfig { address: out_addr },
+                    );
+                    topology.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+                    topology.data_dir = Some(data_dir2.clone());
+                    let (server, trigger, _healthchecks, _warnings) =
+                        topology::build(topology).unwrap();
+
+                    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+                    let output_lines = count_lines(&out_addr, &rt.executor());
+
+                    rt.spawn(server);
+                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+
+                    (rt, trigger, output_lines)
+                },
+                |(mut rt, trigger, output_lines)| {
+                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
+                    rt.block_on(send).unwrap();
+
+                    drop(trigger);
+
+                    rt.shutdown_on_idle().wait().unwrap();
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
