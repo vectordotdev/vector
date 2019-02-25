@@ -63,33 +63,29 @@ impl CloudwatchLogsSink {
         })
     }
 
-    fn send_request(&mut self) {
-        if let Some(token) = self.stream_token.take() {
-            // If we already have a next_token then we can send the logs
-            let log_events = self.buffer.flush();
-            let request = PutLogEventsRequest {
-                log_events,
-                log_group_name: self.config.group_name.clone(),
-                log_stream_name: self.config.stream_name.clone(),
-                sequence_token: Some(token),
-            };
+    fn put_logs(&mut self, token: String) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
+        let log_events = self.buffer.flush();
+        let request = PutLogEventsRequest {
+            log_events,
+            log_group_name: self.config.group_name.clone(),
+            log_stream_name: self.config.stream_name.clone(),
+            sequence_token: Some(token),
+        };
 
-            let fut = self.client.put_log_events(request);
+        self.client.put_log_events(request)
+    }
 
-            self.state = State::Put(fut);
-        } else {
-            // We have no next_token so lets fetch it first then send the logs
-            let request = DescribeLogStreamsRequest {
-                limit: Some(1),
-                log_group_name: self.config.group_name.clone(),
-                log_stream_name_prefix: Some(self.config.stream_name.clone()),
-                ..Default::default()
-            };
+    fn describe_stream(
+        &mut self,
+    ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
+        let request = DescribeLogStreamsRequest {
+            limit: Some(1),
+            log_group_name: self.config.group_name.clone(),
+            log_stream_name_prefix: Some(self.config.stream_name.clone()),
+            ..Default::default()
+        };
 
-            let fut = self.client.describe_log_streams(request);
-
-            self.state = State::Describe(fut);
-        }
+        self.client.describe_log_streams(request)
     }
 
     fn poll_request(&mut self) -> Poll<(), Error> {
@@ -128,7 +124,17 @@ impl CloudwatchLogsSink {
                     self.state = State::Put(fut);
                     continue;
                 }
-                State::Buffering => unreachable!("This is a bug!"),
+                State::Buffering => {
+                    if let Some(token) = self.stream_token.take() {
+                        let fut = self.put_logs(token);
+                        self.state = State::Put(fut);
+                        continue;
+                    } else {
+                        let fut = self.describe_stream();
+                        self.state = State::Describe(fut);
+                        continue;
+                    }
+                }
             }
         }
     }
@@ -161,7 +167,9 @@ impl Sink for CloudwatchLogsSink {
             match self.state {
                 State::Buffering => {
                     if self.buffer.full() {
-                        self.send_request();
+                        try_ready!(self
+                            .poll_request()
+                            .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
                         continue;
                     } else {
                         // check timer here???
@@ -169,7 +177,9 @@ impl Sink for CloudwatchLogsSink {
                         if !self.buffer.empty() {
                             // Buffer isnt empty, isnt full and there is no inflight
                             // so lets take the rest of the buffer and send it.
-                            self.send_request();
+                            try_ready!(self
+                                .poll_request()
+                                .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
                             continue;
                         } else {
                             return Ok(Async::Ready(()));
