@@ -65,7 +65,7 @@ where
         loop {
             match self.state {
                 State::Poll(ref mut fut) => match fut.poll() {
-                    Ok(Async::Ready(response)) => {
+                    Ok(Async::Ready(_response)) => {
                         self.state = State::Batching;
                         continue;
                     }
