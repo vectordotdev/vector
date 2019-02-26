@@ -38,6 +38,7 @@ where
     B::Item: From<Record>,
     S: Service<Vec<B::Item>>,
     S::Error: fmt::Debug,
+    S::Response: fmt::Debug,
 {
     type SinkItem = Record;
     type SinkError = ();
@@ -64,7 +65,7 @@ where
         loop {
             match self.state {
                 State::Poll(ref mut fut) => match fut.poll() {
-                    Ok(Async::Ready(_)) => {
+                    Ok(Async::Ready(response)) => {
                         self.state = State::Batching;
                         continue;
                     }
