@@ -1,7 +1,7 @@
 use crate::{record::Record, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]

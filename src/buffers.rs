@@ -1,7 +1,7 @@
 use crate::record::Record;
 use futures::{sync::mpsc, Sink, Stream};
 use log::error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod disk;

@@ -4,7 +4,7 @@ use regex::{Regex, RegexSet};
 // uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
 // but is slightly slower than some alternatives (which might matter for this use case).
 use crate::record::Record;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;

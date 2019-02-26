@@ -1,6 +1,6 @@
 use crate::record::Record;
 use futures::{future, Sink};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::io;
 

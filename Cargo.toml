@@ -18,8 +18,7 @@ tokio-fs = "0.1.4"
 stream-cancel = "0.4.3"
 prometheus = "0.4.2"
 hyper = "0.12.18"
-serde = "1.0.80"
-serde_derive = "1.0.80"
+serde = { version = "1.0.80", features = ["derive"] }
 serde_json = "1.0.33"
 elastic_responses = "0.20.10"
 tokio-retry = "0.2.0"
@@ -27,6 +26,7 @@ string_cache = "0.7.3"
 hyper-tls = "0.3.1"
 rusoto_core = "0.36.0"
 rusoto_s3 = "0.36.0"
+rusoto_logs = "0.36.0"
 rusoto_credential = "0.15.0"
 flate2 = "1.0.6"
 clap = "2.32.0"
@@ -63,4 +63,5 @@ harness = false
 [features]
 "splunk-integration-tests" = []
 "s3-integration-tests" = []
+"cloudwatch-integration-tests" = []
 "flaky" = []

@@ -4,7 +4,7 @@ use futures::{Async, AsyncSink, Future, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 pub struct S3Sink {
     buffer: Buffer,
