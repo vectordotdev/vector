@@ -22,6 +22,7 @@ jobs:
             - "./target"
             
   build-stable:
+    resource_class: large
     docker:
       - image: rust:latest
 
@@ -39,7 +40,7 @@ jobs:
           environment:
             RUSTFLAGS: "-D warnings"
           command: |
-            cargo build --all --all-features
+            cargo build --all --all-features --all-targets
       - save_cache:
           key: project-cache
           paths:
