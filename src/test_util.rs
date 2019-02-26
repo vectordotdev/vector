@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio::net::TcpStream;
+use tokio::util::FutureExt;
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
 pub fn next_addr() -> SocketAddr {
@@ -78,5 +79,10 @@ pub fn wait_for_tcp(addr: SocketAddr) {
 }
 
 pub fn shutdown_on_idle(runtime: tokio::runtime::Runtime) {
-    runtime.shutdown_on_idle().wait().unwrap()
+    block_on(
+        runtime
+            .shutdown_on_idle()
+            .timeout(std::time::Duration::from_secs(5)),
+    )
+    .unwrap()
 }
