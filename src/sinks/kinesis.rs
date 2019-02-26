@@ -1,6 +1,7 @@
 use super::Record;
-use crate::sinks::util::batch::{BatchSink, VecBatcher};
-use futures::{future, Poll, Sink};
+use crate::sinks::util::batch::BatchSink;
+use futures::{try_ready, Async, Future, Poll, Sink};
+use log::{error, warn};
 use rand::random;
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_kinesis::{
@@ -10,7 +11,8 @@ use rusoto_kinesis::{
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
 use std::fmt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
 use tower_buffer::Buffer;
 use tower_retry::{Policy, Retry};
 use tower_service::Service;
@@ -35,6 +37,12 @@ pub struct KinesisSinkConfig {
 #[derive(Debug, Clone)]
 struct RetryPolicy {
     attempts: usize,
+    backoff: Duration,
+}
+
+struct RetryPolicyFuture {
+    delay: Delay,
+    policy: RetryPolicy,
 }
 
 impl KinesisService {
@@ -42,16 +50,16 @@ impl KinesisService {
         let region = config.region.clone().parse::<Region>().unwrap();
         let client = KinesisClient::new(region);
 
-        let batcher = VecBatcher::new(config.batch_size);
+        let batch_size = config.batch_size;
         let service = KinesisService { client, config };
 
-        let policy = RetryPolicy { attempts: 5 };
+        let policy = RetryPolicy::new(5, Duration::from_secs(1));
 
         let service = Timeout::new(service, Duration::from_secs(5));
         let service = Buffer::new(service, 1).unwrap();
         let service = Retry::new(policy, service);
 
-        BatchSink::new(batcher, service)
+        BatchSink::new(service, batch_size)
     }
 
     fn gen_partition_key(&mut self) -> String {
@@ -100,35 +108,85 @@ impl fmt::Debug for KinesisService {
     }
 }
 
+impl RetryPolicy {
+    pub fn new(attempts: usize, backoff: Duration) -> Self {
+        RetryPolicy { attempts, backoff }
+    }
+
+    fn should_retry(&self, error: &PutRecordsError) -> bool {
+        match error {
+            PutRecordsError::ProvisionedThroughputExceeded(reason) => {
+                warn!("Kinesis ProvisionedThroghPutExceeded: {}", reason);
+                true
+            }
+            PutRecordsError::Unknown(ref res) => {
+                if res.status.is_server_error() {
+                    if let Ok(reason) = String::from_utf8(res.body.clone()) {
+                        error!("Kinesis UnkownError Occured: {}", reason);
+                    } else {
+                        error!(
+                            "Kinesis UnkownError Occured with status: {}",
+                            res.status.as_u16()
+                        );
+                    }
+
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
 impl Policy<Request, PutRecordsOutput, Error> for RetryPolicy {
-    type Future = future::FutureResult<Self, ()>;
+    type Future = RetryPolicyFuture;
 
     fn retry(
         &self,
         _: &Request,
         response: Result<&PutRecordsOutput, &Error>,
     ) -> Option<Self::Future> {
-        match response {
-            Ok(_) => None,
-            // TODO: clean this up, they are all options so they should just return none
-            Err(error) => match error
-                .source()
-                .unwrap()
-                .downcast_ref::<PutRecordsError>()
-                .unwrap()
-            {
-                PutRecordsError::ProvisionedThroughputExceeded(_) => {
-                    let policy = RetryPolicy {
-                        attempts: self.attempts - 1,
-                    };
-                    Some(future::ok(policy))
+        if self.attempts > 0 {
+            match response {
+                Ok(_) => None,
+                // TODO: clean this up, they are all options so they should just return none
+                Err(error) => {
+                    if let Some(ref err) = error
+                        .source()
+                        .and_then(StdError::downcast_ref::<PutRecordsError>)
+                    {
+                        if self.should_retry(err) {
+                            let policy = RetryPolicy::new(self.attempts - 1, self.backoff.clone());
+                            let amt = Instant::now() + self.backoff;
+                            let delay = Delay::new(amt);
+
+                            Some(RetryPolicyFuture { delay, policy })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 }
-                _ => None,
-            },
+            }
+        } else {
+            None
         }
     }
 
     fn clone_request(&self, request: &Request) -> Option<Request> {
         Some(request.clone())
+    }
+}
+
+impl Future for RetryPolicyFuture {
+    type Item = RetryPolicy;
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        try_ready!(self.delay.poll().map_err(|_| ()));
+        Ok(Async::Ready(self.policy.clone()))
     }
 }

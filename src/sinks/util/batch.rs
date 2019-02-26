@@ -3,14 +3,14 @@ use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 use std::fmt;
 use tower_service::Service;
 
-pub struct BatchSink<S, B>
+pub struct BatchSink<S>
 where
-    B: Batch,
-    S: Service<Vec<B::Item>>,
+    S: Service<Vec<Vec<u8>>>,
 {
-    batcher: B,
+    batcher: Vec<Vec<u8>>,
     service: S,
     state: State<S::Future>,
+    size: usize,
 }
 
 enum State<T> {
@@ -18,25 +18,23 @@ enum State<T> {
     Batching,
 }
 
-impl<S, B> BatchSink<S, B>
+impl<S> BatchSink<S>
 where
-    B: Batch,
-    S: Service<Vec<B::Item>>,
+    S: Service<Vec<Vec<u8>>>,
 {
-    pub fn new(batcher: B, service: S) -> Self {
+    pub fn new(service: S, size: usize) -> Self {
         BatchSink {
-            batcher,
+            batcher: Vec::new(),
             service,
             state: State::Batching,
+            size,
         }
     }
 }
 
-impl<S, B> Sink for BatchSink<S, B>
+impl<S> Sink for BatchSink<S>
 where
-    B: Batch,
-    B::Item: From<Record>,
-    S: Service<Vec<B::Item>>,
+    S: Service<Vec<Vec<u8>>>,
     S::Error: fmt::Debug,
     S::Response: fmt::Debug,
 {
@@ -44,17 +42,17 @@ where
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batcher.full() {
+        if self.batcher.len() > self.size {
             self.poll_complete()?;
 
-            if self.batcher.full() {
+            if self.batcher.len() > self.size {
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
         self.batcher.push(item.into());
 
-        if self.batcher.full() {
+        if self.batcher.len() > self.size {
             self.poll_complete()?;
         }
 
@@ -74,8 +72,8 @@ where
                 },
 
                 State::Batching => {
-                    if self.batcher.full() {
-                        let items = self.batcher.flush();
+                    if self.batcher.len() > self.size {
+                        let items = self.batcher.drain(..).collect();
                         let fut = self.service.call(items);
                         self.state = State::Poll(fut);
 
@@ -83,10 +81,10 @@ where
                     } else {
                         // check timer here???
                         // Buffer isnt full and there isn't an inflight request
-                        if !self.batcher.empty() {
+                        if !self.batcher.is_empty() {
                             // Buffer isnt empty, isnt full and there is no inflight
                             // so lets take the rest of the buffer and send it.
-                            let items = self.batcher.flush();
+                            let items = self.batcher.drain(..).collect();
                             let fut = self.service.call(items);
                             self.state = State::Poll(fut);
 
@@ -98,52 +96,5 @@ where
                 }
             }
         }
-    }
-}
-
-pub trait Batch {
-    type Item;
-
-    fn push(&mut self, item: Self::Item);
-
-    fn flush(&mut self) -> Vec<Self::Item>;
-
-    fn full(&self) -> bool;
-
-    fn empty(&self) -> bool;
-}
-
-pub struct VecBatcher<T> {
-    inner: Vec<T>,
-    size: usize,
-}
-
-impl<T> VecBatcher<T> {
-    pub fn new(size: usize) -> Self {
-        VecBatcher {
-            inner: Vec::new(),
-            size,
-        }
-    }
-}
-
-impl<T> Batch for VecBatcher<T> {
-    type Item = T;
-
-    fn full(&self) -> bool {
-        self.inner.len() >= self.size
-    }
-
-    fn push(&mut self, item: T) {
-        self.inner.push(item);
-    }
-
-    fn flush(&mut self) -> Vec<T> {
-        // TODO(lucio): make this unsafe replace?
-        self.inner.drain(..).collect()
-    }
-
-    fn empty(&self) -> bool {
-        self.inner.is_empty()
     }
 }
