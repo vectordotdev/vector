@@ -20,7 +20,7 @@ jobs:
           paths:
             - "~/.cargo"
             - "./target"
-            
+
   build-stable:
     resource_class: large
     docker:
@@ -31,16 +31,16 @@ jobs:
       - restore_cache:
           key: project-cache
       - run:
-          name: Install leveldb deps
+          name: Install make and friends
           command: |
             apt-get update
-            apt-get -y install libleveldb-dev libsnappy-dev
+            apt-get -y install build-essential
       - run:
           name: Build
           environment:
             RUSTFLAGS: "-D warnings"
           command: |
-            cargo build --all --all-features --all-targets
+            cargo check --all --all-features --all-targets
       - save_cache:
           key: project-cache
           paths:
@@ -57,14 +57,21 @@ jobs:
       - restore_cache:
           key: project-cache
       - run:
-          name: Install leveldb deps
+          name: Install make and friends
           command: |
             apt-get update
-            apt-get -y install libleveldb-dev libsnappy-dev
+            apt-get -y install build-essential
+      - run:
+          name: Install suity
+          command: |
+            cargo install --git https://github.com/lukesteensen/cargo-suity.git
+            apt-get -y install build-essential
       - run:
           name: Test
           command: |
-            cargo test --all
+            cargo suity
+      - store_test_results:
+          path: ./test-results
       - save_cache:
           key: project-cache
           paths:
