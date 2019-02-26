@@ -5,7 +5,7 @@ use hyper::service::service_fn_ok;
 use hyper::{Body, Request, Response, Server};
 use router::{
     sinks::http::HttpSinkConfig,
-    test_util::{next_addr, random_lines},
+    test_util::{next_addr, random_lines, shutdown_on_idle},
     topology::config::SinkConfig,
 };
 use std::io::{BufRead, BufReader};
@@ -96,7 +96,7 @@ fn test_http_happy_path() {
         })
         .collect::<Vec<_>>();
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);

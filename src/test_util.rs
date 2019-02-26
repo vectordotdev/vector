@@ -76,3 +76,7 @@ pub fn wait_for_tcp(addr: SocketAddr) {
         }
     }
 }
+
+pub fn shutdown_on_idle(runtime: tokio::runtime::Runtime) {
+    runtime.shutdown_on_idle().wait().unwrap()
+}

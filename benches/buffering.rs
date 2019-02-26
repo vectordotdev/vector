@@ -1,7 +1,7 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines, wait_for_tcp};
+use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
 use router::topology::{self, config};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
@@ -56,7 +56,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
@@ -99,7 +99,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );

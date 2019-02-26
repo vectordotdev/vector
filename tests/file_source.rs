@@ -1,5 +1,6 @@
 use futures::{Future, Stream};
 use router::sources::file;
+use router::test_util::shutdown_on_idle;
 use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
@@ -37,7 +38,7 @@ fn happy_path() {
 
     let received = rx.take(n * 2).collect().wait().unwrap();
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let mut hello_i = 0;
     let mut goodbye_i = 0;
@@ -96,7 +97,7 @@ fn truncate() {
 
     let received = rx.take(n * 2).collect().wait().unwrap();
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let mut i = 0;
     let mut pre_trunc = true;
@@ -157,7 +158,7 @@ fn rotate() {
 
     let received = rx.take(n * 2).collect().wait().unwrap();
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let mut i = 0;
     let mut pre_rot = true;
@@ -217,7 +218,7 @@ fn multiple_paths() {
 
     let received = rx.take(n * 3).collect().wait().unwrap();
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let mut is = [0; 3];
 
@@ -315,7 +316,7 @@ fn context_key() {
     }
 
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 }
 
 #[test]

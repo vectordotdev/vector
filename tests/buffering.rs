@@ -1,5 +1,5 @@
 use futures::{Future, Stream};
-use router::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
+use router::test_util::{next_addr, random_lines, send_lines, shutdown_on_idle, wait_for_tcp};
 use router::topology::{self, config};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
@@ -70,7 +70,7 @@ fn test_buffering() {
 
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines * 2 - 1, output_lines.len());
@@ -137,7 +137,7 @@ fn test_max_size() {
 
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines / 2, output_lines.len());
@@ -190,7 +190,7 @@ fn test_max_size_resume() {
 
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines * 2, output_lines.len());

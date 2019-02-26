@@ -1,6 +1,6 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
-use router::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
+use router::test_util::{next_addr, random_lines, send_lines, shutdown_on_idle, wait_for_tcp};
 use router::topology::{self, config};
 use router::{sinks, sources, transforms};
 use serde_json::json;
@@ -40,7 +40,7 @@ fn test_pipe() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
@@ -85,7 +85,7 @@ fn test_sample() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     let num_output_lines = output_lines.len();
 
@@ -154,7 +154,7 @@ fn test_parse() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(output_lines, vec!["missing status=404".to_owned()]);
 }
@@ -196,7 +196,7 @@ fn test_merge() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     let num_output_lines = output_lines.len();
 
@@ -256,7 +256,7 @@ fn test_fork() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
     let output_lines2 = output_lines2.wait().unwrap();
     assert_eq!(num_lines, output_lines1.len());
@@ -311,7 +311,7 @@ fn test_merge_and_fork() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
     let output_lines2 = output_lines2.wait().unwrap();
 
@@ -398,7 +398,7 @@ fn test_merge_and_fork_json() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
     let output_lines2 = output_lines2.wait().unwrap();
 
@@ -463,10 +463,10 @@ fn test_reconnect() {
 
     // Shut down server and wait for it to fully flush
     drop(trigger);
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     drop(output_trigger);
-    output_rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(output_rt);
 
     let output_lines = output_lines.wait().unwrap();
     assert!(num_lines >= 2);

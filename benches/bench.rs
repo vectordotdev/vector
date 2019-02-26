@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 
 use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines, wait_for_tcp};
+use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
 use router::topology::{self, config};
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
@@ -54,7 +54,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
@@ -108,7 +108,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
@@ -162,7 +162,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
@@ -223,7 +223,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines * num_writers, output_lines.wait().unwrap());
                 },
             );
@@ -297,7 +297,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines * 2, output_lines1.wait().unwrap());
                     assert_eq!(num_lines * 2, output_lines2.wait().unwrap());
                 },
@@ -371,7 +371,7 @@ fn benchmark_transforms(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );
@@ -547,7 +547,7 @@ fn benchmark_complex(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
 
                     let output_lines_all = output_lines_all.wait().unwrap();
                     let output_lines_sampled = output_lines_sampled.wait().unwrap();

@@ -50,7 +50,7 @@ fn test_tcp_syslog() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
@@ -96,7 +96,7 @@ fn test_udp_syslog() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
@@ -161,7 +161,7 @@ fn test_unix_stream_syslog() {
     // Shut down server
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
