@@ -12,18 +12,18 @@ use std::io::{BufRead, BufReader};
 
 #[test]
 fn test_http_happy_path() {
+    router::setup_logger();
+
     let num_lines = 1000;
 
     let in_addr = next_addr();
 
     let config = r#"
-        base_uri = "$IN"
-        path = "/frames"
-        healthcheck_path = "/ping"
+        uri = "http://$IN_ADDR/frames"
         user = "waldo"
         password = "hunter2"
     "#
-    .replace("$IN", &format!("{}", in_addr));
+    .replace("$IN_ADDR", &format!("{}", in_addr));
 
     let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

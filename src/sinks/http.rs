@@ -1,5 +1,5 @@
 use super::util::{self, SinkExt};
-use futures::{Future, Sink};
+use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use hyper::{Request, Uri};
 use serde::{Deserialize, Serialize};
@@ -10,13 +10,10 @@ use crate::record::Record;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
-    pub base_uri: String,
-    #[serde(default)]
-    pub path: String,
+    pub uri: String,
+    pub healthcheck_uri: Option<String>,
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
-    #[serde(default)]
-    pub healthcheck_path: String,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -33,9 +30,10 @@ impl BasicAuth {
     }
 }
 
+#[derive(Clone, Debug)]
 struct ValidatedConfig {
     uri: Uri,
-    healthcheck_uri: Uri,
+    healthcheck_uri: Option<Uri>,
     basic_auth: Option<BasicAuth>,
 }
 
@@ -49,36 +47,45 @@ impl HttpSinkConfig {
     }
 
     fn uri(&self) -> Result<Uri, String> {
-        self.build_uri(&self.path)
+        build_uri(&self.uri)
     }
 
-    fn healthcheck_uri(&self) -> Result<Uri, String> {
-        self.build_uri(&self.healthcheck_path)
+    fn healthcheck_uri(&self) -> Result<Option<Uri>, String> {
+        if let Some(uri) = &self.healthcheck_uri {
+            build_uri(uri).map(Some)
+        } else {
+            Ok(None)
+        }
     }
+}
 
-    fn build_uri(&self, path: &str) -> Result<Uri, String> {
-        let base: Uri = self
-            .base_uri
-            .parse()
-            .map_err(|e| format!("invalid base_uri: {}", e))?;
-        let path: Uri = path.parse().map_err(|e| format!("invalid path: {}", e))?;
-        Ok(Uri::builder()
-            .scheme(base.scheme_str().unwrap_or("http"))
-            .authority(
-                base.authority_part()
-                    .map(|a| a.as_str())
-                    .unwrap_or("127.0.0.1"),
-            )
-            .path_and_query(path.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
-            .build()
-            .expect("bug building uri"))
-    }
+fn build_uri(raw: &str) -> Result<Uri, String> {
+    let base: Uri = raw
+        .parse()
+        .map_err(|e| format!("invalid uri ({}): {:?}", e, raw))?;
+    Ok(Uri::builder()
+        .scheme(base.scheme_str().unwrap_or("http"))
+        .authority(
+            base.authority_part()
+                .map(|a| a.as_str())
+                .unwrap_or("127.0.0.1"),
+        )
+        .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
+        .build()
+        .expect("bug building uri"))
 }
 
 #[typetag::serde(name = "http")]
 impl crate::topology::config::SinkConfig for HttpSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((http(self.validated()?), healthcheck(self.validated()?)))
+        let config = self.validated()?;
+        let sink = http(config.clone());
+
+        if let Some(healthcheck_uri) = config.healthcheck_uri {
+            Ok((sink, healthcheck(healthcheck_uri, config.basic_auth)))
+        } else {
+            Ok((sink, Box::new(future::ok(()))))
+        }
     }
 }
 
@@ -115,15 +122,13 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-fn healthcheck(config: ValidatedConfig) -> super::Healthcheck {
+fn healthcheck(uri: Uri, auth: Option<BasicAuth>) -> super::Healthcheck {
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
 
-    let mut request = Request::head(&config.healthcheck_uri)
-        .body(Body::empty())
-        .unwrap();
+    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
-    if let Some(auth) = config.basic_auth {
+    if let Some(auth) = auth {
         auth.apply(request.headers_mut());
     }
 
