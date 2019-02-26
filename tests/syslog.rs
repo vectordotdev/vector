@@ -1,16 +1,18 @@
-#![cfg(feature = "flaky")]
-
+use approx::assert_relative_eq;
 use futures::{Future, Sink, Stream};
-use router::test_util::{next_addr, random_lines, send_lines};
+use router::test_util::{
+    block_on, next_addr, random_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+};
 use router::topology::{self, config};
 use router::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
-use tokio::net::{TcpListener, UdpSocket};
+use std::{collections::HashMap, net::SocketAddr, thread, time::Duration};
+use tokio::{
+    codec::{FramedRead, FramedWrite, LinesCodec},
+    net::TcpListener,
+};
 use tokio_uds::UnixStream;
 
 #[test]
@@ -43,9 +45,7 @@ fn test_tcp_syslog() {
         .take(num_lines)
         .collect::<Vec<_>>();
 
-    send_lines(in_addr, input_lines.clone().into_iter())
-        .wait()
-        .unwrap();
+    block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
 
     // Shut down server
     drop(trigger);
@@ -58,7 +58,7 @@ fn test_tcp_syslog() {
 
 #[test]
 fn test_udp_syslog() {
-    let num_lines: usize = 10000;
+    let num_lines: usize = 1000;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -85,21 +85,28 @@ fn test_udp_syslog() {
         .collect::<Vec<_>>();
 
     let bind_addr = next_addr();
+    let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
     for line in input_lines.iter() {
-        let socket = UdpSocket::bind(&bind_addr).unwrap();
-        socket.send_dgram(line.as_bytes(), &in_addr).wait().unwrap();
+        socket.send_to(line.as_bytes(), &in_addr).unwrap();
+        // Space things out slightly to try to avoid dropped packets
+        thread::sleep(Duration::from_nanos(200_000));
     }
 
     // Give packets some time to flow through
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(10));
 
     // Shut down server
     drop(trigger);
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
-    assert_eq!(num_lines, output_lines.len());
-    assert_eq!(input_lines, output_lines);
+
+    // Account for some dropped packets :(
+    let output_lines_ratio = output_lines.len() as f32 / num_lines as f32;
+    assert_relative_eq!(output_lines_ratio, 1.0, epsilon = 0.01);
+    for line in output_lines {
+        assert!(input_lines.contains(&line));
+    }
 }
 
 #[test]
@@ -196,7 +203,7 @@ fn generate_rfc5424_log_line(msg_id: usize, msg: String) -> String {
         "<{}>{} {} {} {} {} {} {} {}",
         encode_priority(severity, facility),
         1, // version
-        chrono::Utc::now().to_rfc3339(),
+        chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
         hostname,
         process,
         pid,
