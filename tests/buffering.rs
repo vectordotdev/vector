@@ -1,5 +1,5 @@
 use futures::{Future, Stream};
-use router::test_util::{next_addr, random_lines, send_lines};
+use router::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use router::topology::{self, config};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
@@ -32,7 +32,7 @@ fn test_buffering() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.spawn(server);
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -60,7 +60,7 @@ fn test_buffering() {
 
     rt.spawn(server);
 
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -105,7 +105,7 @@ fn test_max_size() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.spawn(server);
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -133,7 +133,7 @@ fn test_max_size() {
 
     rt.spawn(server);
 
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     drop(trigger);
 
@@ -172,8 +172,8 @@ fn test_max_size_resume() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.spawn(server);
-    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+    wait_for_tcp(in_addr1);
+    wait_for_tcp(in_addr2);
 
     // Send all of the input lines _before_ the output sink is ready. This causes the writers to stop
     // writing to the on-disk buffer, and once the output sink is available and the size of the buffer

@@ -1,7 +1,7 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines};
+use router::test_util::{next_addr, send_lines, wait_for_tcp};
 use router::topology::{self, config};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
@@ -46,7 +46,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -89,7 +89,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },

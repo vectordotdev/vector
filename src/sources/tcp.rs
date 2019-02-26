@@ -70,7 +70,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
 #[cfg(test)]
 mod test {
-    use crate::test_util::{next_addr, send_lines};
+    use crate::test_util::{next_addr, send_lines, wait_for_tcp};
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -83,7 +83,7 @@ mod test {
         let server = super::tcp(addr, super::default_max_length(), tx);
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
-        while let Err(_) = std::net::TcpStream::connect(addr) {}
+        wait_for_tcp(addr);
 
         rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();

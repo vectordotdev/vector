@@ -64,7 +64,7 @@ where
     rt.block_on(future)
 }
 
-pub fn wait_for_tcp(addr: &SocketAddr) {
+pub fn wait_for_tcp(addr: SocketAddr) {
     let wait = std::time::Duration::from_millis(5);
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;

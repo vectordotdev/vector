@@ -1,6 +1,6 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
-use router::test_util::{next_addr, random_lines, send_lines};
+use router::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use router::topology::{self, config};
 use router::{sinks, sources, transforms};
 use serde_json::json;
@@ -31,7 +31,7 @@ fn test_pipe() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -76,7 +76,7 @@ fn test_sample() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -138,7 +138,7 @@ fn test_parse() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = vec![
         "good status=200",
@@ -183,8 +183,8 @@ fn test_merge() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+    wait_for_tcp(in_addr1);
+    wait_for_tcp(in_addr2);
 
     let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -247,7 +247,7 @@ fn test_fork() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -298,8 +298,8 @@ fn test_merge_and_fork() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+    wait_for_tcp(in_addr1);
+    wait_for_tcp(in_addr2);
 
     let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -385,8 +385,8 @@ fn test_merge_and_fork_json() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+    wait_for_tcp(in_addr1);
+    wait_for_tcp(in_addr2);
 
     let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -455,7 +455,7 @@ fn test_reconnect() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());

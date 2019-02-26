@@ -35,7 +35,7 @@ fn test_tcp_syslog() {
 
     rt.spawn(server);
     // Wait for server to accept traffic
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100)
         .enumerate()

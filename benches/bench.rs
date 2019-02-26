@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 
 use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines};
+use router::test_util::{next_addr, send_lines, wait_for_tcp};
 use router::topology::{self, config};
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
@@ -44,7 +44,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -98,7 +98,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -152,7 +152,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -207,7 +207,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -284,8 +284,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let output_lines2 = count_lines(&out_addr2, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-                    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+                    wait_for_tcp(in_addr1);
+                    wait_for_tcp(in_addr2);
 
                     (rt, trigger, output_lines1, output_lines2)
                 },
@@ -356,7 +356,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -500,8 +500,8 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_500 = count_lines(&out_addr_500, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr1) {}
-                    while let Err(_) = std::net::TcpStream::connect(in_addr2) {}
+                    wait_for_tcp(in_addr1);
+                    wait_for_tcp(in_addr2);
 
                     (
                         rt,
