@@ -1,5 +1,6 @@
 use super::util::{self, SinkExt};
 use futures::{Future, Sink};
+use headers::HeaderMapExt;
 use hyper::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -23,6 +24,13 @@ pub struct HttpSinkConfig {
 pub struct BasicAuth {
     user: String,
     password: String,
+}
+
+impl BasicAuth {
+    fn apply(&self, header_map: &mut http::header::HeaderMap) {
+        let auth = headers::Authorization::basic(&self.user, &self.password);
+        header_map.typed_insert(auth)
+    }
 }
 
 struct ValidatedConfig {
@@ -77,11 +85,15 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
 fn http(config: ValidatedConfig) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
         .with(move |body: Vec<u8>| {
-            let request = Request::post(&config.uri)
-                .header("Content-Type", "application/json")
+            let mut request = Request::post(&config.uri)
+                .header("Content-Type", "application/x-ndjson")
                 .header("Content-Encoding", "gzip")
                 .body(body.into())
                 .unwrap();
+
+            if let Some(ref auth) = config.basic_auth {
+                auth.apply(request.headers_mut());
+            }
 
             Ok(request)
         })
@@ -107,9 +119,13 @@ fn healthcheck(config: ValidatedConfig) -> super::Healthcheck {
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
 
-    let request = Request::head(&config.healthcheck_uri)
+    let mut request = Request::head(&config.healthcheck_uri)
         .body(Body::empty())
         .unwrap();
+
+    if let Some(auth) = config.basic_auth {
+        auth.apply(request.headers_mut());
+    }
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);

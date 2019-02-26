@@ -1,5 +1,6 @@
 use bytes::Buf;
 use futures::{stream, sync::mpsc, Future, Sink, Stream};
+use headers::{Authorization, HeaderMapExt};
 use hyper::service::service_fn_ok;
 use hyper::{Body, Request, Response, Server};
 use router::{
@@ -19,6 +20,8 @@ fn test_http_happy_path() {
         base_uri = "$IN"
         path = "/frames"
         healthcheck_path = "/ping"
+        user = "waldo"
+        password = "hunter2"
     "#
     .replace("$IN", &format!("{}", in_addr));
 
@@ -76,6 +79,10 @@ fn test_http_happy_path() {
         .map(|(parts, body)| {
             assert_eq!(hyper::Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
+            assert_eq!(
+                Some(Authorization::basic("waldo", "hunter2")),
+                parts.headers.typed_get()
+            );
             body
         })
         .map(hyper::Chunk::reader)

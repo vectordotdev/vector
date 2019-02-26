@@ -45,6 +45,7 @@ tokio-threadpool = "0.1.8"
 prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
+headers = "0.2.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
