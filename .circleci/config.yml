@@ -39,7 +39,7 @@ jobs:
           environment:
             RUSTFLAGS: "-D warnings"
           command: |
-            cargo build --all --all-features
+            cargo build --all --all-features --all-targets
       - save_cache:
           key: project-cache
           paths:
