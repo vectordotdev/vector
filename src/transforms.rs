@@ -148,29 +148,33 @@ impl Transform for FieldFilter {
 mod test {
     use super::{RegexParser, Sampler, Transform};
     use crate::record::Record;
+    use approx::assert_relative_eq;
     use regex::{Regex, RegexSet};
     use string_cache::DefaultAtom as Atom;
 
-    #[cfg(feature = "flaky")]
     #[test]
     fn samples_at_roughly_the_configured_rate() {
-        let records = random_records(1000);
+        let num_records = 10000;
+
+        let records = random_records(num_records);
         let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
         let total_passed = records
             .into_iter()
             .filter_map(|record| sampler.transform(record))
             .count();
-        assert!(total_passed > 400);
-        assert!(total_passed < 600);
+        let ideal = 1.0 as f64 / 2.0 as f64;
+        let actual = total_passed as f64 / num_records as f64;
+        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
-        let records = random_records(1000);
+        let records = random_records(num_records);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let total_passed = records
             .into_iter()
             .filter_map(|record| sampler.transform(record))
             .count();
-        assert!(total_passed > 30);
-        assert!(total_passed < 50);
+        let ideal = 1.0 as f64 / 25.0 as f64;
+        let actual = total_passed as f64 / num_records as f64;
+        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
     }
 
     #[test]
@@ -204,18 +208,20 @@ mod test {
 
     #[test]
     fn sampler_adds_sampling_rate_to_record() {
-        let records = random_records(100);
+        let records = random_records(10000);
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
+            .filter(|s| !s.line.contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing.custom[&Atom::from("sample_rate")], "10");
 
-        let records = random_records(100);
+        let records = random_records(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
+            .filter(|s| !s.line.contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing.custom[&Atom::from("sample_rate")], "25");
