@@ -1,8 +1,7 @@
-use super::util;
-use super::util::SinkExt;
+use super::util::{self, SinkExt};
 use futures::{Future, Sink};
 use hyper::{Request, Uri};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::record::Record;
@@ -26,19 +25,36 @@ pub struct BasicAuth {
     password: String,
 }
 
+struct ValidatedConfig {
+    uri: Uri,
+    healthcheck_uri: Uri,
+    basic_auth: Option<BasicAuth>,
+}
+
 impl HttpSinkConfig {
-    fn uri(&self) -> Uri {
+    fn validated(&self) -> Result<ValidatedConfig, String> {
+        Ok(ValidatedConfig {
+            uri: self.uri()?,
+            healthcheck_uri: self.healthcheck_uri()?,
+            basic_auth: self.basic_auth.clone(),
+        })
+    }
+
+    fn uri(&self) -> Result<Uri, String> {
         self.build_uri(&self.path)
     }
 
-    fn healthcheck_uri(&self) -> Uri {
+    fn healthcheck_uri(&self) -> Result<Uri, String> {
         self.build_uri(&self.healthcheck_path)
     }
 
-    fn build_uri(&self, path: &str) -> Uri {
-        let base: Uri = self.base_uri.parse().unwrap();
-        let path: Uri = path.parse().unwrap();
-        Uri::builder()
+    fn build_uri(&self, path: &str) -> Result<Uri, String> {
+        let base: Uri = self
+            .base_uri
+            .parse()
+            .map_err(|e| format!("invalid base_uri: {}", e))?;
+        let path: Uri = path.parse().map_err(|e| format!("invalid path: {}", e))?;
+        Ok(Uri::builder()
             .scheme(base.scheme_str().unwrap_or("http"))
             .authority(
                 base.authority_part()
@@ -47,21 +63,21 @@ impl HttpSinkConfig {
             )
             .path_and_query(path.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
             .build()
-            .unwrap()
+            .expect("bug building uri"))
     }
 }
 
 #[typetag::serde(name = "http")]
 impl crate::topology::config::SinkConfig for HttpSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((http(self.clone()), healthcheck(self.clone())))
+        Ok((http(self.validated()?), healthcheck(self.validated()?)))
     }
 }
 
-pub fn http(config: HttpSinkConfig) -> super::RouterSink {
+fn http(config: ValidatedConfig) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
         .with(move |body: Vec<u8>| {
-            let request = Request::post(config.uri())
+            let request = Request::post(&config.uri)
                 .header("Content-Type", "application/json")
                 .header("Content-Encoding", "gzip")
                 .body(body.into())
@@ -87,11 +103,11 @@ pub fn http(config: HttpSinkConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-pub fn healthcheck(config: HttpSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: ValidatedConfig) -> super::Healthcheck {
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
 
-    let request = Request::head(config.healthcheck_uri())
+    let request = Request::head(&config.healthcheck_uri)
         .body(Body::empty())
         .unwrap();
 
