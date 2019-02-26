@@ -63,13 +63,16 @@ impl CloudwatchLogsSink {
         })
     }
 
-    fn put_logs(&mut self, token: String) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
+    fn put_logs(
+        &mut self,
+        token: Option<String>,
+    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
         let log_events = self.buffer.flush();
         let request = PutLogEventsRequest {
             log_events,
             log_group_name: self.config.group_name.clone(),
             log_stream_name: self.config.stream_name.clone(),
-            sequence_token: Some(token),
+            sequence_token: token,
         };
 
         self.client.put_log_events(request)
@@ -116,7 +119,7 @@ impl CloudwatchLogsSink {
                 }
                 State::Buffering => {
                     if let Some(token) = self.stream_token.take() {
-                        let fut = self.put_logs(token);
+                        let fut = self.put_logs(Some(token));
                         self.state = State::Put(fut);
                         continue;
                     } else {
