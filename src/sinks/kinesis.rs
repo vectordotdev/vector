@@ -1,11 +1,23 @@
 use super::Record;
 use crate::sinks::util::batch::{BatchSink, VecBatcher};
-use futures::{Future, Poll, Sink};
+use futures::{future, Poll, Sink};
 use rand::random;
-use rusoto_core::Region;
-use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsInput, PutRecordsRequestEntry};
+use rusoto_core::{Region, RusotoFuture};
+use rusoto_kinesis::{
+    Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput,
+    PutRecordsRequestEntry,
+};
 use serde::{Deserialize, Serialize};
+use std::error::Error as StdError;
+use std::fmt;
+use std::time::Duration;
+use tower_buffer::Buffer;
+use tower_retry::{Policy, Retry};
 use tower_service::Service;
+use tower_timeout::Timeout;
+
+type Request = Vec<Vec<u8>>;
+type Error = tower_buffer::error::Error<tower_timeout::Error<PutRecordsError>>;
 
 pub struct KinesisService {
     client: KinesisClient,
@@ -20,6 +32,11 @@ pub struct KinesisSinkConfig {
     pub batch_size: usize,
 }
 
+#[derive(Debug, Clone)]
+struct RetryPolicy {
+    attempts: usize,
+}
+
 impl KinesisService {
     pub fn new(config: KinesisSinkConfig) -> impl Sink<SinkItem = Record, SinkError = ()> {
         let region = config.region.clone().parse::<Region>().unwrap();
@@ -28,7 +45,11 @@ impl KinesisService {
         let batcher = VecBatcher::new(config.batch_size);
         let service = KinesisService { client, config };
 
-        // TODO: construct service middleware here
+        let policy = RetryPolicy { attempts: 5 };
+
+        let service = Timeout::new(service, Duration::from_secs(5));
+        let service = Buffer::new(service, 1).unwrap();
+        let service = Retry::new(policy, service);
 
         BatchSink::new(batcher, service)
     }
@@ -43,10 +64,10 @@ impl KinesisService {
     }
 }
 
-impl Service<Vec<Vec<u8>>> for KinesisService {
-    type Response = ();
-    type Error = ();
-    type Future = Box<Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+impl Service<Request> for KinesisService {
+    type Response = PutRecordsOutput;
+    type Error = PutRecordsError;
+    type Future = RusotoFuture<PutRecordsOutput, PutRecordsError>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -67,12 +88,47 @@ impl Service<Vec<Vec<u8>>> for KinesisService {
             stream_name: self.config.stream_name.clone(),
         };
 
-        let fut = self
-            .client
-            .put_records(request)
-            .map(|_| ())
-            .map_err(|e| panic!("Kinesis Error: {:?}", e));
+        self.client.put_records(request)
+    }
+}
 
-        Box::new(fut)
+impl fmt::Debug for KinesisService {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("KinesisService")
+            .field("config", &self.config)
+            .finish()
+    }
+}
+
+impl Policy<Request, PutRecordsOutput, Error> for RetryPolicy {
+    type Future = future::FutureResult<Self, ()>;
+
+    fn retry(
+        &self,
+        _: &Request,
+        response: Result<&PutRecordsOutput, &Error>,
+    ) -> Option<Self::Future> {
+        match response {
+            Ok(_) => None,
+            // TODO: clean this up, they are all options so they should just return none
+            Err(error) => match error
+                .source()
+                .unwrap()
+                .downcast_ref::<PutRecordsError>()
+                .unwrap()
+            {
+                PutRecordsError::ProvisionedThroughputExceeded(_) => {
+                    let policy = RetryPolicy {
+                        attempts: self.attempts - 1,
+                    };
+                    Some(future::ok(policy))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    fn clone_request(&self, request: &Request) -> Option<Request> {
+        Some(request.clone())
     }
 }
