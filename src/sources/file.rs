@@ -1,4 +1,5 @@
 use crate::record::Record;
+use file_source::file_server::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -43,7 +44,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         .ignore_older
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
 
-    let cernan_server = cernan_file_source::file_server::FileServer {
+    let cernan_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
         max_read_bytes: 2048,
