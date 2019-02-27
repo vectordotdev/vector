@@ -23,8 +23,8 @@ fn test_insert_cloudwatch_log_event() {
 
     let timestamp = chrono::Utc::now();
 
-    let lines = random_lines(100).take(11).collect::<Vec<_>>();
-    let records = lines
+    let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
+    let records = input_lines
         .iter()
         .map(|line| Record::new_from_line(line.clone()))
         .collect::<Vec<_>>();
@@ -48,5 +48,10 @@ fn test_insert_cloudwatch_log_event() {
 
     let events = response.events.unwrap();
 
-    assert_eq!(events.len(), 11);
+    let output_lines = events
+        .into_iter()
+        .map(|e| e.message.unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(output_lines, input_lines);
 }

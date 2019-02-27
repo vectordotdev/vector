@@ -4,6 +4,7 @@ pub mod cloudwatch;
 pub mod console;
 pub mod elasticsearch;
 pub mod http;
+pub mod kinesis;
 pub mod prometheus;
 pub mod s3;
 pub mod splunk;

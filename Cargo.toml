@@ -27,6 +27,7 @@ hyper-tls = "0.3.1"
 rusoto_core = "0.36.0"
 rusoto_s3 = "0.36.0"
 rusoto_logs = "0.36.0"
+rusoto_kinesis = "0.36.0"
 rusoto_credential = "0.15.0"
 flate2 = "1.0.6"
 clap = "2.32.0"
@@ -46,6 +47,10 @@ prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
 headers = "0.2.1"
+tower-service = "0.2"
+tower-retry = "0.1"
+tower-buffer = "0.1"
+tower-timeout = "0.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -66,3 +71,10 @@ harness = false
 "splunk-integration-tests" = []
 "s3-integration-tests" = []
 "cloudwatch-integration-tests" = []
+"kinesis-integration-tests" = []
+
+[patch.crates-io]
+tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-retry = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }

@@ -1,3 +1,4 @@
+pub mod batch;
 pub mod http;
 pub mod size_buffered;
 

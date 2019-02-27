@@ -74,3 +74,9 @@ impl From<Record> for proto::Record {
         }
     }
 }
+
+impl From<Record> for Vec<u8> {
+    fn from(record: Record) -> Vec<u8> {
+        record.line.into_bytes()
+    }
+}
