@@ -44,7 +44,7 @@ fn test_kinesis_put_records() {
 
     rt.block_on(poll_fn(move || sink.close())).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     let timestamp = timestamp as f64 / 1000.0;
     let records = rt
