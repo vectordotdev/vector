@@ -161,9 +161,7 @@ mod test {
                 // These weights are more or less arbitrary. 'Pause' maybe
                 // doesn't have a use but we keep it in place to allow for
                 // variations in file-system flushes.
-                0...50 => {
-                    FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect())
-                }
+                0...50 => FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect()),
                 51...69 => FWAction::Read,
                 70...75 => FWAction::Pause(pause),
                 76...85 => FWAction::RotateFile,
@@ -203,7 +201,7 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut fp_id = file_id(&fp);
-        let mut fw = FileWatcher::new(&path).expect("must be able to create");
+        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -303,7 +301,7 @@ mod test {
         let dir = tempdir::TempDir::new("file_watcher_qc").unwrap();
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
-        let mut fw = FileWatcher::new(&path).expect("must be able to create");
+        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
