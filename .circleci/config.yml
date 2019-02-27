@@ -64,7 +64,7 @@ jobs:
       - run:
           name: Install suity
           command: |
-            cargo install --git https://github.com/lukesteensen/cargo-suity.git
+            cargo install --git https://github.com/andoriyu/cargo-suity.git
             apt-get -y install build-essential
       - run:
           name: Test
