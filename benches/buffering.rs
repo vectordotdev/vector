@@ -131,7 +131,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
                     rt.spawn(server);
-                    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+                    wait_for_tcp(in_addr);
 
                     (rt, trigger, output_lines)
                 },
@@ -141,7 +141,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     drop(trigger);
 
-                    rt.shutdown_on_idle().wait().unwrap();
+                    shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
                 },
             );

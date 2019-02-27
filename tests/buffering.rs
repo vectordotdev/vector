@@ -224,7 +224,7 @@ fn test_reclaim_disk_space() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.spawn(server);
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
@@ -262,7 +262,7 @@ fn test_reclaim_disk_space() {
 
     rt.spawn(server);
 
-    while let Err(_) = std::net::TcpStream::connect(in_addr) {}
+    wait_for_tcp(in_addr);
 
     let input_lines2 = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -272,7 +272,7 @@ fn test_reclaim_disk_space() {
 
     drop(trigger);
 
-    rt.shutdown_on_idle().wait().unwrap();
+    shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines * 2 - 1, output_lines.len());
