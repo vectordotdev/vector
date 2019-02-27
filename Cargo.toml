@@ -67,6 +67,7 @@ tower-service = "0.2"
 tower-retry = "0.1"
 tower-buffer = "0.1"
 tower-timeout = "0.1"
+rdkafka = "0.20.0"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -84,6 +85,7 @@ walkdir = "2.2.7"
 "s3-integration-tests" = []
 "cloudwatch-integration-tests" = []
 "kinesis-integration-tests" = []
+"kafka-integration-tests" = []
 
 [patch.crates-io]
 tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
