@@ -1,9 +1,6 @@
 #![cfg(feature = "kinesis-integration-tests")]
 
-use futures::{
-    future::{self, poll_fn},
-    stream, Future, Sink,
-};
+use futures::{future::poll_fn, stream, Future, Sink};
 use router::sinks::kinesis::{KinesisService, KinesisSinkConfig};
 use router::test_util::random_lines;
 use router::Record;
@@ -24,16 +21,12 @@ fn test_kinesis_put_records() {
 
     let mut rt = Runtime::new().unwrap();
 
-    let sink = rt
-        .block_on(futures::lazy(|| {
-            future::ok::<_, ()>(KinesisService::new(config))
-        }))
-        .unwrap();
+    let sink = KinesisService::new(config);
 
     let timestamp = chrono::Utc::now().timestamp_millis();
 
-    let lines = random_lines(100).take(11).collect::<Vec<_>>();
-    let records = lines
+    let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
+    let records = input_lines
         .iter()
         .map(|line| Record::new_from_line(line.clone()))
         .collect::<Vec<_>>();
@@ -51,7 +44,12 @@ fn test_kinesis_put_records() {
         .block_on(fetch_records(STREAM_NAME.into(), timestamp))
         .unwrap();
 
-    assert_eq!(records.len(), 11);
+    let output_lines = records
+        .into_iter()
+        .map(|e| String::from_utf8(e.data).unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(output_lines, input_lines)
 }
 
 fn fetch_records(
