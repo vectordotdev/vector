@@ -74,8 +74,7 @@ harness = false
 "kinesis-integration-tests" = []
 
 [patch.crates-io]
-tower-service = { git = "https://github.com/tower-rs/tower", rev = "92653e" }
-tower-retry = { git = "https://github.com/tower-rs/tower", rev = "92653e" }
-tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "92653e" }
-tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "92653e" }
-
+tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-retry = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }

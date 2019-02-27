@@ -30,7 +30,7 @@ fn test_kinesis_put_records() {
         }))
         .unwrap();
 
-    let timestamp = chrono::Utc::now().timestamp() - 500;
+    let timestamp = chrono::Utc::now().timestamp_millis();
 
     let lines = random_lines(100).take(11).collect::<Vec<_>>();
     let records = lines
@@ -46,13 +46,17 @@ fn test_kinesis_put_records() {
 
     std::thread::sleep(std::time::Duration::from_secs(5));
 
-    let records = rt.block_on(fetch_records(STREAM_NAME.into(), timestamp)).unwrap();
+    let timestamp = timestamp as f64 / 1000.0;
+    let records = rt
+        .block_on(fetch_records(STREAM_NAME.into(), timestamp))
+        .unwrap();
+
     assert_eq!(records.len(), 11);
 }
 
 fn fetch_records(
     stream_name: String,
-    timestamp: i64,
+    timestamp: f64,
 ) -> impl Future<Item = Vec<rusoto_kinesis::Record>, Error = ()> {
     let client = Arc::new(KinesisClient::new(Region::UsEast1));
 
@@ -81,7 +85,7 @@ fn fetch_records(
                 stream_name: stream_name1,
                 shard_id,
                 shard_iterator_type: "AT_TIMESTAMP".into(),
-                timestamp: Some(timestamp as f64),
+                timestamp: Some(timestamp),
                 ..Default::default()
             };
 
@@ -93,7 +97,8 @@ fn fetch_records(
         .and_then(move |shard_iterator| {
             let req = rusoto_kinesis::GetRecordsInput {
                 shard_iterator,
-                limit: Some(50)
+                // limit: Some(limit),
+                limit: None,
             };
 
             client2.get_records(req).map_err(|e| panic!("{:?}", e))

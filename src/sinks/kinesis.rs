@@ -11,22 +11,23 @@ use rusoto_kinesis::{
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
 use std::fmt;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
-use tower_buffer::Buffer;
 use tower_retry::{Policy, Retry};
 use tower_service::Service;
 use tower_timeout::Timeout;
 
 type Request = Vec<Vec<u8>>;
-type Error = tower_buffer::error::Error<tower_timeout::Error<PutRecordsError>>;
+type Error = tower_timeout::Error<PutRecordsError>;
 
+#[derive(Clone)]
 pub struct KinesisService {
-    client: KinesisClient,
+    client: Arc<KinesisClient>,
     config: KinesisSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
@@ -48,7 +49,7 @@ struct RetryPolicyFuture {
 impl KinesisService {
     pub fn new(config: KinesisSinkConfig) -> impl Sink<SinkItem = Record, SinkError = ()> {
         let region = config.region.clone().parse::<Region>().unwrap();
-        let client = KinesisClient::new(region);
+        let client = Arc::new(KinesisClient::new(region));
 
         let batch_size = config.batch_size;
         let service = KinesisService { client, config };
@@ -56,7 +57,6 @@ impl KinesisService {
         let policy = RetryPolicy::new(5, Duration::from_secs(1));
 
         let service = Timeout::new(service, Duration::from_secs(5));
-        let service = Buffer::new(service, 1).unwrap();
         let service = Retry::new(policy, service);
 
         BatchSink::new(service, batch_size)
@@ -149,31 +149,18 @@ impl Policy<Request, PutRecordsOutput, Error> for RetryPolicy {
         response: Result<&PutRecordsOutput, &Error>,
     ) -> Option<Self::Future> {
         if self.attempts > 0 {
-            match response {
-                Ok(_) => None,
-                // TODO: clean this up, they are all options so they should just return none
-                Err(error) => {
-                    if let Some(ref err) = error
-                        .source()
-                        .and_then(StdError::downcast_ref::<PutRecordsError>)
-                    {
-                        if self.should_retry(err) {
-                            let policy = RetryPolicy::new(self.attempts - 1, self.backoff.clone());
-                            let amt = Instant::now() + self.backoff;
-                            let delay = Delay::new(amt);
+            if let Err(Some(ref err)) = response.map_err(|e| find::<PutRecordsError>(e)) {
+                if self.should_retry(err) {
+                    let policy = RetryPolicy::new(self.attempts - 1, self.backoff.clone());
+                    let amt = Instant::now() + self.backoff;
+                    let delay = Delay::new(amt);
 
-                            Some(RetryPolicyFuture { delay, policy })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
+                    return Some(RetryPolicyFuture { delay, policy });
                 }
             }
-        } else {
-            None
         }
+
+        None
     }
 
     fn clone_request(&self, request: &Request) -> Option<Request> {
@@ -188,5 +175,19 @@ impl Future for RetryPolicyFuture {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         try_ready!(self.delay.poll().map_err(|_| ()));
         Ok(Async::Ready(self.policy.clone()))
+    }
+}
+
+// Need this for the moment to iterator `Box<dyn Error>`
+fn find<'a, T: StdError + 'static>(mut e: &'a (dyn StdError + 'static)) -> Option<&'a T> {
+    loop {
+        if let Some(err) = e.downcast_ref::<T>() {
+            return Some(err);
+        }
+
+        e = match e.source() {
+            Some(e) => e,
+            None => return None,
+        }
     }
 }
