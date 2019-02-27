@@ -5,9 +5,15 @@
 To start, you'll need `rustup` installed, along with the `rustfmt-preview` and
 `clippy-preview` components installed.
 
-For testing, I use the `flog` tool (`brew tap mingrammer/flog && brew install flog`) to generate a 100MB
-file of sample data used by the test harness:
+Requirements for testing:
 
+``` bash
+brew tap mingrammer/flog
+brew install flog
+brew install minio/stable/minio
+```
+
+To generate a 100MB test sample log file.
 ```
 $ flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
