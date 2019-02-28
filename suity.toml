@@ -1,2 +1,8 @@
 [global]
 features = ["docker"]
+
+[workflow.default]
+doc = true
+unit = true
+lib = true
+integration = ["*"]
