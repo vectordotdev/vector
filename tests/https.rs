@@ -60,7 +60,7 @@ fn test_http_happy_path() {
         input_lines
             .clone()
             .into_iter()
-            .map(|line| router::Record::new_from_line(line)),
+            .map(|line| router::Record::from(line)),
     ));
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();

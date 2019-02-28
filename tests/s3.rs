@@ -19,7 +19,7 @@ fn test_insert_message_into_s3() {
     let lines = random_lines(100).take(10).collect::<Vec<_>>();
     let records = lines
         .iter()
-        .map(|line| Record::new_from_line(line.clone()))
+        .map(|line| Record::from(line.clone()))
         .collect::<Vec<_>>();
 
     let pump = sink.send_all(stream::iter_ok(records.into_iter()));
@@ -83,7 +83,7 @@ fn test_rotate_files_after_the_buffer_size_is_reached() {
     let lines = random_lines(100).take(30).collect::<Vec<_>>();
     let records = lines
         .iter()
-        .map(|line| Record::new_from_line(line.clone()))
+        .map(|line| Record::from(line.clone()))
         .collect::<Vec<_>>();
 
     let pump = sink.send_all(stream::iter_ok(records.into_iter()));
@@ -152,7 +152,7 @@ fn test_gzip() {
     let lines = random_lines(100).take(500).collect::<Vec<_>>();
     let records = lines
         .iter()
-        .map(|line| Record::new_from_line(line.clone()))
+        .map(|line| Record::from(line.clone()))
         .collect::<Vec<_>>();
 
     let pump = sink.send_all(stream::iter_ok(records.into_iter()));

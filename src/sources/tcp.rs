@@ -54,7 +54,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 let out = out.clone();
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .map(Record::new_from_line)
+                    .map(Record::from)
                     .map(move |mut record| {
                         record.host = host.clone();
                         record
