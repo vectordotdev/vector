@@ -1,0 +1,2 @@
+[global]
+features = ["docker"]

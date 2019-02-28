@@ -80,7 +80,7 @@ jobs:
       - run:
           name: Test
           command: |
-            cargo suity --features docker
+            cargo suity
       - store_test_results:
           path: ./test-results
       - save_cache:
