@@ -80,8 +80,8 @@ jobs:
       - run:
           name: Test
           command: |
-            sleep 60
-            cargo suity
+            sleep 30
+            RUST_BACKTRACE=full cargo suity
       - store_test_results:
           path: ./test-results
       - save_cache:
