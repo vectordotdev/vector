@@ -11,7 +11,7 @@ const BUCKET: &str = "router-tests";
 
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
 #[test]
-fn test_insert_message_into_s3() {
+fn s3_insert_message_into() {
     let config = config();
     let prefix = config.key_prefix.clone();
     let sink = sinks::s3::new(config);
@@ -70,7 +70,7 @@ fn test_insert_message_into_s3() {
 
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
 #[test]
-fn test_rotate_files_after_the_buffer_size_is_reached() {
+fn s3_rotate_files_after_the_buffer_size_is_reached() {
     ensure_bucket(&client());
 
     let config = S3SinkInnerConfig {
@@ -138,7 +138,7 @@ fn test_rotate_files_after_the_buffer_size_is_reached() {
 
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
 #[test]
-fn test_gzip() {
+fn s3_gzip() {
     ensure_bucket(&client());
 
     let config = S3SinkInnerConfig {
@@ -211,7 +211,7 @@ fn test_gzip() {
 
 #[cfg_attr(not(feature = "s3-integration-tests"), ignore)]
 #[test]
-fn test_healthchecks() {
+fn s3_healthchecks() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     // OK
@@ -252,11 +252,20 @@ fn test_healthchecks() {
 
 fn client() -> S3Client {
     let region = Region::Custom {
-        name: "minio".to_owned(),
+        name: "localstack".to_owned(),
         endpoint: "http://localhost:9000".to_owned(),
     };
 
-    S3Client::new(region)
+    let static_creds = rusoto_core::credential::StaticProvider::new(
+        "test-access-key".into(),
+        "test-secret-key".into(),
+        None,
+        None,
+    );
+
+    let client = rusoto_core::HttpClient::new().unwrap();
+
+    S3Client::new_with(client, static_creds, region)
 }
 
 fn config() -> S3SinkInnerConfig {

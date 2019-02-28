@@ -11,11 +11,13 @@ const STREAM_NAME: &'static str = "test-1";
 const GROUP_NAME: &'static str = "router";
 
 #[test]
-fn test_insert_cloudwatch_log_event() {
+fn cloudwatch_insert_log_event() {
+    let region = Region::UsEast1;
+
     let config = CloudwatchLogsSinkConfig {
         stream_name: STREAM_NAME.into(),
         group_name: GROUP_NAME.into(),
-        region: "us-east-1".into(),
+        region,
         buffer_size: 2,
     };
 

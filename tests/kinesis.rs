@@ -12,10 +12,19 @@ use tokio::runtime::Runtime;
 const STREAM_NAME: &'static str = "RouterTest";
 
 #[test]
-fn test_kinesis_put_records() {
+fn kinesis_put_records() {
+    let region = Region::Custom {
+        name: "localstack".into(),
+        endpoint: "http://localhost:4568".into(),
+    };
+
+    ensure_stream(region.clone());
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
     let config = KinesisSinkConfig {
         stream_name: STREAM_NAME.into(),
-        region: "us-east-1".into(),
+        region: region.clone(),
         batch_size: 2,
     };
 
@@ -26,6 +35,7 @@ fn test_kinesis_put_records() {
     let timestamp = chrono::Utc::now().timestamp_millis();
 
     let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
+
     let records = input_lines
         .iter()
         .map(|line| Record::new_from_line(line.clone()))
@@ -37,11 +47,11 @@ fn test_kinesis_put_records() {
 
     rt.block_on(poll_fn(move || sink.close())).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     let timestamp = timestamp as f64 / 1000.0;
     let records = rt
-        .block_on(fetch_records(STREAM_NAME.into(), timestamp))
+        .block_on(fetch_records(STREAM_NAME.into(), timestamp, region))
         .unwrap();
 
     let output_lines = records
@@ -55,8 +65,9 @@ fn test_kinesis_put_records() {
 fn fetch_records(
     stream_name: String,
     timestamp: f64,
+    region: Region,
 ) -> impl Future<Item = Vec<rusoto_kinesis::Record>, Error = ()> {
-    let client = Arc::new(KinesisClient::new(Region::UsEast1));
+    let client = Arc::new(KinesisClient::new(region));
 
     let stream_name1 = stream_name.clone();
     let describe = rusoto_kinesis::DescribeStreamInput {
@@ -102,4 +113,18 @@ fn fetch_records(
             client2.get_records(req).map_err(|e| panic!("{:?}", e))
         })
         .map(|records| records.records)
+}
+
+fn ensure_stream(region: Region) {
+    let client = KinesisClient::new(region);
+
+    let req = rusoto_kinesis::CreateStreamInput {
+        stream_name: STREAM_NAME.into(),
+        shard_count: 1,
+    };
+
+    match client.create_stream(req).sync() {
+        Ok(_) => (),
+        Err(_) => (),
+    };
 }

@@ -1,0 +1,16 @@
+version: "3"
+services:
+    localstack:
+      image: localstack/localstack
+      ports:
+        - "4568:4568"
+      environment:
+        SERVICES: kinesis
+    minio:
+      image: minio/minio
+      ports:
+        - "9000:9000"
+      environment:
+        MINIO_ACCESS_KEY: "test-access-key"
+        MINIO_SECRET_KEY: "test-secret-key"
+      command: server /tmp

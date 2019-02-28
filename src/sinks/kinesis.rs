@@ -31,7 +31,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
-    pub region: String,
+    pub region: Region,
     pub batch_size: usize,
 }
 
@@ -48,15 +48,15 @@ struct RetryPolicyFuture {
 
 impl KinesisService {
     pub fn new(config: KinesisSinkConfig) -> impl Sink<SinkItem = Record, SinkError = ()> {
-        let region = config.region.clone().parse::<Region>().unwrap();
-        let client = Arc::new(KinesisClient::new(region));
+        // let region = config.region.clone().parse::<Region>().unwrap();
+        let client = Arc::new(KinesisClient::new(config.region.clone()));
 
         let batch_size = config.batch_size;
         let service = KinesisService { client, config };
 
         let policy = RetryPolicy::new(5, Duration::from_secs(1));
 
-        let service = Timeout::new(service, Duration::from_secs(5));
+        let service = Timeout::new(service, Duration::from_secs(10));
         let service = Retry::new(policy, service);
 
         BatchSink::new(service, batch_size)
