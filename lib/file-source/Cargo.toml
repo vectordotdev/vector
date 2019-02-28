@@ -1,8 +1,9 @@
 [package]
-name = "cernan_file_source"
+name = "file-source"
 version = "0.1.0"
 authors = ["Timber.io <devs@timber.io>"]
 edition = "2018"
+publish = false
 
 [dependencies]
 glob = "0.2.11"

@@ -1,11 +1,11 @@
 use crate::file_watcher::FileWatcher;
-use glob::{glob,Pattern};
+use futures::{stream, Future, Sink, Stream};
+use glob::{glob, Pattern};
+use std::collections::HashMap;
 use std::mem;
 use std::path::PathBuf;
-use std::time;
-use std::collections::HashMap;
-use futures::{stream, Stream, Future, Sink};
 use std::sync::mpsc::RecvTimeoutError;
+use std::time;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -38,7 +38,11 @@ pub struct FileServer {
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
 impl FileServer {
-    pub fn run(self, mut chans: impl Sink<SinkItem=(String, String), SinkError=()>, shutdown: std::sync::mpsc::Receiver<()>) {
+    pub fn run(
+        self,
+        mut chans: impl Sink<SinkItem = (String, String), SinkError = ()>,
+        shutdown: std::sync::mpsc::Receiver<()>,
+    ) {
         let mut buffer = String::new();
 
         let mut fp_map: HashMap<PathBuf, FileWatcher> = Default::default();
@@ -56,18 +60,27 @@ impl FileServer {
         loop {
             let mut global_bytes_read: usize = 0;
             // glob poll
-            let exclude_patterns = self.exclude.iter().map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap()).collect::<Vec<_>>();
+            let exclude_patterns = self
+                .exclude
+                .iter()
+                .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
+                .collect::<Vec<_>>();
             for path in &self.include {
                 for entry in glob(path.to_str().expect("no ability to glob"))
                     .expect("Failed to read glob pattern")
                 {
                     if let Ok(path) = entry {
-                        if exclude_patterns.iter().any(|e| e.matches(path.to_str().unwrap())) {
+                        if exclude_patterns
+                            .iter()
+                            .any(|e| e.matches(path.to_str().unwrap()))
+                        {
                             continue;
                         }
 
                         if !fp_map.contains_key(&path) {
-                            if let Ok(fw) = FileWatcher::new(&path, self.start_at_beginning, self.ignore_before) {
+                            if let Ok(fw) =
+                                FileWatcher::new(&path, self.start_at_beginning, self.ignore_before)
+                            {
                                 fp_map.insert(path, fw);
                             };
                         }
@@ -80,7 +93,10 @@ impl FileServer {
                 while let Ok(sz) = watcher.read_line(&mut buffer) {
                     if sz > 0 {
                         bytes_read += sz;
-                        lines.push((buffer.clone(), path.to_str().expect("not a valid path").to_owned()));
+                        lines.push((
+                            buffer.clone(),
+                            path.to_str().expect("not a valid path").to_owned(),
+                        ));
                         buffer.clear();
                     } else {
                         break;
@@ -98,7 +114,10 @@ impl FileServer {
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
             }
 
-            match stream::iter_ok::<_, ()>(lines.drain(..)).forward(chans).wait() {
+            match stream::iter_ok::<_, ()>(lines.drain(..))
+                .forward(chans)
+                .wait()
+            {
                 Ok((_, sink)) => chans = sink,
                 Err(_) => unreachable!("Output channel is closed"),
             }
@@ -124,7 +143,7 @@ impl FileServer {
 
             match shutdown.recv_timeout(time::Duration::from_millis(backoff as u64)) {
                 Ok(()) => unreachable!(), // The sender should never actually send
-                Err(RecvTimeoutError::Timeout) => {},
+                Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }

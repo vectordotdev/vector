@@ -52,10 +52,6 @@ where
 
         self.batcher.push(item.into());
 
-        if self.batcher.len() > self.size {
-            self.poll_complete()?;
-        }
-
         Ok(AsyncSink::Ready)
     }
 

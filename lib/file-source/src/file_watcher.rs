@@ -42,7 +42,11 @@ impl FileWatcher {
     /// The input path will be used by `FileWatcher` to prime its state
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by cernan.
-    pub fn new(path: &PathBuf, start_at_beginning: bool, ignore_before: Option<time::SystemTime>) -> io::Result<FileWatcher> {
+    pub fn new(
+        path: &PathBuf,
+        start_at_beginning: bool,
+        ignore_before: Option<time::SystemTime>,
+    ) -> io::Result<FileWatcher> {
         match fs::File::open(&path) {
             Ok(f) => {
                 let metadata = f.metadata()?;
@@ -50,9 +54,13 @@ impl FileWatcher {
                 let ino = metadata.ino();
                 let mut rdr = io::BufReader::new(f);
 
-                let too_old = if let (Some(ignore_before), Ok(mtime)) = (ignore_before, metadata.modified()) {
+                let too_old = if let (Some(ignore_before), Ok(mtime)) =
+                    (ignore_before, metadata.modified())
+                {
                     mtime < ignore_before
-                } else { false };
+                } else {
+                    false
+                };
 
                 if !start_at_beginning || too_old {
                     assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());

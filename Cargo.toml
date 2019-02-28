@@ -3,8 +3,19 @@ name = "router"
 version = "0.1.0"
 authors = ["Luke Steensen <luke.steensen@gmail.com>"]
 edition = "2018"
+publish = false
+
+[workspace]
+members = [
+  ".",
+  "lib/file-source"
+]
 
 [dependencies]
+# Internal libs
+file-source = { path = "lib/file-source" }
+
+# External libs
 fern = "0.5.6"
 log = "0.4.5"
 uuid = { version = "0.7.1", features = ["v4"] }
@@ -12,41 +23,46 @@ chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.0.5"
 bytes = "0.4.10"
-tokio = "0.1.11"
 futures = "0.1.25"
-tokio-fs = "0.1.4"
 stream-cancel = "0.4.3"
 prometheus = "0.4.2"
 hyper = "0.12.18"
 serde = { version = "1.0.80", features = ["derive"] }
 serde_json = "1.0.33"
 elastic_responses = "0.20.10"
-tokio-retry = "0.2.0"
 string_cache = "0.7.3"
 hyper-tls = "0.3.1"
-rusoto_core = "0.36.0"
-rusoto_s3 = "0.36.0"
-rusoto_logs = "0.36.0"
-rusoto_kinesis = "0.36.0"
-rusoto_credential = "0.15.0"
 flate2 = "1.0.6"
 clap = "2.32.0"
-tokio-signal = "0.2.7"
 indexmap = {version = "1.0.2", features = ["serde-1"]}
 http = "0.1.14"
 typetag = "0.1"
 toml = "0.4"
-cernan_file_source = { path = "cernan_file_source" }
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
 leveldb = "0.8.4"
 db-key = "0.0.5"
-tokio-threadpool = "0.1.8"
 prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
 headers = "0.2.1"
+
+# Tokio
+tokio = "0.1.11"
+tokio-fs = "0.1.4"
+tokio-retry = "0.2.0"
+tokio-signal = "0.2.7"
+tokio-threadpool = "0.1.8"
+
+# Aws
+rusoto_core = "0.36.0"
+rusoto_s3 = "0.36.0"
+rusoto_logs = "0.36.0"
+rusoto_kinesis = "0.36.0"
+rusoto_credential = "0.15.0"
+
+# Tower
 tower-service = "0.2"
 tower-retry = "0.1"
 tower-buffer = "0.1"
@@ -63,10 +79,6 @@ tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
 
-[[bench]]
-name = "bench"
-harness = false
-
 [features]
 "splunk-integration-tests" = []
 "s3-integration-tests" = []
@@ -78,3 +90,7 @@ tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+
+[[bench]]
+name = "bench"
+harness = false
