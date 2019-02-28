@@ -1,8 +1,16 @@
 use crate::record::Record;
-use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures::{
+    future::{poll_fn, IntoFuture},
+    stream::FuturesUnordered,
+    Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+};
 use log::{debug, error, trace};
-use rdkafka::producer::{DeliveryFuture, FutureProducer, FutureRecord};
+use rdkafka::{
+    consumer::{BaseConsumer, Consumer},
+    producer::{DeliveryFuture, FutureProducer, FutureRecord},
+};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct KafkaSinkConfig {
@@ -14,7 +22,8 @@ struct KafkaSinkConfig {
 impl crate::topology::config::SinkConfig for KafkaSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = KafkaSink::new(self.clone())?;
-        Ok(unreachable!())
+        let hc = healthcheck(self.clone());
+        Ok((Box::new(sink), hc))
     }
 }
 
@@ -95,6 +104,27 @@ impl Sink for KafkaSink {
             }
         }
     }
+}
+
+fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
+    let mut client_config = rdkafka::ClientConfig::new();
+    let bs = config.bootstrap_servers.join(",");
+    client_config.set("bootstrap.servers", &bs);
+
+    let consumer: BaseConsumer = client_config.create().unwrap();
+
+    let check = poll_fn(move || {
+        tokio_threadpool::blocking(|| {
+            consumer
+                .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        })
+    })
+    .map_err(|e| e.to_string())
+    .and_then(|result| result.into_future());
+
+    Box::new(check)
 }
 
 #[cfg(feature = "kafka-integration-tests")]
