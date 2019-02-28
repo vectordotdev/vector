@@ -80,7 +80,7 @@ jobs:
       - run:
           name: Test
           command: |
-            sleep 20
+            sleep 60
             cargo suity
       - store_test_results:
           path: ./test-results
