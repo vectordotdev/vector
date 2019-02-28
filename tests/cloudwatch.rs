@@ -26,7 +26,7 @@ fn test_insert_cloudwatch_log_event() {
     let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
     let records = input_lines
         .iter()
-        .map(|line| Record::new_from_line(line.clone()))
+        .map(|line| Record::from(line.clone()))
         .collect::<Vec<_>>();
 
     let pump = sink.send_all(stream::iter_ok(records.into_iter()));

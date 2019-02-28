@@ -55,7 +55,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
     let context_key = config.context_key.clone().map(Atom::from);
 
     let out = out.sink_map_err(|_| ()).with(move |(line, file)| {
-        let mut record = Record::new_from_line(line);
+        let mut record = Record::from(line);
         if let Some(ref context_key) = context_key {
             record.custom.insert(context_key.clone(), file);
         }
