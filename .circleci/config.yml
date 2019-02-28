@@ -51,6 +51,17 @@ jobs:
     resource_class: large
     docker:
       - image: rust:latest
+      - image: localstack/localstack:latest
+        environment:
+          DATA_DIR: /tmp/localstack/data
+          DEBUG: 1
+          PORT_WEB_UI: 8888
+          SERVICES: kinesis
+      - image: minio/minio
+        environment:
+          MINIO_ACCESS_KEY: "test-access-key"
+          MINIO_SECRET_KEY: "test-secret-key"
+        command: server /tmp
 
     steps:
       - checkout
@@ -69,7 +80,7 @@ jobs:
       - run:
           name: Test
           command: |
-            cargo suity
+            cargo suity --features docker
       - store_test_results:
           path: ./test-results
       - save_cache:
