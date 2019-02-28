@@ -221,6 +221,8 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     rt.block_on(future::join_all(sends)).unwrap();
 
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+
                     drop(trigger);
 
                     shutdown_on_idle(rt);
