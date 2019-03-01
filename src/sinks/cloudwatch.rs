@@ -1,5 +1,5 @@
 use crate::record::Record;
-use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
@@ -20,7 +20,7 @@ pub struct CloudwatchLogsSink {
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
-    pub region: String,
+    pub region: Region,
     pub buffer_size: usize,
 }
 
@@ -51,8 +51,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 impl CloudwatchLogsSink {
     pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
         let buffer = Buffer::new(config.buffer_size);
-        let region = config.region.clone().parse::<Region>()?;
-        let client = CloudWatchLogsClient::new(region);
+        let client = CloudWatchLogsClient::new(config.region.clone());
 
         Ok(CloudwatchLogsSink {
             buffer,
@@ -194,16 +193,7 @@ impl Sink for CloudwatchLogsSink {
 }
 
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
-    let region = config
-        .region
-        .clone()
-        .parse::<Region>()
-        .map_err(|e| format!("Region Not Valid: {}", e));
-
-    let region = match region {
-        Ok(region) => region,
-        Err(e) => return Box::new(future::err(e)),
-    };
+    let region = config.region.clone();
 
     let client = CloudWatchLogsClient::new(region);
 
@@ -302,4 +292,68 @@ where
     pub fn empty(&self) -> bool {
         self.inner.is_empty()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    #![cfg(feature = "cloudwatch-integration-tests")]
+
+    use crate::sinks::cloudwatch::{CloudwatchLogsSink, CloudwatchLogsSinkConfig};
+    use crate::test_util::{block_on, random_lines};
+    use crate::Record;
+    use futures::{future::poll_fn, stream, Sink};
+    use rusoto_core::Region;
+    use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient, GetLogEventsRequest};
+
+    const STREAM_NAME: &'static str = "test-1";
+    const GROUP_NAME: &'static str = "router";
+
+    #[test]
+    fn cloudwatch_insert_log_event() {
+        let region = Region::UsEast1;
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: STREAM_NAME.into(),
+            group_name: GROUP_NAME.into(),
+            region,
+            buffer_size: 2,
+        };
+
+        let sink = CloudwatchLogsSink::new(config).unwrap();
+
+        let timestamp = chrono::Utc::now();
+
+        let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
+        let records = input_lines
+            .iter()
+            .map(|line| Record::from(line.clone()))
+            .collect::<Vec<_>>();
+
+        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
+
+        let (mut sink, _) = block_on(pump).unwrap();
+
+        block_on(poll_fn(move || sink.close())).unwrap();
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = STREAM_NAME.into();
+        request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some(timestamp.timestamp_millis());
+
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let client = CloudWatchLogsClient::new(Region::UsEast1);
+
+        let response = block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(output_lines, input_lines);
+    }
+
 }

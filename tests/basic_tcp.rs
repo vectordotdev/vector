@@ -104,6 +104,7 @@ fn test_sample() {
 }
 
 #[test]
+#[ignore]
 fn test_parse() {
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -266,6 +267,7 @@ fn test_fork() {
 }
 
 #[test]
+#[ignore]
 fn test_merge_and_fork() {
     let num_lines: usize = 10000;
 

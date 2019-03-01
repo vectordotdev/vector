@@ -81,6 +81,13 @@ libc = "0.2.43"
 walkdir = "2.2.7"
 
 [features]
+"docker" = [
+  "s3-integration-tests",
+  "kinesis-integration-tests"
+]
+"aws" = [
+  "cloudwatch-integration-tests"
+]
 "splunk-integration-tests" = []
 "s3-integration-tests" = []
 "cloudwatch-integration-tests" = []
