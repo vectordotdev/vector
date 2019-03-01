@@ -15,17 +15,6 @@ pub struct Record {
     pub host: Option<String>,
 }
 
-impl Record {
-    pub fn new_from_line(line: String) -> Self {
-        Record {
-            line,
-            timestamp: chrono::Utc::now(),
-            custom: HashMap::new(),
-            host: None,
-        }
-    }
-}
-
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
         use chrono::offset::TimeZone;
@@ -78,5 +67,22 @@ impl From<Record> for proto::Record {
 impl From<Record> for Vec<u8> {
     fn from(record: Record) -> Vec<u8> {
         record.line.into_bytes()
+    }
+}
+
+impl From<&str> for Record {
+    fn from(line: &str) -> Self {
+        line.to_owned().into()
+    }
+}
+
+impl From<String> for Record {
+    fn from(line: String) -> Self {
+        Record {
+            line: line.into(),
+            timestamp: chrono::Utc::now(),
+            custom: HashMap::new(),
+            host: None,
+        }
     }
 }

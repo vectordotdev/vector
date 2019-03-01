@@ -197,7 +197,7 @@ mod test {
 
     #[test]
     fn always_passes_records_matching_pass_list() {
-        let record = Record::new_from_line("i am important".to_string());
+        let record = Record::from("i am important");
         let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
@@ -228,14 +228,14 @@ mod test {
 
         // If the record passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
-        let record = Record::new_from_line("nananana".to_string());
+        let record = Record::from("nananana");
         let passing = sampler.transform(record).unwrap();
         assert!(!passing.custom.contains_key(&Atom::from("sample_rate")));
     }
 
     #[test]
     fn regex_parser_adds_parsed_field_to_record() {
-        let record = Record::new_from_line("status=1234 time=5678".to_string());
+        let record = Record::from("status=1234 time=5678");
         let parser =
             RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
@@ -247,7 +247,7 @@ mod test {
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let record = Record::new_from_line("asdf1234".to_string());
+        let record = Record::from("asdf1234");
         let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
         let record = parser.transform(record).unwrap();
@@ -261,9 +261,12 @@ mod test {
 
         (0..n)
             .map(|_| {
-                let line = thread_rng().sample_iter(&Alphanumeric).take(10).collect();
-                Record::new_from_line(line)
+                thread_rng()
+                    .sample_iter(&Alphanumeric)
+                    .take(10)
+                    .collect::<String>()
             })
+            .map(Record::from)
             .collect()
     }
 }
