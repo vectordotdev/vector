@@ -94,6 +94,7 @@ mod tests {
     #![cfg(feature = "splunk-integration-tests")]
 
     use crate::{sinks, Record};
+    use futures::Sink;
     use serde_json::Value as JsonValue;
 
     const USERNAME: &str = "admin";
