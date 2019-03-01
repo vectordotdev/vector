@@ -214,7 +214,7 @@ mod tests {
             input_lines
                 .clone()
                 .into_iter()
-                .map(|line| crate::Record::new_from_line(line)),
+                .map(|line| crate::Record::from(line)),
         ));
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();

@@ -107,7 +107,7 @@ mod tests {
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
         let message = random_string();
-        let record = Record::new_from_line(message.clone());
+        let record = Record::from(message.clone());
 
         let pump = sink.send(record);
 
@@ -139,7 +139,7 @@ mod tests {
         let messages = (0..10).map(|_| random_string()).collect::<Vec<_>>();
         let records = messages
             .iter()
-            .map(|l| Record::new_from_line(l.clone()))
+            .map(|l| Record::from(l.clone()))
             .collect::<Vec<_>>();
 
         let pump = sink.send_all(futures::stream::iter_ok(records));
@@ -173,7 +173,7 @@ mod tests {
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
         let message = random_string();
-        let mut record = Record::new_from_line(message.clone());
+        let mut record = Record::from(message.clone());
         record.custom.insert("asdf".into(), "hello".to_owned());
 
         let pump = sink.send(record);
@@ -203,7 +203,7 @@ mod tests {
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
         let message = random_string();
-        let mut record = Record::new_from_line(message.clone());
+        let mut record = Record::from(message.clone());
         record.custom.insert("asdf".into(), "hello".to_owned());
         record.host = Some("example.com:1234".to_owned());
 

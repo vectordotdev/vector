@@ -234,7 +234,7 @@ mod tests {
 
         let records = input_lines
             .iter()
-            .map(|line| Record::new_from_line(line.clone()))
+            .map(|line| Record::from(line.clone()))
             .collect::<Vec<_>>();
 
         let pump = sink.send_all(stream::iter_ok(records.into_iter()));
