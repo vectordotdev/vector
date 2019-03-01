@@ -77,11 +77,6 @@ jobs:
             apt-get update
             apt-get -y install build-essential
       - run:
-          name: Install suity
-          command: |
-            cargo install --git https://github.com/andoriyu/cargo-suity.git
-            apt-get -y install build-essential
-      - run:
           name: Test
           command: |
             cargo test --all --features docker
