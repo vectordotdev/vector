@@ -49,8 +49,7 @@ prost-types = "0.4.0"
 headers = "0.2.1"
 
 # Tokio
-tokio = "0.1.11"
-tokio-fs = "0.1.4"
+tokio = { version = "0.1.11", features = ["io", "uds", "tcp", "rt-full"]}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
