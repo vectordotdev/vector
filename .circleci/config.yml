@@ -81,7 +81,7 @@ jobs:
           name: Test
           command: |
             sleep 30
-            RUST_BACKTRACE=full cargo suity
+            RUST_BACKTRACE=full cargo test --all --features docker
       - store_test_results:
           path: ./test-results
       - save_cache:
