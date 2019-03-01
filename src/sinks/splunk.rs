@@ -93,8 +93,7 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
 mod tests {
     #![cfg(feature = "splunk-integration-tests")]
 
-    use futures::Sink;
-    use router::{sinks, Record};
+    use crate::{sinks, Record};
     use serde_json::Value as JsonValue;
 
     const USERNAME: &str = "admin";
