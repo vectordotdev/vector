@@ -51,6 +51,10 @@ jobs:
     resource_class: xlarge
     docker:
       - image: rust:latest
+        environment:
+          RUST_BACKTRACE: full
+          AWS_ACCESS_KEY_ID: "fake-aws-key"
+          AWS_SECRET_ACCESS_KEY: "fake-aws-key"
       - image: localstack/localstack:latest
         environment:
           DATA_DIR: /tmp/localstack/data
@@ -80,8 +84,7 @@ jobs:
       - run:
           name: Test
           command: |
-            sleep 30
-            RUST_BACKTRACE=full cargo test --all --features docker
+            cargo test --all --features docker
       - store_test_results:
           path: ./test-results
       - save_cache:
