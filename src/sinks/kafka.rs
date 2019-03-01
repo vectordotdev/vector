@@ -18,6 +18,12 @@ struct KafkaSinkConfig {
     topic: String,
 }
 
+struct KafkaSink {
+    producer: FutureProducer,
+    topic: String,
+    in_flight: FuturesUnordered<DeliveryFuture>,
+}
+
 #[typetag::serde(name = "kafka")]
 impl crate::topology::config::SinkConfig for KafkaSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
@@ -27,19 +33,19 @@ impl crate::topology::config::SinkConfig for KafkaSinkConfig {
     }
 }
 
-struct KafkaSink {
-    producer: FutureProducer,
-    topic: String,
-    in_flight: FuturesUnordered<DeliveryFuture>,
+impl KafkaSinkConfig {
+    fn to_rdkafka(&self) -> rdkafka::ClientConfig {
+        let mut client_config = rdkafka::ClientConfig::new();
+        let bs = self.bootstrap_servers.join(",");
+        client_config.set("bootstrap.servers", &bs);
+        client_config
+    }
 }
 
 impl KafkaSink {
     fn new(config: KafkaSinkConfig) -> Result<Self, String> {
-        let mut client_config = rdkafka::ClientConfig::new();
-        let bs = config.bootstrap_servers.join(",");
-        client_config.set("bootstrap.servers", &bs);
-
-        client_config
+        config
+            .to_rdkafka()
             .create()
             .map_err(|e| format!("error creating kafka producer: {}", e))
             .map(|producer| KafkaSink {
@@ -107,11 +113,7 @@ impl Sink for KafkaSink {
 }
 
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
-    let mut client_config = rdkafka::ClientConfig::new();
-    let bs = config.bootstrap_servers.join(",");
-    client_config.set("bootstrap.servers", &bs);
-
-    let consumer: BaseConsumer = client_config.create().unwrap();
+    let consumer: BaseConsumer = config.to_rdkafka().create().unwrap();
 
     let check = poll_fn(move || {
         tokio_threadpool::blocking(|| {
