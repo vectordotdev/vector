@@ -372,7 +372,10 @@ mod tests {
             ..Default::default()
         };
 
-        client.create_log_group(req).sync();
+        match client.create_log_group(req).sync() {
+            Ok(_) => (),
+            Err(_) => (),
+        };
 
         let req = CreateLogStreamRequest {
             log_group_name: GROUP_NAME.into(),
