@@ -11,7 +11,6 @@ use leveldb::database::{
     options::{Options, ReadOptions, WriteOptions},
     Database,
 };
-use log::error;
 use prost::Message;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

@@ -1,7 +1,6 @@
 use super::Record;
 use crate::sinks::util::batch::BatchSink;
 use futures::{try_ready, Async, Future, Poll, Sink};
-use log::{error, warn};
 use rand::random;
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_kinesis::{

@@ -7,7 +7,6 @@ use futures::{
     Async, AsyncSink, Future, Sink, Stream,
 };
 use hyper::{client::HttpConnector, Body, Client, Request, Uri};
-use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{marker::PhantomData, mem};

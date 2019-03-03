@@ -1,6 +1,5 @@
 use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
-use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::{

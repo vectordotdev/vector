@@ -4,7 +4,6 @@ use hyper::{
     Body, Client, Request,
 };
 use hyper_tls::HttpsConnector;
-use log::error;
 use tokio::executor::DefaultExecutor;
 
 pub struct HttpSink {

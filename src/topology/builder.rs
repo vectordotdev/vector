@@ -1,7 +1,6 @@
 use crate::{buffers, sinks};
 use futures::prelude::*;
 use futures::{future, Future};
-use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
@@ -162,6 +161,7 @@ pub fn build(
 
     if errors.is_empty() {
         let lazy = future::lazy(move || {
+            info!("setting this up");
             for task in tasks {
                 tokio::spawn(task);
             }

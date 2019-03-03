@@ -1,6 +1,5 @@
 use crate::record::Record;
 use futures::{sync::mpsc, Sink, Stream};
-use log::error;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

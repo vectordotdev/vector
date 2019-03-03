@@ -2,7 +2,6 @@ use crate::record::Record;
 use chrono::TimeZone;
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
-use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::{

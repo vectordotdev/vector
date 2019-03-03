@@ -4,7 +4,6 @@ use futures::{
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
-use log::{debug, error, trace};
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},

@@ -53,6 +53,10 @@ tokio = { version = "0.1.11", features = ["io", "uds", "tcp", "rt-full"]}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 
 # Aws
 rusoto_core = "0.36.0"
@@ -98,6 +102,7 @@ tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 
 [[bench]]
 name = "bench"
