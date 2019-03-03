@@ -14,3 +14,9 @@ services:
         MINIO_ACCESS_KEY: "test-access-key"
         MINIO_SECRET_KEY: "test-secret-key"
       command: server /tmp
+    mockwatchlogs:
+      image: luciofranco/mockwatchlogs:latest
+      ports:
+        - "6000:6000"
+      environment:
+        RUST_LOG: trace
