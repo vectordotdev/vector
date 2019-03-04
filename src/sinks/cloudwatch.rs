@@ -303,19 +303,27 @@ mod tests {
     use crate::Record;
     use futures::{future::poll_fn, stream, Sink};
     use rusoto_core::Region;
-    use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient, GetLogEventsRequest};
+    use rusoto_logs::{
+        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
+        GetLogEventsRequest,
+    };
 
     const STREAM_NAME: &'static str = "test-1";
     const GROUP_NAME: &'static str = "router";
 
     #[test]
     fn cloudwatch_insert_log_event() {
-        let region = Region::UsEast1;
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+
+        ensure_stream(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
-            region,
+            region: region.clone(),
             buffer_size: 2,
         };
 
@@ -342,7 +350,7 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let client = CloudWatchLogsClient::new(Region::UsEast1);
+        let client = CloudWatchLogsClient::new(region);
 
         let response = block_on(client.get_log_events(request)).unwrap();
 
@@ -354,6 +362,30 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(output_lines, input_lines);
+    }
+
+    fn ensure_stream(region: Region) {
+        let client = CloudWatchLogsClient::new(region);
+
+        let req = CreateLogGroupRequest {
+            log_group_name: GROUP_NAME.into(),
+            ..Default::default()
+        };
+
+        match client.create_log_group(req).sync() {
+            Ok(_) => (),
+            Err(_) => (),
+        };
+
+        let req = CreateLogStreamRequest {
+            log_group_name: GROUP_NAME.into(),
+            log_stream_name: STREAM_NAME.into(),
+        };
+
+        match client.create_log_stream(req).sync() {
+            Ok(_) => (),
+            Err(_) => (),
+        };
     }
 
 }

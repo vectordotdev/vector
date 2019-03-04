@@ -82,9 +82,7 @@ walkdir = "2.2.7"
 [features]
 "docker" = [
   "s3-integration-tests",
-  "kinesis-integration-tests"
-]
-"aws" = [
+  "kinesis-integration-tests",
   "cloudwatch-integration-tests"
 ]
 "splunk-integration-tests" = []
