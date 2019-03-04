@@ -71,6 +71,11 @@ jobs:
         environment:
           ADVERTISED_HOST: localhost
           ADVERTISED_PORT: 9092
+      - image: luciofranco/splunk-test:latest
+        environment:
+          SPLUNK_START_ARGS: "--accept-license"
+          SPLUNK_PASSWORD: "password"
+          SPLUNK_HEC_TOKEN: abcd1234
 
     steps:
       - checkout
