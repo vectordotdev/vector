@@ -145,9 +145,10 @@ mod test {
     use std::time::Duration;
 
     #[test]
-    fn happy_path() {
+    fn kafka_happy_path() {
         let bootstrap_servers = vec![String::from("localhost:9092")];
         let topic = format!("test-{}", random_lines(10).next().unwrap());
+        println!("{}", topic);
 
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
