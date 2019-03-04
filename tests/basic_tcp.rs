@@ -1,10 +1,11 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
-use router::test_util::{next_addr, random_lines, send_lines, shutdown_on_idle, wait_for_tcp};
+use router::test_util::{
+    next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+};
 use router::topology::{self, config};
 use router::{sinks, sources, transforms};
 use serde_json::json;
-use std::net::SocketAddr;
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
@@ -489,21 +490,4 @@ fn test_healthcheck() {
     let bad_healthcheck = router::sinks::tcp::tcp_healthcheck(bad_addr);
 
     assert!(bad_healthcheck.wait().is_err());
-}
-
-fn receive_lines(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> impl Future<Item = Vec<String>, Error = ()> {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-
-    futures::sync::oneshot::spawn(lines, executor)
 }

@@ -1,8 +1,8 @@
 use futures::{Future, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::codec::{FramedWrite, LinesCodec};
-use tokio::net::TcpStream;
+use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::util::FutureExt;
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
@@ -52,6 +52,23 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
 
     std::iter::repeat(()).map(move |_| rng.sample_iter(&Alphanumeric).take(len).collect::<String>())
+}
+
+pub fn receive_lines(
+    addr: &SocketAddr,
+    executor: &tokio::runtime::TaskExecutor,
+) -> impl Future<Item = Vec<String>, Error = ()> {
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let lines = listener
+        .incoming()
+        .take(1)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .flatten()
+        .map_err(|e| panic!("{:?}", e))
+        .collect();
+
+    futures::sync::oneshot::spawn(lines, executor)
 }
 
 pub fn block_on<F, R, E>(future: F) -> Result<R, E>
