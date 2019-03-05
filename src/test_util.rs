@@ -1,4 +1,4 @@
-use futures::{Future, Sink, Stream};
+use futures::{Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
@@ -102,4 +102,46 @@ pub fn shutdown_on_idle(runtime: tokio::runtime::Runtime) {
             .timeout(std::time::Duration::from_secs(5)),
     )
     .unwrap()
+}
+
+#[derive(Debug)]
+pub struct CollectCurrent<S>
+where
+    S: Stream,
+{
+    stream: Option<S>,
+}
+
+impl<S: Stream> CollectCurrent<S> {
+    pub fn new(s: S) -> Self {
+        Self { stream: Some(s) }
+    }
+}
+
+impl<S> Future for CollectCurrent<S>
+where
+    S: Stream,
+{
+    type Item = (S, Vec<S::Item>);
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
+        if let Some(mut stream) = self.stream.take() {
+            let mut items = vec![];
+
+            loop {
+                match stream.poll() {
+                    Ok(Async::Ready(Some(e))) => items.push(e),
+                    Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
+                        return Ok(Async::Ready((stream, items)));
+                    }
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            panic!("Future already completed");
+        }
+    }
 }

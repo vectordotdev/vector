@@ -1,4 +1,5 @@
-use crate::{buffers, sinks};
+use super::fanout::Fanout;
+use crate::buffers;
 use futures::prelude::*;
 use futures::{future, Future};
 use log::{error, info};
@@ -25,24 +26,15 @@ pub(super) fn build(
 
     // Maps the name of an upstream component to the input channels of its
     // downstream components.
-    let mut connections: HashMap<String, sinks::RouterSink> = HashMap::new();
+    let mut connections: HashMap<String, Fanout> = HashMap::new();
 
     let mut input_names = vec![];
     input_names.extend(config.sources.keys().cloned());
     input_names.extend(config.transforms.keys().cloned());
 
-    // Creates a channel for a downstream component, and adds it to the set
-    // of outbound channels for each of its inputs.
-    let mut add_connections = |inputs: Vec<String>, bic: buffers::BufferInputCloner| {
-        for input in inputs {
-            if let Some(existing) = connections.remove(&input) {
-                let new = existing.fanout(bic.get());
-                connections.insert(input, Box::new(new));
-            } else {
-                connections.insert(input, bic.get());
-            }
-        }
-    };
+    for input_name in &input_names {
+        connections.insert(input_name.clone(), Fanout::new().0);
+    }
 
     // For each sink, set up its inbound channel and spawn a task that pumps
     // from that channel into the sink.
@@ -69,7 +61,11 @@ pub(super) fn build(
             Ok(buffer) => buffer,
         };
 
-        add_connections(sink.inputs, tx);
+        for input in sink.inputs {
+            if let Some(fanout) = connections.get_mut(&input) {
+                fanout.add(name.clone(), tx.get());
+            }
+        }
 
         match sink.inner.build() {
             Err(error) => {
@@ -106,7 +102,12 @@ pub(super) fn build(
                 warnings.push(format!("Transform \"{}\" has no inputs", name));
             }
             let (tx, rx) = futures::sync::mpsc::channel(100);
-            add_connections(outer.inputs, buffers::BufferInputCloner::Memory(tx));
+            let tx = buffers::BufferInputCloner::Memory(tx);
+            for input in outer.inputs {
+                if let Some(fanout) = connections.get_mut(&input) {
+                    fanout.add(name.clone(), tx.get());
+                }
+            }
 
             (name, outer.inner, rx)
         })
@@ -123,10 +124,11 @@ pub(super) fn build(
                 errors.push(format!("Transform \"{}\": {}", name, error));
             }
             Ok(transform) => {
-                let outputs = connections.remove(&name).unwrap_or_else(|| {
+                let outputs = connections.remove(&name).unwrap();
+                if outputs.is_empty() {
                     warnings.push(format!("Transform \"{}\" has no outputs", name));
-                    Box::new(crate::sinks::BlackHole)
-                });
+                }
+
                 let transform_task = rx
                     .filter_map(move |r| transform.transform(r))
                     .forward(outputs)
@@ -142,10 +144,10 @@ pub(super) fn build(
     for (name, source) in config.sources {
         let (tx, rx) = futures::sync::mpsc::channel(1000);
 
-        let outputs = connections.remove(&name).unwrap_or_else(|| {
+        let outputs = connections.remove(&name).unwrap();
+        if outputs.is_empty() {
             warnings.push(format!("Source \"{}\" has no outputs", name));
-            Box::new(crate::sinks::BlackHole)
-        });
+        }
         let pump_task = rx.forward(outputs).map(|_| ());
         tasks.push(Box::new(pump_task));
 
