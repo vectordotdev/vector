@@ -94,10 +94,10 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
-tower-service = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
-tower-retry = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
-tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
-tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "d874c25" }
+tower-service = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
+tower-retry = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
+tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
+tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
 
 [[bench]]
 name = "bench"
