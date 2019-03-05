@@ -243,10 +243,9 @@ mod tests {
         {
             let healthcheck =
                 sinks::splunk::hec_healthcheck(get_token(), "http://localhost:1111".to_string());
-            assert_eq!(
-                rt.block_on(healthcheck).unwrap_err(),
-                "an error occurred trying to connect: Connection refused (os error 61)"
-            );
+
+            let err = rt.block_on(healthcheck).unwrap_err();
+            assert!(err.starts_with("an error occurred trying to connect"));
         }
 
         // Invalid token
