@@ -1,5 +1,6 @@
 pub mod batch;
 pub mod http;
+pub mod retries;
 pub mod size_buffered;
 
 use futures::Sink;
