@@ -20,3 +20,17 @@ services:
         - "6000:6000"
       environment:
         RUST_LOG: trace
+    kafka:
+      image: spotify/kafka
+      ports:
+        - "9092:9092"
+        - "2181:2181"
+      environment:
+        ADVERTISED_HOST: localhost
+        ADVERTISED_PORT: 9092
+    splunk:
+      image: timberio/splunk-hec-test:latest
+      ports:
+        - "8088:8088"
+        - "8000:8000"
+        - "8089:8089"

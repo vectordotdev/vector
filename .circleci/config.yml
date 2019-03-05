@@ -67,6 +67,11 @@ jobs:
           MINIO_SECRET_KEY: "test-secret-key"
         command: server /tmp
       - image: luciofranco/mockwatchlogs:latest
+      - image: spotify/kafka
+        environment:
+          ADVERTISED_HOST: localhost
+          ADVERTISED_PORT: 9092
+      - image: timberio/splunk-hec-test:latest
 
     steps:
       - checkout

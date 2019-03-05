@@ -376,7 +376,7 @@ fn test_merge_and_fork_json() {
     });
 
     let config = serde_json::to_string_pretty(&config).unwrap();
-    println!("{}", config);
+
     let config: topology::Config = serde_json::from_str(&config).unwrap();
 
     let (server, trigger, _healthcheck, _warnings) = topology::build(config).unwrap();

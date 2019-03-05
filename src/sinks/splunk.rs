@@ -101,7 +101,7 @@ mod tests {
     const PASSWORD: &str = "password";
 
     #[test]
-    fn test_insert_message_into_splunk() {
+    fn splunk_insert_message() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_many() {
+    fn splunk_insert_many() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
@@ -167,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_fields() {
+    fn splunk_custom_fields() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hostname() {
+    fn splunk_hostname() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
@@ -229,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_healthcheck() {
+    fn splunk_healthcheck() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         // OK
@@ -243,10 +243,9 @@ mod tests {
         {
             let healthcheck =
                 sinks::splunk::hec_healthcheck(get_token(), "http://localhost:1111".to_string());
-            assert_eq!(
-                rt.block_on(healthcheck).unwrap_err(),
-                "an error occurred trying to connect: Connection refused (os error 111)"
-            );
+
+            let err = rt.block_on(healthcheck).unwrap_err();
+            assert!(err.starts_with("an error occurred trying to connect"));
         }
 
         // Invalid token

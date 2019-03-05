@@ -36,12 +36,6 @@ cargo test
 
 # Test everything that can also be tested with docker
 cargo test --features docker
-
-# Test everything that requires AWS resources
-cargo test --features aws
-
-# Test everything
-cargo test --all-features
 ```
 
 ### Code Style
