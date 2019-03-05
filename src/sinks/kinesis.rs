@@ -96,6 +96,7 @@ struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = PutRecordsError;
+    type Response = PutRecordsOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
