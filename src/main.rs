@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
 use log::{error, info};
-use router::topology;
+use router::topology::Topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 
 fn main() {
@@ -28,15 +28,15 @@ fn main() {
 
     let config = router::topology::Config::load(std::fs::File::open(config).unwrap());
 
-    let topology = config.and_then(topology::build);
+    let topology = config.and_then(Topology::build);
 
-    let (server, server_trigger, healthchecks) = match topology {
-        Ok((server, server_trigger, healthchecks, warnings)) => {
+    let mut topology = match topology {
+        Ok((topology, warnings)) => {
             for warning in warnings {
                 error!("Configuration warning: {}", warning);
             }
 
-            (server, server_trigger, healthchecks)
+            topology
         }
         Err(errors) => {
             for error in errors {
@@ -49,7 +49,7 @@ fn main() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     if matches.is_present("require-healthy") {
-        let success = rt.block_on(healthchecks);
+        let success = rt.block_on(topology.healthchecks());
 
         if success.is_ok() {
             info!("All healthchecks passed");
@@ -58,10 +58,10 @@ fn main() {
             std::process::exit(1);
         }
     } else {
-        rt.spawn(healthchecks);
+        rt.spawn(topology.healthchecks());
     }
 
-    rt.spawn(server);
+    topology.start(&mut rt);
 
     let sigint = Signal::new(SIGINT).flatten_stream();
     let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -76,7 +76,7 @@ fn main() {
         use futures::future::Either;
 
         info!("Shutting down");
-        drop(server_trigger);
+        topology.stop();
 
         let shutdown = rt.shutdown_on_idle();
 

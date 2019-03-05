@@ -3,7 +3,7 @@ use futures::{Future, Sink, Stream};
 use router::test_util::{
     block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use router::topology::{self, config};
+use router::topology::{config, Topology};
 use router::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
@@ -19,20 +19,20 @@ fn test_tcp_syslog() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut topology = config::Config::empty();
-    topology.add_source("in", SyslogConfig::new(Mode::Tcp { address: in_addr }));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", SyslogConfig::new(Mode::Tcp { address: in_addr }));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -45,7 +45,7 @@ fn test_tcp_syslog() {
     block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
 
     // Shut down server
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -60,20 +60,20 @@ fn test_udp_syslog() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut topology = config::Config::empty();
-    topology.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", SyslogConfig::new(Mode::Udp { address: in_addr }));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
 
     let input_lines = random_lines(100)
         .enumerate()
@@ -93,7 +93,7 @@ fn test_udp_syslog() {
     thread::sleep(Duration::from_millis(10));
 
     // Shut down server
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -113,25 +113,25 @@ fn test_unix_stream_syslog() {
     let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
     let out_addr = next_addr();
 
-    let mut topology = config::Config::empty();
-    topology.add_source(
+    let mut config = config::Config::empty();
+    config.add_source(
         "in",
         SyslogConfig::new(Mode::Unix {
             path: in_path.clone(),
         }),
     );
-    topology.add_sink(
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     // Wait for server to accept traffic
     while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
 
@@ -163,7 +163,7 @@ fn test_unix_stream_syslog() {
         .unwrap();
 
     // Shut down server
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();

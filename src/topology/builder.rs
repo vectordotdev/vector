@@ -5,7 +5,7 @@ use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
-pub fn build(
+pub(super) fn build(
     config: super::Config,
 ) -> Result<
     (

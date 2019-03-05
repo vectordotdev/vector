@@ -2,7 +2,7 @@ use futures::Future;
 use router::test_util::{
     next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use router::topology::{self, config};
+use router::topology::{config, Topology};
 use router::{buffers::BufferConfig, sinks, sources};
 use tempfile::tempdir;
 
@@ -17,20 +17,20 @@ fn test_buffering() {
     let out_addr = next_addr();
 
     // Run router while sink server is not running, and then shut it down abruptly
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
-    topology.data_dir = Some(data_dir.clone());
-    let (server, _trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.data_dir = Some(data_dir.clone());
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -42,22 +42,22 @@ fn test_buffering() {
     rt.shutdown_now().wait().unwrap();
 
     // Start sink server, then run router again. It should send all of the lines from the first run.
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
-    topology.data_dir = Some(data_dir);
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.data_dir = Some(data_dir);
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
 
     wait_for_tcp(in_addr);
 
@@ -67,7 +67,7 @@ fn test_buffering() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
 
@@ -90,20 +90,20 @@ fn test_max_size() {
     let out_addr = next_addr();
 
     // Run router while sink server is not running, and then shut it down abruptly
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk { max_size };
-    topology.data_dir = Some(data_dir.clone());
-    let (server, _trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.data_dir = Some(data_dir.clone());
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -115,26 +115,26 @@ fn test_max_size() {
     rt.shutdown_now().wait().unwrap();
 
     // Start sink server, then run router again. It should send the lines from the first run that fit in the limited space
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk { max_size };
-    topology.data_dir = Some(data_dir);
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.data_dir = Some(data_dir);
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
 
     wait_for_tcp(in_addr);
 
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
 
@@ -156,21 +156,21 @@ fn test_max_size_resume() {
     let in_addr2 = next_addr();
     let out_addr = next_addr();
 
-    let mut topology = config::Config::empty();
-    topology.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
-    topology.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
+    config.add_sink(
         "out",
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk { max_size };
-    topology.data_dir = Some(data_dir.clone());
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.data_dir = Some(data_dir.clone());
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
 
@@ -187,7 +187,7 @@ fn test_max_size_resume() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
 
@@ -207,22 +207,22 @@ fn test_reclaim_disk_space() {
     let out_addr = next_addr();
 
     // Run router while sink server is not running, and then shut it down abruptly
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk {
+    config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
     };
-    topology.data_dir = Some(data_dir.clone());
-    let (server, _trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.data_dir = Some(data_dir.clone());
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    rt.spawn(server);
+    topology.start(&mut rt);
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -242,24 +242,24 @@ fn test_reclaim_disk_space() {
         .sum();
 
     // Start sink server, then run router again. It should send all of the lines from the first run.
-    let mut topology = config::Config::empty();
-    topology.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    topology.add_sink(
+    let mut config = config::Config::empty();
+    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+    config.add_sink(
         "out",
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    topology.sinks["out"].buffer = BufferConfig::Disk {
+    config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
     };
-    topology.data_dir = Some(data_dir.clone());
-    let (server, trigger, _healthcheck, _warnings) = topology::build(topology).unwrap();
+    config.data_dir = Some(data_dir.clone());
+    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    rt.spawn(server);
+    topology.start(&mut rt);
 
     wait_for_tcp(in_addr);
 
@@ -269,7 +269,7 @@ fn test_reclaim_disk_space() {
 
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    drop(trigger);
+    topology.stop();
 
     shutdown_on_idle(rt);
 
