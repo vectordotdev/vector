@@ -52,7 +52,7 @@ impl Sink for HttpSink {
         loop {
             if let Some(ref mut in_flight_request) = self.in_flight_request {
                 let _response =
-                    try_ready!(in_flight_request.poll().map_err(|e| panic!("err: {}", e)));
+                    try_ready!(in_flight_request.poll().map_err(|e| error!("err: {}", e)));
 
                 // TODO: retry on errors
 

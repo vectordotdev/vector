@@ -29,12 +29,8 @@ services:
         ADVERTISED_HOST: localhost
         ADVERTISED_PORT: 9092
     splunk:
-      image: luciofranco/splunk-test
+      image: timberio/splunk-hec-test:latest
       ports:
         - "8088:8088"
         - "8000:8000"
         - "8089:8089"
-      environment:
-        SPLUNK_START_ARGS: "--accept-license"
-        SPLUNK_PASSWORD: "password"
-        SPLUNK_HEC_TOKEN: abcd1234

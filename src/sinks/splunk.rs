@@ -322,6 +322,7 @@ mod tests {
             panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
         }
 
+        println!("{:?}", entries);
         let token = entries[0]["content"]["token"].as_str().unwrap().to_owned();
 
         token
