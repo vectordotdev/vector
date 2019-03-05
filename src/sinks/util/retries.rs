@@ -1,3 +1,4 @@
+use super::TowerError;
 use futures::{try_ready, Async, Future, Poll};
 use log::{error, warn};
 use std::{
@@ -6,8 +7,6 @@ use std::{
 };
 use tokio::timer::Delay;
 use tower_retry::Policy;
-
-type TowerError = Box<StdError + 'static + Send + Sync>;
 
 pub trait RetryLogic: Clone {
     type Error: StdError + 'static;
