@@ -1,7 +1,7 @@
 use super::util::{self, SinkExt};
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
-use hyper::{Request, Uri};
+use hyper::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -92,14 +92,13 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
 fn http(config: ValidatedConfig) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
         .with(move |body: Vec<u8>| {
-            let mut request = Request::post(&config.uri)
+            let mut request = util::http::Request::post(config.uri.clone(), body);
+            request
                 .header("Content-Type", "application/x-ndjson")
-                .header("Content-Encoding", "gzip")
-                .body(body.into())
-                .unwrap();
+                .header("Content-Encoding", "gzip");
 
-            if let Some(ref auth) = config.basic_auth {
-                auth.apply(request.headers_mut());
+            if let Some(auth) = &config.basic_auth {
+                auth.apply(&mut request.headers);
             }
 
             Ok(request)

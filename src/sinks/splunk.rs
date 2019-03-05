@@ -1,7 +1,6 @@
-use super::util;
-use super::util::SinkExt;
+use super::util::{self, SinkExt};
 use futures::{Future, Sink};
-use hyper::{Request, Uri};
+use hyper::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -30,12 +29,11 @@ pub fn hec(token: String, host: String) -> super::RouterSink {
             let uri = format!("{}/services/collector/event", host);
             let uri: Uri = uri.parse().unwrap();
 
-            let request = Request::post(uri)
+            let mut request = util::http::Request::post(uri, body);
+            request
                 .header("Content-Type", "application/json")
                 .header("Content-Encoding", "gzip")
-                .header("Authorization", format!("Splunk {}", token))
-                .body(body.into())
-                .unwrap();
+                .header("Authorization", format!("Splunk {}", token));
 
             Ok(request)
         })
