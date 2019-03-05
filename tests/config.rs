@@ -1,9 +1,9 @@
-use router::topology::{self, Config};
+use router::topology::{Config, Topology};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     Config::load(config.as_bytes())
-        .and_then(|c| topology::build(c))
-        .map(|(_server, _trigger, _healthcheck, warnings)| warnings)
+        .and_then(|c| Topology::build(c))
+        .map(|(_topology, warnings)| warnings)
 }
 
 #[test]

@@ -1,5 +1,6 @@
 mod builder;
 pub mod config;
+mod topology;
 
-pub use self::builder::build;
 pub use self::config::Config;
+pub use self::topology::Topology;
