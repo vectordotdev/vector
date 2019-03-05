@@ -10,7 +10,13 @@ use tower_retry::Policy;
 
 pub trait RetryLogic: Clone {
     type Error: StdError + 'static;
+    type Response;
+
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
+
+    fn should_retry_response(&self, _response: &Self::Response) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,12 +53,23 @@ impl<Logic: RetryLogic> FixedRetryPolicy<Logic> {
     }
 }
 
-impl<Req: Clone, Res, Logic: RetryLogic> Policy<Req, Res, TowerError> for FixedRetryPolicy<Logic> {
+impl<Req, Res, Logic> Policy<Req, Res, TowerError> for FixedRetryPolicy<Logic>
+where
+    Req: Clone,
+    Logic: RetryLogic<Response = Res>,
+{
     type Future = RetryPolicyFuture<Logic>;
 
-    fn retry(&self, _: &Req, response: Result<&Res, &TowerError>) -> Option<Self::Future> {
-        match response {
-            Ok(_) => None,
+    fn retry(&self, _: &Req, result: Result<&Res, &TowerError>) -> Option<Self::Future> {
+        match result {
+            Ok(response) => {
+                if self.logic.should_retry_response(response) {
+                    warn!("retrying after response");
+                    Some(self.build_retry())
+                } else {
+                    None
+                }
+            }
             Err(error) => {
                 if self.remaining_attempts == 0 {
                     error!("retries exhausted: {}", error);

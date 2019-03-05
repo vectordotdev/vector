@@ -95,9 +95,14 @@ struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
+    type Response = hyper::Response<Body>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> bool {
+        response.status().is_server_error()
     }
 }
 
