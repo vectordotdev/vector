@@ -40,6 +40,7 @@ fn test_buffering() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     rt.shutdown_now().wait().unwrap();
+    drop(topology);
 
     // Start sink server, then run router again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
@@ -113,6 +114,7 @@ fn test_max_size() {
     std::thread::sleep(std::time::Duration::from_millis(100));
 
     rt.shutdown_now().wait().unwrap();
+    drop(topology);
 
     // Start sink server, then run router again. It should send the lines from the first run that fit in the limited space
     let mut config = config::Config::empty();
@@ -232,6 +234,7 @@ fn test_reclaim_disk_space() {
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     rt.shutdown_now().wait().unwrap();
+    drop(topology);
 
     let before_disk_size: u64 = walkdir::WalkDir::new(&data_dir)
         .into_iter()

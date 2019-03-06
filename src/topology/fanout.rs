@@ -14,8 +14,10 @@ pub enum ControlMessage {
     Remove(String),
 }
 
+pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
+
 impl Fanout {
-    pub fn new() -> (Self, mpsc::UnboundedSender<ControlMessage>) {
+    pub fn new() -> (Self, ControlChannel) {
         let (control_tx, control_rx) = mpsc::unbounded();
 
         let fanout = Self {
@@ -47,10 +49,6 @@ impl Fanout {
         if self.i > i {
             self.i -= 1;
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.sinks.is_empty()
     }
 
     pub fn process_control_messages(&mut self) {

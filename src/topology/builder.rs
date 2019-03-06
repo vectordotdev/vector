@@ -1,58 +1,89 @@
-use super::fanout::Fanout;
+use super::fanout::{self, Fanout};
 use crate::buffers;
 use futures::prelude::*;
-use futures::{future, Future};
+use futures::{sync::mpsc, Future};
 use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
-pub(super) fn build(
-    config: super::Config,
-) -> Result<
-    (
-        impl Future<Item = (), Error = ()>,
-        Trigger,
-        impl Future<Item = (), Error = ()>,
-        Vec<String>,
-    ),
-    Vec<String>,
-> {
-    let mut tasks: Vec<Box<dyn Future<Item = (), Error = ()> + Send>> = vec![];
-    let mut healthcheck_tasks = vec![];
+type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
+
+pub struct Pieces {
+    pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
+    pub outputs: HashMap<String, fanout::ControlChannel>,
+    pub tasks: HashMap<String, Vec<Task>>,
+    pub healthchecks: HashMap<String, Task>,
+    pub shutdown_triggers: HashMap<String, Trigger>,
+}
+
+pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec<String>> {
+    let mut inputs = HashMap::new();
+    let mut outputs = HashMap::new();
+    let mut tasks = HashMap::new();
+    let mut healthchecks = HashMap::new();
+    let mut shutdown_triggers = HashMap::new();
+
     let mut errors = vec![];
     let mut warnings = vec![];
 
-    let (trigger, tripwire) = Tripwire::new();
+    // Build sources
+    for (name, source) in &config.sources {
+        let (tx, rx) = mpsc::channel(1000);
 
-    // Maps the name of an upstream component to the input channels of its
-    // downstream components.
-    let mut connections: HashMap<String, Fanout> = HashMap::new();
+        let server = match source.build(tx) {
+            Err(error) => {
+                errors.push(format!("Transform \"{}\": {}", name, error));
+                continue;
+            }
+            Ok(server) => server,
+        };
 
-    let mut input_names = vec![];
-    input_names.extend(config.sources.keys().cloned());
-    input_names.extend(config.transforms.keys().cloned());
+        let (trigger, tripwire) = Tripwire::new();
 
-    for input_name in &input_names {
-        connections.insert(input_name.clone(), Fanout::new().0);
+        let (output, control) = Fanout::new();
+        let pump = rx.forward(output).map(|_| ());
+        let pump: Task = Box::new(pump);
+
+        let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
+        let server: Task = Box::new(server);
+
+        outputs.insert(name.clone(), control);
+        tasks.insert(name.clone(), vec![pump, server]);
+        shutdown_triggers.insert(name.clone(), trigger);
     }
 
-    // For each sink, set up its inbound channel and spawn a task that pumps
-    // from that channel into the sink.
-    for (name, sink) in config.sinks.into_iter() {
-        for input in &sink.inputs {
-            if !input_names.contains(&input) {
-                errors.push(format!(
-                    "Input \"{}\" for sink \"{}\" doesn't exist.",
-                    input, name
-                ));
+    // Build transforms
+    for (name, transform) in &config.transforms {
+        let trans_inputs = &transform.inputs;
+        let transform = match transform.inner.build() {
+            Err(error) => {
+                errors.push(format!("Transform \"{}\": {}", name, error));
+                continue;
             }
-        }
-        if sink.inputs.is_empty() {
-            warnings.push(format!("Sink \"{}\" has no inputs", name));
-        }
+            Ok(transform) => transform,
+        };
+
+        let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
+        let input_tx = buffers::BufferInputCloner::Memory(input_tx);
+
+        let (output, control) = Fanout::new();
+
+        let task = input_rx
+            .filter_map(move |r| transform.transform(r))
+            .forward(output)
+            .map(|_| ());
+        let task: Task = Box::new(task);
+
+        inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
+        outputs.insert(name.clone(), control);
+        tasks.insert(name.clone(), vec![task]);
+    }
+
+    // Build sinks
+    for (name, sink) in &config.sinks {
+        let sink_inputs = &sink.inputs;
 
         let buffer = sink.buffer.build(&config.data_dir, &name);
-
         let (tx, rx) = match buffer {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
@@ -61,120 +92,99 @@ pub(super) fn build(
             Ok(buffer) => buffer,
         };
 
-        for input in sink.inputs {
-            if let Some(fanout) = connections.get_mut(&input) {
-                fanout.add(name.clone(), tx.get());
-            }
-        }
-
-        match sink.inner.build() {
+        let (sink, healthcheck) = match sink.inner.build() {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
+                continue;
             }
-            Ok((sink, healthcheck)) => {
-                let name2 = name.clone();
-                let healthcheck_task = healthcheck
-                    .map(move |_| info!("Healthcheck for {}: Ok", name))
-                    .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name2, err));
-                healthcheck_tasks.push(healthcheck_task);
+            Ok((sink, healthcheck)) => (sink, healthcheck),
+        };
 
-                let sink_task = rx.forward(sink).map(|_| ());
+        let task = rx.forward(sink).map(|_| ());
+        let task: Task = Box::new(task);
 
-                tasks.push(Box::new(sink_task));
-            }
-        }
+        let name2 = name.clone();
+        let name3 = name.clone();
+        let healthcheck_task = healthcheck
+            .map(move |_| info!("Healthcheck for {}: Ok", name2))
+            .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name3, err));
+        let healthcheck_task: Task = Box::new(healthcheck_task);
+
+        inputs.insert(name.clone(), (tx, sink_inputs.clone()));
+        healthchecks.insert(name.clone(), healthcheck_task);
+        tasks.insert(name.clone(), vec![task]);
     }
 
-    // For each transform, set up an inbound channel (like the sinks above).
-    let transform_rxs = config
+    // Warnings and errors
+    let sink_inputs = config
+        .sinks
+        .iter()
+        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+    let transform_inputs = config
         .transforms
-        .into_iter()
-        .map(|(name, outer)| {
-            for input in &outer.inputs {
-                if !input_names.contains(&input) {
-                    errors.push(format!(
-                        "Input \"{}\" for transform \"{}\" doesn't exist.",
-                        input, name
-                    ));
-                }
-            }
-            if outer.inputs.is_empty() {
-                warnings.push(format!("Transform \"{}\" has no inputs", name));
-            }
-            let (tx, rx) = futures::sync::mpsc::channel(100);
-            let tx = buffers::BufferInputCloner::Memory(tx);
-            for input in outer.inputs {
-                if let Some(fanout) = connections.get_mut(&input) {
-                    fanout.add(name.clone(), tx.get());
-                }
-            }
+        .iter()
+        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
+    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+        if inputs.is_empty() {
+            warnings.push(format!(
+                "{} {:?} has no inputs",
+                capitalize(output_type),
+                name
+            ));
+        }
 
-            (name, outer.inner, rx)
-        })
-        .collect::<Vec<_>>();
-
-    // For each transform, spawn a task that reads from its inbound channel,
-    // transforms the record, and then sends the transformed record to each downstream
-    // component.
-    // This needs to be a separate loop from the one above to make sure that all of the
-    // connection outputs are set up before the inputs start using them.
-    for (name, transform, rx) in transform_rxs.into_iter() {
-        match transform.build() {
-            Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", name, error));
-            }
-            Ok(transform) => {
-                let outputs = connections.remove(&name).unwrap();
-                if outputs.is_empty() {
-                    warnings.push(format!("Transform \"{}\" has no outputs", name));
-                }
-
-                let transform_task = rx
-                    .filter_map(move |r| transform.transform(r))
-                    .forward(outputs)
-                    .map(|_| ());
-                tasks.push(Box::new(transform_task));
+        for input in inputs {
+            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
+                errors.push(format!(
+                    "Input {:?} for {} {:?} doesn't exist.",
+                    input, output_type, name
+                ));
             }
         }
     }
 
-    // For each source, set up a channel to aggregate all of its handlers together,
-    // spin up a task to pump from that channel to each of the downstream channels,
-    // and start the listener task.
-    for (name, source) in config.sources {
-        let (tx, rx) = futures::sync::mpsc::channel(1000);
-
-        let outputs = connections.remove(&name).unwrap();
-        if outputs.is_empty() {
-            warnings.push(format!("Source \"{}\" has no outputs", name));
-        }
-        let pump_task = rx.forward(outputs).map(|_| ());
-        tasks.push(Box::new(pump_task));
-
-        match source.build(tx) {
-            Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", name, error));
-            }
-            Ok(server) => {
-                let server = server.select(tripwire.clone()).map(|_| ()).map_err(|_| ());
-                tasks.push(Box::new(server));
-            }
+    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
+    let transform_names = config
+        .transforms
+        .keys()
+        .map(|name| ("transform", name.clone()));
+    for (input_type, name) in transform_names.chain(source_names) {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&name))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&name))
+        {
+            warnings.push(format!(
+                "{} {:?} has no outputs",
+                capitalize(input_type),
+                name
+            ));
         }
     }
 
     if errors.is_empty() {
-        let lazy = future::lazy(move || {
-            for task in tasks {
-                tokio::spawn(task);
-            }
+        let pieces = Pieces {
+            inputs,
+            outputs,
+            tasks,
+            healthchecks,
+            shutdown_triggers,
+        };
 
-            future::ok(())
-        });
-
-        let healthchecks = futures::future::join_all(healthcheck_tasks).map(|_| ());
-
-        Ok((lazy, trigger, healthchecks, warnings))
+        Ok((pieces, warnings))
     } else {
         Err(errors)
     }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut s = s.to_owned();
+    if let Some(r) = s.get_mut(0..1) {
+        r.make_ascii_uppercase();
+    }
+    s
 }
