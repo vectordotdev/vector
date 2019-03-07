@@ -11,7 +11,6 @@ pub struct Fanout {
 
 pub enum ControlMessage {
     Add(String, RouterSink),
-    #[allow(dead_code)]
     Remove(String),
 }
 
