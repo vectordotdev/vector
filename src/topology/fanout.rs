@@ -12,6 +12,7 @@ pub struct Fanout {
 pub enum ControlMessage {
     Add(String, RouterSink),
     Remove(String),
+    Replace(String, RouterSink),
 }
 
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
@@ -51,11 +52,20 @@ impl Fanout {
         }
     }
 
+    fn replace(&mut self, name: String, sink: RouterSink) {
+        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &name) {
+            *existing = sink
+        } else {
+            panic!("Tried to replace a sink that's not already present");
+        }
+    }
+
     pub fn process_control_messages(&mut self) {
         while let Ok(Async::Ready(Some(message))) = self.control_channel.poll() {
             match message {
                 ControlMessage::Add(name, sink) => self.add(name, sink),
                 ControlMessage::Remove(name) => self.remove(&name),
+                ControlMessage::Replace(name, sink) => self.replace(name, sink),
             }
         }
     }
@@ -379,5 +389,44 @@ mod tests {
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let _fanout = fanout.send(rec2.clone()).wait().unwrap();
+    }
+
+    #[test]
+    fn fanout_replace() {
+        let (tx_a1, rx_a1) = mpsc::unbounded();
+        let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
+        let (tx_b, rx_b) = mpsc::unbounded();
+        let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
+
+        let mut fanout = Fanout::new().0;
+
+        fanout.add("a".to_string(), tx_a1);
+        fanout.add("b".to_string(), tx_b);
+
+        let rec1 = Record::from("line 1".to_string());
+        let rec2 = Record::from("line 2".to_string());
+
+        let fanout = fanout.send(rec1.clone()).wait().unwrap();
+        let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
+
+        let (tx_a2, rx_a2) = mpsc::unbounded();
+        let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
+        fanout.replace("a".to_string(), tx_a2);
+
+        let rec3 = Record::from("line 3".to_string());
+        let _fanout = fanout.send(rec3.clone()).wait().unwrap();
+
+        assert_eq!(
+            CollectCurrent::new(rx_a1).wait().unwrap().1,
+            vec![rec1.clone(), rec2.clone()]
+        );
+        assert_eq!(
+            CollectCurrent::new(rx_b).wait().unwrap().1,
+            vec![rec1.clone(), rec2.clone(), rec3.clone()]
+        );
+        assert_eq!(
+            CollectCurrent::new(rx_a2).wait().unwrap().1,
+            vec![rec3.clone()]
+        );
     }
 }
