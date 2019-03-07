@@ -1,7 +1,8 @@
 use super::Record;
 use crate::sinks::util::{
-    batch::BatchSink,
+    batch::SinkExt,
     retries::{FixedRetryPolicy, RetryLogic},
+    ServiceSink,
 };
 use futures::{Poll, Sink};
 use rand::random;
@@ -35,14 +36,16 @@ impl KinesisService {
         let client = Arc::new(KinesisClient::new(config.region.clone()));
 
         let batch_size = config.batch_size;
-        let service = KinesisService { client, config };
+        let inner = KinesisService { client, config };
 
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), KinesisRetryLogic);
 
-        let service = Timeout::new(service, Duration::from_secs(10));
-        let service = Retry::new(policy, service);
+        let service = Timeout::new(inner, Duration::from_secs(10));
+        let retries = Retry::new(policy, service);
 
-        BatchSink::new(service, batch_size)
+        ServiceSink::new(retries)
+            .batched(batch_size)
+            .with(|record: Record| Ok(record.into()))
     }
 
     fn gen_partition_key(&mut self) -> String {
