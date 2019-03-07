@@ -1,10 +1,10 @@
 use crate::{record::Record, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
     #[serde(default)]
     pub data_dir: Option<PathBuf>,
@@ -19,7 +19,7 @@ pub trait SourceConfig: core::fmt::Debug {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<sources::Source, String>;
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
@@ -33,7 +33,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
@@ -93,5 +93,12 @@ impl Config {
             .map_err(|e| vec![e.to_string()])?;
 
         toml::from_str(&source_string).map_err(|e| vec![e.to_string()])
+    }
+}
+
+impl Clone for Config {
+    fn clone(&self) -> Self {
+        let json = serde_json::to_value(&self).unwrap();
+        serde_json::from_value(json).unwrap()
     }
 }
