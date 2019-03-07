@@ -13,6 +13,7 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc, time::Duration};
+use tower_in_flight_limit::InFlightLimit;
 use tower_retry::Retry;
 use tower_service::Service;
 use tower_timeout::Timeout;
@@ -42,8 +43,9 @@ impl KinesisService {
 
         let service = Timeout::new(inner, Duration::from_secs(10));
         let retries = Retry::new(policy, service);
+        let limited = InFlightLimit::new(retries, 1);
 
-        ServiceSink::new(retries)
+        ServiceSink::new(limited)
             .batched(batch_size)
             .with(|record: Record| Ok(record.into()))
     }
