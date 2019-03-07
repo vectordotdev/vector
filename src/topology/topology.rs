@@ -172,6 +172,7 @@ mod tests {
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
         old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
+        let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
         topology.start(&mut rt);
@@ -183,9 +184,6 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        let mut new_config = Config::empty();
-        new_config.add_source("in", TcpConfig::new(in_addr));
-        new_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
         new_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
 
         topology.reload_config(new_config, &mut rt);
