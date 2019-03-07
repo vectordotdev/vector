@@ -54,6 +54,12 @@ tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
 
+# Tracing
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+
 # Aws
 rusoto_core = "0.36.0"
 rusoto_s3 = "0.36.0"
@@ -95,6 +101,7 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
