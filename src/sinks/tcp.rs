@@ -1,4 +1,4 @@
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink};
+use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -136,9 +136,12 @@ pub fn raw_tcp(addr: SocketAddr) -> super::RouterSink {
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
-    let check = TcpStream::connect(&addr)
-        .map(|_| ())
-        .map_err(|err| err.to_string());
+    // Lazy to avoid immediately connecting
+    let check = future::lazy(move || {
+        TcpStream::connect(&addr)
+            .map(|_| ())
+            .map_err(|err| err.to_string())
+    });
 
     Box::new(check)
 }
