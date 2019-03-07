@@ -186,6 +186,8 @@ mod tests {
 
         new_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
 
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
         topology.reload_config(new_config, &mut rt);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -202,7 +204,7 @@ mod tests {
         assert_eq!(input_lines2, &output_lines1[num_lines..]);
 
         let output_lines2 = output_lines2.wait().unwrap();
-        assert!(output_lines2.len() >= num_lines);
-        assert!(output_lines2.ends_with(&input_lines2));
+        assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines2, output_lines2);
     }
 }
