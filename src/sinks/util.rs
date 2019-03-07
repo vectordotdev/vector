@@ -5,7 +5,6 @@ pub mod size_buffered;
 
 use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use log::{error, trace};
-use std::{error::Error, fmt};
 use tower_service::Service;
 
 pub trait SinkExt: Sink<SinkItem = Vec<u8>> + Sized {
@@ -32,12 +31,13 @@ impl<T, S: Service<T>> ServiceSink<T, S> {
     }
 }
 
-type TowerError = Box<Error + 'static + Send + Sync>;
+type Error = Box<std::error::Error + 'static + Send + Sync>;
 
 impl<T, S> Sink for ServiceSink<T, S>
 where
-    S: Service<T, Error = TowerError>,
-    S::Response: fmt::Debug,
+    S: Service<T>,
+    S::Error: Into<Error>,
+    S::Response: std::fmt::Debug,
 {
     type SinkItem = T;
     type SinkError = ();
@@ -61,7 +61,7 @@ where
                 }
 
                 // TODO: figure out if/how to handle this
-                Err(e) => panic!("service must be discarded: {}", e),
+                Err(e) => panic!("service must be discarded: {}", e.into()),
             }
         }
     }
@@ -75,7 +75,7 @@ where
 
                 Ok(Async::Ready(Some(response))) => trace!("request succeeded: {:?}", response),
 
-                Err(e) => error!("request failed: {}", e),
+                Err(e) => error!("request failed: {}", e.into()),
             }
         }
     }
