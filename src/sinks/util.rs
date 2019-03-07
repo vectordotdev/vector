@@ -23,7 +23,7 @@ pub struct ServiceSink<T, S: Service<T>> {
 }
 
 impl<T, S: Service<T>> ServiceSink<T, S> {
-    fn new(service: S) -> Self {
+    pub fn new(service: S) -> Self {
         Self {
             service,
             in_flight: FuturesUnordered::new(),
