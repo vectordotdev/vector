@@ -42,7 +42,10 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -95,7 +98,9 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -148,7 +153,10 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -202,7 +210,10 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -280,7 +291,10 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let output_lines1 = count_lines(&out_addr1, &rt.executor());
                     let output_lines2 = count_lines(&out_addr2, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
@@ -351,7 +365,10 @@ fn benchmark_transforms(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -493,7 +510,10 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_200 = count_lines(&out_addr_200, &rt.executor());
                     let output_lines_404 = count_lines(&out_addr_404, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 

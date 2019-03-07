@@ -45,7 +45,10 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -87,7 +90,10 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -127,7 +133,10 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    for task in topology.start() {
+                        rt.spawn(task);
+                    }
+
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
