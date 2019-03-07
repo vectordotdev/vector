@@ -1,4 +1,4 @@
-use super::TowerError;
+use super::Error;
 use futures::{try_ready, Async, Future, Poll};
 use log::{error, warn};
 use std::{
@@ -53,14 +53,14 @@ impl<Logic: RetryLogic> FixedRetryPolicy<Logic> {
     }
 }
 
-impl<Req, Res, Logic> Policy<Req, Res, TowerError> for FixedRetryPolicy<Logic>
+impl<Req, Res, Logic> Policy<Req, Res, Error> for FixedRetryPolicy<Logic>
 where
     Req: Clone,
     Logic: RetryLogic<Response = Res>,
 {
     type Future = RetryPolicyFuture<Logic>;
 
-    fn retry(&self, _: &Req, result: Result<&Res, &TowerError>) -> Option<Self::Future> {
+    fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => {
                 if self.logic.should_retry_response(response) {
