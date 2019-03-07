@@ -125,12 +125,27 @@ impl RunningTopology {
         let old_sink_names = old_config.sinks.keys().collect::<HashSet<_>>();
         let new_sink_names = new_config.sinks.keys().collect::<HashSet<_>>();
         let sinks_to_add = &new_sink_names - &old_sink_names;
+        let sinks_to_remove = &old_sink_names - &new_sink_names;
+
+        for name in sinks_to_remove {
+            info!("Removing sink {:?}", name);
+
+            self.inputs.remove(name);
+
+            for input in &old_config.sinks[name].inputs {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                    .unwrap();
+            }
+        }
 
         for name in sinks_to_add {
             info!("Adding sink {:?}", name);
 
             let name = name.to_owned();
             let (tx, inputs) = new_pieces.inputs.remove(&name).unwrap();
+            // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
+            // so until a test exposes this hole
 
             let tasks = new_pieces.tasks.remove(&name).unwrap();
             for task in tasks {
@@ -206,5 +221,60 @@ mod tests {
         let output_lines2 = output_lines2.wait().unwrap();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
+    }
+
+    #[test]
+    fn topology_remove_sink() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out1_addr = next_addr();
+        let out2_addr = next_addr();
+
+        let output_lines1 = receive_lines(&out1_addr, &rt.executor());
+        let output_lines2 = receive_lines(&out2_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(in_addr));
+        old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
+        old_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines1.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        new_config.sinks.remove(&"out2".to_string());
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        topology.reload_config(new_config, &mut rt);
+
+        // out2 should disconnect after the reload
+        let output_lines2 = output_lines2.wait().unwrap();
+
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines1 = output_lines1.wait().unwrap();
+        assert_eq!(num_lines * 2, output_lines1.len());
+        assert_eq!(input_lines1, &output_lines1[..num_lines]);
+        assert_eq!(input_lines2, &output_lines1[num_lines..]);
+
+        assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines1, output_lines2);
     }
 }
