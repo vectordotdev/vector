@@ -66,6 +66,7 @@ tower-service = "0.2"
 tower-retry = "0.1"
 tower-buffer = "0.1"
 tower-timeout = "0.1"
+tower-in-flight-limit = "0.1"
 rdkafka = "0.20.0"
 
 [build-dependencies]
@@ -94,10 +95,11 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
-tower-service = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
-tower-retry = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
-tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
-tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "fb01af2" }
+tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 
 [[bench]]
 name = "bench"
