@@ -122,10 +122,21 @@ impl RunningTopology {
             }
         };
 
-        let old_sink_names = old_config.sinks.keys().collect::<HashSet<_>>();
-        let new_sink_names = new_config.sinks.keys().collect::<HashSet<_>>();
-        let sinks_to_add = &new_sink_names - &old_sink_names;
+        let old_sink_names: HashSet<&String> = old_config.sinks.keys().collect::<HashSet<_>>();
+        let new_sink_names: HashSet<&String> = new_config.sinks.keys().collect::<HashSet<_>>();
+
+        let sinks_to_change: HashSet<&String> = old_sink_names
+            .intersection(&new_sink_names)
+            .filter(|&&n| {
+                let old_toml = toml::Value::try_from(&old_config.sinks[n]).unwrap();
+                let new_toml = toml::Value::try_from(&new_config.sinks[n]).unwrap();
+                old_toml != new_toml
+            })
+            .map(|&n| n)
+            .collect::<HashSet<_>>();
+
         let sinks_to_remove = &old_sink_names - &new_sink_names;
+        let sinks_to_add = &new_sink_names - &old_sink_names;
 
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
@@ -135,6 +146,49 @@ impl RunningTopology {
             for input in &old_config.sinks[name].inputs {
                 self.outputs[input]
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                    .unwrap();
+            }
+        }
+
+        for name in sinks_to_change {
+            info!("Rebuilding sink {:?}", name);
+
+            let name = name.to_owned();
+            let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
+
+            let tasks = new_pieces.tasks.remove(&name).unwrap();
+            for task in tasks {
+                rt.spawn(task);
+            }
+
+            let old_inputs = old_config.sinks[&name]
+                .inputs
+                .iter()
+                .collect::<HashSet<_>>();
+            let new_inputs = new_config.sinks[&name]
+                .inputs
+                .iter()
+                .collect::<HashSet<_>>();
+
+            let inputs_to_remove = &old_inputs - &new_inputs;
+            let inputs_to_add = &new_inputs - &old_inputs;
+            let inputs_to_replace = old_inputs.intersection(&new_inputs);
+
+            for input in inputs_to_remove {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                    .unwrap();
+            }
+
+            for input in inputs_to_add {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                    .unwrap();
+            }
+
+            for &input in inputs_to_replace {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
                     .unwrap();
             }
         }
@@ -170,8 +224,12 @@ mod tests {
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
-    use futures::Future;
-    use std::sync::atomic::Ordering;
+    use futures::{stream, Future, Stream};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    use stream_cancel::{StreamExt, Tripwire};
 
     #[test]
     fn topology_add_sink() {
@@ -280,5 +338,125 @@ mod tests {
 
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines1, output_lines2);
+    }
+
+    #[test]
+    fn topology_change_sink() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out1_addr = next_addr();
+        let out2_addr = next_addr();
+
+        let (output_lines1, output_lines1_count) =
+            receive_lines_with_count(&out1_addr, &rt.executor());
+        let output_lines2 = receive_lines(&out2_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(in_addr));
+        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines1.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig { address: out2_addr });
+
+        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
+
+        topology.reload_config(new_config, &mut rt);
+
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines1 = output_lines1.wait().unwrap();
+        assert_eq!(num_lines, output_lines1.len());
+        assert_eq!(input_lines1, output_lines1);
+
+        let output_lines2 = output_lines2.wait().unwrap();
+        assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines2, output_lines2);
+    }
+
+    // The previous test pauses to make sure the old version of the sink has receieved all messages
+    // sent before the reload. This test does not pause, making sure the new sink is atomically
+    // swapped in for the old one and that no records are lost in the changeover.
+    #[test]
+    fn topology_change_sink_no_gap() {
+        for _ in 0..10 {
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+            let in_addr = next_addr();
+            let out1_addr = next_addr();
+            let out2_addr = next_addr();
+
+            let (output_lines1, output_lines1_count) =
+                receive_lines_with_count(&out1_addr, &rt.executor());
+            let (output_lines2, output_lines2_count) =
+                receive_lines_with_count(&out2_addr, &rt.executor());
+
+            let mut old_config = Config::empty();
+            old_config.add_source("in", TcpConfig::new(in_addr));
+            old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
+            let mut new_config = old_config.clone();
+            let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+            topology.start(&mut rt);
+
+            // Wait for server to accept traffic
+            wait_for_tcp(in_addr);
+
+            let (input_trigger, input_tripwire) = Tripwire::new();
+
+            let num_input_lines = Arc::new(AtomicUsize::new(0));
+            let num_input_lines2 = Arc::clone(&num_input_lines);
+            let input_lines = stream::iter_ok(random_lines(100))
+                .take_until(input_tripwire)
+                .inspect(move |_| {
+                    num_input_lines2.fetch_add(1, Ordering::Relaxed);
+                })
+                .wait()
+                .map(|r: Result<String, ()>| r.unwrap());
+
+            let send = send_lines(in_addr, input_lines);
+            rt.spawn(send);
+
+            new_config.sinks[&"out".to_string()].inner =
+                Box::new(TcpSinkConfig { address: out2_addr });
+
+            wait_for(|| output_lines1_count.load(Ordering::Relaxed) > 0);
+
+            topology.reload_config(new_config, &mut rt);
+            wait_for(|| output_lines2_count.load(Ordering::Relaxed) > 0);
+
+            // Shut down server
+            input_trigger.cancel();
+            topology.stop();
+            let output_lines1 = output_lines1.wait().unwrap();
+            let output_lines2 = output_lines2.wait().unwrap();
+            shutdown_on_idle(rt);
+
+            assert!(output_lines1.len() > 0);
+            assert!(output_lines2.len() > 0);
+
+            assert_eq!(
+                num_input_lines.load(Ordering::Relaxed),
+                output_lines1.len() + output_lines2.len()
+            );
+        }
     }
 }
