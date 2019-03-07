@@ -2,7 +2,7 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{self, config};
+use router::topology::{Topology, config};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
 use tempfile::tempdir;
@@ -25,37 +25,37 @@ fn benchmark_buffers(c: &mut Criterion) {
         Benchmark::new("in-memory", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    topology.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    config.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -65,40 +65,40 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("on-disk", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    topology.sinks["out"].buffer = BufferConfig::Disk {
+                    config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
                     };
-                    topology.data_dir = Some(data_dir.clone());
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    config.data_dir = Some(data_dir.clone());
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -108,38 +108,38 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("on-disk (low limit)", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    topology.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
-                    topology.data_dir = Some(data_dir2.clone());
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+                    config.data_dir = Some(data_dir2.clone());
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
