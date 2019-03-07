@@ -45,7 +45,7 @@ impl Fanout {
 
         let (_name, mut removed) = self.sinks.remove(i);
 
-        tokio::spawn(future::poll_fn(move || removed.poll_complete()));
+        tokio::spawn(future::poll_fn(move || removed.close()));
 
         if self.i > i {
             self.i -= 1;
