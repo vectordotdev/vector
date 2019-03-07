@@ -499,7 +499,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_sampled = count_lines(&out_addr_sampled, &rt.executor());
                     let output_lines_200 = count_lines(&out_addr_200, &rt.executor());
                     let output_lines_404 = count_lines(&out_addr_404, &rt.executor());
-                    let output_lines_500 = count_lines(&out_addr_500, &rt.executor());
 
                     rt.spawn(server);
                     wait_for_tcp(in_addr1);
@@ -512,7 +511,6 @@ fn benchmark_complex(c: &mut Criterion) {
                         output_lines_sampled,
                         output_lines_200,
                         output_lines_404,
-                        output_lines_500,
                     )
                 },
                 |(
@@ -522,7 +520,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_sampled,
                     output_lines_200,
                     output_lines_404,
-                    output_lines_500,
                 )| {
                     use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
@@ -555,7 +552,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_sampled = output_lines_sampled.wait().unwrap();
                     let output_lines_200 = output_lines_200.wait().unwrap();
                     let output_lines_404 = output_lines_404.wait().unwrap();
-                    let output_lines_500 = output_lines_500.wait().unwrap();
 
                     assert_eq!(output_lines_all, num_lines * 2);
                     assert_relative_eq!(
@@ -566,7 +562,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     assert!(output_lines_200 > 0);
                     assert!(output_lines_404 > 0);
                     assert_eq!(output_lines_200 + output_lines_404, num_lines);
-                    assert_eq!(output_lines_500, 0);
                 },
             );
         })
