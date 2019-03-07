@@ -43,16 +43,26 @@ where
     type SinkError = ();
 
     fn start_send(&mut self, item: T) -> StartSend<T, Self::SinkError> {
-        match self.service.poll_ready() {
-            Ok(Async::Ready(())) => {
-                self.in_flight.push(self.service.call(item));
-                Ok(AsyncSink::Ready)
+        let mut tried_once = false;
+        loop {
+            match self.service.poll_ready() {
+                Ok(Async::Ready(())) => {
+                    self.in_flight.push(self.service.call(item));
+                    return Ok(AsyncSink::Ready);
+                }
+
+                Ok(Async::NotReady) => {
+                    if tried_once {
+                        return Ok(AsyncSink::NotReady(item));
+                    } else {
+                        self.poll_complete()?;
+                        tried_once = true;
+                    }
+                }
+
+                // TODO: figure out if/how to handle this
+                Err(e) => panic!("service must be discarded: {}", e),
             }
-
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
-
-            // TODO: figure out if/how to handle this
-            Err(e) => panic!("service must be discarded: {}", e),
         }
     }
 
