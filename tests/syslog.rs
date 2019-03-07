@@ -32,7 +32,10 @@ fn test_tcp_syslog() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -73,7 +76,9 @@ fn test_udp_syslog() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
 
     let input_lines = random_lines(100)
         .enumerate()
@@ -131,7 +136,10 @@ fn test_unix_stream_syslog() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
 

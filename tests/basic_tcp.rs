@@ -30,7 +30,10 @@ fn test_pipe() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -75,7 +78,10 @@ fn test_sample() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -138,7 +144,10 @@ fn test_parse() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -183,7 +192,10 @@ fn test_merge() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -247,7 +259,10 @@ fn test_fork() {
     let output_lines1 = receive_lines(&out_addr1, &rt.executor());
     let output_lines2 = receive_lines(&out_addr2, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -299,7 +314,10 @@ fn test_merge_and_fork() {
     let output_lines1 = receive_lines(&out_addr1, &rt.executor());
     let output_lines2 = receive_lines(&out_addr2, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -386,7 +404,10 @@ fn test_merge_and_fork_json() {
     let output_lines1 = receive_lines(&out_addr1, &rt.executor());
     let output_lines2 = receive_lines(&out_addr2, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -456,7 +477,10 @@ fn test_reconnect() {
         .collect();
     let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 

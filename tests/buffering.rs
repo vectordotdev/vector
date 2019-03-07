@@ -30,7 +30,10 @@ fn test_buffering() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -58,7 +61,9 @@ fn test_buffering() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
 
     wait_for_tcp(in_addr);
 
@@ -104,7 +109,10 @@ fn test_max_size() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -132,7 +140,9 @@ fn test_max_size() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
 
     wait_for_tcp(in_addr);
 
@@ -172,7 +182,10 @@ fn test_max_size_resume() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
 
@@ -224,7 +237,10 @@ fn test_reclaim_disk_space() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
+
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -262,7 +278,9 @@ fn test_reclaim_disk_space() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    for task in topology.start() {
+        rt.spawn(task);
+    }
 
     wait_for_tcp(in_addr);
 

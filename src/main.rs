@@ -1,8 +1,6 @@
 use clap::{App, Arg};
-use futures::{Future, Stream};
-use log::{error, info};
-use router::topology::Topology;
-use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
+use log::error;
+use router::app::Error;
 
 fn main() {
     router::setup_logger();
@@ -26,72 +24,39 @@ fn main() {
 
     let config = matches.value_of("config").unwrap();
 
-    let config = router::topology::Config::load(std::fs::File::open(config).unwrap());
-
-    let topology = config.and_then(Topology::build);
-
-    let mut topology = match topology {
-        Ok((topology, warnings)) => {
-            for warning in warnings {
-                error!("Configuration warning: {}", warning);
-            }
-
-            topology
-        }
-        Err(errors) => {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            return;
+    let file = match std::fs::File::open(config) {
+        Ok(file) => file,
+        Err(e) => {
+            error!("Unable to open the config file: {}", e);
+            std::process::exit(1);
         }
     };
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let config = match router::topology::Config::load(file) {
+        Ok(c) => c,
+        Err(errs) => {
+            error!("Unable to parse config file");
 
-    if matches.is_present("require-healthy") {
-        let success = rt.block_on(topology.healthchecks());
+            for e in errs {
+                error!("{}", e);
+            }
 
-        if success.is_ok() {
-            info!("All healthchecks passed");
-        } else {
-            error!("Sinks unhealthy; shutting down");
             std::process::exit(1);
         }
-    } else {
-        rt.spawn(topology.healthchecks());
-    }
+    };
 
-    topology.start(&mut rt);
-
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-
-    let signals = sigint.select(sigterm.select(sigquit));
-
-    let (signal, signals) = rt.block_on(signals.into_future()).ok().unwrap();
-    let signal = signal.unwrap();
-
-    if signal == SIGINT || signal == SIGTERM {
-        use futures::future::Either;
-
-        info!("Shutting down");
-        topology.stop();
-
-        let shutdown = rt.shutdown_on_idle();
-
-        match shutdown.select2(signals.into_future()).wait() {
-            Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
-            Ok(Either::B(_)) => {
-                info!("Shutting down immediately");
-                // Dropping the shutdown future will immediately shut the server down
+    if let Err(err) = router::app::init(config, matches.is_present("require-healthy")) {
+        match err {
+            Error::Unhealthy => {
+                error!("Sinks unhealthy; shutting down");
+                std::process::exit(1);
             }
-            Err(_) => unreachable!(),
+            Error::Config(errors) => {
+                for error in errors {
+                    error!("Configuration error: {}", error);
+                }
+                std::process::exit(1);
+            }
         }
-    } else if signal == SIGQUIT {
-        info!("Shutting down immediately");
-        rt.shutdown_now().wait().unwrap();
-    } else {
-        unreachable!();
     }
 }

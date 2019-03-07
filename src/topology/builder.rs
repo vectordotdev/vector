@@ -6,7 +6,7 @@ use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 
-type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
+pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,

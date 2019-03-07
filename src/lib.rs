@@ -1,5 +1,9 @@
 #![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
 
+#[macro_use]
+extern crate log;
+
+pub mod app;
 pub mod buffers;
 pub mod record;
 pub mod sinks;

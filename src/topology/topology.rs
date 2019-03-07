@@ -48,7 +48,7 @@ impl Topology {
         }
     }
 
-    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) {
+    pub fn start(&mut self) -> Vec<builder::Task> {
         let state = std::mem::replace(&mut self.state, State::Stopped);
         let (components, config) = if let State::Ready(components, config) = state {
             (components, config)
@@ -75,16 +75,14 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
-        for task in tasks.into_iter().flat_map(|(_, ts)| ts) {
-            rt.spawn(task);
-        }
-
         self.state = State::Running(RunningTopology {
             inputs: new_inputs,
             outputs,
             config,
             shutdown_triggers,
         });
+
+        tasks.into_iter().flat_map(|(_, ts)| ts).collect()
     }
 
     pub fn stop(&mut self) {
@@ -174,7 +172,9 @@ mod tests {
         old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        for task in topology.start() {
+            rt.spawn(task);
+        }
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
