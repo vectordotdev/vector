@@ -20,19 +20,19 @@ pub trait RetryLogic: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub struct FixedRetryPolicy<Logic: RetryLogic> {
+pub struct FixedRetryPolicy<L: RetryLogic> {
     remaining_attempts: usize,
     backoff: Duration,
-    logic: Logic,
+    logic: L,
 }
 
-pub struct RetryPolicyFuture<Logic: RetryLogic> {
+pub struct RetryPolicyFuture<L: RetryLogic> {
     delay: Delay,
-    policy: FixedRetryPolicy<Logic>,
+    policy: FixedRetryPolicy<L>,
 }
 
-impl<Logic: RetryLogic> FixedRetryPolicy<Logic> {
-    pub fn new(remaining_attempts: usize, backoff: Duration, logic: Logic) -> Self {
+impl<L: RetryLogic> FixedRetryPolicy<L> {
+    pub fn new(remaining_attempts: usize, backoff: Duration, logic: L) -> Self {
         FixedRetryPolicy {
             remaining_attempts,
             backoff,
@@ -40,7 +40,7 @@ impl<Logic: RetryLogic> FixedRetryPolicy<Logic> {
         }
     }
 
-    fn build_retry(&self) -> RetryPolicyFuture<Logic> {
+    fn build_retry(&self) -> RetryPolicyFuture<L> {
         let policy = FixedRetryPolicy::new(
             self.remaining_attempts - 1,
             self.backoff.clone(),
@@ -53,12 +53,12 @@ impl<Logic: RetryLogic> FixedRetryPolicy<Logic> {
     }
 }
 
-impl<Req, Res, Logic> Policy<Req, Res, Error> for FixedRetryPolicy<Logic>
+impl<Req, Res, L> Policy<Req, Res, Error> for FixedRetryPolicy<L>
 where
     Req: Clone,
-    Logic: RetryLogic<Response = Res>,
+    L: RetryLogic<Response = Res>,
 {
-    type Future = RetryPolicyFuture<Logic>;
+    type Future = RetryPolicyFuture<L>;
 
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
@@ -97,8 +97,8 @@ where
     }
 }
 
-impl<Logic: RetryLogic> Future for RetryPolicyFuture<Logic> {
-    type Item = FixedRetryPolicy<Logic>;
+impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
+    type Item = FixedRetryPolicy<L>;
     type Error = ();
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
