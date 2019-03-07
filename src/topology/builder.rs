@@ -3,6 +3,7 @@ use futures::prelude::*;
 use futures::{future, Future};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
+use tokio_trace_futures::{Instrument, WithSubscriber};
 
 pub fn build(
     config: super::Config,
@@ -76,12 +77,20 @@ pub fn build(
             }
             Ok((sink, healthcheck)) => {
                 let name2 = name.clone();
+                let name3 = name.clone();
                 let healthcheck_task = healthcheck
                     .map(move |_| info!("Healthcheck for {}: Ok", name))
                     .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name2, err));
                 healthcheck_tasks.push(healthcheck_task);
 
-                let sink_task = rx.forward(sink).map(|_| ());
+                let span = span!("sink", name = name3.as_str());
+
+                let sub = tokio_trace::dispatcher::with(|subscriber| subscriber.clone());
+
+                let sink_task = rx
+                    .forward(sink.instrument(span))
+                    .with_subscriber(sub)
+                    .map(|_| ());
 
                 tasks.push(Box::new(sink_task));
             }
@@ -162,8 +171,10 @@ pub fn build(
     if errors.is_empty() {
         let lazy = future::lazy(move || {
             info!("setting this up");
+            let sub = tokio_trace::dispatcher::with(|subscriber| subscriber.clone());
             for task in tasks {
-                tokio::spawn(task);
+                let sub = sub.clone();
+                tokio::spawn(task.instrument(span!("a")).with_subscriber(sub));
             }
 
             future::ok(())

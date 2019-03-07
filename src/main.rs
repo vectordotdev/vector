@@ -25,12 +25,11 @@ fn main() {
 
     let config = router::topology::Config::load(std::fs::File::open(config).unwrap());
 
-    let topology = config.and_then(topology::build);
-
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
     tokio_trace::subscriber::with_default(subscriber, || {
+        let topology = topology::build(config.unwrap());
         router::run_server(topology, matches.is_present("require-healthy"));
     });
 }

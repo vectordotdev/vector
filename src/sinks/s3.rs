@@ -110,14 +110,18 @@ impl Sink for S3Sink {
         &mut self,
         item: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+        trace!("Starting to send an item");
         if self.full() {
+            trace!("Buffer is full, attempting to flush");
             self.poll_complete()?;
 
             if self.full() {
+                trace!("Buffer full after attempt to flush, applying back pressure");
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
+        trace!("Adding record to internal buffer");
         self.buffer.push(&item.line.into_bytes());
         self.buffer.push(b"\n");
 
@@ -129,11 +133,16 @@ impl Sink for S3Sink {
     }
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
+        trace!("poll_completing");
         loop {
             if let Some(ref mut in_flight) = self.in_flight {
+                trace!("One future in flight");
                 match in_flight.poll() {
                     Err(e) => panic!("{:?}", e),
-                    Ok(Async::Ready(_)) => self.in_flight = None,
+                    Ok(Async::Ready(_)) => {
+                        debug!("flushed successfully");
+                        self.in_flight = None;
+                    }
                     Ok(Async::NotReady) => {
                         if self.buffer_full() {
                             return Ok(Async::NotReady);
@@ -143,6 +152,7 @@ impl Sink for S3Sink {
                     }
                 }
             } else if self.buffer_full() {
+                debug!("buffer is full, flushing....");
                 self.send_request();
             } else {
                 return Ok(Async::Ready(()));

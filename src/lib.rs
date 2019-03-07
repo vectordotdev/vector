@@ -77,15 +77,19 @@ pub fn run_server(
         }
     } else {
         // this works
-        // let sub = tokio_trace::dispatcher::with(|subscriber| subscriber.clone());
+        let sub = tokio_trace::dispatcher::with(|subscriber| subscriber.clone());
         // rt.spawn(healthchecks.with_subscriber(sub));
 
         // this doesnt
-        rt.spawn(healthchecks.instrument(span!("healthchecks")));
+        rt.spawn(
+            healthchecks
+                .instrument(span!("healthchecks"))
+                .with_subscriber(sub),
+        );
     }
 
     let sub = tokio_trace::dispatcher::with(|subscriber| subscriber.clone());
-    rt.spawn(server.with_subscriber(sub));
+    rt.spawn(server.instrument(span!("server")).with_subscriber(sub));
 
     let sigint = Signal::new(SIGINT).flatten_stream();
     let sigterm = Signal::new(SIGTERM).flatten_stream();
