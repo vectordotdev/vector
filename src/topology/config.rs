@@ -98,7 +98,7 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        let json = serde_json::to_value(&self).unwrap();
-        serde_json::from_value(json).unwrap()
+        let toml = toml::Value::try_from(&self).unwrap();
+        toml.try_into().unwrap()
     }
 }
