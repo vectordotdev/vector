@@ -165,11 +165,13 @@ mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{
-        next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+        next_addr, random_lines, receive_lines, receive_lines_with_count, send_lines,
+        shutdown_on_idle, wait_for, wait_for_tcp,
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
     use futures::Future;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn topology_add_sink() {
@@ -181,7 +183,8 @@ mod tests {
         let out1_addr = next_addr();
         let out2_addr = next_addr();
 
-        let output_lines1 = receive_lines(&out1_addr, &rt.executor());
+        let (output_lines1, output_lines1_count) =
+            receive_lines_with_count(&out1_addr, &rt.executor());
         let output_lines2 = receive_lines(&out2_addr, &rt.executor());
 
         let mut old_config = Config::empty();
@@ -201,7 +204,7 @@ mod tests {
 
         new_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
 
         topology.reload_config(new_config, &mut rt);
 
@@ -233,7 +236,8 @@ mod tests {
         let out1_addr = next_addr();
         let out2_addr = next_addr();
 
-        let output_lines1 = receive_lines(&out1_addr, &rt.executor());
+        let (output_lines1, output_lines1_count) =
+            receive_lines_with_count(&out1_addr, &rt.executor());
         let output_lines2 = receive_lines(&out2_addr, &rt.executor());
 
         let mut old_config = Config::empty();
@@ -254,7 +258,7 @@ mod tests {
 
         new_config.sinks.remove(&"out2".to_string());
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
 
         topology.reload_config(new_config, &mut rt);
 
