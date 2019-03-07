@@ -3,7 +3,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{self, config};
+use router::topology::{Topology, config};
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
@@ -23,36 +23,36 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
         Benchmark::new("pipe", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -77,36 +77,36 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
         Benchmark::new("pipe_with_tiny_lines", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -131,36 +131,36 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
         Benchmark::new("pipe_with_huge_lines", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -186,32 +186,32 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
         Benchmark::new("pipe_with_many_writers", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let sends = (0..num_writers)
                         .map(|_| {
                             let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
@@ -223,7 +223,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines * num_writers, output_lines.wait().unwrap());
@@ -252,52 +252,52 @@ fn benchmark_interconnected(c: &mut Criterion) {
         Benchmark::new("interconnected", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in1",
                         sources::tcp::TcpConfig {
                             address: in_addr1,
                             max_length: 102400,
                         },
                     );
-                    topology.add_source(
+                    config.add_source(
                         "in2",
                         sources::tcp::TcpConfig {
                             address: in_addr2,
                             max_length: 102400,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out1",
                         &["in1", "in2"],
                         sinks::tcp::TcpSinkConfig { address: out_addr1 },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out2",
                         &["in1", "in2"],
                         sinks::tcp::TcpSinkConfig { address: out_addr2 },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines1 = count_lines(&out_addr1, &rt.executor());
                     let output_lines2 = count_lines(&out_addr2, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
-                    (rt, trigger, output_lines1, output_lines2)
+                    (rt, topology, output_lines1, output_lines2)
                 },
-                |(mut rt, trigger, output_lines1, output_lines2)| {
+                |(mut rt, mut topology, output_lines1, output_lines2)| {
                     let send1 = send_lines(in_addr1, random_lines(line_size).take(num_lines));
                     let send2 = send_lines(in_addr2, random_lines(line_size).take(num_lines));
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines * 2, output_lines1.wait().unwrap());
@@ -323,22 +323,22 @@ fn benchmark_transforms(c: &mut Criterion) {
         Benchmark::new("transforms", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in",
                         sources::tcp::TcpConfig {
                             address: in_addr,
                             max_length: 102400,
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "parser",
                         &["in"],
                         transforms::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "filter",
                         &["parser"],
                         transforms::FieldFilterConfig {
@@ -346,23 +346,23 @@ fn benchmark_transforms(c: &mut Criterion) {
                             value: "404".to_string(),
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out",
                         &["filter"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
-                    (rt, trigger, output_lines)
+                    (rt, topology, output_lines)
                 },
-                |(mut rt, trigger, output_lines)| {
+                |(mut rt, mut topology, output_lines)| {
                     let send = send_lines(
                         in_addr,
                         random_lines(line_size)
@@ -371,7 +371,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     );
                     rt.block_on(send).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -402,29 +402,29 @@ fn benchmark_complex(c: &mut Criterion) {
         Benchmark::new("complex", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut topology = config::Config::empty();
-                    topology.add_source(
+                    let mut config = config::Config::empty();
+                    config.add_source(
                         "in1",
                         sources::tcp::TcpConfig {
                             address: in_addr1,
                             max_length: 102400,
                         },
                     );
-                    topology.add_source(
+                    config.add_source(
                         "in2",
                         sources::tcp::TcpConfig {
                             address: in_addr2,
                             max_length: 102400,
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "parser",
                         &["in1", "in2"],
                         transforms::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "filter_200",
                         &["parser"],
                         transforms::FieldFilterConfig {
@@ -432,7 +432,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             value: "200".to_string(),
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "filter_404",
                         &["parser"],
                         transforms::FieldFilterConfig {
@@ -440,7 +440,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             value: "404".to_string(),
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "filter_500",
                         &["parser"],
                         transforms::FieldFilterConfig {
@@ -448,7 +448,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             value: "500".to_string(),
                         },
                     );
-                    topology.add_transform(
+                    config.add_transform(
                         "sampler",
                         &["parser"],
                         transforms::SamplerConfig {
@@ -456,43 +456,43 @@ fn benchmark_complex(c: &mut Criterion) {
                             pass_list: vec![],
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out_all",
                         &["parser"],
                         sinks::tcp::TcpSinkConfig {
                             address: out_addr_all,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out_sampled",
                         &["sampler"],
                         sinks::tcp::TcpSinkConfig {
                             address: out_addr_sampled,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out_200",
                         &["filter_200"],
                         sinks::tcp::TcpSinkConfig {
                             address: out_addr_200,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out_404",
                         &["filter_404"],
                         sinks::tcp::TcpSinkConfig {
                             address: out_addr_404,
                         },
                     );
-                    topology.add_sink(
+                    config.add_sink(
                         "out_500",
                         &["filter_500"],
                         sinks::tcp::TcpSinkConfig {
                             address: out_addr_500,
                         },
                     );
-                    let (server, trigger, _healthchecks, _warnings) =
-                        topology::build(topology).unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines_all = count_lines(&out_addr_all, &rt.executor());
@@ -500,13 +500,13 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_200 = count_lines(&out_addr_200, &rt.executor());
                     let output_lines_404 = count_lines(&out_addr_404, &rt.executor());
 
-                    rt.spawn(server);
+                    topology.start(&mut rt);
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
                     (
                         rt,
-                        trigger,
+                        topology,
                         output_lines_all,
                         output_lines_sampled,
                         output_lines_200,
@@ -515,7 +515,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 },
                 |(
                     mut rt,
-                    trigger,
+                    mut topology,
                     output_lines_all,
                     output_lines_sampled,
                     output_lines_200,
@@ -544,7 +544,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 
-                    drop(trigger);
+                    topology.stop();
 
                     shutdown_on_idle(rt);
 
