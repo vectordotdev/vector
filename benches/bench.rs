@@ -3,7 +3,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{Topology, config};
+use router::topology::{config, Topology};
 use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
@@ -36,8 +36,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -90,8 +89,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -144,8 +142,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -199,8 +196,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -277,8 +273,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         &["in1", "in2"],
                         sinks::tcp::TcpSinkConfig { address: out_addr2 },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -351,8 +346,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         &["filter"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
@@ -491,8 +485,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             address: out_addr_500,
                         },
                     );
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines_all = count_lines(&out_addr_all, &rt.executor());

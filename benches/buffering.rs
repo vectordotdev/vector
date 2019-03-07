@@ -2,7 +2,7 @@ use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use futures::{future, Future, Stream};
 use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{Topology, config};
+use router::topology::{config, Topology};
 use router::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
 use tempfile::tempdir;
@@ -39,8 +39,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -82,8 +81,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         max_size: 1_000_000,
                     };
                     config.data_dir = Some(data_dir.clone());
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -123,8 +121,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
                     config.data_dir = Some(data_dir2.clone());
-                    let (mut topology, _warnings) =
-                        Topology::build(config).unwrap();
+                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
