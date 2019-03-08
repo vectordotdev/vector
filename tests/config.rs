@@ -1,4 +1,4 @@
-use router::topology::{Config, Topology};
+use vector::topology::{Config, Topology};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     Config::load(config.as_bytes())

@@ -1,6 +1,6 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
-use router::topology::Topology;
+use vector::topology::Topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace_futures::Instrument;
 
@@ -21,15 +21,18 @@ fn main() {
             Arg::with_name("require-healthy")
                 .short("r")
                 .long("require-healthy")
-                .help("Causes router to immediate exit on startup if any sinks having failing healthchecks")
+                .help("Causes vector to immediate exit on startup if any sinks having failing healthchecks")
         );
     let matches = app.get_matches();
 
     let config = matches.value_of("config").unwrap();
 
-    let config = router::topology::Config::load(std::fs::File::open(config).unwrap());
+    let config = vector::topology::Config::load(std::fs::File::open(config).unwrap());
 
-    let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();
+    let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
+        .with_filter(tokio_trace_fmt::filter::EnvFilter::from("vector=trace"))
+        .full()
+        .finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
     tokio_trace::subscriber::with_default(subscriber, || {

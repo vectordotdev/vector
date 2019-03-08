@@ -1,9 +1,9 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{config, Topology};
-use router::{buffers::BufferConfig, sinks, sources};
+use vector::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
+use vector::topology::{config, Topology};
+use vector::{buffers::BufferConfig, sinks, sources};
 use std::net::SocketAddr;
 use tempfile::tempdir;
 use tokio::codec::{FramedRead, LinesCodec};

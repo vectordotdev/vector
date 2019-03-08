@@ -83,7 +83,7 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
-        for task in tasks.into_iter().flat_map(|(_, ts)| ts) {
+        for task in tasks.into_iter().map(|(_, t)| t) {
             // TODO(lucio): find better way to name this span
             rt.spawn(task.instrument(span!("task")));
         }

@@ -1,10 +1,10 @@
 use approx::assert_relative_eq;
 use futures::{Future, Sink, Stream};
-use router::test_util::{
+use vector::test_util::{
     block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use router::topology::{config, Topology};
-use router::{
+use vector::topology::{config, Topology};
+use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
 };
