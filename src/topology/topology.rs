@@ -176,11 +176,6 @@ impl RunningTopology {
             self.shutdown_triggers.remove(&name).unwrap().cancel();
             self.source_tasks.remove(&name).wait().unwrap();
 
-            self.shutdown_triggers.insert(
-                name.clone(),
-                new_pieces.shutdown_triggers.remove(&name).unwrap(),
-            );
-
             let output = new_pieces.outputs.remove(&name).unwrap();
 
             for (sink_name, sink) in &self.config.sinks {
@@ -196,27 +191,15 @@ impl RunningTopology {
 
             self.outputs.insert(name.clone(), output);
 
-            let source_task = new_pieces.source_tasks.remove(&name).unwrap();
-            self.source_tasks
-                .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
-
+            self.spawn_source(&name, &mut new_pieces, rt);
             self.spawn(&name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
             info!("Adding source {:?}", name);
 
-            self.shutdown_triggers.insert(
-                name.clone(),
-                new_pieces.shutdown_triggers.remove(&name).unwrap(),
-            );
-
             self.setup_outputs(&name, &mut new_pieces);
-
-            let source_task = new_pieces.source_tasks.remove(&name).unwrap();
-            self.source_tasks
-                .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
-
+            self.spawn_source(&name, &mut new_pieces, rt);
             self.spawn(&name, &mut new_pieces, rt);
         }
 
@@ -369,6 +352,21 @@ impl RunningTopology {
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         rt.spawn(task);
+    }
+
+    fn spawn_source(
+        &mut self,
+        name: &String,
+        new_pieces: &mut builder::Pieces,
+        rt: &mut tokio::runtime::Runtime,
+    ) {
+        let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
+        self.shutdown_triggers
+            .insert(name.clone(), shutdown_trigger);
+
+        let source_task = new_pieces.source_tasks.remove(name).unwrap();
+        self.source_tasks
+            .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
     }
 
     fn remove_outputs(&mut self, name: &String) {
