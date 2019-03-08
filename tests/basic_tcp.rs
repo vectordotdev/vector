@@ -1,14 +1,14 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
+use serde_json::json;
+use stream_cancel::{StreamExt, Tripwire};
+use tokio::codec::{FramedRead, LinesCodec};
+use tokio::net::TcpListener;
 use vector::test_util::{
     next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
-use serde_json::json;
-use stream_cancel::{StreamExt, Tripwire};
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::net::TcpListener;
 
 #[test]
 fn test_pipe() {

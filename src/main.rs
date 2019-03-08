@@ -1,8 +1,8 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
-use vector::topology::Topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace_futures::Instrument;
+use vector::topology::Topology;
 
 #[macro_use]
 extern crate tokio_trace;

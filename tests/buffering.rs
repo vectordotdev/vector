@@ -1,10 +1,10 @@
 use futures::Future;
+use tempfile::tempdir;
 use vector::test_util::{
     next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{buffers::BufferConfig, sinks, sources};
-use tempfile::tempdir;
 
 #[test]
 fn test_buffering() {
