@@ -134,8 +134,18 @@ impl RunningTopology {
         let old_source_names: HashSet<&String> = old_config.sources.keys().collect::<HashSet<_>>();
         let new_source_names: HashSet<&String> = new_config.sources.keys().collect::<HashSet<_>>();
 
-        let sources_to_remove = &old_source_names - &new_source_names;
-        let sources_to_add = &new_source_names - &old_source_names;
+        let sources_to_change: HashSet<&String> = old_source_names
+            .intersection(&new_source_names)
+            .filter(|&&n| {
+                let old_toml = toml::Value::try_from(&old_config.sources[n]).unwrap();
+                let new_toml = toml::Value::try_from(&new_config.sources[n]).unwrap();
+                old_toml != new_toml
+            })
+            .map(|&n| n)
+            .collect::<HashSet<_>>();
+
+        let sources_to_remove = &(&old_source_names - &new_source_names) | &sources_to_change;
+        let sources_to_add = &(&new_source_names - &old_source_names) | &sources_to_change;
 
         for name in sources_to_remove {
             info!("Removing source {:?}", name);
@@ -154,8 +164,22 @@ impl RunningTopology {
                 new_pieces.shutdown_triggers.remove(name).unwrap(),
             );
 
-            self.outputs
-                .insert(name.clone(), new_pieces.outputs.remove(name).unwrap());
+            let output = new_pieces.outputs.remove(name).unwrap();
+
+            if sources_to_change.contains(name) {
+                for (sink_name, sink) in &old_config.sinks {
+                    if sink.inputs.contains(name) {
+                        output
+                            .unbounded_send(fanout::ControlMessage::Add(
+                                sink_name.clone(),
+                                self.inputs[sink_name].get(),
+                            ))
+                            .unwrap();
+                    }
+                }
+            }
+
+            self.outputs.insert(name.clone(), output);
 
             let source_task = new_pieces.source_tasks.remove(name).unwrap();
             self.source_tasks
@@ -270,6 +294,7 @@ mod tests {
     use crate::topology::config::Config;
     use crate::topology::Topology;
     use futures::{stream, Future, Stream};
+    use std::collections::HashSet;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -641,5 +666,95 @@ mod tests {
         let output_lines2 = output_lines2.wait().unwrap();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
+    }
+
+    #[test]
+    fn topology_change_source() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let (output_lines, output_lines_count) =
+            receive_lines_with_count(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source(
+            "in",
+            TcpConfig {
+                address: in_addr,
+                max_length: 20,
+            },
+        );
+        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = vec![
+            "short1",
+            "mediummedium1",
+            "longlonglonglonglonglong1",
+            "mediummedium2",
+            "short2",
+        ];
+
+        for &line in &input_lines1 {
+            rt.block_on(send_lines(in_addr, std::iter::once(line.to_owned())))
+                .unwrap();
+        }
+
+        wait_for(|| output_lines_count.load(Ordering::Relaxed) >= 4);
+
+        new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
+            address: in_addr,
+            max_length: 10,
+        });
+
+        topology.reload_config(new_config, &mut rt);
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        wait_for_tcp(in_addr);
+
+        let input_lines2 = vec![
+            "short3",
+            "mediummedium3",
+            "longlonglonglonglonglong2",
+            "mediummedium4",
+            "short4",
+        ];
+
+        for &line in &input_lines2 {
+            rt.block_on(send_lines(in_addr, std::iter::once(line.to_owned())))
+                .unwrap();
+        }
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines = output_lines
+            .wait()
+            .unwrap()
+            .into_iter()
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            output_lines,
+            vec![
+                // From old
+                "short1".to_owned(),
+                "mediummedium1".to_owned(),
+                "mediummedium2".to_owned(),
+                "short2".to_owned(),
+                // From new
+                "short3".to_owned(),
+                "short4".to_owned(),
+            ]
+            .into_iter()
+            .collect::<HashSet<_>>()
+        );
     }
 }
