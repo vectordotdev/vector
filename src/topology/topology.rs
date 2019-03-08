@@ -272,19 +272,12 @@ impl RunningTopology {
         for name in transforms_to_add {
             info!("Adding transform {:?}", name);
 
+            self.setup_inputs(&name, &mut new_pieces);
+
             let name = name.to_owned();
-            let (tx, inputs) = new_pieces.inputs.remove(&name).unwrap();
-            // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
-            // so until a test exposes this hole
 
             let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
-
-            for input in inputs {
-                self.outputs[&input]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
 
             let output = new_pieces.outputs.remove(&name).unwrap();
             self.outputs.insert(name.clone(), output);
@@ -348,19 +341,10 @@ impl RunningTopology {
         for name in sinks_to_add {
             info!("Adding sink {:?}", name);
 
-            let name = name.to_owned();
-            let (tx, inputs) = new_pieces.inputs.remove(&name).unwrap();
-            // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
-            // so until a test exposes this hole
+            self.setup_inputs(&name, &mut new_pieces);
 
             let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
-
-            for input in inputs {
-                self.outputs[&input]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
         }
     }
 
@@ -382,6 +366,18 @@ impl RunningTopology {
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
             }
+        }
+    }
+
+    fn setup_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+        let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
+        // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
+        // so until a test exposes this hole
+
+        for input in inputs {
+            self.outputs[&input]
+                .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                .unwrap();
         }
     }
 }
