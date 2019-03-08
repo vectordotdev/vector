@@ -162,9 +162,9 @@ impl RunningTopology {
         for name in &sources_to_remove | &sources_to_change {
             info!("Removing source {:?}", name);
 
-            self.shutdown_triggers.remove(&name).unwrap().cancel();
-            self.outputs.remove(&name);
+            self.remove_outputs(&name);
 
+            self.shutdown_triggers.remove(&name).unwrap().cancel();
             self.source_tasks.remove(&name).wait().unwrap();
         }
 
@@ -208,15 +208,8 @@ impl RunningTopology {
         for name in transforms_to_remove {
             info!("Removing transform {:?}", name);
 
-            self.inputs.remove(&name);
-
-            for input in &self.config.transforms[&name].inputs {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                    .unwrap();
-            }
-
-            self.outputs.remove(&name);
+            self.remove_inputs(&name);
+            self.remove_outputs(&name);
         }
 
         for name in transforms_to_change {
@@ -304,13 +297,7 @@ impl RunningTopology {
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
 
-            self.inputs.remove(&name);
-
-            for input in &self.config.sinks[&name].inputs {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                    .unwrap();
-            }
+            self.remove_inputs(&name);
         }
 
         for name in sinks_to_change {
@@ -372,6 +359,27 @@ impl RunningTopology {
             for input in inputs {
                 self.outputs[&input]
                     .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                    .unwrap();
+            }
+        }
+    }
+
+    fn remove_outputs(&mut self, name: &String) {
+        self.outputs.remove(name);
+    }
+
+    fn remove_inputs(&mut self, name: &String) {
+        self.inputs.remove(name);
+
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+
+        let inputs = sink_inputs.or(trans_inputs);
+
+        if let Some(inputs) = inputs {
+            for input in inputs {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
             }
         }
