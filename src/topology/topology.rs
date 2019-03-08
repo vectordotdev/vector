@@ -270,11 +270,7 @@ impl RunningTopology {
             info!("Adding transform {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
-
-            let name = name.to_owned();
-
             self.spawn(&name, &mut new_pieces, rt);
-
             self.setup_outputs(&name, &mut new_pieces);
         }
 
