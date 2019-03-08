@@ -126,7 +126,15 @@ impl RunningTopology {
         let old_source_names: HashSet<&String> = old_config.sources.keys().collect::<HashSet<_>>();
         let new_source_names: HashSet<&String> = new_config.sources.keys().collect::<HashSet<_>>();
 
+        let sources_to_remove = &old_source_names - &new_source_names;
         let sources_to_add = &new_source_names - &old_source_names;
+
+        for name in sources_to_remove {
+            info!("Removing source {:?}", name);
+
+            self.shutdown_triggers.remove(name).unwrap().cancel();
+            self.outputs.remove(name);
+        }
 
         for name in sources_to_add {
             info!("Adding source {:?}", name);
@@ -199,9 +207,11 @@ impl RunningTopology {
             let inputs_to_replace = old_inputs.intersection(&new_inputs);
 
             for input in inputs_to_remove {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                    .unwrap();
+                if let Some(output) = self.outputs.get(input) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                        .unwrap();
+                }
             }
 
             for input in inputs_to_add {
@@ -517,6 +527,47 @@ mod tests {
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines.clone().into_iter());
         rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines = output_lines.wait().unwrap();
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[test]
+    fn topology_remove_source() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let output_lines = receive_lines(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(in_addr));
+        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        wait_for_tcp(in_addr);
+
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        new_config.sources.remove(&"in".to_string());
+        new_config.sinks[&"out".to_string()].inputs.clear();
+
+        topology.reload_config(new_config, &mut rt);
+
+        wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
         // Shut down server
         topology.stop();
