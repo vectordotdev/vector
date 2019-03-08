@@ -200,8 +200,7 @@ impl RunningTopology {
             self.source_tasks
                 .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
 
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
@@ -218,8 +217,7 @@ impl RunningTopology {
             self.source_tasks
                 .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
 
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
         }
 
         // Transforms
@@ -238,8 +236,7 @@ impl RunningTopology {
 
             let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
 
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
 
             let old_inputs = self.config.transforms[&name]
                 .inputs
@@ -297,8 +294,7 @@ impl RunningTopology {
 
             let name = name.to_owned();
 
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
 
             self.setup_outputs(&name, &mut new_pieces);
         }
@@ -319,8 +315,7 @@ impl RunningTopology {
             let name = name.to_owned();
             let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
 
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
 
             let old_inputs = self.config.sinks[&name]
                 .inputs
@@ -362,10 +357,18 @@ impl RunningTopology {
             info!("Adding sink {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
-
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            rt.spawn(task);
+            self.spawn(&name, &mut new_pieces, rt);
         }
+    }
+
+    fn spawn(
+        &mut self,
+        name: &String,
+        new_pieces: &mut builder::Pieces,
+        rt: &mut tokio::runtime::Runtime,
+    ) {
+        let task = new_pieces.tasks.remove(name).unwrap();
+        rt.spawn(task);
     }
 
     fn remove_outputs(&mut self, name: &String) {
