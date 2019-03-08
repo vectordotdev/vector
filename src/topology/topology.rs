@@ -1,6 +1,6 @@
 use super::{builder, fanout, Config};
 use crate::buffers;
-use futures::Future;
+use futures::{sync::oneshot, Future};
 use log::{error, info};
 use std::collections::{HashMap, HashSet};
 use stream_cancel::Trigger;
@@ -19,6 +19,7 @@ enum State {
 struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
+    source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     shutdown_triggers: HashMap<String, Trigger>,
     config: Config,
 }
@@ -61,6 +62,7 @@ impl Topology {
             outputs,
             shutdown_triggers,
             tasks,
+            source_tasks,
             healthchecks: _healthchecks,
         } = components;
 
@@ -75,15 +77,21 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
-        for task in tasks.into_iter().flat_map(|(_, ts)| ts) {
+        for task in tasks.into_iter().map(|(_, t)| t) {
             rt.spawn(task);
         }
+
+        let source_tasks = source_tasks
+            .into_iter()
+            .map(|(name, task)| (name, oneshot::spawn(task, &rt.executor())))
+            .collect();
 
         self.state = State::Running(RunningTopology {
             inputs: new_inputs,
             outputs,
             config,
             shutdown_triggers,
+            source_tasks,
         });
     }
 
@@ -134,6 +142,8 @@ impl RunningTopology {
 
             self.shutdown_triggers.remove(name).unwrap().cancel();
             self.outputs.remove(name);
+
+            self.source_tasks.remove(name).wait().unwrap();
         }
 
         for name in sources_to_add {
@@ -147,10 +157,12 @@ impl RunningTopology {
             self.outputs
                 .insert(name.clone(), new_pieces.outputs.remove(name).unwrap());
 
-            let tasks = new_pieces.tasks.remove(name).unwrap();
-            for task in tasks {
-                rt.spawn(task);
-            }
+            let source_task = new_pieces.source_tasks.remove(name).unwrap();
+            self.source_tasks
+                .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
+
+            let task = new_pieces.tasks.remove(name).unwrap();
+            rt.spawn(task);
         }
 
         // Sinks
@@ -188,10 +200,8 @@ impl RunningTopology {
             let name = name.to_owned();
             let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
 
-            let tasks = new_pieces.tasks.remove(&name).unwrap();
-            for task in tasks {
-                rt.spawn(task);
-            }
+            let task = new_pieces.tasks.remove(&name).unwrap();
+            rt.spawn(task);
 
             let old_inputs = old_config.sinks[&name]
                 .inputs
@@ -225,6 +235,8 @@ impl RunningTopology {
                     .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
                     .unwrap();
             }
+
+            self.inputs.insert(name.clone(), tx);
         }
 
         for name in sinks_to_add {
@@ -235,10 +247,9 @@ impl RunningTopology {
             // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
             // so until a test exposes this hole
 
-            let tasks = new_pieces.tasks.remove(&name).unwrap();
-            for task in tasks {
-                rt.spawn(task);
-            }
+            let task = new_pieces.tasks.remove(&name).unwrap();
+            rt.spawn(task);
+
             for input in inputs {
                 self.outputs[&input]
                     .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
@@ -576,5 +587,59 @@ mod tests {
         let output_lines = output_lines.wait().unwrap();
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
+    }
+
+    #[test]
+    fn topology_remove_source_add_source_with_same_port() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let (output_lines1, output_lines1_count) =
+            receive_lines_with_count(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in1", TcpConfig::new(in_addr));
+        old_config.add_sink("out", &["in1"], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines1.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= num_lines);
+
+        new_config.sources.remove(&"in1".to_string());
+        new_config.add_source("in2", TcpConfig::new(in_addr));
+        new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
+
+        topology.reload_config(new_config, &mut rt);
+
+        // The sink gets rebuilt, causing it to open a new connection
+        let output_lines1 = output_lines1.wait().unwrap();
+        let output_lines2 = receive_lines(&out_addr, &rt.executor());
+
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        assert_eq!(num_lines, output_lines1.len());
+        assert_eq!(input_lines1, output_lines1);
+
+        let output_lines2 = output_lines2.wait().unwrap();
+        assert_eq!(num_lines, output_lines2.len());
+        assert_eq!(input_lines2, output_lines2);
     }
 }
