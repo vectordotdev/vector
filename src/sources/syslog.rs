@@ -10,6 +10,7 @@ use tokio::{
     codec::{BytesCodec, FramedRead, LinesCodec},
     net::{TcpListener, UdpFramed, UdpSocket},
 };
+use tokio_trace_futures::Instrument;
 use tokio_uds::UnixListener;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -74,7 +75,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(handler)
+                tokio::spawn(handler.instrument(span!("SyslogConnection")))
             })
     }))
 }

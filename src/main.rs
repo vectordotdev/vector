@@ -3,6 +3,7 @@ use futures::{Future, Stream};
 use log::{error, info};
 use router::topology::Topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
+use tokio_trace_futures::Instrument;
 
 fn main() {
     router::setup_logger();
@@ -53,7 +54,7 @@ fn main() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         if matches.is_present("require-healthy") {
-            let success = rt.block_on(topology.healthchecks());
+            let success = rt.block_on(topology.healthchecks().instrument(span!("healthcheck")));
 
             if success.is_ok() {
                 info!("All healthchecks passed");
@@ -62,7 +63,7 @@ fn main() {
                 std::process::exit(1);
             }
         } else {
-            rt.spawn(topology.healthchecks());
+            rt.spawn(topology.healthchecks().instrument(span!("healthcheck")));
         }
 
         topology.start(&mut rt);
