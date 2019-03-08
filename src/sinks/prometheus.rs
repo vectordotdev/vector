@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
+use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -98,7 +99,7 @@ impl PrometheusSink {
             .with_graceful_shutdown(tripwire)
             .map_err(|e| eprintln!("server error: {}", e));
 
-        tokio::spawn(server.instrument(spawn!("PrometheusSink")));
+        tokio::spawn(server.instrument(span!("PrometheusSink")));
         self.server_shutdown_trigger = Some(trigger);
     }
 }

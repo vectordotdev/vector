@@ -7,7 +7,6 @@ pub use self::config::Config;
 use crate::buffers;
 use futures::{sync::oneshot, Future};
 use indexmap::IndexMap;
-use log::{error, info};
 use std::collections::{HashMap, HashSet};
 use stream_cancel::Trigger;
 use tokio_trace_futures::Instrument;
@@ -347,13 +346,7 @@ impl RunningTopology {
             .into_iter()
             .collect::<HashSet<_>>();
 
-<<<<<<< HEAD:src/topology.rs
         let new_inputs = inputs.iter().collect::<HashSet<_>>();
-=======
-            let task = new_pieces.tasks.remove(&name).unwrap();
-            // TODO(lucio): rename this span to something useful
-            rt.spawn(task.instrument(span!("task")));
->>>>>>> WIP:src/topology/topology.rs
 
         let inputs_to_remove = &old_inputs - &new_inputs;
         let inputs_to_add = &new_inputs - &old_inputs;

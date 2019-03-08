@@ -2,7 +2,6 @@ use super::fanout::{self, Fanout};
 use crate::buffers;
 use futures::prelude::*;
 use futures::{sync::mpsc, Future};
-use log::{error, info};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
 

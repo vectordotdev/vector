@@ -1,6 +1,5 @@
 use super::Error;
 use futures::{try_ready, Async, Future, Poll};
-use log::{error, warn};
 use std::{
     error::Error as StdError,
     time::{Duration, Instant},

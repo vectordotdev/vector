@@ -533,14 +533,6 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "fern"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "file-source"
 version = "0.1.0"
 dependencies = [
@@ -1630,7 +1622,6 @@ dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_is_enum_variant 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "elastic_responses 0.20.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "fern 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "file-source 0.1.0",
  "flate2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1641,7 +1632,6 @@ dependencies = [
  "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "leveldb 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.50 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "prometheus 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-build 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2301,7 +2291,7 @@ dependencies = [
 [[package]]
 name = "tokio-trace-env-logger"
 version = "0.1.0"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#cc4e8883c5585142e3d7a9bc83d6429609edb1a2"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery#7a64ca80fef80f9c82088a3bb41c8f9d1b645904"
 dependencies = [
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2311,7 +2301,7 @@ dependencies = [
 [[package]]
 name = "tokio-trace-fmt"
 version = "0.1.0"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#cc4e8883c5585142e3d7a9bc83d6429609edb1a2"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery#7a64ca80fef80f9c82088a3bb41c8f9d1b645904"
 dependencies = [
  "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2323,7 +2313,7 @@ dependencies = [
 [[package]]
 name = "tokio-trace-futures"
 version = "0.0.1"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#cc4e8883c5585142e3d7a9bc83d6429609edb1a2"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery#7a64ca80fef80f9c82088a3bb41c8f9d1b645904"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2333,7 +2323,7 @@ dependencies = [
 [[package]]
 name = "tokio-trace-log"
 version = "0.0.1"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#cc4e8883c5585142e3d7a9bc83d6429609edb1a2"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery#7a64ca80fef80f9c82088a3bb41c8f9d1b645904"
 dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)",
@@ -2343,7 +2333,7 @@ dependencies = [
 [[package]]
 name = "tokio-trace-subscriber"
 version = "0.0.1"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#cc4e8883c5585142e3d7a9bc83d6429609edb1a2"
+source = "git+https://github.com/tokio-rs/tokio-trace-nursery#7a64ca80fef80f9c82088a3bb41c8f9d1b645904"
 dependencies = [
  "tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)",
 ]
@@ -2733,7 +2723,6 @@ dependencies = [
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"
 "checksum failure_derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "ea1063915fd7ef4309e222a5a07cf9c319fb9c7836b1f89b85458672dbb127e1"
 "checksum fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
-"checksum fern 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)" = "b48af88aaf938b11baef948a5599e66e709cf92854aa2b87c71f1bcf20f80a01"
 "checksum fixedbitset 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "86d4de0081402f5e88cdac65c8dcdcc73118c1a7a465e2a05f0da05843a8ea33"
 "checksum flate2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2291c165c8e703ee54ef3055ad6188e3d51108e2ded18e9f2476e774fc5ad3d4"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"

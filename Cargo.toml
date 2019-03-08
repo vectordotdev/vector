@@ -16,8 +16,6 @@ members = [
 file-source = { path = "lib/file-source" }
 
 # External libs
-fern = "0.5.6"
-log = "0.4.5"
 uuid = { version = "0.7.1", features = ["v4"] }
 chrono = "0.4.6"
 rand = "0.5.5"

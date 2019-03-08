@@ -1,13 +1,13 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
-use log::{error, info};
 use router::topology::Topology;
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace_futures::Instrument;
 
-fn main() {
-    router::setup_logger();
+#[macro_use]
+extern crate tokio_trace;
 
+fn main() {
     let app = App::new("Router").version("1.0").author("timber.io")
         .arg(
             Arg::with_name("config")
