@@ -165,8 +165,6 @@ mod tests {
 
     #[test]
     fn test_http_happy_path() {
-        crate::setup_logger();
-
         let num_lines = 1000;
 
         let in_addr = next_addr();
