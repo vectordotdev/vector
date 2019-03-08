@@ -54,17 +54,20 @@ where
     S: Sink<SinkItem = B>,
 {
     pub fn new(inner: S, max_size: usize) -> Self {
+        let min_size = max_size; // TODO: more patterns
+
+        assert!(max_size >= min_size);
         BatchSink {
             batch: Default::default(),
             inner,
             max_size,
-            min_size: max_size, // TODO: more patterns
+            min_size,
             closing: false,
         }
     }
 
     fn should_send(&self) -> bool {
-        self.closing || self.batch.len() > self.min_size || self.batch.len() >= self.max_size
+        self.closing || self.batch.len() >= self.min_size
     }
 
     fn poll_send(&mut self) -> Poll<(), S::SinkError> {
