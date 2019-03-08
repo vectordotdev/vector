@@ -1,4 +1,4 @@
-use super::util::{self, SinkExt};
+use super::util::{self, Buffer, SinkExt};
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use hyper::Uri;
@@ -91,8 +91,8 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
 
 fn http(config: ValidatedConfig) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
-        .with(move |body: Vec<u8>| {
-            let mut request = util::http::Request::post(config.uri.clone(), body);
+        .with(move |body: Buffer| {
+            let mut request = util::http::Request::post(config.uri.clone(), body.into());
             request
                 .header("Content-Type", "application/x-ndjson")
                 .header("Content-Encoding", "gzip");
@@ -103,7 +103,7 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
 
             Ok(request)
         })
-        .size_buffered(2 * 1024 * 1024, true)
+        .batched(Buffer::new(true), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
                 "msg": record.line,

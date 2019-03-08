@@ -1,5 +1,5 @@
 use crate::record::Record;
-use crate::sinks::util::size_buffered::Buffer;
+use crate::sinks::util::Buffer;
 use futures::{Async, AsyncSink, Future, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;

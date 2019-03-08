@@ -1,68 +1,6 @@
 use flate2::write::GzEncoder;
-use futures::{try_ready, Async, AsyncSink, Sink};
 use std::io::Write;
 use std::mem;
-
-pub struct SizeBuffered<S: Sink<SinkItem = Vec<u8>>> {
-    inner: S,
-    buffer: Buffer,
-    buffer_limit: usize,
-}
-
-impl<S: Sink<SinkItem = Vec<u8>>> SizeBuffered<S> {
-    pub fn new(inner: S, limit: usize, gzip: bool) -> Self {
-        Self {
-            inner,
-            buffer: Buffer::new(gzip),
-            buffer_limit: limit,
-        }
-    }
-
-    pub fn into_inner(self) -> S {
-        self.inner
-    }
-}
-
-impl<S: Sink<SinkItem = Vec<u8>>> Sink for SizeBuffered<S> {
-    type SinkItem = Vec<u8>;
-    type SinkError = S::SinkError;
-
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        if self.buffer.size() >= self.buffer_limit {
-            self.poll_complete()?;
-
-            if self.buffer.size() >= self.buffer_limit {
-                return Ok(AsyncSink::NotReady(item));
-            }
-        }
-
-        self.buffer.push(&item);
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        loop {
-            try_ready!(self.inner.poll_complete());
-
-            if self.buffer.is_empty() {
-                return Ok(Async::Ready(()));
-            } else {
-                let buffer = self.buffer.get_and_reset();
-
-                match self.inner.start_send(buffer)? {
-                    AsyncSink::Ready => {}
-                    AsyncSink::NotReady(_item) => {
-                        unreachable!("Will only get here if inner.poll_complete() returned Ready")
-                    }
-                }
-            }
-        }
-    }
-}
 
 pub enum Buffer {
     Plain(Vec<u8>),
@@ -122,77 +60,54 @@ impl Buffer {
     }
 }
 
+impl super::batch::Batch for Buffer {
+    type Item = Vec<u8>;
+
+    fn len(&self) -> usize {
+        self.size()
+    }
+
+    fn push(&mut self, item: Self::Item) {
+        self.push(&item)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        match self {
+            Buffer::Plain(_) => Buffer::Plain(Vec::new()),
+            Buffer::Gzip(_) => {
+                Buffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
+            }
+        }
+    }
+}
+
+impl From<Buffer> for Vec<u8> {
+    fn from(buffer: Buffer) -> Self {
+        match buffer {
+            Buffer::Plain(inner) => inner,
+            Buffer::Gzip(inner) => inner
+                .finish()
+                .expect("This can't fail because the inner writer is a Vec"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::SizeBuffered;
+    use super::Buffer;
+    use crate::sinks::util::batch::BatchSink;
     use futures::{Future, Sink};
     use std::io::Read;
-
-    #[test]
-    fn size_buffered_buffers_messages_until_limit() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let input = (0..22).map(|i| vec![i]).collect::<Vec<_>>();
-        let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
-            .wait()
-            .unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(
-            output,
-            vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-                vec![20, 21]
-            ]
-        );
-    }
-
-    #[test]
-    fn size_buffered_doesnt_buffer_if_its_flushed() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let buffered = buffered.send(vec![0]).wait().unwrap();
-        let buffered = buffered.send(vec![1]).wait().unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(output, vec![vec![0], vec![1],]);
-    }
-
-    #[test]
-    fn size_buffered_allows_the_final_item_to_exceed_the_buffer_size() {
-        let buffered = SizeBuffered::new(vec![], 10, false);
-
-        let input = vec![
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            vec![9, 10, 11],
-            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-            vec![24],
-        ];
-        let (buffered, _) = buffered
-            .send_all(futures::stream::iter_ok(input))
-            .wait()
-            .unwrap();
-
-        let output = buffered.into_inner();
-        assert_eq!(
-            output,
-            vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-                vec![24],
-            ]
-        );
-    }
 
     #[test]
     fn gzip() {
         use flate2::read::GzDecoder;
 
-        let buffered = SizeBuffered::new(vec![], 1000, true);
+        let buffered = BatchSink::new(vec![], Buffer::new(true), 1000);
 
         let input = std::iter::repeat(
             b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
@@ -204,7 +119,11 @@ mod test {
             .wait()
             .unwrap();
 
-        let output = buffered.into_inner();
+        let output = buffered
+            .into_inner()
+            .into_iter()
+            .map(|buf| buf.into())
+            .collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
         assert!(output.iter().map(|o| o.len()).sum::<usize>() < 50_000);

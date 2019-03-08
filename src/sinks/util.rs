@@ -7,13 +7,24 @@ use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend,
 use log::{error, trace};
 use tower_service::Service;
 
-pub trait SinkExt: Sink<SinkItem = Vec<u8>> + Sized {
-    fn size_buffered(self, limit: usize, gzip: bool) -> size_buffered::SizeBuffered<Self> {
-        size_buffered::SizeBuffered::new(self, limit, gzip)
+pub use size_buffered::Buffer;
+
+pub trait SinkExt<B>
+where
+    B: batch::Batch,
+    Self: Sink<SinkItem = B> + Sized,
+{
+    fn batched(self, batch: B, limit: usize) -> batch::BatchSink<B, Self> {
+        batch::BatchSink::new(self, batch, limit)
     }
 }
 
-impl<S> SinkExt for S where S: Sink<SinkItem = Vec<u8>> + Sized {}
+impl<B, S> SinkExt<B> for S
+where
+    B: batch::Batch,
+    S: Sink<SinkItem = B> + Sized,
+{
+}
 
 pub struct ServiceSink<T, S: Service<T>> {
     service: S,
