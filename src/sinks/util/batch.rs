@@ -1,17 +1,18 @@
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend};
 
-pub trait SinkExt<Input, B>: Sink<SinkItem = B> + Sized
+pub trait SinkExt<B>
 where
-    B: Batch<Item = Input>,
+    B: Batch,
+    Self: Sink<SinkItem = B> + Sized,
 {
-    fn batched(self, limit: usize) -> BatchSink<Input, B, Self> {
+    fn batched(self, limit: usize) -> BatchSink<B, Self> {
         BatchSink::new(self, limit)
     }
 }
 
-impl<Input, B, S> SinkExt<Input, B> for S
+impl<B, S> SinkExt<B> for S
 where
-    B: Batch<Item = Input>,
+    B: Batch,
     S: Sink<SinkItem = B> + Sized,
 {
 }
@@ -39,18 +40,17 @@ impl<T> Batch for Vec<T> {
     }
 }
 
-pub struct BatchSink<Item, B: Batch, S: Sink> {
+pub struct BatchSink<B: Batch, S: Sink> {
     batch: B,
     inner: S,
     max_size: usize,
     min_size: usize,
     closing: bool,
-    _pd: std::marker::PhantomData<Item>,
 }
 
-impl<Input, B, S> BatchSink<Input, B, S>
+impl<B, S> BatchSink<B, S>
 where
-    B: Batch<Item = Input>,
+    B: Batch,
     S: Sink<SinkItem = B>,
 {
     pub fn new(inner: S, max_size: usize) -> Self {
@@ -60,7 +60,6 @@ where
             max_size,
             min_size: max_size, // TODO: more patterns
             closing: false,
-            _pd: std::marker::PhantomData,
         }
     }
 
@@ -79,13 +78,13 @@ where
     }
 }
 
-impl<Input, B, Error, S> Sink for BatchSink<Input, B, S>
+impl<B, E, S> Sink for BatchSink<B, S>
 where
-    B: Batch<Item = Input>,
-    S: Sink<SinkItem = B, SinkError = Error>,
+    B: Batch,
+    S: Sink<SinkItem = B, SinkError = E>,
 {
-    type SinkItem = Input;
-    type SinkError = Error;
+    type SinkItem = B::Item;
+    type SinkError = E;
 
     // When used with Stream::forward, a successful call to start_send will always be followed
     // immediately by another call to start_send or a call to poll_complete. This means that
