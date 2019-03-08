@@ -1,8 +1,7 @@
 use super::Record;
 use crate::sinks::util::{
-    batch::SinkExt,
     retries::{FixedRetryPolicy, RetryLogic},
-    ServiceSink,
+    ServiceSink, SinkExt,
 };
 use futures::{Poll, Sink};
 use rand::random;
@@ -46,7 +45,7 @@ impl KinesisService {
         let limited = InFlightLimit::new(retries, 1);
 
         ServiceSink::new(limited)
-            .batched(batch_size)
+            .batched(Vec::new(), batch_size)
             .with(|record: Record| Ok(record.into()))
     }
 

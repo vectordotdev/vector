@@ -1,4 +1,4 @@
-use super::util::{self, SinkExt};
+use super::util::{self, Buffer, SinkExt};
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
@@ -25,11 +25,11 @@ impl crate::topology::config::SinkConfig for HecSinkConfig {
 
 pub fn hec(token: String, host: String) -> super::RouterSink {
     let sink = util::http::HttpSink::new()
-        .with(move |body: Vec<u8>| {
+        .with(move |body: Buffer| {
             let uri = format!("{}/services/collector/event", host);
             let uri: Uri = uri.parse().unwrap();
 
-            let mut request = util::http::Request::post(uri, body);
+            let mut request = util::http::Request::post(uri, body.into());
             request
                 .header("Content-Type", "application/json")
                 .header("Content-Encoding", "gzip")
@@ -37,7 +37,7 @@ pub fn hec(token: String, host: String) -> super::RouterSink {
 
             Ok(request)
         })
-        .size_buffered(2 * 1024 * 1024, true)
+        .batched(Buffer::new(true), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
                 "event": record.line,

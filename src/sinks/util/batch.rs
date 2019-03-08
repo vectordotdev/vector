@@ -1,27 +1,11 @@
 use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend};
 
-pub trait SinkExt<B>
-where
-    B: Batch,
-    Self: Sink<SinkItem = B> + Sized,
-{
-    fn batched(self, limit: usize) -> BatchSink<B, Self> {
-        BatchSink::new(self, limit)
-    }
-}
-
-impl<B, S> SinkExt<B> for S
-where
-    B: Batch,
-    S: Sink<SinkItem = B> + Sized,
-{
-}
-
-pub trait Batch: Default {
+pub trait Batch {
     type Item;
     fn len(&self) -> usize;
     fn push(&mut self, item: Self::Item);
     fn is_empty(&self) -> bool;
+    fn fresh(&self) -> Self;
 }
 
 impl<T> Batch for Vec<T> {
@@ -38,6 +22,10 @@ impl<T> Batch for Vec<T> {
     fn is_empty(&self) -> bool {
         self.is_empty()
     }
+
+    fn fresh(&self) -> Self {
+        Self::new()
+    }
 }
 
 pub struct BatchSink<B, S> {
@@ -53,12 +41,12 @@ where
     B: Batch,
     S: Sink<SinkItem = B>,
 {
-    pub fn new(inner: S, max_size: usize) -> Self {
-        let min_size = max_size; // TODO: more patterns
+    pub fn new(inner: S, batch: B, max_size: usize) -> Self {
+        let min_size = 0; // TODO: more patterns
 
         assert!(max_size >= min_size);
         BatchSink {
-            batch: Default::default(),
+            batch,
             inner,
             max_size,
             min_size,
@@ -66,12 +54,17 @@ where
         }
     }
 
+    pub fn into_inner(self) -> S {
+        self.inner
+    }
+
     fn should_send(&self) -> bool {
         self.closing || self.batch.len() >= self.min_size
     }
 
     fn poll_send(&mut self) -> Poll<(), S::SinkError> {
-        let batch = std::mem::replace(&mut self.batch, Default::default());
+        let fresh = self.batch.fresh();
+        let batch = std::mem::replace(&mut self.batch, fresh);
         if let AsyncSink::NotReady(batch) = self.inner.start_send(batch)? {
             self.batch = batch;
             Ok(Async::NotReady)
@@ -95,7 +88,7 @@ where
     // and need to push it down to the inner sink. The other case, when our batch is not full but
     // we want to push it to the inner sink anyway, can be detected and handled by poll_complete.
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batch.len() > self.max_size {
+        if self.batch.len() >= self.max_size {
             self.poll_complete()?;
 
             if self.batch.len() > self.max_size {
@@ -151,4 +144,76 @@ where
         self.closing = true;
         self.poll_complete()
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::BatchSink;
+    use crate::sinks::util::Buffer;
+    use futures::{Future, Sink};
+
+    #[test]
+    fn batch_sink_buffers_messages_until_limit() {
+        let buffered = BatchSink::new(vec![], Vec::new(), 10);
+
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(0..22))
+            .wait()
+            .unwrap();
+
+        let output = buffered.into_inner();
+        assert_eq!(
+            output,
+            vec![
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                vec![20, 21]
+            ]
+        );
+    }
+
+    #[test]
+    fn batch_sink_doesnt_buffer_if_its_flushed() {
+        let buffered = BatchSink::new(vec![], Vec::new(), 10);
+
+        let buffered = buffered.send(0).wait().unwrap();
+        let buffered = buffered.send(1).wait().unwrap();
+
+        let output = buffered.into_inner();
+        assert_eq!(output, vec![vec![0], vec![1],]);
+    }
+
+    #[test]
+    fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
+        let buffered = BatchSink::new(vec![], Buffer::new(false), 10);
+
+        let input = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 7, 8],
+            vec![9, 10, 11],
+            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+            vec![24],
+        ];
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered
+            .into_inner()
+            .into_iter()
+            .map(|buf| buf.into())
+            .collect::<Vec<Vec<u8>>>();
+
+        assert_eq!(
+            output,
+            vec![
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+                vec![24],
+            ]
+        );
+    }
+
 }
