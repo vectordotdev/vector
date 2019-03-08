@@ -1,6 +1,6 @@
 use crate::record::Record;
 use crate::sinks::util::{Buffer, ServiceSink, SinkExt};
-use futures::{Async, AsyncSink, Future, Poll, Sink};
+use futures::{Future, Poll, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
@@ -11,8 +11,6 @@ use tower_service::Service;
 use tower_timeout::Timeout;
 
 pub struct S3Sink {
-    buffer: Buffer,
-    in_flight: Option<RusotoFuture<PutObjectOutput, PutObjectError>>,
     config: S3SinkInnerConfig,
 }
 
@@ -73,13 +71,6 @@ impl S3SinkConfig {
 }
 
 impl S3Sink {
-    fn send_request(&mut self) {
-        let body = self.buffer.get_and_reset();
-        let response = self.send_body(body);
-        assert!(self.in_flight.is_none());
-        self.in_flight = Some(response);
-    }
-
     fn send_body(&mut self, body: Vec<u8>) -> RusotoFuture<PutObjectOutput, PutObjectError> {
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
@@ -98,81 +89,6 @@ impl S3Sink {
         };
 
         self.config.client.put_object(request)
-    }
-
-    fn buffer_full(&self) -> bool {
-        self.buffer.size() >= self.config.buffer_size
-    }
-
-    fn full(&self) -> bool {
-        self.buffer_full() && self.in_flight.is_some()
-    }
-}
-
-impl Sink for S3Sink {
-    type SinkItem = Record;
-    type SinkError = ();
-
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        if self.full() {
-            self.poll_complete()?;
-
-            if self.full() {
-                return Ok(AsyncSink::NotReady(item));
-            }
-        }
-
-        self.buffer.push(&item.line.into_bytes());
-        self.buffer.push(b"\n");
-
-        if self.buffer_full() {
-            self.poll_complete()?;
-        }
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        loop {
-            if let Some(ref mut in_flight) = self.in_flight {
-                match in_flight.poll() {
-                    Err(e) => panic!("{:?}", e),
-                    Ok(Async::Ready(_)) => self.in_flight = None,
-                    Ok(Async::NotReady) => {
-                        if self.buffer_full() {
-                            return Ok(Async::NotReady);
-                        } else {
-                            return Ok(Async::Ready(()));
-                        }
-                    }
-                }
-            } else if self.buffer_full() {
-                self.send_request();
-            } else {
-                return Ok(Async::Ready(()));
-            }
-        }
-    }
-
-    fn close(&mut self) -> Result<Async<()>, Self::SinkError> {
-        loop {
-            if let Some(ref mut in_flight) = self.in_flight {
-                match in_flight.poll() {
-                    Err(e) => panic!("{:?}", e),
-                    Ok(Async::Ready(_)) => self.in_flight = None,
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    }
-                }
-            } else if !self.buffer.is_empty() {
-                self.send_request();
-            } else {
-                return Ok(Async::Ready(()));
-            }
-        }
     }
 }
 
@@ -194,13 +110,7 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let gzip = config.gzip;
     let buffer_size = config.buffer_size;
 
-    let buffer = Buffer::new(config.gzip);
-
-    let inner = S3Sink {
-        buffer,
-        in_flight: None,
-        config,
-    };
+    let inner = S3Sink { config };
 
     let timeout = Timeout::new(inner, Duration::from_secs(10));
     let limited = InFlightLimit::new(timeout, 1);
