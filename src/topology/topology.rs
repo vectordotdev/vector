@@ -189,6 +189,35 @@ impl RunningTopology {
             rt.spawn(task);
         }
 
+        // Transforms
+        let old_transform_names: HashSet<&String> =
+            old_config.transforms.keys().collect::<HashSet<_>>();
+        let new_transform_names: HashSet<&String> =
+            new_config.transforms.keys().collect::<HashSet<_>>();
+
+        let transforms_to_add = &new_transform_names - &old_transform_names;
+
+        for name in transforms_to_add {
+            info!("Adding transform {:?}", name);
+
+            let name = name.to_owned();
+            let (tx, inputs) = new_pieces.inputs.remove(&name).unwrap();
+            // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
+            // so until a test exposes this hole
+
+            let task = new_pieces.tasks.remove(&name).unwrap();
+            rt.spawn(task);
+
+            for input in inputs {
+                self.outputs[&input]
+                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                    .unwrap();
+            }
+
+            let output = new_pieces.outputs.remove(&name).unwrap();
+            self.outputs.insert(name.clone(), output);
+        }
+
         // Sinks
         let old_sink_names: HashSet<&String> = old_config.sinks.keys().collect::<HashSet<_>>();
         let new_sink_names: HashSet<&String> = new_config.sinks.keys().collect::<HashSet<_>>();
@@ -293,6 +322,7 @@ mod tests {
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
+    use crate::transforms::SamplerConfig;
     use futures::{stream, Future, Stream};
     use std::collections::HashSet;
     use std::sync::{
@@ -756,5 +786,66 @@ mod tests {
             .into_iter()
             .collect::<HashSet<_>>()
         );
+    }
+
+    #[test]
+    fn topology_add_transform() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let (output_lines1, output_lines1_count) =
+            receive_lines_with_count(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(in_addr));
+        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines1.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        new_config.add_transform(
+            "sampler",
+            &["in"],
+            SamplerConfig {
+                rate: 2,
+                pass_list: vec![],
+            },
+        );
+        new_config.sinks[&"out".to_string()].inputs = vec!["sampler".to_string()];
+
+        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= num_lines);
+
+        topology.reload_config(new_config, &mut rt);
+
+        // The sink gets rebuilt, causing it to open a new connection
+        let output_lines1 = output_lines1.wait().unwrap();
+        let output_lines2 = receive_lines(&out_addr, &rt.executor());
+
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        assert_eq!(num_lines, output_lines1.len());
+        assert_eq!(input_lines1, output_lines1);
+
+        let output_lines2 = output_lines2.wait().unwrap();
+        assert!(output_lines2.len() > 0);
+        assert!(output_lines2.len() < num_lines);
     }
 }
