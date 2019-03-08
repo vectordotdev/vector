@@ -1,6 +1,7 @@
 use super::{builder, fanout, Config};
 use crate::buffers;
 use futures::{sync::oneshot, Future};
+use indexmap::IndexMap;
 use log::{error, info};
 use std::collections::{HashMap, HashSet};
 use stream_cancel::Trigger;
@@ -130,45 +131,58 @@ impl RunningTopology {
             }
         };
 
-        // Sources
-        let old_source_names: HashSet<&String> = old_config.sources.keys().collect::<HashSet<_>>();
-        let new_source_names: HashSet<&String> = new_config.sources.keys().collect::<HashSet<_>>();
+        fn to_remove_change_add<C>(
+            old: &IndexMap<String, C>,
+            new: &IndexMap<String, C>,
+        ) -> (HashSet<String>, HashSet<String>, HashSet<String>)
+        where
+            C: serde::Serialize + serde::Deserialize<'static>,
+        {
+            let old_names = old.keys().cloned().collect::<HashSet<_>>();
+            let new_names = new.keys().cloned().collect::<HashSet<_>>();
 
-        let sources_to_change: HashSet<&String> = old_source_names
-            .intersection(&new_source_names)
-            .filter(|&&n| {
-                let old_toml = toml::Value::try_from(&old_config.sources[n]).unwrap();
-                let new_toml = toml::Value::try_from(&new_config.sources[n]).unwrap();
-                old_toml != new_toml
-            })
-            .map(|&n| n)
-            .collect::<HashSet<_>>();
+            let to_change = old_names
+                .intersection(&new_names)
+                .filter(|&n| {
+                    let old_toml = toml::Value::try_from(&old[n]).unwrap();
+                    let new_toml = toml::Value::try_from(&new[n]).unwrap();
+                    old_toml != new_toml
+                })
+                .cloned()
+                .collect::<HashSet<_>>();
 
-        let sources_to_remove = &(&old_source_names - &new_source_names) | &sources_to_change;
-        let sources_to_add = &(&new_source_names - &old_source_names) | &sources_to_change;
+            let to_remove = &old_names - &new_names;
+            let to_add = &new_names - &old_names;
 
-        for name in sources_to_remove {
-            info!("Removing source {:?}", name);
-
-            self.shutdown_triggers.remove(name).unwrap().cancel();
-            self.outputs.remove(name);
-
-            self.source_tasks.remove(name).wait().unwrap();
+            (to_remove, to_change, to_add)
         }
 
-        for name in sources_to_add {
+        // Sources
+        let (sources_to_remove, sources_to_change, sources_to_add) =
+            to_remove_change_add(&old_config.sources, &new_config.sources);
+
+        for name in &sources_to_remove | &sources_to_change {
+            info!("Removing source {:?}", name);
+
+            self.shutdown_triggers.remove(&name).unwrap().cancel();
+            self.outputs.remove(&name);
+
+            self.source_tasks.remove(&name).wait().unwrap();
+        }
+
+        for name in &sources_to_add | &sources_to_change {
             info!("Adding source {:?}", name);
 
             self.shutdown_triggers.insert(
                 name.clone(),
-                new_pieces.shutdown_triggers.remove(name).unwrap(),
+                new_pieces.shutdown_triggers.remove(&name).unwrap(),
             );
 
-            let output = new_pieces.outputs.remove(name).unwrap();
+            let output = new_pieces.outputs.remove(&name).unwrap();
 
-            if sources_to_change.contains(name) {
+            if sources_to_change.contains(&name) {
                 for (sink_name, sink) in &old_config.sinks {
-                    if sink.inputs.contains(name) {
+                    if sink.inputs.contains(&name) {
                         output
                             .unbounded_send(fanout::ControlMessage::Add(
                                 sink_name.clone(),
@@ -181,60 +195,45 @@ impl RunningTopology {
 
             self.outputs.insert(name.clone(), output);
 
-            let source_task = new_pieces.source_tasks.remove(name).unwrap();
+            let source_task = new_pieces.source_tasks.remove(&name).unwrap();
             self.source_tasks
                 .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
 
-            let task = new_pieces.tasks.remove(name).unwrap();
+            let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
         }
 
         // Transforms
-        let old_transform_names: HashSet<&String> =
-            old_config.transforms.keys().collect::<HashSet<_>>();
-        let new_transform_names: HashSet<&String> =
-            new_config.transforms.keys().collect::<HashSet<_>>();
-
-        let transforms_to_change: HashSet<&String> = old_transform_names
-            .intersection(&new_transform_names)
-            .filter(|&&n| {
-                let old_toml = toml::Value::try_from(&old_config.transforms[n]).unwrap();
-                let new_toml = toml::Value::try_from(&new_config.transforms[n]).unwrap();
-                old_toml != new_toml
-            })
-            .map(|&n| n)
-            .collect::<HashSet<_>>();
-
-        let transforms_to_remove = &old_transform_names - &new_transform_names;
-        let transforms_to_add = &new_transform_names - &old_transform_names;
+        let (transforms_to_remove, transforms_to_change, transforms_to_add) =
+            to_remove_change_add(&old_config.transforms, &new_config.transforms);
 
         for name in transforms_to_remove {
             info!("Removing transform {:?}", name);
 
-            self.inputs.remove(name);
+            self.inputs.remove(&name);
 
-            for input in &old_config.transforms[name].inputs {
+            for input in &old_config.transforms[&name].inputs {
                 self.outputs[input]
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
             }
 
-            self.outputs.remove(name);
+            self.outputs.remove(&name);
         }
 
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
-            let (tx, _) = new_pieces.inputs.remove(name).unwrap();
+            let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
 
-            let task = new_pieces.tasks.remove(name).unwrap();
+            let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
 
-            let old_inputs = old_config.transforms[name]
+            let old_inputs = old_config.transforms[&name]
                 .inputs
                 .iter()
                 .collect::<HashSet<_>>();
-            let new_inputs = new_config.transforms[name]
+            let new_inputs = new_config.transforms[&name]
                 .inputs
                 .iter()
                 .collect::<HashSet<_>>();
@@ -263,12 +262,12 @@ impl RunningTopology {
                     .unwrap();
             }
 
-            let output = new_pieces.outputs.remove(name).unwrap();
+            let output = new_pieces.outputs.remove(&name).unwrap();
 
             self.inputs.insert(name.clone(), tx);
 
             for (sink_name, sink) in &old_config.sinks {
-                if sink.inputs.contains(name) {
+                if sink.inputs.contains(&name) {
                     output
                         .unbounded_send(fanout::ControlMessage::Add(
                             sink_name.clone(),
@@ -301,28 +300,15 @@ impl RunningTopology {
         }
 
         // Sinks
-        let old_sink_names: HashSet<&String> = old_config.sinks.keys().collect::<HashSet<_>>();
-        let new_sink_names: HashSet<&String> = new_config.sinks.keys().collect::<HashSet<_>>();
-
-        let sinks_to_change: HashSet<&String> = old_sink_names
-            .intersection(&new_sink_names)
-            .filter(|&&n| {
-                let old_toml = toml::Value::try_from(&old_config.sinks[n]).unwrap();
-                let new_toml = toml::Value::try_from(&new_config.sinks[n]).unwrap();
-                old_toml != new_toml
-            })
-            .map(|&n| n)
-            .collect::<HashSet<_>>();
-
-        let sinks_to_remove = &old_sink_names - &new_sink_names;
-        let sinks_to_add = &new_sink_names - &old_sink_names;
+        let (sinks_to_remove, sinks_to_change, sinks_to_add) =
+            to_remove_change_add(&old_config.sinks, &new_config.sinks);
 
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
 
-            self.inputs.remove(name);
+            self.inputs.remove(&name);
 
-            for input in &old_config.sinks[name].inputs {
+            for input in &old_config.sinks[&name].inputs {
                 self.outputs[input]
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
