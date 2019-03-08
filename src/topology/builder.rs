@@ -11,7 +11,8 @@ type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
     pub outputs: HashMap<String, fanout::ControlChannel>,
-    pub tasks: HashMap<String, Vec<Task>>,
+    pub tasks: HashMap<String, Task>,
+    pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_triggers: HashMap<String, Trigger>,
 }
@@ -20,6 +21,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
     let mut tasks = HashMap::new();
+    let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_triggers = HashMap::new();
 
@@ -48,7 +50,8 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let server: Task = Box::new(server);
 
         outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), vec![pump, server]);
+        tasks.insert(name.clone(), pump);
+        source_tasks.insert(name.clone(), server);
         shutdown_triggers.insert(name.clone(), trigger);
     }
 
@@ -76,7 +79,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
         outputs.insert(name.clone(), control);
-        tasks.insert(name.clone(), vec![task]);
+        tasks.insert(name.clone(), task);
     }
 
     // Build sinks
@@ -112,7 +115,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(name.clone(), healthcheck_task);
-        tasks.insert(name.clone(), vec![task]);
+        tasks.insert(name.clone(), task);
     }
 
     // Warnings and errors
@@ -171,6 +174,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
             inputs,
             outputs,
             tasks,
+            source_tasks,
             healthchecks,
             shutdown_triggers,
         };
