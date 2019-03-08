@@ -1,10 +1,14 @@
 use crate::record::Record;
-use crate::sinks::util::Buffer;
-use futures::{Async, AsyncSink, Future, Sink};
+use crate::sinks::util::{Buffer, ServiceSink, SinkExt};
+use futures::{Async, AsyncSink, Future, Poll, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tower_in_flight_limit::InFlightLimit;
+use tower_service::Service;
+use tower_timeout::Timeout;
 
 pub struct S3Sink {
     buffer: Buffer,
@@ -71,7 +75,12 @@ impl S3SinkConfig {
 impl S3Sink {
     fn send_request(&mut self) {
         let body = self.buffer.get_and_reset();
+        let response = self.send_body(body);
+        assert!(self.in_flight.is_none());
+        self.in_flight = Some(response);
+    }
 
+    fn send_body(&mut self, body: Vec<u8>) -> RusotoFuture<PutObjectOutput, PutObjectError> {
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
         let extension = if self.config.gzip { ".log.gz" } else { ".log" };
@@ -88,9 +97,7 @@ impl S3Sink {
             ..Default::default()
         };
 
-        let response = self.config.client.put_object(request);
-        assert!(self.in_flight.is_none());
-        self.in_flight = Some(response);
+        self.config.client.put_object(request)
     }
 
     fn buffer_full(&self) -> bool {
@@ -169,14 +176,42 @@ impl Sink for S3Sink {
     }
 }
 
+impl Service<Buffer> for S3Sink {
+    type Response = PutObjectOutput;
+    type Error = PutObjectError;
+    type Future = RusotoFuture<PutObjectOutput, PutObjectError>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, buf: Buffer) -> Self::Future {
+        self.send_body(buf.into())
+    }
+}
+
 pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
+    let gzip = config.gzip;
+    let buffer_size = config.buffer_size;
+
     let buffer = Buffer::new(config.gzip);
 
-    let sink = S3Sink {
+    let inner = S3Sink {
         buffer,
         in_flight: None,
         config,
     };
+
+    let timeout = Timeout::new(inner, Duration::from_secs(10));
+    let limited = InFlightLimit::new(timeout, 1);
+
+    let sink = ServiceSink::new(limited)
+        .batched(Buffer::new(gzip), buffer_size)
+        .with(|record: Record| {
+            let mut bytes: Vec<u8> = record.into();
+            bytes.push(b'\n');
+            Ok(bytes)
+        });
 
     Box::new(sink)
 }
