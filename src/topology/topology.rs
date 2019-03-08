@@ -442,12 +442,12 @@ mod tests {
     // swapped in for the old one and that no records are lost in the changeover.
     #[test]
     fn topology_change_sink_no_gap() {
+        let in_addr = next_addr();
+        let out1_addr = next_addr();
+        let out2_addr = next_addr();
+
         for _ in 0..10 {
             let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-            let in_addr = next_addr();
-            let out1_addr = next_addr();
-            let out2_addr = next_addr();
 
             let (output_lines1, output_lines1_count) =
                 receive_lines_with_count(&out1_addr, &rt.executor());
