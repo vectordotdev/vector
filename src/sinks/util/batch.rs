@@ -40,7 +40,7 @@ impl<T> Batch for Vec<T> {
     }
 }
 
-pub struct BatchSink<B: Batch, S: Sink> {
+pub struct BatchSink<B, S> {
     batch: B,
     inner: S,
     max_size: usize,
