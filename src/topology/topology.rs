@@ -195,6 +195,16 @@ impl RunningTopology {
         let new_transform_names: HashSet<&String> =
             new_config.transforms.keys().collect::<HashSet<_>>();
 
+        let transforms_to_change: HashSet<&String> = old_transform_names
+            .intersection(&new_transform_names)
+            .filter(|&&n| {
+                let old_toml = toml::Value::try_from(&old_config.transforms[n]).unwrap();
+                let new_toml = toml::Value::try_from(&new_config.transforms[n]).unwrap();
+                old_toml != new_toml
+            })
+            .map(|&n| n)
+            .collect::<HashSet<_>>();
+
         let transforms_to_remove = &old_transform_names - &new_transform_names;
         let transforms_to_add = &new_transform_names - &old_transform_names;
 
@@ -210,6 +220,63 @@ impl RunningTopology {
             }
 
             self.outputs.remove(name);
+        }
+
+        for name in transforms_to_change {
+            info!("Rebuilding transform {:?}", name);
+
+            let (tx, _) = new_pieces.inputs.remove(name).unwrap();
+
+            let task = new_pieces.tasks.remove(name).unwrap();
+            rt.spawn(task);
+
+            let old_inputs = old_config.transforms[name]
+                .inputs
+                .iter()
+                .collect::<HashSet<_>>();
+            let new_inputs = new_config.transforms[name]
+                .inputs
+                .iter()
+                .collect::<HashSet<_>>();
+
+            let inputs_to_remove = &old_inputs - &new_inputs;
+            let inputs_to_add = &new_inputs - &old_inputs;
+            let inputs_to_replace = old_inputs.intersection(&new_inputs);
+
+            for input in inputs_to_remove {
+                if let Some(output) = self.outputs.get(input) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                        .unwrap();
+                }
+            }
+
+            for input in inputs_to_add {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                    .unwrap();
+            }
+
+            for &input in inputs_to_replace {
+                self.outputs[input]
+                    .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
+                    .unwrap();
+            }
+
+            let output = new_pieces.outputs.remove(name).unwrap();
+
+            self.inputs.insert(name.clone(), tx);
+
+            for (sink_name, sink) in &old_config.sinks {
+                if sink.inputs.contains(name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(
+                            sink_name.clone(),
+                            self.inputs[sink_name].get(),
+                        ))
+                        .unwrap();
+                }
+            }
         }
 
         for name in transforms_to_add {
@@ -925,5 +992,86 @@ mod tests {
         let output_lines2 = output_lines2.wait().unwrap();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
+    }
+
+    #[test]
+    fn topology_change_transform() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let (output_lines, output_lines_count) =
+            receive_lines_with_count(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(in_addr));
+        old_config.add_transform(
+            "sampler",
+            &["in"],
+            SamplerConfig {
+                rate: 2,
+                pass_list: vec![],
+            },
+        );
+        old_config.add_sink("out", &["sampler"], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr);
+
+        let input_lines1 = random_lines(100)
+            .map(|s| s + "before")
+            .take(num_lines)
+            .collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines1.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        wait_for(|| output_lines_count.load(Ordering::Relaxed) >= 1);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        new_config.transforms[&"sampler".to_string()].inner = Box::new(SamplerConfig {
+            rate: 10,
+            pass_list: vec![],
+        });
+
+        topology.reload_config(new_config, &mut rt);
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        let input_lines2 = random_lines(100)
+            .map(|s| s + "after")
+            .take(num_lines)
+            .collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines = output_lines.wait().unwrap();
+
+        let num_before = output_lines
+            .iter()
+            .filter(|&l| l.ends_with("before"))
+            .count();
+        let num_after = output_lines
+            .iter()
+            .filter(|&l| l.ends_with("after"))
+            .count();
+
+        assert!(num_before > 0);
+        assert!(num_before < num_lines);
+
+        assert!(num_after > 0);
+        assert!(num_after < num_lines);
+
+        assert!(num_before > num_after);
     }
 }
