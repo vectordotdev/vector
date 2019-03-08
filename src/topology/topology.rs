@@ -857,6 +857,7 @@ mod tests {
             rt.block_on(send_lines(in_addr, std::iter::once(line.to_owned())))
                 .unwrap();
         }
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
         // Shut down server
         topology.stop();
