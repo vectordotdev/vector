@@ -67,7 +67,7 @@ where
         self.closing || self.batch.len() > self.min_size || self.batch.len() >= self.max_size
     }
 
-    fn try_send(&mut self) -> Poll<(), S::SinkError> {
+    fn poll_send(&mut self) -> Poll<(), S::SinkError> {
         let batch = std::mem::replace(&mut self.batch, Default::default());
         if let AsyncSink::NotReady(batch) = self.inner.start_send(batch)? {
             self.batch = batch;
@@ -136,7 +136,7 @@ where
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
                 if self.should_send() {
-                    try_ready!(self.try_send());
+                    try_ready!(self.poll_send());
                 } else {
                     return Ok(Async::NotReady);
                 }
