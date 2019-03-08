@@ -114,8 +114,6 @@ impl RunningTopology {
     fn reload_config(&mut self, new_config: Config, rt: &mut tokio::runtime::Runtime) {
         info!("Reloading config");
 
-        let old_config = &self.config;
-
         let mut new_pieces = match builder::build_pieces(&new_config) {
             Err(errors) => {
                 for error in errors {
@@ -159,7 +157,7 @@ impl RunningTopology {
 
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
-            to_remove_change_add(&old_config.sources, &new_config.sources);
+            to_remove_change_add(&self.config.sources, &new_config.sources);
 
         for name in &sources_to_remove | &sources_to_change {
             info!("Removing source {:?}", name);
@@ -181,7 +179,7 @@ impl RunningTopology {
             let output = new_pieces.outputs.remove(&name).unwrap();
 
             if sources_to_change.contains(&name) {
-                for (sink_name, sink) in &old_config.sinks {
+                for (sink_name, sink) in &self.config.sinks {
                     if sink.inputs.contains(&name) {
                         output
                             .unbounded_send(fanout::ControlMessage::Add(
@@ -205,14 +203,14 @@ impl RunningTopology {
 
         // Transforms
         let (transforms_to_remove, transforms_to_change, transforms_to_add) =
-            to_remove_change_add(&old_config.transforms, &new_config.transforms);
+            to_remove_change_add(&self.config.transforms, &new_config.transforms);
 
         for name in transforms_to_remove {
             info!("Removing transform {:?}", name);
 
             self.inputs.remove(&name);
 
-            for input in &old_config.transforms[&name].inputs {
+            for input in &self.config.transforms[&name].inputs {
                 self.outputs[input]
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
@@ -229,7 +227,7 @@ impl RunningTopology {
             let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
 
-            let old_inputs = old_config.transforms[&name]
+            let old_inputs = self.config.transforms[&name]
                 .inputs
                 .iter()
                 .collect::<HashSet<_>>();
@@ -266,7 +264,7 @@ impl RunningTopology {
 
             self.inputs.insert(name.clone(), tx);
 
-            for (sink_name, sink) in &old_config.sinks {
+            for (sink_name, sink) in &self.config.sinks {
                 if sink.inputs.contains(&name) {
                     output
                         .unbounded_send(fanout::ControlMessage::Add(
@@ -301,14 +299,14 @@ impl RunningTopology {
 
         // Sinks
         let (sinks_to_remove, sinks_to_change, sinks_to_add) =
-            to_remove_change_add(&old_config.sinks, &new_config.sinks);
+            to_remove_change_add(&self.config.sinks, &new_config.sinks);
 
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
 
             self.inputs.remove(&name);
 
-            for input in &old_config.sinks[&name].inputs {
+            for input in &self.config.sinks[&name].inputs {
                 self.outputs[input]
                     .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                     .unwrap();
@@ -324,7 +322,7 @@ impl RunningTopology {
             let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
 
-            let old_inputs = old_config.sinks[&name]
+            let old_inputs = self.config.sinks[&name]
                 .inputs
                 .iter()
                 .collect::<HashSet<_>>();
