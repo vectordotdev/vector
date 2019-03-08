@@ -163,18 +163,14 @@ impl RunningTopology {
             info!("Removing source {:?}", name);
 
             self.remove_outputs(&name);
-
-            self.shutdown_triggers.remove(&name).unwrap().cancel();
-            self.source_tasks.remove(&name).wait().unwrap();
+            self.shutdown_source(&name);
         }
 
         for name in sources_to_change {
             info!("Rebuiling source {:?}", name);
 
             self.remove_outputs(&name);
-
-            self.shutdown_triggers.remove(&name).unwrap().cancel();
-            self.source_tasks.remove(&name).wait().unwrap();
+            self.shutdown_source(&name);
 
             let output = new_pieces.outputs.remove(&name).unwrap();
 
@@ -367,6 +363,11 @@ impl RunningTopology {
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         self.source_tasks
             .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
+    }
+
+    fn shutdown_source(&mut self, name: &String) {
+        self.shutdown_triggers.remove(name).unwrap().cancel();
+        self.source_tasks.remove(name).wait().unwrap();
     }
 
     fn remove_outputs(&mut self, name: &String) {
