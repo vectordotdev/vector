@@ -1,13 +1,13 @@
 pub mod batch;
+pub mod buffer;
 pub mod http;
 pub mod retries;
-pub mod size_buffered;
 
 use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use log::{error, trace};
 use tower_service::Service;
 
-pub use size_buffered::Buffer;
+pub use buffer::Buffer;
 
 pub trait SinkExt<B>
 where
