@@ -159,7 +159,7 @@ impl RunningTopology {
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
 
-        for name in &sources_to_remove | &sources_to_change {
+        for name in sources_to_remove {
             info!("Removing source {:?}", name);
 
             self.remove_outputs(&name);
@@ -168,8 +168,13 @@ impl RunningTopology {
             self.source_tasks.remove(&name).wait().unwrap();
         }
 
-        for name in &sources_to_add | &sources_to_change {
-            info!("Adding source {:?}", name);
+        for name in sources_to_change {
+            info!("Rebuiling source {:?}", name);
+
+            self.remove_outputs(&name);
+
+            self.shutdown_triggers.remove(&name).unwrap().cancel();
+            self.source_tasks.remove(&name).wait().unwrap();
 
             self.shutdown_triggers.insert(
                 name.clone(),
@@ -178,18 +183,36 @@ impl RunningTopology {
 
             let output = new_pieces.outputs.remove(&name).unwrap();
 
-            if sources_to_change.contains(&name) {
-                for (sink_name, sink) in &self.config.sinks {
-                    if sink.inputs.contains(&name) {
-                        output
-                            .unbounded_send(fanout::ControlMessage::Add(
-                                sink_name.clone(),
-                                self.inputs[sink_name].get(),
-                            ))
-                            .unwrap();
-                    }
+            for (sink_name, sink) in &self.config.sinks {
+                if sink.inputs.contains(&name) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Add(
+                            sink_name.clone(),
+                            self.inputs[sink_name].get(),
+                        ))
+                        .unwrap();
                 }
             }
+
+            self.outputs.insert(name.clone(), output);
+
+            let source_task = new_pieces.source_tasks.remove(&name).unwrap();
+            self.source_tasks
+                .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
+
+            let task = new_pieces.tasks.remove(&name).unwrap();
+            rt.spawn(task);
+        }
+
+        for name in sources_to_add {
+            info!("Adding source {:?}", name);
+
+            self.shutdown_triggers.insert(
+                name.clone(),
+                new_pieces.shutdown_triggers.remove(&name).unwrap(),
+            );
+
+            let output = new_pieces.outputs.remove(&name).unwrap();
 
             self.outputs.insert(name.clone(), output);
 
