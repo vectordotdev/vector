@@ -172,20 +172,7 @@ impl RunningTopology {
             self.remove_outputs(&name);
             self.shutdown_source(&name);
 
-            let output = new_pieces.outputs.remove(&name).unwrap();
-
-            for (sink_name, sink) in &self.config.sinks {
-                if sink.inputs.contains(&name) {
-                    output
-                        .unbounded_send(fanout::ControlMessage::Add(
-                            sink_name.clone(),
-                            self.inputs[sink_name].get(),
-                        ))
-                        .unwrap();
-                }
-            }
-
-            self.outputs.insert(name.clone(), output);
+            self.setup_outputs(&name, &mut new_pieces);
 
             self.spawn_source(&name, &mut new_pieces, rt);
             self.spawn(&name, &mut new_pieces, rt);
@@ -213,57 +200,10 @@ impl RunningTopology {
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
-            let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
-
             self.spawn(&name, &mut new_pieces, rt);
 
-            let old_inputs = self.config.transforms[&name]
-                .inputs
-                .iter()
-                .collect::<HashSet<_>>();
-            let new_inputs = new_config.transforms[&name]
-                .inputs
-                .iter()
-                .collect::<HashSet<_>>();
-
-            let inputs_to_remove = &old_inputs - &new_inputs;
-            let inputs_to_add = &new_inputs - &old_inputs;
-            let inputs_to_replace = old_inputs.intersection(&new_inputs);
-
-            for input in inputs_to_remove {
-                if let Some(output) = self.outputs.get(input) {
-                    output
-                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                        .unwrap();
-                }
-            }
-
-            for input in inputs_to_add {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            for &input in inputs_to_replace {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            let output = new_pieces.outputs.remove(&name).unwrap();
-
-            self.inputs.insert(name.clone(), tx);
-
-            for (sink_name, sink) in &self.config.sinks {
-                if sink.inputs.contains(&name) {
-                    output
-                        .unbounded_send(fanout::ControlMessage::Add(
-                            sink_name.clone(),
-                            self.inputs[sink_name].get(),
-                        ))
-                        .unwrap();
-                }
-            }
+            self.setup_outputs(&name, &mut new_pieces);
+            self.replace_inputs(&name, &mut new_pieces);
         }
 
         for name in transforms_to_add {
@@ -287,45 +227,8 @@ impl RunningTopology {
         for name in sinks_to_change {
             info!("Rebuilding sink {:?}", name);
 
-            let name = name.to_owned();
-            let (tx, _) = new_pieces.inputs.remove(&name).unwrap();
-
             self.spawn(&name, &mut new_pieces, rt);
-
-            let old_inputs = self.config.sinks[&name]
-                .inputs
-                .iter()
-                .collect::<HashSet<_>>();
-            let new_inputs = new_config.sinks[&name]
-                .inputs
-                .iter()
-                .collect::<HashSet<_>>();
-
-            let inputs_to_remove = &old_inputs - &new_inputs;
-            let inputs_to_add = &new_inputs - &old_inputs;
-            let inputs_to_replace = old_inputs.intersection(&new_inputs);
-
-            for input in inputs_to_remove {
-                if let Some(output) = self.outputs.get(input) {
-                    output
-                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                        .unwrap();
-                }
-            }
-
-            for input in inputs_to_add {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            for &input in inputs_to_replace {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            self.inputs.insert(name.clone(), tx);
+            self.replace_inputs(&name, &mut new_pieces);
         }
 
         for name in sinks_to_add {
@@ -389,6 +292,28 @@ impl RunningTopology {
 
     fn setup_outputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
         let output = new_pieces.outputs.remove(name).unwrap();
+
+        for (sink_name, sink) in &self.config.sinks {
+            if sink.inputs.contains(&name) {
+                output
+                    .unbounded_send(fanout::ControlMessage::Add(
+                        sink_name.clone(),
+                        self.inputs[sink_name].get(),
+                    ))
+                    .unwrap();
+            }
+        }
+        for (transform_name, transform) in &self.config.transforms {
+            if transform.inputs.contains(&name) {
+                output
+                    .unbounded_send(fanout::ControlMessage::Add(
+                        transform_name.clone(),
+                        self.inputs[transform_name].get(),
+                    ))
+                    .unwrap();
+            }
+        }
+
         self.outputs.insert(name.clone(), output);
     }
 
@@ -402,6 +327,46 @@ impl RunningTopology {
                 .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
                 .unwrap();
         }
+    }
+
+    fn replace_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+        let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
+
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let old_inputs = sink_inputs
+            .or(trans_inputs)
+            .unwrap()
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        let new_inputs = inputs.iter().collect::<HashSet<_>>();
+
+        let inputs_to_remove = &old_inputs - &new_inputs;
+        let inputs_to_add = &new_inputs - &old_inputs;
+        let inputs_to_replace = old_inputs.intersection(&new_inputs);
+
+        for input in inputs_to_remove {
+            if let Some(output) = self.outputs.get(input) {
+                output
+                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                    .unwrap();
+            }
+        }
+
+        for input in inputs_to_add {
+            self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
+                .unwrap();
+        }
+
+        for &input in inputs_to_replace {
+            self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.clone(), tx.get()))
+                .unwrap();
+        }
+
+        self.inputs.insert(name.clone(), tx);
     }
 }
 
