@@ -122,6 +122,30 @@ impl RunningTopology {
             }
         };
 
+        // Sources
+        let old_source_names: HashSet<&String> = old_config.sources.keys().collect::<HashSet<_>>();
+        let new_source_names: HashSet<&String> = new_config.sources.keys().collect::<HashSet<_>>();
+
+        let sources_to_add = &new_source_names - &old_source_names;
+
+        for name in sources_to_add {
+            info!("Adding source {:?}", name);
+
+            self.shutdown_triggers.insert(
+                name.clone(),
+                new_pieces.shutdown_triggers.remove(name).unwrap(),
+            );
+
+            self.outputs
+                .insert(name.clone(), new_pieces.outputs.remove(name).unwrap());
+
+            let tasks = new_pieces.tasks.remove(name).unwrap();
+            for task in tasks {
+                rt.spawn(task);
+            }
+        }
+
+        // Sinks
         let old_sink_names: HashSet<&String> = old_config.sinks.keys().collect::<HashSet<_>>();
         let new_sink_names: HashSet<&String> = new_config.sinks.keys().collect::<HashSet<_>>();
 
@@ -458,5 +482,48 @@ mod tests {
                 output_lines1.len() + output_lines2.len()
             );
         }
+    }
+
+    #[test]
+    fn topology_add_source() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let num_lines: usize = 100;
+
+        let in_addr = next_addr();
+        let out_addr = next_addr();
+
+        let output_lines = receive_lines(&out_addr, &rt.executor());
+
+        let mut old_config = Config::empty();
+        old_config.add_sink("out", &[], TcpSinkConfig { address: out_addr });
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        assert!(std::net::TcpStream::connect(in_addr).is_err());
+
+        new_config.add_source("in", TcpConfig::new(in_addr));
+        new_config.sinks[&"out".to_string()]
+            .inputs
+            .push("in".to_string());
+
+        topology.reload_config(new_config, &mut rt);
+
+        wait_for_tcp(in_addr);
+
+        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let send = send_lines(in_addr, input_lines.clone().into_iter());
+        rt.block_on(send).unwrap();
+
+        // Shut down server
+        topology.stop();
+        shutdown_on_idle(rt);
+
+        let output_lines = output_lines.wait().unwrap();
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
     }
 }
