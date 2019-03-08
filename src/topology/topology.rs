@@ -212,9 +212,7 @@ impl RunningTopology {
                 new_pieces.shutdown_triggers.remove(&name).unwrap(),
             );
 
-            let output = new_pieces.outputs.remove(&name).unwrap();
-
-            self.outputs.insert(name.clone(), output);
+            self.setup_outputs(&name, &mut new_pieces);
 
             let source_task = new_pieces.source_tasks.remove(&name).unwrap();
             self.source_tasks
@@ -302,8 +300,7 @@ impl RunningTopology {
             let task = new_pieces.tasks.remove(&name).unwrap();
             rt.spawn(task);
 
-            let output = new_pieces.outputs.remove(&name).unwrap();
-            self.outputs.insert(name.clone(), output);
+            self.setup_outputs(&name, &mut new_pieces);
         }
 
         // Sinks
@@ -390,6 +387,11 @@ impl RunningTopology {
                     .unwrap();
             }
         }
+    }
+
+    fn setup_outputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
+        let output = new_pieces.outputs.remove(name).unwrap();
+        self.outputs.insert(name.clone(), output);
     }
 
     fn setup_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
