@@ -116,7 +116,7 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let limited = InFlightLimit::new(timeout, 1);
 
     let sink = ServiceSink::new(limited)
-        .batched(Buffer::new(gzip), buffer_size)
+        .batched_with_min(Buffer::new(gzip), buffer_size)
         .with(|record: Record| {
             let mut bytes: Vec<u8> = record.into();
             bytes.push(b'\n');
@@ -155,7 +155,7 @@ mod tests {
     use crate::test_util::{random_lines, random_string};
     use crate::{sinks, Record};
     use flate2::read::GzDecoder;
-    use futures::{stream, Sink};
+    use futures::{stream, Future, Sink};
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader};
@@ -243,6 +243,86 @@ mod tests {
         let (mut sink, _) = rt.block_on(pump).unwrap();
         rt.block_on(futures::future::poll_fn(move || sink.close()))
             .unwrap();
+
+        let list_res = client()
+            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
+                bucket: BUCKET.to_string(),
+                prefix: Some(prefix),
+                ..Default::default()
+            })
+            .sync()
+            .unwrap();
+
+        let keys = list_res
+            .contents
+            .unwrap()
+            .into_iter()
+            .map(|obj| obj.key.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(keys.len(), 3);
+
+        let response_lines = keys
+            .into_iter()
+            .map(|key| {
+                let obj = client()
+                    .get_object(rusoto_s3::GetObjectRequest {
+                        bucket: BUCKET.to_string(),
+                        key: key,
+                        ..Default::default()
+                    })
+                    .sync()
+                    .unwrap();
+
+                let response_lines = {
+                    let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
+                    buf_read.lines().map(|l| l.unwrap()).collect::<Vec<_>>()
+                };
+
+                response_lines
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(&lines[00..10], response_lines[0].as_slice());
+        assert_eq!(&lines[10..20], response_lines[1].as_slice());
+        assert_eq!(&lines[20..30], response_lines[2].as_slice());
+    }
+
+    #[test]
+    fn s3_waits_for_full_batch_or_timeout_before_sending() {
+        ensure_bucket(&client());
+
+        let config = S3SinkInnerConfig {
+            buffer_size: 1000,
+            ..config()
+        };
+        let prefix = config.key_prefix.clone();
+        let sink = sinks::s3::new(config);
+
+        let lines = random_lines(100).take(30).collect::<Vec<_>>();
+        let records = lines
+            .iter()
+            .map(|line| Record::from(line.clone()))
+            .collect::<Vec<_>>();
+
+        let (tx, rx) = futures::sync::mpsc::channel(1);
+        let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(pump);
+
+        let mut tx = tx.wait();
+        for record in records.iter().take(15) {
+            tx.send(record.clone()).unwrap();
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        for record in records.iter().skip(15) {
+            tx.send(record.clone()).unwrap();
+        }
+        drop(tx);
+
+        crate::test_util::shutdown_on_idle(rt);
 
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
