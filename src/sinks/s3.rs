@@ -1,6 +1,7 @@
 use crate::record::Record;
 use crate::sinks::util::{Buffer, ServiceSink, SinkExt};
 use futures::{Future, Poll, Sink};
+use log::info;
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
@@ -20,6 +21,7 @@ pub struct S3SinkInnerConfig {
     pub bucket: String,
     pub client: S3Client,
     pub gzip: bool,
+    pub max_linger_secs: u64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -31,6 +33,7 @@ pub struct S3SinkConfig {
     pub endpoint: Option<String>,
     pub buffer_size: usize,
     pub gzip: bool,
+    pub max_linger_secs: Option<u64>,
     // TODO: access key and secret token (if the rusoto provider chain stuff isn't good enough)
 }
 
@@ -66,6 +69,7 @@ impl S3SinkConfig {
             buffer_size: self.buffer_size,
             key_prefix: self.key_prefix.clone(),
             bucket: self.bucket.clone(),
+            max_linger_secs: self.max_linger_secs.unwrap_or(300),
         })
     }
 }
@@ -75,11 +79,14 @@ impl S3Sink {
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
         let extension = if self.config.gzip { ".log.gz" } else { ".log" };
+        let key = format!("{}{}{}", self.config.key_prefix, filename, extension);
+
+        info!("Flushing {} to S3 ({} bytes)", key, body.len());
 
         let request = PutObjectRequest {
             body: Some(body.into()),
             bucket: self.config.bucket.clone(),
-            key: format!("{}{}{}", self.config.key_prefix, filename, extension),
+            key,
             content_encoding: if self.config.gzip {
                 Some("gzip".to_string())
             } else {
@@ -109,6 +116,7 @@ impl Service<Buffer> for S3Sink {
 pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let gzip = config.gzip;
     let buffer_size = config.buffer_size;
+    let max_linger_secs = config.max_linger_secs;
 
     let inner = S3Sink { config };
 
@@ -116,7 +124,11 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let limited = InFlightLimit::new(timeout, 1);
 
     let sink = ServiceSink::new(limited)
-        .batched_with_min(Buffer::new(gzip), buffer_size)
+        .batched_with_min(
+            Buffer::new(gzip),
+            buffer_size,
+            Duration::from_secs(max_linger_secs),
+        )
         .with(|record: Record| {
             let mut bytes: Vec<u8> = record.into();
             bytes.push(b'\n');
@@ -508,6 +520,7 @@ mod tests {
             buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
             gzip: false,
+            max_linger_secs: 5,
         }
     }
 

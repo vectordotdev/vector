@@ -5,6 +5,7 @@ pub mod retries;
 
 use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use log::{error, trace};
+use std::time::Duration;
 use tower_service::Service;
 
 pub use buffer::Buffer;
@@ -18,8 +19,8 @@ where
         batch::BatchSink::new(self, batch, limit)
     }
 
-    fn batched_with_min(self, batch: B, min: usize) -> batch::BatchSink<B, Self> {
-        batch::BatchSink::new_min(self, batch, min)
+    fn batched_with_min(self, batch: B, min: usize, delay: Duration) -> batch::BatchSink<B, Self> {
+        batch::BatchSink::new_min(self, batch, min, Some(delay))
     }
 }
 
