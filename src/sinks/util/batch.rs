@@ -1,4 +1,6 @@
-use futures::{try_ready, Async, AsyncSink, Poll, Sink, StartSend};
+use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
 
 pub trait Batch {
     type Item;
@@ -34,6 +36,8 @@ pub struct BatchSink<B, S> {
     max_size: usize,
     min_size: usize,
     closing: bool,
+    max_linger: Option<Duration>,
+    linger_deadline: Option<Delay>,
 }
 
 impl<B, S> BatchSink<B, S>
@@ -42,14 +46,20 @@ where
     S: Sink<SinkItem = B>,
 {
     pub fn new(inner: S, batch: B, max_size: usize) -> Self {
-        Self::build(inner, batch, 0, max_size)
+        Self::build(inner, batch, 0, max_size, None)
     }
 
-    pub fn new_min(inner: S, batch: B, min_size: usize) -> Self {
-        Self::build(inner, batch, min_size, min_size)
+    pub fn new_min(inner: S, batch: B, min_size: usize, max_linger: Option<Duration>) -> Self {
+        Self::build(inner, batch, min_size, min_size, max_linger)
     }
 
-    fn build(inner: S, batch: B, min_size: usize, max_size: usize) -> Self {
+    fn build(
+        inner: S,
+        batch: B,
+        min_size: usize,
+        max_size: usize,
+        max_linger: Option<Duration>,
+    ) -> Self {
         assert!(max_size >= min_size);
         BatchSink {
             batch,
@@ -57,6 +67,8 @@ where
             max_size,
             min_size,
             closing: false,
+            max_linger,
+            linger_deadline: None,
         }
     }
 
@@ -64,8 +76,16 @@ where
         self.inner
     }
 
-    fn should_send(&self) -> bool {
-        self.closing || self.batch.len() >= self.min_size
+    fn should_send(&mut self) -> bool {
+        self.closing || self.batch.len() >= self.min_size || self.linger_elapsed()
+    }
+
+    fn linger_elapsed(&self) -> bool {
+        if let Some(delay) = &self.linger_deadline {
+            delay.is_elapsed()
+        } else {
+            false
+        }
     }
 
     fn poll_send(&mut self) -> Poll<(), S::SinkError> {
@@ -75,6 +95,7 @@ where
             self.batch = batch;
             Ok(Async::NotReady)
         } else {
+            self.linger_deadline = None;
             Ok(Async::Ready(()))
         }
     }
@@ -99,6 +120,16 @@ where
 
             if self.batch.len() > self.max_size {
                 return Ok(AsyncSink::NotReady(item));
+            }
+        }
+
+        if self.batch.len() == 0 {
+            if let Some(duration) = &self.max_linger {
+                // We just inserted the first item of a new batch, so set our delay to the longest time
+                // we want to allow that item to linger in the batch before being flushed.
+                let mut delay = Delay::new(Instant::now() + duration.clone());
+                assert!(delay.poll().expect("timer error").is_not_ready()); // Make sure we get notified when it elapses
+                self.linger_deadline = Some(delay);
             }
         }
 
