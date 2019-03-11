@@ -17,6 +17,10 @@ where
     fn batched(self, batch: B, limit: usize) -> batch::BatchSink<B, Self> {
         batch::BatchSink::new(self, batch, limit)
     }
+
+    fn batched_with_min(self, batch: B, min: usize) -> batch::BatchSink<B, Self> {
+        batch::BatchSink::new_min(self, batch, min)
+    }
 }
 
 impl<B, S> SinkExt<B> for S

@@ -42,8 +42,14 @@ where
     S: Sink<SinkItem = B>,
 {
     pub fn new(inner: S, batch: B, max_size: usize) -> Self {
-        let min_size = 0; // TODO: more patterns
+        Self::build(inner, batch, 0, max_size)
+    }
 
+    pub fn new_min(inner: S, batch: B, min_size: usize) -> Self {
+        Self::build(inner, batch, min_size, min_size)
+    }
+
+    fn build(inner: S, batch: B, min_size: usize, max_size: usize) -> Self {
         assert!(max_size >= min_size);
         BatchSink {
             batch,
@@ -134,6 +140,7 @@ where
                 if self.should_send() {
                     try_ready!(self.poll_send());
                 } else {
+                    self.inner.poll_complete()?;
                     return Ok(Async::NotReady);
                 }
             }
