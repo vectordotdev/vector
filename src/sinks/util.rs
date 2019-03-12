@@ -3,6 +3,7 @@ pub mod buffer;
 pub mod http;
 pub mod retries;
 
+use batch::{Batch, BatchSink};
 use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use log::{error, trace};
 use std::time::Duration;
@@ -12,21 +13,21 @@ pub use buffer::Buffer;
 
 pub trait SinkExt<B>
 where
-    B: batch::Batch,
+    B: Batch,
     Self: Sink<SinkItem = B> + Sized,
 {
-    fn batched(self, batch: B, limit: usize) -> batch::BatchSink<B, Self> {
-        batch::BatchSink::new(self, batch, limit)
+    fn batched(self, batch: B, limit: usize) -> BatchSink<B, Self> {
+        BatchSink::new(self, batch, limit)
     }
 
-    fn batched_with_min(self, batch: B, min: usize, delay: Duration) -> batch::BatchSink<B, Self> {
-        batch::BatchSink::new_min(self, batch, min, Some(delay))
+    fn batched_with_min(self, batch: B, min: usize, delay: Duration) -> BatchSink<B, Self> {
+        BatchSink::new_min(self, batch, min, Some(delay))
     }
 }
 
 impl<B, S> SinkExt<B> for S
 where
-    B: batch::Batch,
+    B: Batch,
     S: Sink<SinkItem = B> + Sized,
 {
 }
