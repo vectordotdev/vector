@@ -80,9 +80,9 @@ where
         self.closing || self.batch.len() >= self.min_size || self.linger_elapsed()
     }
 
-    fn linger_elapsed(&self) -> bool {
-        if let Some(delay) = &self.linger_deadline {
-            delay.is_elapsed()
+    fn linger_elapsed(&mut self) -> bool {
+        if let Some(delay) = &mut self.linger_deadline {
+            delay.poll().expect("timer error").is_ready()
         } else {
             false
         }
@@ -127,9 +127,7 @@ where
             if let Some(duration) = &self.max_linger {
                 // We just inserted the first item of a new batch, so set our delay to the longest time
                 // we want to allow that item to linger in the batch before being flushed.
-                let mut delay = Delay::new(Instant::now() + duration.clone());
-                assert!(delay.poll().expect("timer error").is_not_ready()); // Make sure we get notified when it elapses
-                self.linger_deadline = Some(delay);
+                self.linger_deadline = Some(Delay::new(Instant::now() + duration.clone()));
             }
         }
 
