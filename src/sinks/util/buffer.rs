@@ -38,7 +38,6 @@ impl Buffer {
             }
             Buffer::Gzip(inner) => {
                 inner.write_all(input).unwrap();
-                // inner.flush().unwrap();
             }
         }
     }
