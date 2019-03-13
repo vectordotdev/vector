@@ -45,9 +45,10 @@ prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
 headers = "0.2.1"
+lazy_static = "1.3"
 
 # Tokio
-tokio = { version = "0.1.11", features = ["io", "uds", "tcp", "rt-full"]}
+tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
@@ -58,6 +59,7 @@ tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" 
 tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 hotmic = "0.7"
+quanta = "0.2"
 
 # Aws
 rusoto_core = "0.36.0"
@@ -101,8 +103,7 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
-# tokio-trace = { path = "../tokio/tokio-trace" }
-tokio-trace = { git = "https://github.com/tokio-rs/tokio", rev = "90b1a01" }
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
