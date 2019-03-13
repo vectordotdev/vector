@@ -45,7 +45,6 @@ prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
 headers = "0.2.1"
-lazy_static = "1.3"
 
 # Tokio
 tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
@@ -59,7 +58,6 @@ tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" 
 tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 hotmic = "0.7"
-quanta = "0.2"
 
 # Aws
 rusoto_core = "0.36.0"
