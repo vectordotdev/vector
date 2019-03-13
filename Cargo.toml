@@ -101,8 +101,8 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
-tokio-trace = { path = "../tokio/tokio-trace" }
-# tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+# tokio-trace = { path = "../tokio/tokio-trace" }
+tokio-trace = { git = "https://github.com/tokio-rs/tokio", rev = "90b1a01" }
 tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }

@@ -31,7 +31,9 @@ fn main() {
 
     let (metrics_server, metrics_visitor) = NewMetricRecorder::new();
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
-        .with_filter(tokio_trace_fmt::filter::EnvFilter::from("vector=trace"))
+        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
+            "vector=info,vector[sink]=info",
+        ))
         .with_visitor(metrics_visitor)
         .full()
         .finish();
