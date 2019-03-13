@@ -1,7 +1,6 @@
 use crate::record::Record;
 use crate::sinks::util::{Buffer, ServiceSink, SinkExt};
 use futures::{Future, Poll, Sink};
-use log::info;
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
@@ -81,7 +80,12 @@ impl S3Sink {
         let extension = if self.config.gzip { ".log.gz" } else { ".log" };
         let key = format!("{}{}{}", self.config.key_prefix, filename, extension);
 
-        info!("Flushing {} to S3 ({} bytes)", key, body.len());
+        info!(
+            { s3_sink_bytes_flushed_counter = body.len() },
+            "Flushing {} to S3 ({} bytes)",
+            key,
+            body.len()
+        );
 
         let request = PutObjectRequest {
             body: Some(body.into()),
