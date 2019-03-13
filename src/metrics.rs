@@ -1,7 +1,6 @@
 use futures::{future, Future, Poll, Stream};
 use hotmic::{Controller, Receiver, Sink, Snapshot};
 use hyper::{Body, Request, Response};
-use std::collections::HashMap;
 use std::fmt;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -23,7 +22,6 @@ pub struct MetricsServer {
 pub struct MetricVisitor<'a> {
     recorder: Recorder<'a>,
     sink: Sink<String>,
-    hist: HashMap<String, u64>,
 }
 
 pub struct MetricsServerSvc {
@@ -85,25 +83,7 @@ impl<'a> NewVisitor<'a> for NewMetricRecorder {
 
 impl<'a> MetricVisitor<'a> {
     pub fn new(recorder: Recorder<'a>, sink: Sink<String>) -> Self {
-        MetricVisitor {
-            recorder,
-            sink,
-            hist: HashMap::new(),
-        }
-    }
-
-    fn capture_hist(&mut self, field: &Field, value: u64) {
-        let name = field.name();
-
-        if name.contains("start_hist") {
-            let key = name.split("start_hist").next().unwrap();
-            self.hist.insert(key.to_string(), value);
-        } else if name.contains("end_hist") {
-            let key = name.split("end_hist").next().unwrap();
-            if let Some(start) = self.hist.get(key) {
-                self.sink.update_timing(key.to_string(), *start, value);
-            }
-        }
+        MetricVisitor { recorder, sink }
     }
 }
 
@@ -120,8 +100,6 @@ impl<'a> Visit for MetricVisitor<'a> {
         if field.name().contains("counter") {
             self.sink
                 .update_count(field.name().to_string(), value as i64);
-        } else if field.name().contains("hist") {
-            self.capture_hist(field, value);
         } else {
             self.recorder.record_u64(field, value);
         }
