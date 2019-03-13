@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 use futures::{Future, Stream};
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
-use tokio_trace_futures::Instrument;
+use vector::metrics::{self, NewMetricRecorder};
 use vector::topology::Topology;
 
 #[macro_use]
@@ -29,8 +29,10 @@ fn main() {
 
     let config = vector::topology::Config::load(std::fs::File::open(config).unwrap());
 
+    let (metrics_server, metrics_visitor) = NewMetricRecorder::new();
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
         .with_filter(tokio_trace_fmt::filter::EnvFilter::from("vector=trace"))
+        .with_visitor(metrics_visitor)
         .full()
         .finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");
@@ -56,8 +58,13 @@ fn main() {
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
+        let metrics_addr = "127.0.0.1:8888".parse().unwrap();
+        let metrics_serve = metrics::serve(metrics_addr, metrics_server);
+
+        rt.spawn(metrics_serve);
+
         if matches.is_present("require-healthy") {
-            let success = rt.block_on(topology.healthchecks().instrument(span!("healthcheck")));
+            let success = rt.block_on(topology.healthchecks());
 
             if success.is_ok() {
                 info!("All healthchecks passed");
@@ -66,7 +73,7 @@ fn main() {
                 std::process::exit(1);
             }
         } else {
-            rt.spawn(topology.healthchecks().instrument(span!("healthcheck")));
+            rt.spawn(topology.healthchecks());
         }
 
         topology.start(&mut rt);

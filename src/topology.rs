@@ -83,9 +83,9 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
-        for task in tasks.into_iter().map(|(_, t)| t) {
-            // TODO(lucio): find better way to name this span
-            rt.spawn(task.instrument(span!("task")));
+        for (name, task) in tasks.into_iter() {
+            info!("Starting sink {}", name);
+            rt.spawn(task.instrument(span!("sink", name = name.as_str())));
         }
 
         let source_tasks = source_tasks

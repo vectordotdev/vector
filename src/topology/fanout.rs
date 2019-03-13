@@ -2,7 +2,6 @@ use crate::sinks::RouterSink;
 use crate::Record;
 use futures::sync::mpsc;
 use futures::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
-use tokio_trace_futures::Instrument;
 
 pub struct Fanout {
     sinks: Vec<(String, RouterSink)>,
@@ -46,7 +45,7 @@ impl Fanout {
 
         let (_name, mut removed) = self.sinks.remove(i);
 
-        tokio::spawn(future::poll_fn(move || removed.close()).instrument(span!("FanoutClose")));
+        tokio::spawn(future::poll_fn(move || removed.close()));
 
         if self.i > i {
             self.i -= 1;
