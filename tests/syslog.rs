@@ -1,16 +1,16 @@
 use approx::assert_relative_eq;
 use futures::{Future, Sink, Stream};
-use router::test_util::{
-    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
-};
-use router::topology::{config, Topology};
-use router::{
-    sinks,
-    sources::syslog::{Mode, SyslogConfig},
-};
 use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio_uds::UnixStream;
+use vector::test_util::{
+    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+};
+use vector::topology::{config, Topology};
+use vector::{
+    sinks,
+    sources::syslog::{Mode, SyslogConfig},
+};
 
 #[test]
 fn test_tcp_syslog() {

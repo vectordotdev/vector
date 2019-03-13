@@ -1,14 +1,14 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
-use router::test_util::{
-    next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
-};
-use router::topology::{config, Topology};
-use router::{sinks, sources, transforms};
 use serde_json::json;
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
+use vector::test_util::{
+    next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+};
+use vector::topology::{config, Topology};
+use vector::{sinks, sources, transforms};
 
 #[test]
 fn test_pipe() {
@@ -482,12 +482,12 @@ fn test_healthcheck() {
 
     let _listener = TcpListener::bind(&addr).unwrap();
 
-    let healthcheck = router::sinks::tcp::tcp_healthcheck(addr);
+    let healthcheck = vector::sinks::tcp::tcp_healthcheck(addr);
 
     assert!(healthcheck.wait().is_ok());
 
     let bad_addr = next_addr();
-    let bad_healthcheck = router::sinks::tcp::tcp_healthcheck(bad_addr);
+    let bad_healthcheck = vector::sinks::tcp::tcp_healthcheck(bad_addr);
 
     assert!(bad_healthcheck.wait().is_err());
 }

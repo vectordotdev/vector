@@ -1,10 +1,10 @@
 use futures::Future;
-use router::test_util::{
+use tempfile::tempdir;
+use vector::test_util::{
     next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use router::topology::{config, Topology};
-use router::{buffers::BufferConfig, sinks, sources};
-use tempfile::tempdir;
+use vector::topology::{config, Topology};
+use vector::{buffers::BufferConfig, sinks, sources};
 
 #[test]
 fn test_buffering() {
@@ -16,7 +16,7 @@ fn test_buffering() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    // Run router while sink server is not running, and then shut it down abruptly
+    // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(
@@ -42,7 +42,7 @@ fn test_buffering() {
     rt.shutdown_now().wait().unwrap();
     drop(topology);
 
-    // Start sink server, then run router again. It should send all of the lines from the first run.
+    // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(
@@ -90,7 +90,7 @@ fn test_max_size() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    // Run router while sink server is not running, and then shut it down abruptly
+    // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(
@@ -116,7 +116,7 @@ fn test_max_size() {
     rt.shutdown_now().wait().unwrap();
     drop(topology);
 
-    // Start sink server, then run router again. It should send the lines from the first run that fit in the limited space
+    // Start sink server, then run vector again. It should send the lines from the first run that fit in the limited space
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(
@@ -208,7 +208,7 @@ fn test_reclaim_disk_space() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    // Run router while sink server is not running, and then shut it down abruptly
+    // Run vector while sink server is not running, and then shut it down abruptly
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(
@@ -244,7 +244,7 @@ fn test_reclaim_disk_space() {
         .map(|m| m.len())
         .sum();
 
-    // Start sink server, then run router again. It should send all of the lines from the first run.
+    // Start sink server, then run vector again. It should send all of the lines from the first run.
     let mut config = config::Config::empty();
     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
     config.add_sink(

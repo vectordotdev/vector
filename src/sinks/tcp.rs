@@ -1,5 +1,4 @@
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink};
-use log::error;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};

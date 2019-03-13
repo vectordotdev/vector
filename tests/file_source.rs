@@ -1,10 +1,10 @@
 use futures::{Future, Stream};
-use router::sources::file;
-use router::test_util::shutdown_on_idle;
 use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
+use vector::sources::file;
+use vector::test_util::shutdown_on_idle;
 
 #[test]
 fn happy_path() {

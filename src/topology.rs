@@ -7,9 +7,9 @@ pub use self::config::Config;
 use crate::buffers;
 use futures::{sync::oneshot, Future};
 use indexmap::IndexMap;
-use log::{error, info};
 use std::collections::{HashMap, HashSet};
 use stream_cancel::Trigger;
+use tokio_trace_futures::Instrument;
 
 pub struct Topology {
     state: State,
@@ -83,8 +83,9 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
-        for task in tasks.into_iter().map(|(_, t)| t) {
-            rt.spawn(task);
+        for (name, task) in tasks.into_iter() {
+            info!("Starting sink {}", name);
+            rt.spawn(task.instrument(span!("sink", name = name.as_str())));
         }
 
         let source_tasks = source_tasks

@@ -1,5 +1,5 @@
 [package]
-name = "router"
+name = "vector"
 version = "0.1.0"
 authors = ["Luke Steensen <luke.steensen@gmail.com>"]
 edition = "2018"
@@ -8,7 +8,7 @@ publish = false
 [workspace]
 members = [
   ".",
-  "lib/file-source"
+  "lib/file-source",
 ]
 
 [dependencies]
@@ -16,8 +16,6 @@ members = [
 file-source = { path = "lib/file-source" }
 
 # External libs
-fern = "0.5.6"
-log = "0.4.5"
 uuid = { version = "0.7.1", features = ["v4"] }
 chrono = "0.4.6"
 rand = "0.5.5"
@@ -49,10 +47,17 @@ prost-types = "0.4.0"
 headers = "0.2.1"
 
 # Tokio
-tokio = { version = "0.1.11", features = ["io", "uds", "tcp", "rt-full"]}
+tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
+
+# Tracing
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+hotmic = "0.7"
 
 # Aws
 rusoto_core = "0.36.0"
@@ -67,6 +72,7 @@ tower-retry = "0.1"
 tower-buffer = "0.1"
 tower-timeout = "0.1"
 tower-in-flight-limit = "0.1"
+tower-hyper = "0.1"
 rdkafka = "0.20.0"
 
 [build-dependencies]
@@ -95,11 +101,13 @@ walkdir = "2.2.7"
 "kafka-integration-tests" = []
 
 [patch.crates-io]
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", rev = "3faa6ed" }
 
 [[bench]]
 name = "bench"

@@ -2,12 +2,12 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 
 use approx::assert_relative_eq;
 use futures::{future, Future, Stream};
-use router::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use router::topology::{config, Topology};
-use router::{sinks, sources, transforms};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
+use vector::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
+use vector::topology::{config, Topology};
+use vector::{sinks, sources, transforms};
 
 mod buffering;
 
