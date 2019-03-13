@@ -91,19 +91,19 @@ walkdir = "2.2.7"
 [features]
 "default" = ["rdkafka", "leveldb"]
 "docker" = [
-  "s3-integration-tests",
-  "kinesis-integration-tests",
   "cloudwatch-integration-tests",
-  "kafka-integration-tests",
-  "splunk-integration-tests",
   "es-integration-tests",
+  "kafka-integration-tests",
+  "kinesis-integration-tests",
+  "s3-integration-tests",
+  "splunk-integration-tests",
 ]
-"splunk-integration-tests" = []
-"s3-integration-tests" = []
 "cloudwatch-integration-tests" = []
-"kinesis-integration-tests" = []
-"kafka-integration-tests" = []
 "es-integration-tests" = []
+"kafka-integration-tests" = []
+"kinesis-integration-tests" = []
+"s3-integration-tests" = []
+"splunk-integration-tests" = []
 
 [[bench]]
 name = "bench"
