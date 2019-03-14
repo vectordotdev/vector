@@ -9,11 +9,13 @@ publish = false
 members = [
   ".",
   "lib/file-source",
+  "lib/trace-metrics"
 ]
 
 [dependencies]
 # Internal libs
 file-source = { path = "lib/file-source" }
+trace-metrics = { path = "lib/trace-metrics" }
 
 # External libs
 uuid = { version = "0.7.1", features = ["v4"] }

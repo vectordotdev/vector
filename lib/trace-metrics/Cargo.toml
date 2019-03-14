@@ -1,0 +1,12 @@
+[package]
+name = "trace-metrics"
+version = "0.1.0"
+authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio-trace-core = "0.1"
+hotmic = "0.7"
+
+[dev-dependencies]
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }

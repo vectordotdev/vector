@@ -2514,6 +2514,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "trace-metrics"
+version = "0.1.0"
+dependencies = [
+ "hotmic 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)",
+ "tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2694,6 +2703,7 @@ dependencies = [
  "tower-retry 0.1.0 (git+https://github.com/tower-rs/tower?rev=1e38ee6)",
  "tower-service 0.2.0 (git+https://github.com/tower-rs/tower?rev=1e38ee6)",
  "tower-timeout 0.1.0 (git+https://github.com/tower-rs/tower?rev=1e38ee6)",
+ "trace-metrics 0.1.0",
  "typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
