@@ -2154,6 +2154,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-connect"
+version = "0.1.0"
+source = "git+https://github.com/carllerche/tokio-connect#f7ad1ca437973d6e24037ac6f7d5ef1013833c0b"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "tokio-current-thread"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2517,9 +2526,17 @@ dependencies = [
 name = "trace-metrics"
 version = "0.1.0"
 dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hotmic 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.12.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-connect 0.1.0 (git+https://github.com/carllerche/tokio-connect)",
  "tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)",
  "tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-trace-env-logger 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
+ "tokio-trace-fmt 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
+ "tokio-trace-futures 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
 ]
 
 [[package]]
@@ -3048,6 +3065,7 @@ dependencies = [
 "checksum tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)" = "1021bb1f4150435ab8f222eb7ed37c60b2d57037def63ba43085a79f387512d7"
 "checksum tokio-buf 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "473a45a40e558d6d80e9f60e3d934c32488045def2745488a257e472941e9bce"
 "checksum tokio-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5c501eceaf96f0e1793cf26beb63da3d11c738c4a943fdf3746d81d64684c39f"
+"checksum tokio-connect 0.1.0 (git+https://github.com/carllerche/tokio-connect)" = "<none>"
 "checksum tokio-current-thread 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c756b04680eea21902a46fca4e9f410a2332c04995af590e07ff262e2193a9a3"
 "checksum tokio-executor 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "30c6dbf2d1ad1de300b393910e8a3aa272b724a400b6531da03eed99e329fbf0"
 "checksum tokio-fs 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "3fe6dc22b08d6993916647d108a1a7d15b9cd29c4f4496c62b92c45b5041b7af"

@@ -54,10 +54,11 @@ pub fn serve(addr: SocketAddr, svc: MetricsServer) -> impl Future<Item = (), Err
 }
 
 impl NewMetricRecorder {
-    pub fn new() -> (MetricsServer, Self) {
+    pub fn new() -> (MetricsServer, Sink<String>, Self) {
         let mut receiver = Receiver::builder().build();
         let controller = receiver.get_controller();
         let sink = receiver.get_sink();
+        let sink2 = sink.clone();
 
         std::thread::spawn(move || {
             receiver.run();
@@ -66,7 +67,7 @@ impl NewMetricRecorder {
         let visitor = NewMetricRecorder { sink };
         let server = MetricsServer { controller };
 
-        (server, visitor)
+        (server, sink2, visitor)
     }
 }
 
