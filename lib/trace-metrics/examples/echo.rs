@@ -152,6 +152,10 @@ fn main() {
                 );
                 hyper::rt::spawn(
                     http.serve_connection(sock, service_fn(echo))
+                        .and_then(|_| {
+                            println!("Connection is done!");
+                            Ok(())
+                        })
                         .map_err(|e| {
                             error!({ error = field::display(e) }, "serve error");
                         })

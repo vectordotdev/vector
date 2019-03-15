@@ -103,10 +103,11 @@ impl S3Sink {
     }
 }
 
+use tokio_trace_futures::{Instrument, Instrumented};
 impl Service<Buffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
-    type Future = RusotoFuture<PutObjectOutput, PutObjectError>;
+    type Future = Instrumented<'static, RusotoFuture<PutObjectOutput, PutObjectError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -114,6 +115,7 @@ impl Service<Buffer> for S3Sink {
 
     fn call(&mut self, buf: Buffer) -> Self::Future {
         self.send_body(buf.into())
+            .instrument(span!(level: tokio_trace::Level::ERROR, "s3_request"))
     }
 }
 
