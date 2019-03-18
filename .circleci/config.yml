@@ -5,7 +5,6 @@ release-job-defaults: &release-job-defaults
   docker:
     - image: liuchong/rustup
   steps:
-    - checkout
     - setup_remote_docker
     - run:
         name: Install Docker client
@@ -20,10 +19,13 @@ release-job-defaults: &release-job-defaults
         command: |
           apt-get update
           apt-get install -y git
-          git clone https://github.com/rust-embedded/cross
+          git clone https://github.com/rust-embedded/cross 
           cd cross
           cargo build --release
           mv target/release/cross /usr/bin
+          cd ..
+          rm -rf cross
+    - checkout
     - run:
         name: Cross Compile
         command: cross build --target $TARGET build --release $EXTRA_ARGS
