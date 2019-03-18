@@ -9,7 +9,7 @@ release-job-defaults: &release-job-defaults
         command: |
           set -e
           curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-          source echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
+          source $HOME/.cargo/env
     - run:
         name: Install Cross
         command: cargo install cross
