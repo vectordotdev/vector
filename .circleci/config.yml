@@ -154,17 +154,12 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
             export PATH="$HOME/.cargo/bin:$PATH"
             rustup install stable
-      - run:
-          name: Install Cross
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo install cross
       - checkout
       - run:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cross build --target $TARGET --release $EXTRA_ARGS
+            cargo build --target $TARGET --release $EXTRA_ARGS
 
 workflows:
   version: 2
