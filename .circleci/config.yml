@@ -2,31 +2,18 @@ version: 2
 
 release-job-defaults: &release-job-defaults
   resource_class: large
-  docker:
-    - image: liuchong/rustup
+  machine: true
   steps:
     - setup_remote_docker
     - run:
-        name: Install Docker client
+        name: Install Rust
         command: |
-          set -x
-          VER="17.03.0-ce"
-          curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
-          tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-          mv /tmp/docker/* /usr/bin
+          set -e
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+          source echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
     - run:
         name: Install Cross
-        command: |
-          apt-get update
-          apt-get install -y git
-          git clone https://github.com/rust-embedded/cross 
-          cd cross
-          cargo build --release
-          rustup show
-          ls target/x86_64-unknown-linux-musl/release -la
-          mv target/x86_64-unknown-linux-musl/release/cross /usr/bin
-          cd ..
-          rm -rf cross
+        command: cargo install cross
     - checkout
     - run:
         name: Cross Compile
