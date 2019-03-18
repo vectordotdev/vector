@@ -13,11 +13,15 @@ release-job-defaults: &release-job-defaults
           rustup install stable
     - run:
         name: Install Cross
-        command: cargo install cross
+        command: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cross
     - checkout
     - run:
         name: Cross Compile
-        command: cross build --target $TARGET build --release $EXTRA_ARGS
+        command: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cross build --target $TARGET build --release $EXTRA_ARGS
 
 jobs:
   rustfmt:
