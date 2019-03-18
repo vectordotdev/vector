@@ -18,6 +18,5 @@ tokio = "0.1"
 hyper = "0.12"
 tokio-connect = { git = "https://github.com/carllerche/tokio-connect" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-# tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { path = "../../../tokio-trace-nursery/tokio-trace-fmt" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
