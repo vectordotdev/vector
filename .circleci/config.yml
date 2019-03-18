@@ -22,6 +22,7 @@ release-job-defaults: &release-job-defaults
           git clone https://github.com/rust-embedded/cross 
           cd cross
           cargo build --release
+          ls -la
           mv target/release/cross /usr/bin
           cd ..
           rm -rf cross
