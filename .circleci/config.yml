@@ -1,7 +1,6 @@
 version: 2
 
 release-job-defaults: &release-job-defaults
-  resource_class: large
   machine: true
   steps:
     - run:
@@ -116,10 +115,29 @@ jobs:
           paths:
             - "~/.cargo"
             - "./target"
-  release-arm:
+
+  release-arm-unknown-linux-gnueabi:
     <<: *release-job-defaults
     environment:
       TARGET: "arm-unknown-linux-gnueabi"
+      EXTRA_ARGS: --no-default-features
+
+  release-x86_64-unknown-linux-gnu:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "x86_64-unknown-linux-gnu"
+      EXTRA_ARGS: --no-default-features
+
+  release-x86_64-unknown-freebsd:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "x86_64-unknown-freebsd"
+      EXTRA_ARGS: --no-default-features
+
+  release-x86_64-unknown-netbsd:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "x86_64-unknown-netbsd"
       EXTRA_ARGS: --no-default-features
 
 workflows:
@@ -130,4 +148,7 @@ workflows:
       - rustfmt
       - build-stable
       - test-stable
-      - release-arm
+      - release-arm-unknown-linux-gnueabi
+      - release-x86_64-unknown-linux-gnu
+      - release-x86_64-unknown-freebsd
+      - release-x86_64-unknown-netbsd
