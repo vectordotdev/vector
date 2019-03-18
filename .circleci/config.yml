@@ -10,9 +10,9 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install Cross
         command: cargo install cross
-        - run:
-            name: Cross Compile
-            command: cross build --target $TARGET build --release $EXTRA_ARGS
+    - run:
+        name: Cross Compile
+        command: cross build --target $TARGET build --release $EXTRA_ARGS
 
 jobs:
   rustfmt:
@@ -121,3 +121,4 @@ workflows:
       - rustfmt
       - build-stable
       - test-stable
+      - release-arm
