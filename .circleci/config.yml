@@ -4,16 +4,15 @@ release-job-defaults: &release-job-defaults
   resource_class: large
   docker:
     - image: rust:latest
-  build:
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          name: Install Cross
-          command: cargo install cross
-      - run:
-          name: Cross Compile
-          command: cross build --target $TARGET build --release $EXTRA_ARGS
+  steps:
+    - checkout
+    - setup_remote_docker
+    - run:
+        name: Install Cross
+        command: cargo install cross
+        - run:
+            name: Cross Compile
+            command: cross build --target $TARGET build --release $EXTRA_ARGS
 
 jobs:
   rustfmt:
