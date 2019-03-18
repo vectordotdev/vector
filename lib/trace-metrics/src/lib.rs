@@ -1,3 +1,34 @@
+//! A `tokio-trace` metrics based subscriber
+//!
+//! This subscriber takes another subscriber like `tokio-trace-fmt` and wraps it
+//! with this basic subscriber. It will enable all spans and events that match the
+//! metric capturing criteria. This means every span is enabled regardless of its level
+//! and any event that contains a `counter` or a `gauge` field name.
+//!
+//! # Example
+//!
+//! ```
+//! # #[macro_use] extern crate tokio_trace;
+//! # extern crate tokio_trace_fmt;
+//! # extern crate trace_metrics;
+//! # extern crate hotmic;
+//! # use hotmic::Receiver;
+//! # use trace_metrics::MetricsSubscriber;
+//! # use tokio_trace_fmt::FmtSubscriber;
+//! // Get the metrics sink
+//! let mut receiver = Receiver::builder().build();
+//! let sink = receiver.get_sink();
+//!
+//! // Setup the subscribers
+//! let fmt_subscriber = FmtSubscriber::builder().finish();
+//! let metric_subscriber = MetricsSubscriber::new(fmt_subscriber, sink);
+//!
+//! tokio_trace::subscriber::with_default(metric_subscriber, || {
+//!     info!({ do_something_counter = 1 }, "Do some logging");
+//! })
+//! ```
+
+#[warn(missing_debug_implementations, missing_docs)]
 extern crate hotmic;
 extern crate tokio_trace_core;
 
@@ -10,14 +41,19 @@ use tokio_trace_core::{
 };
 
 /// Metrics collector
+// TODO(lucio): move this to a trait
 pub type Collector = Sink<String>;
 
+/// The subscriber that wraps another subscriber and produces metrics
 pub struct MetricsSubscriber<S> {
     inner: S,
     spans: Mutex<HashMap<Id, Span>>,
     collector: Collector,
 }
 
+/// A `tokio_trace_core::field::Visit` implementation that captures fields
+/// that contain `counter` or `gague` in their name and dispatches the `i64`
+/// or `u64` value to the underlying metrics sink.
 pub struct MetricVisitor {
     collector: Collector,
 }
@@ -32,6 +68,7 @@ struct Span {
 }
 
 impl<S> MetricsSubscriber<S> {
+    /// Create a new `MetricsSubscriber` with the underlying subscriber and collector.
     pub fn new(inner: S, collector: Collector) -> Self {
         MetricsSubscriber {
             inner,
@@ -43,6 +80,7 @@ impl<S> MetricsSubscriber<S> {
 
 impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     fn enabled(&self, metadata: &Metadata) -> bool {
+        // TODO(lucio): also enable all callsites taht contain `counter` and `gauge`
         if metadata.name().contains("event") {
             self.inner.enabled(metadata)
         } else {
@@ -155,6 +193,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
 }
 
 impl MetricVisitor {
+    /// Create a new visitor with the underlying collector.
     pub fn new(collector: Collector) -> Self {
         MetricVisitor { collector }
     }
@@ -169,12 +208,17 @@ impl Visit for MetricVisitor {
         if field.name().contains("counter") {
             self.collector
                 .update_count(field.name().to_string(), value as i64);
+        } else if field.name().contains("guage") {
+            self.collector.update_gauge(field.name().to_string(), value);
         }
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name().contains("counter") {
             self.collector.update_count(field.name().to_string(), value);
+        } else if field.name().contains("guage") {
+            self.collector
+                .update_gauge(field.name().to_string(), value as u64);
         }
     }
 }

@@ -7,6 +7,7 @@ use tower_hyper::body::LiftBody;
 use tower_hyper::server::Server;
 use tower_service::Service;
 
+/// Create the metrics sink and provide the server Service
 pub fn metrics() -> (Sink<String>, MetricsServer) {
     let mut receiver = Receiver::builder().build();
     let controller = receiver.get_controller();
@@ -21,6 +22,7 @@ pub fn metrics() -> (Sink<String>, MetricsServer) {
     (sink, server)
 }
 
+/// Represents the Server that serves the metrics
 pub struct MetricsServer {
     controller: Controller,
 }
@@ -29,6 +31,7 @@ pub struct MetricsServerSvc {
     snapshot: Snapshot,
 }
 
+/// Start a Tcplistener and serve the metrics server on that socket
 pub fn serve(addr: SocketAddr, svc: MetricsServer) -> impl Future<Item = (), Error = ()> {
     let bind = TcpListener::bind(&addr).expect("Unable to bind metrics server address");
 
