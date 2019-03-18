@@ -22,8 +22,9 @@ release-job-defaults: &release-job-defaults
           git clone https://github.com/rust-embedded/cross 
           cd cross
           cargo build --release
-          ls target/x86_64-unknown-linux-musl -la
-          mv target/release/cross /usr/bin
+          rustup show
+          ls target/x86_64-unknown-linux-musl/release -la
+          mv target/x86_64-unknown-linux-musl/release/cross /usr/bin
           cd ..
           rm -rf cross
     - checkout
