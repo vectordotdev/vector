@@ -4,6 +4,7 @@ pub mod cloudwatch;
 pub mod console;
 pub mod elasticsearch;
 pub mod http;
+#[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kinesis;
 pub mod prometheus;

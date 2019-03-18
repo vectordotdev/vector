@@ -1,3 +1,5 @@
+#![cfg(feature = "leveldb")]
+
 use crate::record::{proto, Record};
 use futures::{
     task::{self, AtomicTask, Task},

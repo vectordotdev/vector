@@ -1,5 +1,16 @@
 version: 2
 
+release-job-defaults: &release-job-defaults
+  resource_class: large
+  docker:
+    - image: rust:latest
+  build:
+    steps:
+      - checkout
+      - setup_remote_docker
+      - cargo install cross
+      - cross build --target $TARGET build --release $EXTRA_ARGS
+
 jobs:
   rustfmt:
     docker:
@@ -93,6 +104,11 @@ jobs:
           paths:
             - "~/.cargo"
             - "./target"
+  release-arm:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "arm-unknown-linux-gnueabi"
+      EXTRA_ARGS: --no-default-features
 
 workflows:
   version: 2

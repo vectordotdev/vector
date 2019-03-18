@@ -3,13 +3,19 @@ use futures::{sync::mpsc, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[cfg(feature = "leveldb")]
 mod disk;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type")]
 pub enum BufferConfig {
-    Memory { num_items: usize },
-    Disk { max_size: usize },
+    Memory {
+        num_items: usize,
+    },
+    #[cfg(feature = "leveldb")]
+    Disk {
+        max_size: usize,
+    },
 }
 
 impl Default for BufferConfig {
@@ -20,6 +26,7 @@ impl Default for BufferConfig {
 
 pub enum BufferInputCloner {
     Memory(mpsc::Sender<Record>),
+    #[cfg(feature = "leveldb")]
     Disk(disk::Writer),
 }
 
@@ -29,12 +36,14 @@ impl BufferInputCloner {
             BufferInputCloner::Memory(tx) => {
                 Box::new(tx.clone().sink_map_err(|e| error!("sender error: {:?}", e)))
             }
+            #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer) => Box::new(writer.clone()),
         }
     }
 }
 
 impl BufferConfig {
+    #[cfg_attr(not(feature = "leveldb"), allow(unused))]
     pub fn build(
         &self,
         data_dir: &Option<PathBuf>,
@@ -53,6 +62,7 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx))
             }
+            #[cfg(feature = "leveldb")]
             BufferConfig::Disk { max_size } => {
                 let path = data_dir
                     .as_ref()
