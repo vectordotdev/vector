@@ -18,6 +18,7 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install Cross
         command: |
+          apt-get install -y git
           git clone https://github.com/rust-embedded/cross
           cd cross
           cargo build --release
