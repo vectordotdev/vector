@@ -140,6 +140,33 @@ jobs:
       TARGET: "x86_64-unknown-netbsd"
       EXTRA_ARGS: --no-default-features
 
+  release-x86_64-apple-darwin:
+    build:
+      macos:
+        xcode: "9.0"
+      environment:
+        EXTRA_ARGS: --no-default-features
+        TARGET: "x86_64-apple-darwin"
+      steps:
+        - run:
+            name: Install Rust
+            command: |
+              set -e
+              curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+              export PATH="$HOME/.cargo/bin:$PATH"
+              rustup install stable
+        - run:
+            name: Install Cross
+            command: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              cargo install cross
+        - checkout
+        - run:
+            name: Compile
+            command: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              cross build --target $TARGET --release $EXTRA_ARGS
+
 workflows:
   version: 2
 
