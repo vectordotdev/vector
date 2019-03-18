@@ -21,7 +21,7 @@ release-job-defaults: &release-job-defaults
         name: Cross Compile
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cross build --target $TARGET build --release $EXTRA_ARGS
+          cross build --target $TARGET --release $EXTRA_ARGS
 
 jobs:
   rustfmt:
