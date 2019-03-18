@@ -9,8 +9,8 @@ release-job-defaults: &release-job-defaults
         command: |
           set -e
           curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-          rustup install stable
           export PATH="$HOME/.cargo/bin:$PATH"
+          rustup install stable
     - run:
         name: Install Cross
         command: cargo install cross
