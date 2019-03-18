@@ -57,8 +57,7 @@ tokio-threadpool = "0.1.8"
 # Tracing
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-# tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { path = "../tokio-trace-nursery/tokio-trace-fmt" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 hotmic = "0.7"
 
@@ -110,7 +109,7 @@ tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", rev = "3faa6ed" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 [[bench]]
 name = "bench"
