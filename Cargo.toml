@@ -57,7 +57,8 @@ tokio-threadpool = "0.1.8"
 # Tracing
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+# tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-fmt = { path = "../tokio-trace-nursery/tokio-trace-fmt" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 hotmic = "0.7"
 

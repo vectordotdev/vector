@@ -2,7 +2,7 @@ use clap::{App, Arg};
 use futures::{Future, Stream};
 use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
 use trace_metrics::MetricsSubscriber;
-use vector::metrics::{self, NewMetricRecorder};
+use vector::metrics;
 use vector::topology::Topology;
 
 #[macro_use]
@@ -30,12 +30,12 @@ fn main() {
 
     let config = vector::topology::Config::load(std::fs::File::open(config).unwrap());
 
-    let (metrics_server, metrics_sink, metrics_visitor) = NewMetricRecorder::new();
+    let (metrics_sink, metrics_server) = metrics::metrics();
+
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
         .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
             "vector=info,vector[sink]=info",
         ))
-        .with_visitor(metrics_visitor)
         .full()
         .finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");

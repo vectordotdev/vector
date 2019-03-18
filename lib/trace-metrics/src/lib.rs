@@ -2,8 +2,9 @@ extern crate hotmic;
 extern crate tokio_trace_core;
 
 use hotmic::Sink;
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, fmt, sync::Mutex};
 use tokio_trace_core::{
+    field::{Field, Visit},
     span::{Attributes, Id, Record},
     Event, Interest, Metadata, Subscriber,
 };
@@ -14,6 +15,10 @@ pub type Collector = Sink<String>;
 pub struct MetricsSubscriber<S> {
     inner: S,
     spans: Mutex<HashMap<Id, Span>>,
+    collector: Collector,
+}
+
+pub struct MetricVisitor {
     collector: Collector,
 }
 
@@ -70,6 +75,8 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     }
 
     fn event(&self, event: &Event) {
+        let mut recorder = MetricVisitor::new(self.collector.clone());
+        event.record(&mut recorder);
         self.inner.event(event);
     }
 
@@ -144,5 +151,30 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
 
         drop(spans);
         self.inner.drop_span(id.clone());
+    }
+}
+
+impl MetricVisitor {
+    pub fn new(collector: Collector) -> Self {
+        MetricVisitor { collector }
+    }
+}
+
+impl Visit for MetricVisitor {
+    fn record_str(&mut self, _field: &Field, _value: &str) {}
+
+    fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        if field.name().contains("counter") {
+            self.collector
+                .update_count(field.name().to_string(), value as i64);
+        }
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        if field.name().contains("counter") {
+            self.collector.update_count(field.name().to_string(), value);
+        }
     }
 }

@@ -2322,20 +2322,6 @@ dependencies = [
 [[package]]
 name = "tokio-trace-fmt"
 version = "0.1.0"
-source = "git+https://github.com/tokio-rs/tokio-trace-nursery#dbaeff6492ba7a730e19a78e7cd3dc149a3fc9d8"
-dependencies = [
- "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "regex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tokio-trace-fmt"
-version = "0.1.0"
 dependencies = [
  "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2723,7 +2709,7 @@ dependencies = [
  "tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)",
  "tokio-trace-env-logger 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
- "tokio-trace-fmt 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
+ "tokio-trace-fmt 0.1.0",
  "tokio-trace-futures 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
  "tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3093,7 +3079,6 @@ dependencies = [
 "checksum tokio-trace 0.0.1 (git+https://github.com/tokio-rs/tokio)" = "<none>"
 "checksum tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "350c9edade9830dc185ae48ba45667a445ab59f6167ef6d0254ec9d2430d9dd3"
 "checksum tokio-trace-env-logger 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)" = "<none>"
-"checksum tokio-trace-fmt 0.1.0 (git+https://github.com/tokio-rs/tokio-trace-nursery)" = "<none>"
 "checksum tokio-trace-futures 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)" = "<none>"
 "checksum tokio-trace-log 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)" = "<none>"
 "checksum tokio-trace-subscriber 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)" = "<none>"
