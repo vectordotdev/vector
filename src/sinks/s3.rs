@@ -6,6 +6,7 @@ use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio_trace_futures::{Instrument, Instrumented};
 use tower_in_flight_limit::InFlightLimit;
 use tower_service::Service;
 use tower_timeout::Timeout;
@@ -103,7 +104,6 @@ impl S3Sink {
     }
 }
 
-use tokio_trace_futures::{Instrument, Instrumented};
 impl Service<Buffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
