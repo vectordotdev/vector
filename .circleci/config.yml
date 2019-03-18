@@ -17,7 +17,11 @@ release-job-defaults: &release-job-defaults
           mv /tmp/docker/* /usr/bin
     - run:
         name: Install Cross
-        command: cargo install cross
+        command: |
+          git clone https://github.com/rust-embedded/cross
+          cd cross
+          cargo build --release
+          mv target/release/cross /usr/bin
     - run:
         name: Cross Compile
         command: cross build --target $TARGET build --release $EXTRA_ARGS
