@@ -3,7 +3,7 @@ version: 2
 release-job-defaults: &release-job-defaults
   resource_class: large
   docker:
-    - image: rust:latest
+    - image: liuchong/rustup
   steps:
     - checkout
     - setup_remote_docker
