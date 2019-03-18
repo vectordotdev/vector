@@ -178,3 +178,4 @@ workflows:
       - release-x86_64-unknown-linux-gnu
       - release-x86_64-unknown-freebsd
       - release-x86_64-unknown-netbsd
+      - release-x86_64-apple-darwin
