@@ -8,8 +8,12 @@ release-job-defaults: &release-job-defaults
     steps:
       - checkout
       - setup_remote_docker
-      - cargo install cross
-      - cross build --target $TARGET build --release $EXTRA_ARGS
+      - run:
+          name: Install Cross
+          command: cargo install cross
+      - run:
+          name: Cross Compile
+          command: cross build --target $TARGET build --release $EXTRA_ARGS
 
 jobs:
   rustfmt:
