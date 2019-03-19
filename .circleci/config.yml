@@ -140,6 +140,12 @@ jobs:
       TARGET: "x86_64-unknown-netbsd"
       EXTRA_ARGS: --no-default-features
 
+  release-armv7-unknown-linux-gnueabihf:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "armv7-unknown-linux-gnueabihf"
+      EXTRA_ARGS: --no-default-features
+
   release-x86_64-apple-darwin:
     macos:
       xcode: "9.0"
@@ -171,6 +177,11 @@ workflows:
       - check-stable
       - test-stable
       - release-arm-unknown-linux-gnueabi:
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-armv7-unknown-linux-gnueabihf:
           requires:
             - rustfmt
             - check-stable
