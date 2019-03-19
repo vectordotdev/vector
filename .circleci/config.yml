@@ -144,16 +144,12 @@ jobs:
             set -e
             curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
             export PATH="$HOME/.cargo/bin:$PATH"
-      - run:
-          name: Install AWS CLI
-          command: |
-            set -e
-            pip install awscli --upgrade --user
       - checkout
       - run:
-          name: Compile
+          name: Install AWS and Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            pip install awscli --upgrade --user
             ./ci/release.sh
 
 # release-workflow-filters: &release-workflow-filters

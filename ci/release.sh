@@ -17,7 +17,6 @@
 set -eou pipefail
 
 DEFAULT_TARGET="$(rustup target list | grep '(default)' | awk '{print $1}')"
-TARGET=${1:-}
 ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
