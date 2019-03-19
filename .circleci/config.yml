@@ -17,9 +17,9 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install AWS CLI
         command: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          sudo pip install --upgrade awscli
+          apt-get update
+          apt-get install -y python3-pip
+          pip install --upgrade awscli
     - checkout
     - run:
         name: Cross Compile
