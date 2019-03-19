@@ -75,7 +75,7 @@ jobs:
             - "./target"
 
   test-stable:
-    resource_class: large
+    resource_class: xlarge
     docker:
       - image: rust:latest
         environment:
