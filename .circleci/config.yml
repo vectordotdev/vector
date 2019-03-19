@@ -17,8 +17,8 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install AWS CLI
         command: |
-          sudo apt-get install python3 pip3
-          sudo pip3 install --upgrade awscli
+          sudo apt-get install -y python pip
+          sudo pip install --upgrade awscli
     - checkout
     - run:
         name: Cross Compile
@@ -153,6 +153,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            ls -la
             ./ci/release.sh
 
 
