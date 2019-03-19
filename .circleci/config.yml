@@ -1,5 +1,32 @@
 version: 2
 
+release-job-defaults: &release-job-defaults
+  machine: true
+  steps:
+    - run:
+        name: Install Rust
+        command: |
+          set -e
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+          export PATH="$HOME/.cargo/bin:$PATH"
+    - run:
+        name: Install Cross
+        command: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cross
+    - run:
+        name: Install AWS CLI
+        command: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip install --upgrade awscli
+    - checkout
+    - run:
+        name: Cross Compile
+        command: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          ./ci/release.sh
+
 jobs:
   rustfmt:
     docker:
@@ -21,7 +48,7 @@ jobs:
             - "~/.cargo"
             - "./target"
 
-  build-stable:
+  check-stable:
     resource_class: large
     docker:
       - image: rust:latest
@@ -48,7 +75,7 @@ jobs:
             - "./target"
 
   test-stable:
-    resource_class: large
+    resource_class: xlarge
     docker:
       - image: rust:latest
         environment:
@@ -94,11 +121,68 @@ jobs:
             - "~/.cargo"
             - "./target"
 
+  release-x86_64-unknown-linux-gnu:
+    <<: *release-job-defaults
+    environment:
+      TARGET: "x86_64-unknown-linux-gnu"
+
+  release-x86_64-apple-darwin:
+    macos:
+      xcode: "9.0"
+    environment:
+      TARGET: "x86_64-apple-darwin"
+      BUILDER: "cargo"
+    steps:
+      - run:
+          name: Install Rust
+          command: |
+            set -e
+            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+            export PATH="$HOME/.cargo/bin:$PATH"
+      - checkout
+      - run:
+          name: Compile
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            brew uninstall python
+            brew install awscli
+            ./ci/release.sh
+
+release-workflow-filters: &release-workflow-filters
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /v.*/
+
+
 workflows:
   version: 2
 
   test:
     jobs:
       - rustfmt
-      - build-stable
+      - check-stable
       - test-stable
+  
+  release:
+    jobs:
+      - rustfmt:
+          <<: *release-workflow-filters
+      - check-stable:
+          <<: *release-workflow-filters
+      - test-stable:
+          <<: *release-workflow-filters
+      - release-x86_64-unknown-linux-gnu:
+          <<: *release-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-x86_64-apple-darwin:
+          <<: *release-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+

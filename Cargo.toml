@@ -41,12 +41,13 @@ toml = "0.4"
 syslog_rfc5424 = "0.6.1"
 tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
-leveldb = "0.8.4"
+leveldb = { version = "0.8.4", optional = true }
 db-key = "0.0.5"
 prost = "0.4.0"
 prost-derive = "0.4.0"
 prost-types = "0.4.0"
 headers = "0.2.1"
+rdkafka = { version = "0.20.0", optional = true }
 
 # Tokio
 tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
@@ -75,7 +76,6 @@ tower-buffer = "0.1"
 tower-timeout = "0.1"
 tower-in-flight-limit = "0.1"
 tower-hyper = "0.1"
-rdkafka = "0.20.0"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -89,6 +89,7 @@ libc = "0.2.43"
 walkdir = "2.2.7"
 
 [features]
+"default" = ["rdkafka", "leveldb"]
 "docker" = [
   "s3-integration-tests",
   "kinesis-integration-tests",
