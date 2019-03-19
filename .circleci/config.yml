@@ -148,7 +148,7 @@ jobs:
           name: Install AWS CLI
           command: |
             set -e
-            pip3 install awscli --upgrade --user
+            pip install awscli --upgrade --user
       - checkout
       - run:
           name: Compile
