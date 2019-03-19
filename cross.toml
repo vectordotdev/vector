@@ -1,0 +1,5 @@
+[target.x86_64-unknown-linux-gnu]
+image = "timberio/vector-builder-x86_64-unknown-linux-gnu:latest"
+
+[target.x86_64-unknown-freebsd]
+image = "timberio/vector-builder-x86_64-unknown-freebsd:latest"
