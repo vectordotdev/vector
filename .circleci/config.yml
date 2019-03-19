@@ -156,39 +156,42 @@ jobs:
             export PATH="$HOME/.cargo/bin:$PATH"
             ./ci/release.sh
 
-release-workflow-filters: &release-workflow-filters
-  filters:
-    branches:
-      ignore: /.*/
-    tags:
-      only: /v.*/
+# release-workflow-filters: &release-workflow-filters
+#   filters:
+#     branches:
+#       ignore: /.*/
+#     tags:
+#       only: /v.*/
 
 
 workflows:
   version: 2
 
-  test:
-    jobs:
-      - rustfmt
-      - check-stable
-      - test-stable
+  # test:
+  #   jobs:
+  #     - rustfmt
+  #     - check-stable
+  #     - test-stable
   
   release:
     jobs:
       - rustfmt
       - check-stable
       - test-stable
-      - release-x86_64-unknown-linux-gnu
+      - release-x86_64-unknown-linux-gnu:
+          # <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-x86_64-unknown-freebsd
+      - release-x86_64-unknown-freebsd:
+          # <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-x86_64-apple-darwin
+      - release-x86_64-apple-darwin:
+          # <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
