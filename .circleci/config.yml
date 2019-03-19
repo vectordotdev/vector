@@ -149,6 +149,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            brew uninstall python
             brew install awscli
             ./ci/release.sh
 
