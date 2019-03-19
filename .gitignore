@@ -4,3 +4,4 @@ logs*/
 sample.log
 .envrc
 miniodat
+dist

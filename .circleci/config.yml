@@ -15,12 +15,16 @@ release-job-defaults: &release-job-defaults
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo install cross
+    - run:
+        name: Install AWS CLI
+        command: |
+          sudo pip3 install --upgrade awscli
     - checkout
     - run:
         name: Cross Compile
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cross build --target $TARGET --release $EXTRA_ARGS
+          cross build --target $TARGET --release --frozen $EXTRA_ARGS
 
 jobs:
   rustfmt:
@@ -116,41 +120,20 @@ jobs:
             - "~/.cargo"
             - "./target"
 
-  release-arm-unknown-linux-gnueabi:
-    <<: *release-job-defaults
-    environment:
-      TARGET: "arm-unknown-linux-gnueabi"
-      EXTRA_ARGS: --no-default-features
-
   release-x86_64-unknown-linux-gnu:
     <<: *release-job-defaults
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
-      EXTRA_ARGS: --no-default-features
 
   release-x86_64-unknown-freebsd:
     <<: *release-job-defaults
     environment:
       TARGET: "x86_64-unknown-freebsd"
-      EXTRA_ARGS: --no-default-features
-
-  release-x86_64-unknown-netbsd:
-    <<: *release-job-defaults
-    environment:
-      TARGET: "x86_64-unknown-netbsd"
-      EXTRA_ARGS: --no-default-features
-
-  release-armv7-unknown-linux-gnueabihf:
-    <<: *release-job-defaults
-    environment:
-      TARGET: "armv7-unknown-linux-gnueabihf"
-      EXTRA_ARGS: --no-default-features
 
   release-x86_64-apple-darwin:
     macos:
       xcode: "9.0"
     environment:
-      EXTRA_ARGS: --no-default-features
       TARGET: "x86_64-apple-darwin"
     steps:
       - run:
@@ -160,12 +143,17 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
             export PATH="$HOME/.cargo/bin:$PATH"
             rustup install stable
+      - run:
+          name: Install AWS CLI
+          command: |
+            set -e
+            pip3 install awscli --upgrade --user
       - checkout
       - run:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cargo build --target $TARGET --release $EXTRA_ARGS
+            cargo build --target $TARGET --release --frozen
 
 
 workflows:
