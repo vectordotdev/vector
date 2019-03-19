@@ -2,6 +2,8 @@ use super::util::{self, Buffer, SinkExt};
 use crate::record::Record;
 use futures::{Future, Sink};
 use http::Uri;
+use hyper::{Body, Client, Request};
+use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -56,12 +58,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 }
 
 fn healthcheck(host: String) -> super::Healthcheck {
-    use hyper::{Body, Client, Request};
-    use hyper_tls::HttpsConnector;
-
     let uri = format!("{}/_cluster/health", host);
-    let uri: Uri = uri.parse().unwrap();
-
     let request = Request::get(uri).body(Body::empty()).unwrap();
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
