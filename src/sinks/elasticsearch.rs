@@ -6,7 +6,6 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -43,7 +42,6 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
                 "index": {
                     "_index": config.index,
                     "_type": config.doc_type,
-                    "_id": Uuid::new_v4().to_string(),
                 }
             });
             let mut body = serde_json::to_vec(&action).unwrap();
