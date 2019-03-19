@@ -9,11 +9,13 @@ publish = false
 members = [
   ".",
   "lib/file-source",
+  "lib/trace-metrics"
 ]
 
 [dependencies]
 # Internal libs
 file-source = { path = "lib/file-source" }
+trace-metrics = { path = "lib/trace-metrics" }
 
 # External libs
 uuid = { version = "0.7.1", features = ["v4"] }
@@ -107,7 +109,7 @@ tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
 tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", rev = "3faa6ed" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 [[bench]]
 name = "bench"

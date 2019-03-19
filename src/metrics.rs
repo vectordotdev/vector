@@ -1,33 +1,37 @@
 use futures::{future, Future, Poll, Stream};
 use hotmic::{Controller, Receiver, Sink, Snapshot};
 use hyper::{Body, Request, Response};
-use std::fmt;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use tokio_trace::field::{Field, Visit};
-use tokio_trace_fmt::default::Recorder;
-use tokio_trace_fmt::NewVisitor;
 use tower_hyper::body::LiftBody;
 use tower_hyper::server::Server;
 use tower_service::Service;
 
-pub struct NewMetricRecorder {
-    sink: Sink<String>,
+/// Create the metrics sink and provide the server Service
+pub fn metrics() -> (Sink<String>, MetricsServer) {
+    let mut receiver = Receiver::builder().build();
+    let controller = receiver.get_controller();
+    let sink = receiver.get_sink();
+
+    std::thread::spawn(move || {
+        receiver.run();
+    });
+
+    let server = MetricsServer { controller };
+
+    (sink, server)
 }
 
+/// Represents the Server that serves the metrics
 pub struct MetricsServer {
     controller: Controller,
-}
-
-pub struct MetricVisitor<'a> {
-    recorder: Recorder<'a>,
-    sink: Sink<String>,
 }
 
 pub struct MetricsServerSvc {
     snapshot: Snapshot,
 }
 
+/// Start a Tcplistener and serve the metrics server on that socket
 pub fn serve(addr: SocketAddr, svc: MetricsServer) -> impl Future<Item = (), Error = ()> {
     let bind = TcpListener::bind(&addr).expect("Unable to bind metrics server address");
 
@@ -51,59 +55,6 @@ pub fn serve(addr: SocketAddr, svc: MetricsServer) -> impl Future<Item = (), Err
         })
         .map_err(|e| panic!("metrics serve error: {:?}", e))
         .map(|_| {})
-}
-
-impl NewMetricRecorder {
-    pub fn new() -> (MetricsServer, Self) {
-        let mut receiver = Receiver::builder().build();
-        let controller = receiver.get_controller();
-        let sink = receiver.get_sink();
-
-        std::thread::spawn(move || {
-            receiver.run();
-        });
-
-        let visitor = NewMetricRecorder { sink };
-        let server = MetricsServer { controller };
-
-        (server, visitor)
-    }
-}
-
-impl<'a> NewVisitor<'a> for NewMetricRecorder {
-    type Visitor = MetricVisitor<'a>;
-
-    #[inline]
-    fn make(&self, writer: &'a mut fmt::Write, is_empty: bool) -> Self::Visitor {
-        let recorder = Recorder::new(writer, is_empty);
-        let sink = self.sink.clone();
-        MetricVisitor::new(recorder, sink)
-    }
-}
-
-impl<'a> MetricVisitor<'a> {
-    pub fn new(recorder: Recorder<'a>, sink: Sink<String>) -> Self {
-        MetricVisitor { recorder, sink }
-    }
-}
-
-impl<'a> Visit for MetricVisitor<'a> {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.recorder.record_str(field, value)
-    }
-
-    fn record_debug(&mut self, field: &Field, value: &fmt::Debug) {
-        self.recorder.record_debug(field, value)
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name().contains("counter") {
-            self.sink
-                .update_count(field.name().to_string(), value as i64);
-        } else {
-            self.recorder.record_u64(field, value);
-        }
-    }
 }
 
 impl Service<()> for MetricsServer {
