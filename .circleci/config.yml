@@ -18,6 +18,7 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install AWS CLI
         command: |
+          sudo apt-get install python3 pip3
           sudo pip3 install --upgrade awscli
     - checkout
     - run:
