@@ -162,12 +162,6 @@ jobs:
             cargo build --target $TARGET --release $EXTRA_ARGS
 
 
-release-workflow:
-  requires:
-    - rustfmt
-    - check-stable
-    - test-stable
-            
 workflows:
   version: 2
 
@@ -177,12 +171,28 @@ workflows:
       - check-stable
       - test-stable
       - release-arm-unknown-linux-gnueabi:
-          <<: *release-workflow
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
       - release-x86_64-unknown-linux-gnu:
-          <<: *release-workflow
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
       - release-x86_64-unknown-freebsd:
-          <<: *release-workflow
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
       - release-x86_64-unknown-netbsd:
-          <<: *release-workflow
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
       - release-x86_64-apple-darwin:
-          <<: *release-workflow
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+
