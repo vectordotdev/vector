@@ -43,7 +43,7 @@ jobs:
             - "~/.cargo"
             - "./target"
 
-  build-stable:
+  check-stable:
     resource_class: large
     docker:
       - image: rust:latest
@@ -161,16 +161,28 @@ jobs:
             export PATH="$HOME/.cargo/bin:$PATH"
             cargo build --target $TARGET --release $EXTRA_ARGS
 
+
+release-workflow:
+  requires:
+    - rustfmt
+    - check-stable
+    - test-stable
+            
 workflows:
   version: 2
 
   test:
     jobs:
       - rustfmt
-      - build-stable
+      - check-stable
       - test-stable
       - release-arm-unknown-linux-gnueabi
+      <<: *release-workflows
       - release-x86_64-unknown-linux-gnu
+      <<: *release-workflows
       - release-x86_64-unknown-freebsd
+      <<: *release-workflows
       - release-x86_64-unknown-netbsd
+      <<: *release-workflows
       - release-x86_64-apple-darwin
+      <<: *release-workflows
