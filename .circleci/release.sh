@@ -10,33 +10,35 @@
 #
 # Release with extra cargo flags
 # EXTRA_ARGS="--no-default-features" ./release.sh
+#
+# Release using custom builder eg cargo
+# BUILDER=cargo ./release.sh
 
 set -eou pipefail
-
-APP_NAME=vector
-DIST_DIR="$(pwd)/dist"
-VERSION="$(git describe --abbrev=0 --tags)"
-
-S3_PREFIX="s3://packages.timber.io/vector"
-TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
 
 DEFAULT_TARGET="$(rustup target list | grep '(default)' | awk '{print $1}')"
 TARGET=${1:-}
 ARGS=${EXTRA_ARGS:-}
+
+APP_NAME=vector
+DIST_DIR="$(pwd)/dist"
+VERSION="$(git describe --abbrev=0 --tags)"
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
     TARGET="$DEFAULT_TARGET"
 fi
 
+S3_PREFIX="s3://packages.timber.io/vector"
+TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
+
+BUILDER_COMMAND=${BUILDER:-"cross"}
+
 function build_release() {
-    cross build --target $TARGET --release --frozen $ARGS
+    $BUILDER_COMMAND build --target $TARGET --release --frozen $ARGS
 }
 
 function build_tar() {
-    
-
-
     mkdir -p $DIST_DIR
     cp "target/$TARGET/release/$APP_NAME" "$DIST_DIR"
     cd $DIST_DIR

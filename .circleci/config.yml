@@ -25,7 +25,7 @@ release-job-defaults: &release-job-defaults
         name: Cross Compile
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          cross build --target $TARGET --release --frozen $EXTRA_ARGS
+          ./.circleci/release.sh
 
 jobs:
   rustfmt:
@@ -136,6 +136,7 @@ jobs:
       xcode: "9.0"
     environment:
       TARGET: "x86_64-apple-darwin"
+      BUILDER: "cargo"
     steps:
       - run:
           name: Install Rust
@@ -154,7 +155,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            cargo build --target $TARGET --release --frozen
+            ./.circleci/release.sh
 
 
 workflows:
