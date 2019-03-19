@@ -126,11 +126,6 @@ jobs:
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
-  release-x86_64-unknown-freebsd:
-    <<: *release-job-defaults
-    environment:
-      TARGET: "x86_64-unknown-freebsd"
-
   release-x86_64-apple-darwin:
     macos:
       xcode: "9.0"
@@ -153,42 +148,39 @@ jobs:
             brew install awscli
             ./ci/release.sh
 
-# release-workflow-filters: &release-workflow-filters
-#   filters:
-#     branches:
-#       ignore: /.*/
-#     tags:
-#       only: /v.*/
+release-workflow-filters: &release-workflow-filters
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /v.*/
 
 
 workflows:
   version: 2
 
-  # test:
-  #   jobs:
-  #     - rustfmt
-  #     - check-stable
-  #     - test-stable
-  
-  release:
+  test:
     jobs:
       - rustfmt
       - check-stable
       - test-stable
+  
+  release:
+    jobs:
+      - rustfmt:
+          <<: *release-workflow-filters
+      - check-stable:
+          <<: *release-workflow-filters
+      - test-stable:
+          <<: *release-workflow-filters
       - release-x86_64-unknown-linux-gnu:
-          # <<: *release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      # - release-x86_64-unknown-freebsd:
-      #     # <<: *release-workflow-filters
-      #     requires:
-      #       - rustfmt
-      #       - check-stable
-      #       - test-stable
       - release-x86_64-apple-darwin:
-          # <<: *release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable

@@ -21,8 +21,7 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
-# VERSION="$(git describe --abbrev=0 --tags)"
-VERSION="unreleased"
+VERSION="$(git describe --abbrev=0 --tags)"
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
