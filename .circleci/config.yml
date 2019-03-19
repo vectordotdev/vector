@@ -149,8 +149,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            pip install awscli --upgrade --user
-            pip show awscli
+            brew install awscli
             ./ci/release.sh
 
 # release-workflow-filters: &release-workflow-filters
@@ -181,12 +180,12 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
-      - release-x86_64-unknown-freebsd:
-          # <<: *release-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+      # - release-x86_64-unknown-freebsd:
+      #     # <<: *release-workflow-filters
+      #     requires:
+      #       - rustfmt
+      #       - check-stable
+      #       - test-stable
       - release-x86_64-apple-darwin:
           # <<: *release-workflow-filters
           requires:
