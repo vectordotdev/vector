@@ -17,6 +17,7 @@ release-job-defaults: &release-job-defaults
     - run:
         name: Install AWS CLI
         command: |
+          sudo apt-get update
           sudo apt-get install -y python pip
           sudo pip install --upgrade awscli
     - checkout
@@ -24,7 +25,7 @@ release-job-defaults: &release-job-defaults
         name: Cross Compile
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          ./ci/release.sh
+          /ci/release.sh
 
 jobs:
   rustfmt:
@@ -153,8 +154,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            ls -la
-            ./ci/release.sh
+            /ci/release.sh
 
 
 workflows:
