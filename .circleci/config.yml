@@ -162,22 +162,22 @@ workflows:
 
   test:
     jobs:
-      - rustfmt
-      - check-stable
-      - test-stable
-      - release-x86_64-unknown-linux-gnu:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - release-x86_64-unknown-freebsd:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - release-x86_64-apple-darwin:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+      # - rustfmt
+      # - check-stable
+      # - test-stable
+      - release-x86_64-unknown-linux-gnu
+          # requires:
+          #   - rustfmt
+          #   - check-stable
+          #   - test-stable
+      - release-x86_64-unknown-freebsd
+          # requires:
+          #   - rustfmt
+          #   - check-stable
+          #   - test-stable
+      - release-x86_64-apple-darwin
+          # requires:
+          #   - rustfmt
+          #   - check-stable
+          #   - test-stable
 
