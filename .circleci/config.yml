@@ -164,27 +164,12 @@ workflows:
       - rustfmt
       - check-stable
       - test-stable
-      - release-arm-unknown-linux-gnueabi:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - release-armv7-unknown-linux-gnueabihf:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
       - release-x86_64-unknown-linux-gnu:
           requires:
             - rustfmt
             - check-stable
             - test-stable
       - release-x86_64-unknown-freebsd:
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - release-x86_64-unknown-netbsd:
           requires:
             - rustfmt
             - check-stable
