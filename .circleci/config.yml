@@ -177,12 +177,12 @@ workflows:
       - check-stable
       - test-stable
       - release-arm-unknown-linux-gnueabi:
-          <<: *release-workflows
+          <<: *release-workflow
       - release-x86_64-unknown-linux-gnu:
-          <<: *release-workflows
+          <<: *release-workflow
       - release-x86_64-unknown-freebsd:
-          <<: *release-workflows
+          <<: *release-workflow
       - release-x86_64-unknown-netbsd:
-          <<: *release-workflows
+          <<: *release-workflow
       - release-x86_64-apple-darwin:
-          <<: *release-workflows
+          <<: *release-workflow
