@@ -146,10 +146,11 @@ jobs:
             export PATH="$HOME/.cargo/bin:$PATH"
       - checkout
       - run:
-          name: Install AWS and Compile
+          name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             pip install awscli --upgrade --user
+            pip show awscli
             ./ci/release.sh
 
 # release-workflow-filters: &release-workflow-filters
