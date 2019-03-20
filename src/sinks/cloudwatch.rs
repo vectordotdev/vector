@@ -1,6 +1,6 @@
 use crate::{
     record::Record,
-    sinks::util::{RecordBuffer, ServiceSink, SinkExt},
+    sinks::util::{ServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
@@ -58,7 +58,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let svc = CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
         let svc = Timeout::new(svc, Duration::from_secs(10));
         let sink = {
-            let svc_sink = ServiceSink::new(svc).batched(RecordBuffer::default(), self.buffer_size);
+            let svc_sink = ServiceSink::new(svc).batched(Vec::new(), self.buffer_size);
             Box::new(svc_sink)
         };
 
@@ -129,7 +129,7 @@ impl CloudwatchLogsSvc {
     }
 }
 
-impl Service<RecordBuffer> for CloudwatchLogsSvc {
+impl Service<Vec<Record>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
     type Future = CloudwatchFuture;
@@ -147,7 +147,7 @@ impl Service<RecordBuffer> for CloudwatchLogsSvc {
         Ok(().into())
     }
 
-    fn call(&mut self, req: RecordBuffer) -> Self::Future {
+    fn call(&mut self, req: Vec<Record>) -> Self::Future {
         let (tx, rx) = oneshot::channel();
         self.in_flight = Some(rx);
         self.send_request(req.into(), tx)
