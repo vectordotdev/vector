@@ -112,9 +112,11 @@ impl CloudwatchLogsSvc {
     }
 
     fn send_request(&mut self, records: Vec<Record>) -> CloudwatchFuture {
+        // FIXME: the token here will always be None until we can force the service
+        // to send one request at a time and use the return value of the previous.
         CloudwatchFuture::new(
             self.client.clone(),
-            self.stream_token.take().clone(),
+            self.stream_token.take(),,
             self.config.clone(),
             records,
         )
