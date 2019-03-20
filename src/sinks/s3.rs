@@ -107,7 +107,7 @@ impl S3Sink {
 impl Service<Buffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
-    type Future = Instrumented<'static, RusotoFuture<PutObjectOutput, PutObjectError>>;
+    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
