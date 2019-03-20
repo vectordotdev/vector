@@ -116,7 +116,7 @@ impl CloudwatchLogsSvc {
         // to send one request at a time and use the return value of the previous.
         CloudwatchFuture::new(
             self.client.clone(),
-            self.stream_token.take(),,
+            self.stream_token.take(),
             self.config.clone(),
             records,
         )
