@@ -2,7 +2,7 @@ use crate::{
     record::Record,
     sinks::util::{RecordBuffer, ServiceSink, SinkExt},
 };
-use futures::{try_ready, Async, Future, Poll};
+use futures::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
@@ -14,13 +14,13 @@ use std::error::Error as _;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use tower_in_flight_limit::InFlightLimit;
 use tower_service::Service;
 use tower_timeout::Timeout;
 
 pub struct CloudwatchLogsSvc {
     stream_token: Option<String>,
     client: Arc<CloudWatchLogsClient>,
+    in_flight: Option<oneshot::Receiver<PutLogEventsResponse>>,
     config: CloudwatchLogsSinkConfig,
 }
 
@@ -36,6 +36,7 @@ pub struct CloudwatchFuture {
     client: Arc<CloudWatchLogsClient>,
     config: CloudwatchLogsSinkConfig,
     records: Option<Vec<Record>>,
+    tx: Option<oneshot::Sender<PutLogEventsResponse>>,
     state: State,
 }
 
@@ -56,7 +57,6 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let svc = CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
         let svc = Timeout::new(svc, Duration::from_secs(10));
-        let svc = InFlightLimit::new(svc, 1);
         let sink = {
             let svc_sink = ServiceSink::new(svc).batched(RecordBuffer::default(), self.buffer_size);
             Box::new(svc_sink)
@@ -75,6 +75,7 @@ impl CloudwatchLogsSvc {
         Ok(CloudwatchLogsSvc {
             client,
             config,
+            in_flight: None,
             stream_token: None,
         })
     }
@@ -111,29 +112,45 @@ impl CloudwatchLogsSvc {
         client.describe_log_streams(request)
     }
 
-    fn send_request(&mut self, records: Vec<Record>) -> CloudwatchFuture {
+    fn send_request(
+        &mut self,
+        records: Vec<Record>,
+        tx: oneshot::Sender<PutLogEventsResponse>,
+    ) -> CloudwatchFuture {
         // FIXME: the token here will always be None until we can force the service
         // to send one request at a time and use the return value of the previous.
         CloudwatchFuture::new(
             self.client.clone(),
             self.stream_token.take(),
             self.config.clone(),
+            tx,
             records,
         )
     }
 }
 
 impl Service<RecordBuffer> for CloudwatchLogsSvc {
-    type Response = PutLogEventsResponse;
+    type Response = ();
     type Error = CloudwatchError;
     type Future = CloudwatchFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        if let Some(in_flight) = &mut self.in_flight {
+            let response = match in_flight.poll() {
+                Ok(Async::Ready(response)) => response,
+                Ok(Async::NotReady) => return Ok(Async::NotReady),
+                Err(_) => panic!("The in flight future was dropped!"),
+            };
+            self.stream_token = response.next_sequence_token;
+        }
+
         Ok(().into())
     }
 
     fn call(&mut self, req: RecordBuffer) -> Self::Future {
-        self.send_request(req.into())
+        let (tx, rx) = oneshot::channel();
+        self.in_flight = Some(rx);
+        self.send_request(req.into(), tx)
     }
 }
 
@@ -142,6 +159,7 @@ impl CloudwatchFuture {
         client: Arc<CloudWatchLogsClient>,
         stream_token: Option<String>,
         config: CloudwatchLogsSinkConfig,
+        tx: oneshot::Sender<PutLogEventsResponse>,
         records: Vec<Record>,
     ) -> Self {
         if let Some(token) = stream_token {
@@ -151,6 +169,7 @@ impl CloudwatchFuture {
                 client,
                 records: None,
                 config,
+                tx: Some(tx),
                 state,
             }
         } else {
@@ -160,6 +179,7 @@ impl CloudwatchFuture {
                 client,
                 records: Some(records),
                 config,
+                tx: Some(tx),
                 state,
             }
         }
@@ -167,7 +187,7 @@ impl CloudwatchFuture {
 }
 
 impl Future for CloudwatchFuture {
-    type Item = PutLogEventsResponse;
+    type Item = ();
     type Error = CloudwatchError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -177,7 +197,9 @@ impl Future for CloudwatchFuture {
                     // TODO(lucio): invesitgate failure cases on rejected logs
                     let response = try_ready!(fut.poll());
 
-                    return Ok(Async::Ready(response));
+                    self.tx.take().unwrap().send(response).unwrap();
+
+                    return Ok(Async::Ready(()));
                 }
                 State::Describe(ref mut fut) => {
                     let response = try_ready!(fut.poll());
