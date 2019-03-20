@@ -13,6 +13,7 @@ pub struct ElasticSearchConfig {
     pub host: String,
     pub index: String,
     pub doc_type: String,
+    pub id_key: Option<String>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -24,6 +25,7 @@ impl crate::topology::config::SinkConfig for ElasticSearchConfig {
 
 fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let host = config.host.clone();
+    let id_key = config.id_key.clone();
     let sink = util::http::HttpSink::new()
         .with(move |body: Buffer| {
             let uri = format!("{}/_bulk", host);
@@ -38,12 +40,14 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
         })
         .batched(Buffer::new(true), 2 * 1024 * 1024)
         .with(move |record: Record| {
-            let action = json!({
+            let mut action = json!({
                 "index": {
                     "_index": config.index,
                     "_type": config.doc_type,
                 }
             });
+            maybe_set_id(id_key.as_ref(), &mut action, &record);
+
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
 
@@ -53,6 +57,15 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
         });
 
     Box::new(sink)
+}
+
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
+    let id = key.and_then(|k| record.custom.get(&k.as_ref().into()));
+    if let Some(val) = id {
+        doc.as_object_mut()
+            .unwrap()
+            .insert("_id".into(), json!(val));
+    }
 }
 
 fn healthcheck(host: String) -> super::Healthcheck {
@@ -76,8 +89,51 @@ fn healthcheck(host: String) -> super::Healthcheck {
 }
 
 #[cfg(test)]
-#[cfg(feature = "es-integration-tests")]
 mod tests {
+    use super::maybe_set_id;
+    use crate::Record;
+    use serde_json::json;
+
+    #[test]
+    fn sets_id_from_custom_field() {
+        let id_key = Some("foo");
+        let mut record = Record::from("butts");
+        record.custom.insert("foo".into(), "bar".into());
+        let mut action = json!({});
+
+        maybe_set_id(id_key, &mut action, &record);
+
+        assert_eq!(json!({"_id": "bar"}), action);
+    }
+
+    #[test]
+    fn doesnt_set_id_when_field_missing() {
+        let id_key = Some("foo");
+        let mut record = Record::from("butts");
+        record.custom.insert("not_foo".into(), "bar".into());
+        let mut action = json!({});
+
+        maybe_set_id(id_key, &mut action, &record);
+
+        assert_eq!(json!({}), action);
+    }
+
+    #[test]
+    fn doesnt_set_id_when_not_configured() {
+        let id_key: Option<&str> = None;
+        let mut record = Record::from("butts");
+        record.custom.insert("foo".into(), "bar".into());
+        let mut action = json!({});
+
+        maybe_set_id(id_key, &mut action, &record);
+
+        assert_eq!(json!({}), action);
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "es-integration-tests")]
+mod integration_tests {
     use super::ElasticSearchConfig;
     use crate::{
         test_util::{block_on, random_lines},
@@ -97,6 +153,7 @@ mod tests {
             host: "http://localhost:9200/".into(),
             index: index.clone(),
             doc_type: "log_lines".into(),
+            id_key: None,
         };
 
         let (sink, _hc) = config.build().unwrap();
