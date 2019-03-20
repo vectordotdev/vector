@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio-trace-core = "0.1"
-hotmic = "0.7"
+hotmic = "0.8"
 
 [dev-dependencies]
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }

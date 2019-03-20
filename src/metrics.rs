@@ -1,5 +1,8 @@
 use futures::{future, Future, Poll, Stream};
-use hotmic::{Controller, Receiver, Sink, Snapshot};
+use hotmic::{
+    snapshot::{Snapshot, TypedMeasurement},
+    Controller, Receiver, Sink,
+};
 use hyper::{Body, Request, Response};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -28,7 +31,7 @@ pub struct MetricsServer {
 }
 
 pub struct MetricsServerSvc {
-    snapshot: Snapshot,
+    snapshot: Option<Snapshot>,
 }
 
 /// Start a Tcplistener and serve the metrics server on that socket
@@ -67,7 +70,7 @@ impl Service<()> for MetricsServer {
     }
 
     fn call(&mut self, _: ()) -> Self::Future {
-        let snapshot = self.controller.get_snapshot().unwrap();
+        let snapshot = Some(self.controller.get_snapshot().unwrap());
         future::ok(MetricsServerSvc { snapshot })
     }
 }
@@ -82,9 +85,88 @@ impl Service<Request<Body>> for MetricsServerSvc {
     }
 
     fn call(&mut self, _req: Request<Body>) -> Self::Future {
-        let snapshot = serde_json::to_vec(&self.snapshot).unwrap();
+        let snapshot = self.snapshot.take().unwrap();
+        let snapshot = process_snapshot(snapshot).unwrap();
         let body = LiftBody::new(Body::from(snapshot));
         let res = Response::new(body);
         future::ok(res)
     }
+}
+
+// taken from https://github.com/nuclearfurnace/hotmic-prometheus/blob/master/src/lib.rs
+fn process_snapshot(snapshot: Snapshot) -> Result<String, ()> {
+    let mut output = String::from("# hotmic-prometheus exporter\n");
+
+    for measurement in snapshot.into_vec() {
+        output.push_str("\n");
+
+        match measurement {
+            TypedMeasurement::Counter(label, value) => {
+                let label = label.replace('.', "_");
+                output.push_str("# TYPE ");
+                output.push_str(label.as_str());
+                output.push_str(" counter\n");
+                output.push_str(label.as_str());
+                output.push_str(" ");
+                output.push_str(value.to_string().as_str());
+                output.push_str("\n");
+            }
+            TypedMeasurement::Gauge(label, value) => {
+                let label = label.replace('.', "_");
+                output.push_str("# TYPE ");
+                output.push_str(label.as_str());
+                output.push_str(" gauge\n");
+                output.push_str(label.as_str());
+                output.push_str(" ");
+                output.push_str(value.to_string().as_str());
+                output.push_str("\n");
+            }
+            TypedMeasurement::TimingHistogram(label, summary) => {
+                let label = label.replace('.', "_");
+                output.push_str("# TYPE ");
+                output.push_str(label.as_str());
+                output.push_str("_nanoseconds summary\n");
+                for (percentile, value) in summary.measurements() {
+                    output.push_str(label.as_str());
+                    output.push_str("_nanoseconds{quantile=\"");
+                    output.push_str(percentile.as_quantile().to_string().as_str());
+                    output.push_str("\"} ");
+                    output.push_str(value.to_string().as_str());
+                    output.push_str("\n");
+                }
+                output.push_str(label.as_str());
+                output.push_str("_nanoseconds_sum ");
+                output.push_str(summary.sum().to_string().as_str());
+                output.push_str("\n");
+                output.push_str(label.as_str());
+                output.push_str("_nanoseconds_count ");
+                output.push_str(summary.count().to_string().as_str());
+                output.push_str("\n");
+            }
+            TypedMeasurement::ValueHistogram(label, summary) => {
+                let label = label.replace('.', "_");
+                output.push_str("# TYPE ");
+                output.push_str(label.as_str());
+                output.push_str(" summary\n");
+                for (percentile, value) in summary.measurements() {
+                    output.push_str(label.as_str());
+                    output.push_str("{quantile=\"");
+                    output.push_str(percentile.as_quantile().to_string().as_str());
+                    output.push_str("\"} ");
+                    output.push_str(value.to_string().as_str());
+                    output.push_str("\n");
+                }
+                output.push_str(label.as_str());
+                output.push_str("_sum ");
+                output.push_str(summary.sum().to_string().as_str());
+                output.push_str("\n");
+                output.push_str(label.as_str());
+                output.push_str("_count ");
+                output.push_str(summary.count().to_string().as_str());
+                output.push_str("\n");
+            }
+        }
+    }
+
+    Ok(output)
 }
