@@ -57,9 +57,9 @@ tokio-threadpool = "0.1.8"
 
 # Tracing
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
-tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
+tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
 hotmic = "0.7"
 
 # Aws
@@ -71,11 +71,11 @@ rusoto_credential = "0.15.0"
 
 # Tower
 tower-service = "0.2"
-tower-retry = "0.1"
-tower-buffer = "0.1"
-tower-timeout = "0.1"
-tower-in-flight-limit = "0.1"
-tower-hyper = "0.1"
+tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -102,15 +102,6 @@ walkdir = "2.2.7"
 "cloudwatch-integration-tests" = []
 "kinesis-integration-tests" = []
 "kafka-integration-tests" = []
-
-[patch.crates-io]
-tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
-tower-service = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-retry = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "1e38ee6" }
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 [[bench]]
 name = "bench"
