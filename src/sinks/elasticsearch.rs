@@ -85,7 +85,9 @@ mod tests {
         Record,
     };
     use elastic::client::SyncClientBuilder;
-    use futures::{stream, Sink};
+    use futures::{stream, Future, Sink};
+    use hyper::{Body, Client, Request};
+    use hyper_tls::HttpsConnector;
     use serde_json::{json, Value};
 
     #[test]
@@ -107,8 +109,8 @@ mod tests {
         let pump = sink.send_all(stream::iter_ok(input.clone().into_iter()));
         block_on(pump).unwrap();
 
-        // new indices aren't immediately visible
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        // make sure writes all all visible
+        block_on(flush(config.host)).unwrap();
 
         let client = SyncClientBuilder::new().build().unwrap();
 
@@ -131,4 +133,23 @@ mod tests {
     fn gen_index() -> String {
         format!("test-{}", random_lines(10).next().unwrap().to_lowercase())
     }
+
+    fn flush(host: String) -> impl Future<Item = (), Error = String> {
+        let uri = format!("{}/_flush", host);
+        let request = Request::post(uri).body(Body::empty()).unwrap();
+
+        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        let client = Client::builder().build(https);
+        client
+            .request(request)
+            .map_err(|err| err.to_string())
+            .and_then(|response| {
+                if response.status() == hyper::StatusCode::OK {
+                    Ok(())
+                } else {
+                    Err(format!("Unexpected status: {}", response.status()))
+                }
+            })
+    }
+
 }
