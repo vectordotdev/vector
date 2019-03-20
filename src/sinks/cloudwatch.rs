@@ -1,5 +1,8 @@
-use crate::record::Record;
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use crate::{
+    record::Record,
+    sinks::util::{RecordBuffer, ServiceSink, SinkExt},
+};
+use futures::{try_ready, Async, Future, Poll};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
@@ -7,13 +10,18 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
+use std::error::Error as _;
+use std::fmt;
+use std::sync::Arc;
+use std::time::Duration;
+use tower_in_flight_limit::InFlightLimit;
+use tower_service::Service;
+use tower_timeout::Timeout;
 
-pub struct CloudwatchLogsSink {
-    buffer: Buffer<InputLogEvent>,
+pub struct CloudwatchLogsSvc {
     stream_token: Option<String>,
-    client: CloudWatchLogsClient,
+    client: Arc<CloudWatchLogsClient>,
     config: CloudwatchLogsSinkConfig,
-    state: State,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -24,14 +32,20 @@ pub struct CloudwatchLogsSinkConfig {
     pub buffer_size: usize,
 }
 
+pub struct CloudwatchFuture {
+    client: Arc<CloudWatchLogsClient>,
+    config: CloudwatchLogsSinkConfig,
+    records: Option<Vec<Record>>,
+    state: State,
+}
+
 enum State {
     Describe(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
     Put(RusotoFuture<PutLogEventsResponse, PutLogEventsError>),
-    Buffering,
 }
 
 #[derive(Debug)]
-enum Error {
+pub enum CloudwatchError {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
     NoStreamsFound,
@@ -40,151 +54,149 @@ enum Error {
 #[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = CloudwatchLogsSink::new(self.clone())
-            .map_err(|e| format!("Failed to create CloudwatchLogsSink: {}", e))?;
+        let svc = CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
+        let svc = Timeout::new(svc, Duration::from_secs(10));
+        let svc = InFlightLimit::new(svc, 1);
+        let sink = {
+            let svc_sink = ServiceSink::new(svc).batched(RecordBuffer::default(), self.buffer_size);
+            Box::new(svc_sink)
+        };
+
         let healthcheck = healthcheck(self.clone());
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((sink, healthcheck))
     }
 }
 
-impl CloudwatchLogsSink {
+impl CloudwatchLogsSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
-        let buffer = Buffer::new(config.buffer_size);
-        let client = CloudWatchLogsClient::new(config.region.clone());
+        let client = Arc::new(CloudWatchLogsClient::new(config.region.clone()));
 
-        Ok(CloudwatchLogsSink {
-            buffer,
+        Ok(CloudwatchLogsSvc {
             client,
             config,
-            state: State::Buffering,
             stream_token: None,
         })
     }
 
     fn put_logs(
-        &mut self,
+        client: Arc<CloudWatchLogsClient>,
+        config: &CloudwatchLogsSinkConfig,
+        records: Vec<Record>,
         token: Option<String>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        let log_events = self.buffer.flush();
+        let log_events = records.into_iter().map(Into::into).collect();
+
         let request = PutLogEventsRequest {
             log_events,
-            log_group_name: self.config.group_name.clone(),
-            log_stream_name: self.config.stream_name.clone(),
+            log_group_name: config.group_name.clone(),
+            log_stream_name: config.stream_name.clone(),
             sequence_token: token,
         };
 
-        self.client.put_log_events(request)
+        client.put_log_events(request)
     }
 
     fn describe_stream(
-        &mut self,
+        client: Arc<CloudWatchLogsClient>,
+        config: &CloudwatchLogsSinkConfig,
     ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
         let request = DescribeLogStreamsRequest {
             limit: Some(1),
-            log_group_name: self.config.group_name.clone(),
-            log_stream_name_prefix: Some(self.config.stream_name.clone()),
+            log_group_name: config.group_name.clone(),
+            log_stream_name_prefix: Some(config.stream_name.clone()),
             ..Default::default()
         };
 
-        self.client.describe_log_streams(request)
+        client.describe_log_streams(request)
     }
 
-    fn poll_request(&mut self) -> Poll<(), Error> {
+    fn send_request(&mut self, records: Vec<Record>) -> CloudwatchFuture {
+        CloudwatchFuture::new(
+            self.client.clone(),
+            self.stream_token.take().clone(),
+            self.config.clone(),
+            records,
+        )
+    }
+}
+
+impl Service<RecordBuffer> for CloudwatchLogsSvc {
+    type Response = PutLogEventsResponse;
+    type Error = CloudwatchError;
+    type Future = CloudwatchFuture;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, req: RecordBuffer) -> Self::Future {
+        self.send_request(req.into())
+    }
+}
+
+impl CloudwatchFuture {
+    pub fn new(
+        client: Arc<CloudWatchLogsClient>,
+        stream_token: Option<String>,
+        config: CloudwatchLogsSinkConfig,
+        records: Vec<Record>,
+    ) -> Self {
+        if let Some(token) = stream_token {
+            let fut = CloudwatchLogsSvc::put_logs(client.clone(), &config, records, Some(token));
+            let state = State::Put(fut);
+            CloudwatchFuture {
+                client,
+                records: None,
+                config,
+                state,
+            }
+        } else {
+            let fut = CloudwatchLogsSvc::describe_stream(client.clone(), &config);
+            let state = State::Describe(fut);
+            CloudwatchFuture {
+                client,
+                records: Some(records),
+                config,
+                state,
+            }
+        }
+    }
+}
+
+impl Future for CloudwatchFuture {
+    type Item = PutLogEventsResponse;
+    type Error = CloudwatchError;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             match self.state {
                 State::Put(ref mut fut) => {
                     // TODO(lucio): invesitgate failure cases on rejected logs
                     let response = try_ready!(fut.poll());
 
-                    self.stream_token = response.next_sequence_token;
-                    return Ok(().into());
+                    return Ok(Async::Ready(response));
                 }
                 State::Describe(ref mut fut) => {
                     let response = try_ready!(fut.poll());
 
                     let stream = response
                         .log_streams
-                        .ok_or(Error::NoStreamsFound)?
+                        .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
                         .next()
-                        .ok_or(Error::NoStreamsFound)?;
+                        .ok_or(CloudwatchError::NoStreamsFound)?;
 
                     let token = stream.upload_sequence_token;
 
-                    let fut = self.put_logs(token);
+                    let records = self.records.take().unwrap();
+                    let fut = CloudwatchLogsSvc::put_logs(
+                        self.client.clone(),
+                        &self.config,
+                        records,
+                        token,
+                    );
                     self.state = State::Put(fut);
-                    continue;
-                }
-                State::Buffering => {
-                    if let Some(token) = self.stream_token.take() {
-                        let fut = self.put_logs(Some(token));
-                        self.state = State::Put(fut);
-                        continue;
-                    } else {
-                        let fut = self.describe_stream();
-                        self.state = State::Describe(fut);
-                        continue;
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl Sink for CloudwatchLogsSink {
-    type SinkItem = Record;
-    type SinkError = ();
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.buffer.full() {
-            self.poll_complete()?;
-
-            if self.buffer.full() {
-                return Ok(AsyncSink::NotReady(item));
-            }
-        }
-
-        self.buffer.push(item.into());
-
-        if self.buffer.full() {
-            self.poll_complete()?;
-        }
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        loop {
-            match self.state {
-                State::Buffering => {
-                    if self.buffer.full() {
-                        try_ready!(self
-                            .poll_request()
-                            .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
-                        continue;
-                    } else {
-                        // check timer here???
-                        // Buffer isnt full and there isn't an inflight request
-                        if !self.buffer.empty() {
-                            // Buffer isnt empty, isnt full and there is no inflight
-                            // so lets take the rest of the buffer and send it.
-                            try_ready!(self
-                                .poll_request()
-                                .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
-                            continue;
-                        } else {
-                            return Ok(Async::Ready(()));
-                        }
-                    }
-                }
-
-                State::Describe(_) | State::Put(_) => {
-                    try_ready!(self
-                        .poll_request()
-                        .map_err(|e| panic!("Error sending logs to cloudwatch: {:?}", e)));
-
-                    self.state = State::Buffering;
                     continue;
                 }
             }
@@ -239,6 +251,18 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
     Box::new(fut)
 }
 
+impl fmt::Display for CloudwatchError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CloudwatchError::Put(e) => write!(f, "CloudwatchError: {}", e),
+            CloudwatchError::Describe(e) => write!(f, "CloudwatchError: {}", e),
+            CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
+        }
+    }
+}
+
+impl std::error::Error for CloudwatchError {}
+
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
         InputLogEvent {
@@ -248,49 +272,15 @@ impl From<Record> for InputLogEvent {
     }
 }
 
-impl From<PutLogEventsError> for Error {
+impl From<PutLogEventsError> for CloudwatchError {
     fn from(e: PutLogEventsError) -> Self {
-        Error::Put(e)
+        CloudwatchError::Put(e)
     }
 }
 
-impl From<DescribeLogStreamsError> for Error {
+impl From<DescribeLogStreamsError> for CloudwatchError {
     fn from(e: DescribeLogStreamsError) -> Self {
-        Error::Describe(e)
-    }
-}
-
-pub struct Buffer<T> {
-    inner: Vec<T>,
-    size: usize,
-}
-
-impl<T> Buffer<T>
-where
-    T: std::fmt::Debug,
-{
-    pub fn new(size: usize) -> Self {
-        Buffer {
-            inner: Vec::new(),
-            size,
-        }
-    }
-
-    pub fn full(&self) -> bool {
-        self.inner.len() >= self.size
-    }
-
-    pub fn push(&mut self, item: T) {
-        self.inner.push(item);
-    }
-
-    pub fn flush(&mut self) -> Vec<T> {
-        // TODO(lucio): make this unsafe replace?
-        self.inner.drain(..).collect()
-    }
-
-    pub fn empty(&self) -> bool {
-        self.inner.is_empty()
+        CloudwatchError::Describe(e)
     }
 }
 
@@ -298,8 +288,9 @@ where
 mod tests {
     #![cfg(feature = "cloudwatch-integration-tests")]
 
-    use crate::sinks::cloudwatch::{CloudwatchLogsSink, CloudwatchLogsSinkConfig};
+    use crate::sinks::cloudwatch::CloudwatchLogsSinkConfig;
     use crate::test_util::{block_on, random_lines};
+    use crate::topology::config::SinkConfig;
     use crate::Record;
     use futures::{future::poll_fn, stream, Sink};
     use rusoto_core::Region;
@@ -324,10 +315,10 @@ mod tests {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
             region: region.clone(),
-            buffer_size: 2,
+            buffer_size: 1,
         };
 
-        let sink = CloudwatchLogsSink::new(config).unwrap();
+        let (sink, _) = config.build().unwrap();
 
         let timestamp = chrono::Utc::now();
 

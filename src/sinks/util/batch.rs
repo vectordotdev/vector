@@ -185,7 +185,8 @@ where
 #[cfg(test)]
 mod test {
     use super::BatchSink;
-    use crate::sinks::util::Buffer;
+    use crate::record::Record;
+    use crate::sinks::util::{Buffer, RecordBuffer};
     use futures::{Future, Sink};
 
     #[test]
@@ -252,4 +253,70 @@ mod test {
         );
     }
 
+    #[test]
+    fn batch_sink_doesnt_allow_final_item_to_exceed_the_buffer_size() {
+        let input = ["1", "2", "3", "4", "5"]
+            .into_iter()
+            .map(|e| Record::from(*e))
+            .collect::<Vec<_>>();
+
+        let input2 = input.clone();
+        let buffered = BatchSink::new(vec![], RecordBuffer::default(), 2);
+
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered
+            .into_inner()
+            .into_iter()
+            .map(|e| e.into_inner())
+            .collect::<Vec<Vec<Record>>>();
+
+        let first_batch = input2[0..2]
+            .iter()
+            .map(|e| e.clone())
+            .collect::<Vec<Record>>();
+
+        let second_batch = input2[2..4]
+            .iter()
+            .map(|e| e.clone())
+            .collect::<Vec<Record>>();
+
+        let third_batch = input2[4..5]
+            .iter()
+            .map(|e| e.clone())
+            .collect::<Vec<Record>>();
+
+        assert_eq!(output, vec![first_batch, second_batch, third_batch]);
+    }
+
+    #[test]
+    fn batch_sink_doesnt_allow_final_item_to_exceed_the_buffer_size_buf_size_1() {
+        let input = ["1", "2", "3", "4", "5"]
+            .into_iter()
+            .map(|e| Record::from(*e))
+            .collect::<Vec<_>>();
+
+        let input2 = input.clone();
+        let buffered = BatchSink::new(vec![], RecordBuffer::default(), 1);
+
+        let (buffered, _) = buffered
+            .send_all(futures::stream::iter_ok(input))
+            .wait()
+            .unwrap();
+
+        let output = buffered
+            .into_inner()
+            .into_iter()
+            .map(|e| e.into_inner())
+            .collect::<Vec<Vec<Record>>>();
+
+        let expected_output = input2
+            .into_iter()
+            .map(|e| vec![e])
+            .collect::<Vec<Vec<Record>>>();
+        assert_eq!(output, expected_output);
+    }
 }

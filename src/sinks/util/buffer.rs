@@ -1,3 +1,4 @@
+use crate::record::Record;
 use flate2::write::GzEncoder;
 use std::io::Write;
 use std::mem;
@@ -92,6 +93,43 @@ impl From<Buffer> for Vec<u8> {
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec"),
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RecordBuffer {
+    inner: Vec<Record>,
+}
+
+impl RecordBuffer {
+    pub fn into_inner(self) -> Vec<Record> {
+        self.inner
+    }
+}
+
+impl super::batch::Batch for RecordBuffer {
+    type Item = Record;
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn push(&mut self, item: Self::Item) {
+        self.inner.push(item)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        RecordBuffer::default()
+    }
+}
+
+impl From<RecordBuffer> for Vec<Record> {
+    fn from(buf: RecordBuffer) -> Vec<Record> {
+        buf.into_inner()
     }
 }
 

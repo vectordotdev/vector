@@ -8,7 +8,7 @@ use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend,
 use std::time::Duration;
 use tower_service::Service;
 
-pub use buffer::Buffer;
+pub use buffer::{Buffer, RecordBuffer};
 
 pub trait SinkExt<B>
 where
