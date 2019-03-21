@@ -128,10 +128,10 @@ fn main() {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(2));
 
-        let snapshot = controller.get_snapshot().unwrap();
-        let raw_snap = serde_json::to_string_pretty(&snapshot).unwrap();
+        let _snapshot = controller.get_snapshot().unwrap();
+        // let raw_snap = serde_json::to_string_pretty(&snapshot).unwrap();
 
-        println!("Metrics snapshot: {}", raw_snap);
+        // println!("Metrics snapshot: {}", raw_snap);
     });
 
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();

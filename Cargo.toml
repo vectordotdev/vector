@@ -60,7 +60,9 @@ tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
 tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
-hotmic = "0.7"
+
+# Metrics
+hotmic = "0.8"
 
 # Aws
 rusoto_core = "0.36.0"

@@ -66,8 +66,8 @@ fn main() {
         );
     });
 
-    let snapshot = controller.get_snapshot().unwrap();
-    let raw_snap = serde_json::to_string_pretty(&snapshot).unwrap();
+    let _snapshot = controller.get_snapshot().unwrap();
+    // let raw_snap = serde_json::to_string_pretty(&snapshot).unwrap();
 
-    println!("Metrics snapshot: {}", raw_snap);
+    // println!("Metrics snapshot: {}", raw_snap);
 }
