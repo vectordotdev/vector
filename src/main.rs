@@ -9,7 +9,7 @@ use vector::topology::Topology;
 extern crate tokio_trace;
 
 fn main() {
-    let app = App::new("Router").version("1.0").author("timber.io")
+    let app = App::new("Vector").version("1.0").author("timber.io")
         .arg(
             Arg::with_name("config")
                 .short("c")
