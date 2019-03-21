@@ -34,7 +34,7 @@ TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
 BUILDER_COMMAND=${BUILDER:-"cross"}
 
 function build_release() {
-    $BUILDER_COMMAND build --target $TARGET --release $ARGS --frozen
+    $BUILDER_COMMAND build --target $TARGET --release $ARGS
 }
 
 function build_tar() {
