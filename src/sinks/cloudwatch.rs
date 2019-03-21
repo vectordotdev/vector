@@ -12,15 +12,13 @@ use rusoto_logs::{
 use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::fmt;
-use std::sync::Arc;
 use std::time::Duration;
 use tower_service::Service;
 use tower_timeout::Timeout;
 
 pub struct CloudwatchLogsSvc {
-    stream_token: Option<String>,
-    client: Arc<CloudWatchLogsClient>,
-    in_flight: Option<oneshot::Receiver<PutLogEventsResponse>>,
+    client: CloudWatchLogsClient,
+    state: State,
     config: CloudwatchLogsSinkConfig,
 }
 
@@ -32,17 +30,11 @@ pub struct CloudwatchLogsSinkConfig {
     pub buffer_size: usize,
 }
 
-pub struct CloudwatchFuture {
-    client: Arc<CloudWatchLogsClient>,
-    config: CloudwatchLogsSinkConfig,
-    records: Option<Vec<Record>>,
-    tx: Option<oneshot::Sender<PutLogEventsResponse>>,
-    state: State,
-}
-
 enum State {
+    Idle,
+    Token(Option<String>),
     Describe(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
-    Put(RusotoFuture<PutLogEventsResponse, PutLogEventsError>),
+    Put(oneshot::Receiver<PutLogEventsResponse>),
 }
 
 #[derive(Debug)]
@@ -50,6 +42,7 @@ pub enum CloudwatchError {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
     NoStreamsFound,
+    ServiceDropped,
 }
 
 #[typetag::serde(name = "cloudwatch_logs")]
@@ -70,139 +63,61 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
-        let client = Arc::new(CloudWatchLogsClient::new(config.region.clone()));
+        let client = CloudWatchLogsClient::new(config.region.clone());
 
         Ok(CloudwatchLogsSvc {
             client,
             config,
-            in_flight: None,
-            stream_token: None,
+            state: State::Idle,
         })
     }
 
     fn put_logs(
-        client: Arc<CloudWatchLogsClient>,
-        config: &CloudwatchLogsSinkConfig,
+        &mut self,
+        sequence_token: Option<String>,
         records: Vec<Record>,
-        token: Option<String>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
         let log_events = records.into_iter().map(Into::into).collect();
 
         let request = PutLogEventsRequest {
             log_events,
-            log_group_name: config.group_name.clone(),
-            log_stream_name: config.stream_name.clone(),
-            sequence_token: token,
+            sequence_token,
+            log_group_name: self.config.group_name.clone(),
+            log_stream_name: self.config.stream_name.clone(),
         };
 
-        client.put_log_events(request)
+        self.client.put_log_events(request)
     }
 
     fn describe_stream(
-        client: Arc<CloudWatchLogsClient>,
-        config: &CloudwatchLogsSinkConfig,
+        &mut self,
     ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
         let request = DescribeLogStreamsRequest {
             limit: Some(1),
-            log_group_name: config.group_name.clone(),
-            log_stream_name_prefix: Some(config.stream_name.clone()),
+            log_group_name: self.config.group_name.clone(),
+            log_stream_name_prefix: Some(self.config.stream_name.clone()),
             ..Default::default()
         };
 
-        client.describe_log_streams(request)
-    }
-
-    fn send_request(
-        &mut self,
-        records: Vec<Record>,
-        tx: oneshot::Sender<PutLogEventsResponse>,
-    ) -> CloudwatchFuture {
-        // FIXME: the token here will always be None until we can force the service
-        // to send one request at a time and use the return value of the previous.
-        CloudwatchFuture::new(
-            self.client.clone(),
-            self.stream_token.take(),
-            self.config.clone(),
-            tx,
-            records,
-        )
+        self.client.describe_log_streams(request)
     }
 }
 
 impl Service<Vec<Record>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
-    type Future = CloudwatchFuture;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        if let Some(in_flight) = &mut self.in_flight {
-            let response = match in_flight.poll() {
-                Ok(Async::Ready(response)) => response,
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(_) => panic!("The in flight future was dropped!"),
-            };
-            self.stream_token = response.next_sequence_token;
-        }
-
-        Ok(().into())
-    }
-
-    fn call(&mut self, req: Vec<Record>) -> Self::Future {
-        let (tx, rx) = oneshot::channel();
-        self.in_flight = Some(rx);
-        self.send_request(req.into(), tx)
-    }
-}
-
-impl CloudwatchFuture {
-    pub fn new(
-        client: Arc<CloudWatchLogsClient>,
-        stream_token: Option<String>,
-        config: CloudwatchLogsSinkConfig,
-        tx: oneshot::Sender<PutLogEventsResponse>,
-        records: Vec<Record>,
-    ) -> Self {
-        if let Some(token) = stream_token {
-            let fut = CloudwatchLogsSvc::put_logs(client.clone(), &config, records, Some(token));
-            let state = State::Put(fut);
-            CloudwatchFuture {
-                client,
-                records: None,
-                config,
-                tx: Some(tx),
-                state,
-            }
-        } else {
-            let fut = CloudwatchLogsSvc::describe_stream(client.clone(), &config);
-            let state = State::Describe(fut);
-            CloudwatchFuture {
-                client,
-                records: Some(records),
-                config,
-                tx: Some(tx),
-                state,
-            }
-        }
-    }
-}
-
-impl Future for CloudwatchFuture {
-    type Item = ();
-    type Error = CloudwatchError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
-            match self.state {
-                State::Put(ref mut fut) => {
-                    // TODO(lucio): invesitgate failure cases on rejected logs
-                    let response = try_ready!(fut.poll());
-
-                    self.tx.take().unwrap().send(response).unwrap();
-
-                    return Ok(Async::Ready(()));
+            match &mut self.state {
+                State::Idle => {
+                    let fut = self.describe_stream();
+                    self.state = State::Describe(fut);
+                    continue;
                 }
-                State::Describe(ref mut fut) => {
-                    let response = try_ready!(fut.poll());
+                State::Describe(fut) => {
+                    let response = try_ready!(fut.poll().map_err(CloudwatchError::Describe));
 
                     let stream = response
                         .log_streams
@@ -211,19 +126,39 @@ impl Future for CloudwatchFuture {
                         .next()
                         .ok_or(CloudwatchError::NoStreamsFound)?;
 
-                    let token = stream.upload_sequence_token;
+                    self.state = State::Token(stream.upload_sequence_token);
+                    return Ok(Async::Ready(()));
+                }
+                State::Token(_) => return Ok(Async::Ready(())),
+                State::Put(fut) => {
+                    let response = match fut.poll() {
+                        Ok(Async::Ready(response)) => response,
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Err(_) => panic!("The in flight future was dropped!"),
+                    };
 
-                    let records = self.records.take().unwrap();
-                    let fut = CloudwatchLogsSvc::put_logs(
-                        self.client.clone(),
-                        &self.config,
-                        records,
-                        token,
-                    );
-                    self.state = State::Put(fut);
-                    continue;
+                    self.state = State::Token(response.next_sequence_token);
+                    return Ok(Async::Ready(()));
                 }
             }
+        }
+    }
+
+    fn call(&mut self, req: Vec<Record>) -> Self::Future {
+        match &mut self.state {
+            State::Token(token) => {
+                let token = token.take();
+                let (tx, rx) = oneshot::channel();
+                self.state = State::Put(rx);
+
+                let fut = self
+                    .put_logs(token, req.into())
+                    .map_err(CloudwatchError::Put)
+                    .and_then(move |res| tx.send(res).map_err(|_| CloudwatchError::ServiceDropped));
+
+                Box::new(fut)
+            }
+            _ => panic!("You did not call poll_ready!"),
         }
     }
 }
@@ -278,9 +213,13 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CloudwatchError::Put(e) => write!(f, "CloudwatchError: {}", e),
-            CloudwatchError::Describe(e) => write!(f, "CloudwatchError: {}", e),
+            CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
+            CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
+            CloudwatchError::ServiceDropped => write!(
+                f,
+                "CloudwatchError: The service was dropped while there was a request in flight."
+            ),
         }
     }
 }
