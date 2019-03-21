@@ -99,6 +99,9 @@ jobs:
           ADVERTISED_HOST: localhost
           ADVERTISED_PORT: 9092
       - image: timberio/splunk-hec-test:latest
+      - image: docker.elastic.co/elasticsearch/elasticsearch:6.6.2
+        environment:
+          - discovery.type=single-node
 
     steps:
       - checkout

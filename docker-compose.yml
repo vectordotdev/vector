@@ -34,3 +34,10 @@ services:
         - "8088:8088"
         - "8000:8000"
         - "8089:8089"
+    elasticsearch:
+      image: docker.elastic.co/elasticsearch/elasticsearch:6.6.2
+      ports:
+        - "9200:9200"
+        - "9300:9300"
+      environment:
+        - discovery.type=single-node

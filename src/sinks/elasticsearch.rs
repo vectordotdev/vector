@@ -1,276 +1,203 @@
+use super::util::{self, Buffer, SinkExt};
 use crate::record::Record;
-use chrono::{Date, Utc};
-use elastic_responses::{bulk::BulkErrorsResponse, parse};
-use futures::{
-    stream::FuturesUnordered,
-    sync::oneshot::{self, SpawnHandle},
-    Async, AsyncSink, Future, Sink, Stream,
-};
-use hyper::{client::HttpConnector, Body, Client, Request, Uri};
+use futures::{Future, Sink};
+use http::Uri;
+use hyper::{Body, Client, Request};
+use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{marker::PhantomData, mem};
-use tokio::executor::DefaultExecutor;
-use tokio_retry::{
-    strategy::{jitter, ExponentialBackoff},
-    Retry,
-};
-use uuid::Uuid;
 
-pub trait Document {
-    type Body: Serialize;
-
-    fn app_id(&self) -> &str;
-    fn id(&self) -> Uuid;
-    fn ty(&self) -> &str;
-    fn dt(&self) -> Date<Utc>;
-    fn body(&self) -> Self::Body;
-
-    fn index(&self) -> String {
-        format!("a-{}-{}", self.app_id(), self.dt().format("%F"))
-    }
-}
-
-// for testing
-impl<T: Serialize> Document for T {
-    type Body = serde_json::Value;
-
-    fn app_id(&self) -> &str {
-        "12345"
-    }
-
-    fn id(&self) -> Uuid {
-        Uuid::new_v4()
-    }
-
-    fn ty(&self) -> &str {
-        "log_lines"
-    }
-
-    fn dt(&self) -> Date<Utc> {
-        Utc::today()
-    }
-
-    fn body(&self) -> Self::Body {
-        json!({ "msg": self })
-    }
-}
-
-impl Document for Record {
-    type Body = serde_json::Value;
-
-    fn app_id(&self) -> &str {
-        "12345"
-    }
-
-    fn id(&self) -> Uuid {
-        Uuid::new_v4()
-    }
-
-    fn ty(&self) -> &str {
-        "log_lines"
-    }
-
-    fn dt(&self) -> Date<Utc> {
-        Utc::today()
-    }
-
-    fn body(&self) -> Self::Body {
-        json!({ "msg": self.line })
-    }
-}
-
-pub struct ElasticsearchSink<T> {
-    client: Client<HttpConnector, Body>,
-    buffer: Vec<u8>,
-    buffer_limit: usize,
-    buffered_lines: usize,
-    in_flight_requests: FuturesUnordered<SpawnHandle<(), String>>,
-    in_flight_limit: usize,
-    _pd: PhantomData<T>,
-}
-
-impl<T: Document> ElasticsearchSink<T> {
-    pub fn new() -> Self {
-        let client: Client<_, Body> = Client::builder()
-            .executor(DefaultExecutor::current())
-            .build_http();
-
-        Self {
-            client,
-            buffer: Vec::new(),
-            // TODO: configurable
-            buffer_limit: 2 * 1024 * 1024,
-            buffered_lines: 0,
-            in_flight_requests: FuturesUnordered::new(),
-            in_flight_limit: 3, // TODO: configurable
-            _pd: PhantomData,
-        }
-    }
-
-    // TODO: do better than string errors
-    fn add_to_buffer(&mut self, msg: &T) -> Result<(), String> {
-        let action = json!({
-            "index": {
-                "_index": msg.index(),
-                "_type": msg.ty(),
-                "_id": msg.id().to_string(),
-            }
-        });
-
-        serde_json::to_writer(&mut self.buffer, &action)
-            .map_err(|e| format!("serialization error! {}", e))?;
-        self.buffer.push(b'\n');
-
-        serde_json::to_writer(&mut self.buffer, &msg.body())
-            .map_err(|e| format!("serialization error! {}", e))?;
-        self.buffer.push(b'\n');
-
-        self.buffered_lines += 1;
-        Ok(())
-    }
-
-    fn spawn_request(&mut self, body: Vec<u8>) -> SpawnHandle<(), String> {
-        // this is cheap and reuses the same connection pools, etc
-        // TODO: try to make the whole client Send + Sync so we don't need this?
-        let client = self.client.clone();
-
-        // before jitter, this gives us 15ms, 225ms, and 3.375s retries
-        let retry_strategy = ExponentialBackoff::from_millis(15).map(jitter).take(3);
-
-        // TODO: request ids for logging
-        let request = Retry::spawn(retry_strategy, move || {
-            // TODO: configurable
-            let uri: Uri = "http://localhost:9200/_bulk".parse().unwrap();
-
-            let request = Request::post(uri)
-                .header("Content-Type", "application/x-ndjson")
-                .body(body.clone().into()) // TODO: don't actually clone the whole vec everytime
-                .unwrap();
-
-            client
-                .request(request)
-                .and_then(|response| {
-                    let (parts, body) = response.into_parts();
-                    info!("got response headers! status code {:?}", parts.status);
-                    body.concat2().map(|body| (parts, body))
-                })
-                .map_err(|e| format!("request error: {:?}", e))
-                .and_then(|(parts, body)| {
-                    parse::<BulkErrorsResponse>()
-                        .from_reader(parts.status.as_u16(), body.as_ref())
-                        .map_err(|e| format!("response error: {:?}", e))
-                })
-                .and_then(|response| {
-                    // TODO: use the response to build a new body for retries that include
-                    // only the failed items
-                    if response.is_err() {
-                        Err(format!("{} bulk items failed", response.iter().count()))
-                    } else {
-                        info!("all bulk items succeeded!");
-                        Ok(())
-                    }
-                })
-        })
-        .map_err(|e| match e {
-            tokio_retry::Error::OperationError(e) => {
-                format!("retry limited exhausted, dropping request: {}", e)
-            }
-            tokio_retry::Error::TimerError(e) => format!("timer error during retry: {}", e),
-        });
-
-        oneshot::spawn(request, &DefaultExecutor::current())
-    }
-}
-
-impl<T: Document> Sink for ElasticsearchSink<T> {
-    type SinkItem = T;
-    type SinkError = String; // TODO: better than string errors
-
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        if self.buffer.len() >= self.buffer_limit {
-            self.poll_complete()?;
-
-            if self.buffer.len() >= self.buffer_limit {
-                return Ok(AsyncSink::NotReady(item));
-            }
-        }
-
-        self.add_to_buffer(&item)?;
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        loop {
-            if self.buffer.is_empty() && self.in_flight_requests.is_empty() {
-                return Ok(Async::Ready(()));
-
-            // do we have records to send and room for another request?
-            } else if !self.buffer.is_empty()
-                && self.in_flight_requests.len() < self.in_flight_limit
-            {
-                info!(
-                    "preparing to send request of {} messages ({} bytes)",
-                    self.buffered_lines,
-                    self.buffer.len(),
-                );
-
-                // existing buffer becomes request body, replace with fresh buffer
-                // TODO: use a Buf instead
-                let body = mem::replace(&mut self.buffer, Vec::new());
-                self.buffered_lines = 0;
-
-                let request = self.spawn_request(body);
-                self.in_flight_requests.push(request);
-
-            // do we have in flight requests we need to poll?
-            } else if !self.in_flight_requests.is_empty() {
-                match self.in_flight_requests.poll() {
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Ok(Async::Ready(Some(()))) => {} // request finished normally, continue
-                    Err(e) => error!("{}", e), // request finished with an error, just log and continue
-                    Ok(Async::Ready(None)) => {
-                        unreachable!("got Ready(None) with requests in flight")
-                    }
-                }
-
-            // catch any unexpected states instead of looping forever
-            } else {
-                panic!("this should only be possible if in_flight_limit < 1, which is broken")
-            }
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct ElasticSearchConfig;
+pub struct ElasticSearchConfig {
+    pub host: String,
+    pub index: String,
+    pub doc_type: String,
+    pub id_key: Option<String>,
+}
 
 #[typetag::serde(name = "elasticsearch")]
 impl crate::topology::config::SinkConfig for ElasticSearchConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((ElasticsearchSink::build(), ElasticsearchSink::healthcheck()))
+        Ok((es(self.clone()), healthcheck(self.host.clone())))
     }
 }
 
-impl ElasticsearchSink<Record> {
-    pub fn build() -> super::RouterSink {
-        Box::new(Self::new().sink_map_err(|e| error!("es sink error: {:?}", e)))
+fn es(config: ElasticSearchConfig) -> super::RouterSink {
+    let host = config.host.clone();
+    let id_key = config.id_key.clone();
+    let sink = util::http::HttpSink::new()
+        .with(move |body: Buffer| {
+            let uri = format!("{}/_bulk", host);
+            let uri: Uri = uri.parse().unwrap();
+
+            let mut request = util::http::Request::post(uri, body.into());
+            request
+                .header("Content-Type", "application/x-ndjson")
+                .header("Content-Encoding", "gzip");
+
+            Ok(request)
+        })
+        .batched(Buffer::new(true), 2 * 1024 * 1024)
+        .with(move |record: Record| {
+            let mut action = json!({
+                "index": {
+                    "_index": config.index,
+                    "_type": config.doc_type,
+                }
+            });
+            maybe_set_id(id_key.as_ref(), &mut action, &record);
+
+            let mut body = serde_json::to_vec(&action).unwrap();
+            body.push(b'\n');
+
+            serde_json::to_writer(&mut body, &record).unwrap();
+            body.push(b'\n');
+            Ok(body)
+        });
+
+    Box::new(sink)
+}
+
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
+    let id = key.and_then(|k| record.custom.get(&k.as_ref().into()));
+    if let Some(val) = id {
+        doc.as_object_mut()
+            .unwrap()
+            .insert("_id".into(), json!(val));
+    }
+}
+
+fn healthcheck(host: String) -> super::Healthcheck {
+    let uri = format!("{}/_cluster/health", host);
+    let request = Request::get(uri).body(Body::empty()).unwrap();
+
+    let https = HttpsConnector::new(4).expect("TLS initialization failed");
+    let client = Client::builder().build(https);
+    let healthcheck = client
+        .request(request)
+        .map_err(|err| err.to_string())
+        .and_then(|response| {
+            if response.status() == hyper::StatusCode::OK {
+                Ok(())
+            } else {
+                Err(format!("Unexpected status: {}", response.status()))
+            }
+        });
+
+    Box::new(healthcheck)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::maybe_set_id;
+    use crate::Record;
+    use serde_json::json;
+
+    #[test]
+    fn sets_id_from_custom_field() {
+        let id_key = Some("foo");
+        let mut record = Record::from("butts");
+        record.custom.insert("foo".into(), "bar".into());
+        let mut action = json!({});
+
+        maybe_set_id(id_key, &mut action, &record);
+
+        assert_eq!(json!({"_id": "bar"}), action);
     }
 
-    pub fn healthcheck() -> super::Healthcheck {
-        let client: Client<_, Body> = Client::builder()
-            .executor(DefaultExecutor::current())
-            .build_http();
+    #[test]
+    fn doesnt_set_id_when_field_missing() {
+        let id_key = Some("foo");
+        let mut record = Record::from("butts");
+        record.custom.insert("not_foo".into(), "bar".into());
+        let mut action = json!({});
 
-        let uri: Uri = "http://localhost:9200/_cluster/health".parse().unwrap();
+        maybe_set_id(id_key, &mut action, &record);
 
+        assert_eq!(json!({}), action);
+    }
+
+    #[test]
+    fn doesnt_set_id_when_not_configured() {
+        let id_key: Option<&str> = None;
+        let mut record = Record::from("butts");
+        record.custom.insert("foo".into(), "bar".into());
+        let mut action = json!({});
+
+        maybe_set_id(id_key, &mut action, &record);
+
+        assert_eq!(json!({}), action);
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "es-integration-tests")]
+mod integration_tests {
+    use super::ElasticSearchConfig;
+    use crate::{
+        test_util::{block_on, random_lines},
+        topology::config::SinkConfig,
+        Record,
+    };
+    use elastic::client::SyncClientBuilder;
+    use futures::{stream, Future, Sink};
+    use hyper::{Body, Client, Request};
+    use hyper_tls::HttpsConnector;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn insert_records() {
+        let index = gen_index();
+        let config = ElasticSearchConfig {
+            host: "http://localhost:9200/".into(),
+            index: index.clone(),
+            doc_type: "log_lines".into(),
+            id_key: None,
+        };
+
+        let (sink, _hc) = config.build().unwrap();
+
+        let input = random_lines(100)
+            .map(Record::from)
+            .take(100)
+            .collect::<Vec<_>>();
+
+        let pump = sink.send_all(stream::iter_ok(input.clone().into_iter()));
+        block_on(pump).unwrap();
+
+        // make sure writes all all visible
+        block_on(flush(config.host)).unwrap();
+
+        let client = SyncClientBuilder::new().build().unwrap();
+
+        let response = client
+            .search::<Value>()
+            .index(index)
+            .body(json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .unwrap();
+
+        assert_eq!(input.len() as u64, response.total());
+        for hit in response.into_hits() {
+            let record: Record = serde_json::from_value(hit.into_document().unwrap()).unwrap();
+            assert!(input.contains(&record));
+        }
+    }
+
+    fn gen_index() -> String {
+        format!("test-{}", random_lines(10).next().unwrap().to_lowercase())
+    }
+
+    fn flush(host: String) -> impl Future<Item = (), Error = String> {
+        let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let healthcheck = client
+        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        let client = Client::builder().build(https);
+        client
             .request(request)
             .map_err(|err| err.to_string())
             .and_then(|response| {
@@ -279,8 +206,7 @@ impl ElasticsearchSink<Record> {
                 } else {
                     Err(format!("Unexpected status: {}", response.status()))
                 }
-            });
-
-        Box::new(healthcheck)
+            })
     }
+
 }

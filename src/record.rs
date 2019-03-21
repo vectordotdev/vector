@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -7,7 +8,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
     pub line: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
