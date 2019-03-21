@@ -1,6 +1,7 @@
 use super::util::{self, Buffer, SinkExt};
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
+use http::header::{HeaderName, HeaderValue};
 use hyper::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,7 @@ struct ValidatedConfig {
 
 impl HttpSinkConfig {
     fn validated(&self) -> Result<ValidatedConfig, String> {
+        validate_headers(&self.headers)?;
         Ok(ValidatedConfig {
             uri: self.uri()?,
             healthcheck_uri: self.healthcheck_uri()?,
@@ -61,6 +63,16 @@ impl HttpSinkConfig {
             Ok(None)
         }
     }
+}
+
+fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), String> {
+    if let Some(map) = headers {
+        for (name, value) in map {
+            HeaderName::from_bytes(name.as_bytes()).map_err(|e| format!("{}: {}", e, name))?;
+            HeaderValue::from_bytes(value.as_bytes()).map_err(|e| format!("{}: {}", e, value))?;
+        }
+    }
+    Ok(())
 }
 
 fn build_uri(raw: &str) -> Result<Uri, String> {
@@ -172,6 +184,34 @@ mod tests {
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
     use std::io::{BufRead, BufReader};
+
+    #[test]
+    fn validates_normal_headers() {
+        let config = r#"
+        uri = "http://$IN_ADDR/frames"
+        [headers]
+        Auth = "token:thing_and-stuff"
+        X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
+        "#;
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        assert_eq!(Ok(()), super::validate_headers(&config.headers));
+    }
+
+    #[test]
+    fn catches_bad_header_names() {
+        let config = r#"
+        uri = "http://$IN_ADDR/frames"
+        [headers]
+        "\u0001" = "bad"
+        "#;
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        assert_eq!(
+            Err(String::from("invalid HTTP header name: \u{1}")),
+            super::validate_headers(&config.headers)
+        );
+    }
 
     #[test]
     fn test_http_happy_path() {
