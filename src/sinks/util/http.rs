@@ -1,6 +1,9 @@
 use super::retries::{FixedRetryPolicy, RetryLogic};
 use futures::{Poll, Sink};
-use http::{header::HeaderValue, HeaderMap, HttpTryFrom, Method, Uri};
+use http::{
+    header::{HeaderName, HeaderValue},
+    HeaderMap, Method, Uri,
+};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client,
@@ -38,8 +41,13 @@ impl Request {
         }
     }
 
-    pub fn header(&mut self, name: &'static str, value: impl AsRef<str>) -> &mut Self {
-        let value = HeaderValue::try_from(value.as_ref()).unwrap();
+    pub fn header<T, U>(&mut self, name: T, value: U) -> &mut Self
+    where
+        T: AsRef<[u8]>,
+        U: AsRef<[u8]>,
+    {
+        let name = HeaderName::from_bytes(name.as_ref()).unwrap();
+        let value = HeaderValue::from_bytes(value.as_ref()).unwrap();
         self.headers.append(name, value);
         self
     }
