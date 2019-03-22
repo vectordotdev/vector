@@ -1,6 +1,6 @@
 use crate::record::Record;
 
-pub mod augmenter;
+pub mod add_fields;
 pub mod field_filter;
 pub mod regex_parser;
 pub mod sampler;

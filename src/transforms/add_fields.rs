@@ -1,56 +1,57 @@
 use super::Transform;
 use crate::record::Record;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct AugmenterConfig {
-    pub key: String,
-    pub value: String,
+pub struct AddFieldsConfig {
+    pub fields: IndexMap<String, String>,
 }
 
-pub struct Augmenter {
-    key: Atom,
-    value: String,
+pub struct AddFields {
+    fields: IndexMap<Atom, String>,
 }
 
 #[typetag::serde(name = "augmenter")]
-impl crate::topology::config::TransformConfig for AugmenterConfig {
+impl crate::topology::config::TransformConfig for AddFieldsConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Ok(Box::new(Augmenter::new(
-            self.key.clone(),
-            self.value.clone(),
-        )))
+        Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 }
 
-impl Augmenter {
-    pub fn new(key: String, value: String) -> Self {
-        Augmenter {
-            key: key.into(),
-            value,
-        }
+impl AddFields {
+    pub fn new(fields: IndexMap<String, String>) -> Self {
+        let fields = fields.into_iter().map(|(k, v)| (k.into(), v)).collect();
+
+        AddFields { fields }
     }
 }
 
-impl Transform for Augmenter {
+impl Transform for AddFields {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        record.custom.insert(self.key.clone(), self.value.clone());
+        for (key, value) in self.fields.clone() {
+            record.custom.insert(key, value);
+        }
+
         Some(record)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Augmenter;
+    use super::AddFields;
     use crate::{record::Record, transforms::Transform};
+    use indexmap::IndexMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
-    fn augment_record() {
+    fn add_fields_record() {
         let record = Record::from("augment me");
-        let augment = Augmenter::new("some_key".into(), "some_val".into());
+        let mut fields = IndexMap::new();
+        fields.insert("some_key".into(), "some_val".into());
+        let augment = AddFields::new(fields);
 
         let new_record = augment.transform(record).unwrap();
 
