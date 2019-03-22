@@ -386,7 +386,7 @@ mod tests {
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
-    use crate::transforms::SamplerConfig;
+    use crate::transforms::sampler::SamplerConfig;
     use futures::{stream, Future, Stream};
     use std::collections::HashSet;
     use std::sync::{
