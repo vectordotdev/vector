@@ -329,14 +329,14 @@ fn benchmark_transforms(c: &mut Criterion) {
                     config.add_transform(
                         "parser",
                         &["in"],
-                        transforms::RegexParserConfig {
+                        transforms::regex_parser::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
                     config.add_transform(
                         "filter",
                         &["parser"],
-                        transforms::FieldFilterConfig {
+                        transforms::field_filter::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "404".to_string(),
                         },
@@ -414,14 +414,14 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_transform(
                         "parser",
                         &["in1", "in2"],
-                        transforms::RegexParserConfig {
+                        transforms::regex_parser::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                         },
                     );
                     config.add_transform(
                         "filter_200",
                         &["parser"],
-                        transforms::FieldFilterConfig {
+                        transforms::field_filter::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "200".to_string(),
                         },
@@ -429,7 +429,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_transform(
                         "filter_404",
                         &["parser"],
-                        transforms::FieldFilterConfig {
+                        transforms::field_filter::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "404".to_string(),
                         },
@@ -437,7 +437,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_transform(
                         "filter_500",
                         &["parser"],
-                        transforms::FieldFilterConfig {
+                        transforms::field_filter::FieldFilterConfig {
                             field: "status".to_string(),
                             value: "500".to_string(),
                         },
@@ -445,7 +445,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_transform(
                         "sampler",
                         &["parser"],
-                        transforms::SamplerConfig {
+                        transforms::sampler::SamplerConfig {
                             rate: 10,
                             pass_list: vec![],
                         },
