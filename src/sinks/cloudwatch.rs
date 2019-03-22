@@ -251,11 +251,12 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
 mod tests {
     #![cfg(feature = "cloudwatch-integration-tests")]
 
-    use crate::sinks::cloudwatch::CloudwatchLogsSinkConfig;
-    use crate::test_util::{block_on, random_lines};
-    use crate::topology::config::SinkConfig;
-    use crate::Record;
-    use futures::{future::poll_fn, stream, Sink};
+    use crate::{
+        sinks::cloudwatch::CloudwatchLogsSinkConfig,
+        test_util::{block_on, random_lines_with_stream},
+        topology::config::SinkConfig,
+    };
+    use futures::Sink;
     use rusoto_core::Region;
     use rusoto_logs::{
         CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
@@ -285,17 +286,10 @@ mod tests {
 
         let timestamp = chrono::Utc::now();
 
-        let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
-        let records = input_lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
+        let (input_lines, records) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
-
-        let (mut sink, _) = block_on(pump).unwrap();
-
-        block_on(poll_fn(move || sink.close())).unwrap();
+        let pump = sink.send_all(records);
+        block_on(pump).unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = STREAM_NAME.into();

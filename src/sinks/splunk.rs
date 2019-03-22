@@ -91,7 +91,11 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
 mod tests {
     #![cfg(feature = "splunk-integration-tests")]
 
-    use crate::{sinks, Record};
+    use crate::{
+        sinks,
+        test_util::{random_lines_with_stream, random_string},
+        Record,
+    };
     use futures::Sink;
     use serde_json::Value as JsonValue;
 
@@ -104,7 +108,7 @@ mod tests {
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
-        let message = random_string();
+        let message = random_string(100);
         let record = Record::from(message.clone());
 
         let pump = sink.send(record);
@@ -134,13 +138,9 @@ mod tests {
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
-        let messages = (0..10).map(|_| random_string()).collect::<Vec<_>>();
-        let records = messages
-            .iter()
-            .map(|l| Record::from(l.clone()))
-            .collect::<Vec<_>>();
+        let (messages, records) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(futures::stream::iter_ok(records));
+        let pump = sink.send_all(records);
 
         rt.block_on(pump).unwrap();
 
@@ -170,7 +170,7 @@ mod tests {
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
-        let message = random_string();
+        let message = random_string(100);
         let mut record = Record::from(message.clone());
         record.custom.insert("asdf".into(), "hello".to_owned());
 
@@ -200,7 +200,7 @@ mod tests {
 
         let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
 
-        let message = random_string();
+        let message = random_string(100);
         let mut record = Record::from(message.clone());
         record.custom.insert("asdf".into(), "hello".to_owned());
         record.host = Some("example.com:1234".to_owned());
@@ -289,16 +289,6 @@ mod tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn random_string() -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::{thread_rng, Rng};
-
-        thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(100)
-            .collect::<String>()
-    }
-
     fn get_token() -> String {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -323,5 +313,4 @@ mod tests {
 
         token
     }
-
 }

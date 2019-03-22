@@ -116,9 +116,8 @@ mod tests {
     #![cfg(feature = "kinesis-integration-tests")]
 
     use crate::sinks::kinesis::{KinesisService, KinesisSinkConfig};
-    use crate::test_util::random_lines;
-    use crate::Record;
-    use futures::{future::poll_fn, stream, Future, Sink};
+    use crate::test_util::random_lines_with_stream;
+    use futures::{Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
@@ -149,18 +148,10 @@ mod tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let input_lines = random_lines(100).take(11).collect::<Vec<_>>();
+        let (input_lines, records) = random_lines_with_stream(100, 11);
 
-        let records = input_lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
-
-        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
-
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-
-        rt.block_on(poll_fn(move || sink.close())).unwrap();
+        let pump = sink.send_all(records);
+        rt.block_on(pump).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 

@@ -1,4 +1,5 @@
-use futures::{Async, Future, Poll, Sink, Stream};
+use crate::Record;
+use futures::{stream, Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -36,6 +37,27 @@ pub fn send_lines(
         })
 }
 
+pub fn random_lines_with_stream(
+    len: usize,
+    count: usize,
+) -> (Vec<String>, impl Stream<Item = Record, Error = ()>) {
+    let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
+    let stream = stream::iter_ok(lines.clone().into_iter().map(Record::from));
+    (lines, stream)
+}
+
+pub fn random_records_with_stream(
+    len: usize,
+    count: usize,
+) -> (Vec<Record>, impl Stream<Item = Record, Error = ()>) {
+    let records = (0..count)
+        .map(|_| random_string(len))
+        .map(Record::from)
+        .collect::<Vec<_>>();
+    let stream = stream::iter_ok(records.clone().into_iter());
+    (records, stream)
+}
+
 pub fn random_string(len: usize) -> String {
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
@@ -47,12 +69,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    use rand::distributions::Alphanumeric;
-    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
-    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
-
-    std::iter::repeat(()).map(move |_| rng.sample_iter(&Alphanumeric).take(len).collect::<String>())
+    std::iter::repeat(()).map(move |_| random_string(len))
 }
 
 pub fn receive_lines(

@@ -169,11 +169,13 @@ pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
 mod tests {
     #![cfg(feature = "s3-integration-tests")]
 
-    use crate::sinks::s3::S3SinkInnerConfig;
-    use crate::test_util::{random_lines, random_string};
-    use crate::{sinks, Record};
+    use crate::{
+        sinks::{self, s3::S3SinkInnerConfig},
+        test_util::{block_on, random_lines_with_stream, random_string},
+        Record,
+    };
     use flate2::read::GzDecoder;
-    use futures::{stream, Future, Sink};
+    use futures::{Future, Sink};
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader};
@@ -186,18 +188,10 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = sinks::s3::new(config);
 
-        let lines = random_lines(100).take(10).collect::<Vec<_>>();
-        let records = lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
+        let (lines, records) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
-
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-        rt.block_on(futures::future::poll_fn(move || sink.close()))
-            .unwrap();
+        let pump = sink.send_all(records);
+        block_on(pump).unwrap();
 
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
@@ -249,18 +243,10 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = sinks::s3::new(config);
 
-        let lines = random_lines(100).take(30).collect::<Vec<_>>();
-        let records = lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
+        let (lines, records) = random_lines_with_stream(100, 30);
 
-        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
-
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-        rt.block_on(futures::future::poll_fn(move || sink.close()))
-            .unwrap();
+        let pump = sink.send_all(records);
+        block_on(pump).unwrap();
 
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
@@ -316,11 +302,7 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = sinks::s3::new(config);
 
-        let lines = random_lines(100).take(30).collect::<Vec<_>>();
-        let records = lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
+        let (lines, _) = random_lines_with_stream(100, 30);
 
         let (tx, rx) = futures::sync::mpsc::channel(1);
         let pump = sink.send_all(rx).map(|_| ()).map_err(|_| ());
@@ -329,14 +311,14 @@ mod tests {
         rt.spawn(pump);
 
         let mut tx = tx.wait();
-        for record in records.iter().take(15) {
-            tx.send(record.clone()).unwrap();
+        for line in lines.iter().take(15) {
+            tx.send(Record::from(line.as_str())).unwrap();
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        for record in records.iter().skip(15) {
-            tx.send(record.clone()).unwrap();
+        for line in lines.iter().skip(15) {
+            tx.send(Record::from(line.as_str())).unwrap();
         }
         drop(tx);
 
@@ -397,18 +379,10 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = sinks::s3::new(config);
 
-        let lines = random_lines(100).take(500).collect::<Vec<_>>();
-        let records = lines
-            .iter()
-            .map(|line| Record::from(line.clone()))
-            .collect::<Vec<_>>();
+        let (lines, records) = random_lines_with_stream(100, 500);
 
-        let pump = sink.send_all(stream::iter_ok(records.into_iter()));
-
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-        rt.block_on(futures::future::poll_fn(move || sink.close()))
-            .unwrap();
+        let pump = sink.send_all(records);
+        block_on(pump).unwrap();
 
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {

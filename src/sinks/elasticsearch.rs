@@ -136,12 +136,12 @@ mod tests {
 mod integration_tests {
     use super::ElasticSearchConfig;
     use crate::{
-        test_util::{block_on, random_lines},
+        test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
         Record,
     };
     use elastic::client::SyncClientBuilder;
-    use futures::{stream, Future, Sink};
+    use futures::{Future, Sink};
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
     use serde_json::{json, Value};
@@ -158,12 +158,9 @@ mod integration_tests {
 
         let (sink, _hc) = config.build().unwrap();
 
-        let input = random_lines(100)
-            .map(Record::from)
-            .take(100)
-            .collect::<Vec<_>>();
+        let (input, records) = random_records_with_stream(100, 100);
 
-        let pump = sink.send_all(stream::iter_ok(input.clone().into_iter()));
+        let pump = sink.send_all(records);
         block_on(pump).unwrap();
 
         // make sure writes all all visible
@@ -188,7 +185,7 @@ mod integration_tests {
     }
 
     fn gen_index() -> String {
-        format!("test-{}", random_lines(10).next().unwrap().to_lowercase())
+        format!("test-{}", random_string(10).to_lowercase())
     }
 
     fn flush(host: String) -> impl Future<Item = (), Error = String> {

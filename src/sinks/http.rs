@@ -175,11 +175,11 @@ fn healthcheck(uri: Uri, auth: Option<BasicAuth>) -> super::Healthcheck {
 mod tests {
     use crate::{
         sinks::http::HttpSinkConfig,
-        test_util::{next_addr, random_lines, shutdown_on_idle},
+        test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkConfig,
     };
     use bytes::Buf;
-    use futures::{stream, sync::mpsc, Future, Sink, Stream};
+    use futures::{sync::mpsc, Future, Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
@@ -255,22 +255,15 @@ mod tests {
             .with_graceful_shutdown(tripwire)
             .map_err(|e| panic!("server error: {}", e));
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let (input_lines, records) = random_lines_with_stream(100, num_lines);
 
-        let pump = sink.send_all(stream::iter_ok::<_, ()>(
-            input_lines
-                .clone()
-                .into_iter()
-                .map(|line| crate::Record::from(line)),
-        ));
+        let pump = sink.send_all(records);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
 
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-        rt.block_on(futures::future::poll_fn(move || sink.close()))
-            .unwrap();
+        rt.block_on(pump).unwrap();
 
         drop(trigger);
 
@@ -346,22 +339,15 @@ mod tests {
             .with_graceful_shutdown(tripwire)
             .map_err(|e| panic!("server error: {}", e));
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let (input_lines, records) = random_lines_with_stream(100, num_lines);
 
-        let pump = sink.send_all(stream::iter_ok::<_, ()>(
-            input_lines
-                .clone()
-                .into_iter()
-                .map(|line| crate::Record::from(line)),
-        ));
+        let pump = sink.send_all(records);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         rt.spawn(server);
 
-        let (mut sink, _) = rt.block_on(pump).unwrap();
-        rt.block_on(futures::future::poll_fn(move || sink.close()))
-            .unwrap();
+        rt.block_on(pump).unwrap();
 
         drop(trigger);
 

@@ -132,11 +132,8 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 #[cfg(test)]
 mod test {
     use super::{KafkaSink, KafkaSinkConfig};
-    use crate::{
-        record::Record,
-        test_util::{block_on, random_lines},
-    };
-    use futures::{future::poll_fn, stream, Sink};
+    use crate::test_util::{block_on, random_lines_with_stream, random_string};
+    use futures::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -146,7 +143,7 @@ mod test {
     #[test]
     fn kafka_happy_path() {
         let bootstrap_servers = vec![String::from("localhost:9092")];
-        let topic = format!("test-{}", random_lines(10).next().unwrap());
+        let topic = format!("test-{}", random_string(10));
 
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
@@ -155,20 +152,16 @@ mod test {
         let sink = KafkaSink::new(config).unwrap();
 
         let num_records = 1000;
-        let input = random_lines(100).take(num_records).collect::<Vec<_>>();
+        let (input, records) = random_lines_with_stream(100, num_records);
 
-        let pump = sink.send_all(stream::iter_ok::<_, ()>(
-            input.clone().into_iter().map(Record::from),
-        ));
-
-        let (mut sink, _) = block_on(pump).unwrap();
-        block_on(poll_fn(move || sink.close())).unwrap();
+        let pump = sink.send_all(records);
+        block_on(pump).unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
-        client_config.set("group.id", &random_lines(10).next().unwrap());
+        client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
 
         let mut tpl = TopicPartitionList::new();
