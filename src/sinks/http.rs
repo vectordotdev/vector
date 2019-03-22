@@ -225,46 +225,18 @@ mod tests {
         password = "hunter2"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
-
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let (sink, _healthcheck) = config.build().unwrap();
-
-        let (tx, rx) = mpsc::unbounded();
-        let service = move || {
-            let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
-
-                let tx = tx.clone();
-                tokio::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
-
-                Response::new(Body::empty())
-            })
-        };
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(&in_addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|e| panic!("server error: {}", e));
+        let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, records) = random_lines_with_stream(100, num_lines);
-
         let pump = sink.send_all(records);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
-
         rt.spawn(server);
 
         rt.block_on(pump).unwrap();
-
         drop(trigger);
 
         let output_lines = rx
@@ -309,46 +281,18 @@ mod tests {
         baz = "quux"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
-
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         let (sink, _healthcheck) = config.build().unwrap();
-
-        let (tx, rx) = mpsc::unbounded();
-        let service = move || {
-            let tx = tx.clone();
-            service_fn_ok(move |req: Request<Body>| {
-                let (parts, body) = req.into_parts();
-
-                let tx = tx.clone();
-                tokio::spawn(
-                    body.concat2()
-                        .map_err(|e| panic!(e))
-                        .and_then(|body| tx.send((parts, body)))
-                        .map(|_| ())
-                        .map_err(|e| panic!(e)),
-                );
-
-                Response::new(Body::empty())
-            })
-        };
-
-        let (trigger, tripwire) = stream_cancel::Tripwire::new();
-        let server = Server::bind(&in_addr)
-            .serve(service)
-            .with_graceful_shutdown(tripwire)
-            .map_err(|e| panic!("server error: {}", e));
+        let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, records) = random_lines_with_stream(100, num_lines);
-
         let pump = sink.send_all(records);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
-
         rt.spawn(server);
 
         rt.block_on(pump).unwrap();
-
         drop(trigger);
 
         let output_lines = rx
@@ -382,5 +326,40 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
+    }
+
+    fn build_test_server(
+        addr: &std::net::SocketAddr,
+    ) -> (
+        mpsc::Receiver<(http::request::Parts, hyper::Chunk)>,
+        stream_cancel::Trigger,
+        impl Future<Item = (), Error = ()>,
+    ) {
+        let (tx, rx) = mpsc::channel(100);
+        let service = move || {
+            let tx = tx.clone();
+            service_fn_ok(move |req: Request<Body>| {
+                let (parts, body) = req.into_parts();
+
+                let tx = tx.clone();
+                tokio::spawn(
+                    body.concat2()
+                        .map_err(|e| panic!(e))
+                        .and_then(|body| tx.send((parts, body)))
+                        .map(|_| ())
+                        .map_err(|e| panic!(e)),
+                );
+
+                Response::new(Body::empty())
+            })
+        };
+
+        let (trigger, tripwire) = stream_cancel::Tripwire::new();
+        let server = Server::bind(addr)
+            .serve(service)
+            .with_graceful_shutdown(tripwire)
+            .map_err(|e| panic!("server error: {}", e));
+
+        (rx, trigger, server)
     }
 }
