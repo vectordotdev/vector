@@ -28,8 +28,6 @@ fn main() {
 
     let config = matches.value_of("config").unwrap();
 
-    let config = vector::topology::Config::load(std::fs::File::open(config).unwrap());
-
     let (metrics_sink, metrics_server) = metrics::metrics();
 
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
@@ -43,6 +41,19 @@ fn main() {
     let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
 
     tokio_trace::subscriber::with_default(subscriber, || {
+        let file = match std::fs::File::open(config) {
+            Ok(f) => f,
+            Err(e) => {
+                if let std::io::ErrorKind::NotFound = e.kind() {
+                    error!("Config file not found in: {}", config);
+                    std::process::exit(1);
+                } else {
+                    panic!("Error opening config file: {}", e)
+                }
+            }
+        };
+        let config = vector::topology::Config::load(file);
+
         let topology = config.and_then(Topology::build);
 
         let mut topology = match topology {
