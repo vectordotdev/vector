@@ -193,42 +193,16 @@ mod tests {
         let pump = sink.send_all(records);
         block_on(pump).unwrap();
 
-        let list_res = client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
-        let keys = list_res
-            .contents
-            .unwrap()
-            .into_iter()
-            .map(|obj| obj.key.unwrap())
-            .collect::<Vec<_>>();
+        let keys = get_keys(prefix);
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
         assert!(key.ends_with(".log"));
 
-        let obj = client()
-            .get_object(rusoto_s3::GetObjectRequest {
-                bucket: BUCKET.to_string(),
-                key: key,
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
+        let obj = get_object(key);
         assert_eq!(obj.content_encoding, None);
 
-        let response_lines = {
-            let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
-            buf_read.lines().map(|l| l.unwrap()).collect::<Vec<_>>()
-        };
-
+        let response_lines = get_lines(obj);
         assert_eq!(lines, response_lines);
     }
 
@@ -248,42 +222,12 @@ mod tests {
         let pump = sink.send_all(records);
         block_on(pump).unwrap();
 
-        let list_res = client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
-        let keys = list_res
-            .contents
-            .unwrap()
-            .into_iter()
-            .map(|obj| obj.key.unwrap())
-            .collect::<Vec<_>>();
+        let keys = get_keys(prefix);
         assert_eq!(keys.len(), 3);
 
         let response_lines = keys
             .into_iter()
-            .map(|key| {
-                let obj = client()
-                    .get_object(rusoto_s3::GetObjectRequest {
-                        bucket: BUCKET.to_string(),
-                        key: key,
-                        ..Default::default()
-                    })
-                    .sync()
-                    .unwrap();
-
-                let response_lines = {
-                    let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
-                    buf_read.lines().map(|l| l.unwrap()).collect::<Vec<_>>()
-                };
-
-                response_lines
-            })
+            .map(|key| get_lines(get_object(key)))
             .collect::<Vec<_>>();
 
         assert_eq!(&lines[00..10], response_lines[0].as_slice());
@@ -324,42 +268,12 @@ mod tests {
 
         crate::test_util::shutdown_on_idle(rt);
 
-        let list_res = client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
-        let keys = list_res
-            .contents
-            .unwrap()
-            .into_iter()
-            .map(|obj| obj.key.unwrap())
-            .collect::<Vec<_>>();
+        let keys = get_keys(prefix);
         assert_eq!(keys.len(), 3);
 
         let response_lines = keys
             .into_iter()
-            .map(|key| {
-                let obj = client()
-                    .get_object(rusoto_s3::GetObjectRequest {
-                        bucket: BUCKET.to_string(),
-                        key: key,
-                        ..Default::default()
-                    })
-                    .sync()
-                    .unwrap();
-
-                let response_lines = {
-                    let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
-                    buf_read.lines().map(|l| l.unwrap()).collect::<Vec<_>>()
-                };
-
-                response_lines
-            })
+            .map(|key| get_lines(get_object(key)))
             .collect::<Vec<_>>();
 
         assert_eq!(&lines[00..10], response_lines[0].as_slice());
@@ -384,21 +298,7 @@ mod tests {
         let pump = sink.send_all(records);
         block_on(pump).unwrap();
 
-        let list_res = client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: BUCKET.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
-            .sync()
-            .unwrap();
-
-        let keys = list_res
-            .contents
-            .unwrap()
-            .into_iter()
-            .map(|obj| obj.key.unwrap())
-            .collect::<Vec<_>>();
+        let keys = get_keys(prefix);
         assert_eq!(keys.len(), 2);
 
         let response_lines = keys
@@ -406,24 +306,10 @@ mod tests {
             .map(|key| {
                 assert!(key.ends_with(".log.gz"));
 
-                let obj = client()
-                    .get_object(rusoto_s3::GetObjectRequest {
-                        bucket: BUCKET.to_string(),
-                        key: key,
-                        ..Default::default()
-                    })
-                    .sync()
-                    .unwrap();
-
+                let obj = get_object(key);
                 assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
-                let response_lines = {
-                    let buf_read =
-                        BufReader::new(GzDecoder::new(obj.body.unwrap().into_blocking_read()));
-                    buf_read.lines().map(|l| l.unwrap()).collect::<Vec<_>>()
-                };
-
-                response_lines
+                get_gzipped_lines(obj)
             })
             .flatten()
             .collect::<Vec<_>>();
@@ -522,4 +408,42 @@ mod tests {
         }
     }
 
+    fn get_keys(prefix: String) -> Vec<String> {
+        let list_res = client()
+            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
+                bucket: BUCKET.to_string(),
+                prefix: Some(prefix),
+                ..Default::default()
+            })
+            .sync()
+            .unwrap();
+
+        list_res
+            .contents
+            .unwrap()
+            .into_iter()
+            .map(|obj| obj.key.unwrap())
+            .collect()
+    }
+
+    fn get_object(key: String) -> rusoto_s3::GetObjectOutput {
+        client()
+            .get_object(rusoto_s3::GetObjectRequest {
+                bucket: BUCKET.to_string(),
+                key: key,
+                ..Default::default()
+            })
+            .sync()
+            .unwrap()
+    }
+
+    fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let buf_read = BufReader::new(obj.body.unwrap().into_blocking_read());
+        buf_read.lines().map(|l| l.unwrap()).collect()
+    }
+
+    fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+        let buf_read = BufReader::new(GzDecoder::new(obj.body.unwrap().into_blocking_read()));
+        buf_read.lines().map(|l| l.unwrap()).collect()
+    }
 }
