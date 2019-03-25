@@ -95,21 +95,23 @@ impl PrometheusSink {
 
         let counters = counters
             .into_iter()
-            .map(|f| {
-                let counter = prometheus::Counter::new(f.label.clone(), f.doc.clone()).unwrap();
+            .map(|config| {
+                let counter =
+                    prometheus::Counter::new(config.label.clone(), config.doc.clone()).unwrap();
                 registry.register(Box::new(counter.clone())).unwrap();
 
-                (f, counter)
+                (config, counter)
             })
             .collect();
 
         let gauges = gauges
             .into_iter()
-            .map(|f| {
-                let gauge = prometheus::Gauge::new(f.label.clone(), f.doc.clone()).unwrap();
+            .map(|config| {
+                let gauge =
+                    prometheus::Gauge::new(config.label.clone(), config.doc.clone()).unwrap();
                 registry.register(Box::new(gauge.clone())).unwrap();
 
-                (f, gauge)
+                (config, gauge)
             })
             .collect();
 
