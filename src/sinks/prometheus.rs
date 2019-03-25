@@ -2,17 +2,36 @@ use crate::Record;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
-use prometheus::{Counter, Encoder, Registry, TextEncoder};
+use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+    pub counters: Vec<Counter>,
+    pub gauges: Vec<Gauge>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Counter {
+    key: Atom,
+    label: String,
+    doc: String,
+    parse_value: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Gauge {
+    key: Atom,
+    label: String,
+    doc: String,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -24,7 +43,11 @@ pub fn default_address() -> SocketAddr {
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(PrometheusSink::new(self.address));
+        let sink = Box::new(PrometheusSink::new(
+            self.address,
+            self.counters.clone(),
+            self.gauges.clone(),
+        ));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
@@ -35,7 +58,8 @@ struct PrometheusSink {
     registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
     address: SocketAddr,
-    counter: Counter,
+    counters: HashMap<Counter, prometheus::Counter>,
+    gauges: HashMap<Gauge, prometheus::Gauge>,
 }
 
 fn handle(
@@ -66,16 +90,37 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr) -> Self {
+    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>) -> Self {
         let registry = Registry::new();
-        let counter = Counter::new("lines", "Number of lines sent into this sink").unwrap();
-        registry.register(Box::new(counter.clone())).unwrap();
+
+        let counters = counters
+            .into_iter()
+            .map(|config| {
+                let counter =
+                    prometheus::Counter::new(config.label.clone(), config.doc.clone()).unwrap();
+                registry.register(Box::new(counter.clone())).unwrap();
+
+                (config, counter)
+            })
+            .collect();
+
+        let gauges = gauges
+            .into_iter()
+            .map(|config| {
+                let gauge =
+                    prometheus::Gauge::new(config.label.clone(), config.doc.clone()).unwrap();
+                registry.register(Box::new(gauge.clone())).unwrap();
+
+                (config, gauge)
+            })
+            .collect();
 
         Self {
             registry: Arc::new(registry),
             server_shutdown_trigger: None,
             address,
-            counter,
+            counters,
+            gauges,
         }
     }
 
@@ -109,11 +154,39 @@ impl Sink for PrometheusSink {
 
     fn start_send(
         &mut self,
-        _record: Self::SinkItem,
+        record: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        self.counter.inc();
+        for (field, counter) in &self.counters {
+            if let Some(val) = record.custom.get(&field.key) {
+                if field.parse_value {
+                    if let Ok(count) = val.parse() {
+                        counter.inc_by(count);
+                    } else {
+                        warn!(
+                            "Unable to parse value from field {} with value {}",
+                            field.key, val
+                        );
+                    }
+                } else {
+                    counter.inc_by(1.0);
+                }
+            }
+        }
+
+        for (field, gauge) in &self.gauges {
+            if let Some(val) = record.custom.get(&field.key) {
+                if let Ok(count) = val.parse() {
+                    gauge.add(count);
+                } else {
+                    warn!(
+                        "Unable to parse value from field {} with value {}",
+                        field.key, val
+                    );
+                }
+            }
+        }
 
         Ok(AsyncSink::Ready)
     }
