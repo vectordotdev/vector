@@ -1,4 +1,4 @@
-use super::util::{self, Buffer, SinkExt};
+use super::util::{self, Buffer, Compression, SinkExt};
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
@@ -6,24 +6,33 @@ use serde_json::json;
 
 use crate::record::Record;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct HecSinkConfig {
     pub token: String,
     pub host: String,
+    pub buffer_size: Option<usize>,
+    pub compression: Option<Compression>,
 }
 
 #[typetag::serde(name = "splunk_hec")]
 impl crate::topology::config::SinkConfig for HecSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         Ok((
-            hec(self.token.clone(), self.host.clone()),
+            hec(self.clone()),
             hec_healthcheck(self.token.clone(), self.host.clone()),
         ))
     }
 }
 
-pub fn hec(token: String, host: String) -> super::RouterSink {
+pub fn hec(config: HecSinkConfig) -> super::RouterSink {
+    let host = config.host.clone();
+    let token = config.token.clone();
+    let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
+    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+        Compression::None => false,
+        Compression::Gzip => true,
+    };
     let sink = util::http::HttpSink::new()
         .with(move |body: Buffer| {
             let uri = format!("{}/services/collector/event", host);
@@ -37,7 +46,7 @@ pub fn hec(token: String, host: String) -> super::RouterSink {
 
             Ok(request)
         })
-        .batched(Buffer::new(true), 2 * 1024 * 1024)
+        .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut body = json!({
                 "event": record.line,
@@ -106,7 +115,7 @@ mod tests {
     fn splunk_insert_message() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
+        let sink = sinks::splunk::hec(config());
 
         let message = random_string(100);
         let record = Record::from(message.clone());
@@ -136,7 +145,7 @@ mod tests {
     fn splunk_insert_many() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
+        let sink = sinks::splunk::hec(config());
 
         let (messages, records) = random_lines_with_stream(100, 10);
 
@@ -168,7 +177,7 @@ mod tests {
     fn splunk_custom_fields() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
+        let sink = sinks::splunk::hec(config());
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -198,7 +207,7 @@ mod tests {
     fn splunk_hostname() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(get_token(), "http://localhost:8088".to_string());
+        let sink = sinks::splunk::hec(config());
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -287,6 +296,15 @@ mod tests {
         let json: JsonValue = res.json().unwrap();
 
         json["results"].as_array().unwrap().clone()
+    }
+
+    fn config() -> super::HecSinkConfig {
+        super::HecSinkConfig {
+            host: "http://localhost:8088/".into(),
+            token: get_token(),
+            buffer_size: None,
+            compression: None,
+        }
     }
 
     fn get_token() -> String {
