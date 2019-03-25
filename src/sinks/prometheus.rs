@@ -2,7 +2,7 @@ use crate::Record;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
-use prometheus::{Counter, Encoder, Registry, TextEncoder};
+use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -15,15 +15,23 @@ use string_cache::DefaultAtom as Atom;
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub fields: Vec<Field>,
+    pub counters: Vec<Counter>,
+    pub gauges: Vec<Gauge>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Field {
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Counter {
     key: String,
     label: String,
     doc: String,
     parse_value: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Gauge {
+    key: String,
+    label: String,
+    doc: String,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -35,7 +43,11 @@ pub fn default_address() -> SocketAddr {
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(PrometheusSink::new(self.address, self.fields.clone()));
+        let sink = Box::new(PrometheusSink::new(
+            self.address,
+            self.counters.clone(),
+            self.gauges.clone(),
+        ));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
@@ -46,8 +58,8 @@ struct PrometheusSink {
     registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
     address: SocketAddr,
-    fields: Vec<Field>,
-    counters: HashMap<String, Counter>,
+    counters: HashMap<Counter, prometheus::Counter>,
+    gauges: HashMap<Gauge, prometheus::Gauge>,
 }
 
 fn handle(
@@ -78,15 +90,35 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, fields: Vec<Field>) -> Self {
+    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>) -> Self {
         let registry = Registry::new();
+
+        let counters = counters
+            .into_iter()
+            .map(|f| {
+                let counter = prometheus::Counter::new(f.label.clone(), f.doc.clone()).unwrap();
+                registry.register(Box::new(counter.clone())).unwrap();
+
+                (f, counter)
+            })
+            .collect();
+
+        let gauges = gauges
+            .into_iter()
+            .map(|f| {
+                let gauge = prometheus::Gauge::new(f.label.clone(), f.doc.clone()).unwrap();
+                registry.register(Box::new(gauge.clone())).unwrap();
+
+                (f, gauge)
+            })
+            .collect();
 
         Self {
             registry: Arc::new(registry),
             server_shutdown_trigger: None,
             address,
-            fields,
-            counters: HashMap::new(),
+            counters,
+            gauges,
         }
     }
 
@@ -112,18 +144,6 @@ impl PrometheusSink {
         tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
     }
-
-    fn update_or_create_counter(&mut self, field: &Field, count: f64) {
-        if let Some(counter) = self.counters.get_mut(&field.key) {
-            counter.inc_by(count);
-        } else {
-            let counter = Counter::new(field.label.clone(), field.doc.clone()).unwrap();
-            self.registry.register(Box::new(counter.clone())).unwrap();
-            counter.inc_by(count);
-
-            self.counters.insert(field.key.clone(), counter);
-        }
-    }
 }
 
 impl Sink for PrometheusSink {
@@ -136,12 +156,12 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        for field in self.fields.clone() {
+        for (field, counter) in &self.counters {
             let atom = Atom::from(field.key.as_str());
             if let Some(val) = record.custom.get(&atom) {
                 if field.parse_value {
                     if let Ok(count) = val.parse() {
-                        self.update_or_create_counter(&field, count);
+                        counter.inc_by(count);
                     } else {
                         warn!(
                             "Unable to parse value from field {} with value {}",
@@ -149,7 +169,21 @@ impl Sink for PrometheusSink {
                         );
                     }
                 } else {
-                    self.update_or_create_counter(&field, 1.0);
+                    counter.inc_by(1.0);
+                }
+            }
+        }
+
+        for (field, gauge) in &self.gauges {
+            let atom = Atom::from(field.key.as_str());
+            if let Some(val) = record.custom.get(&atom) {
+                if let Ok(count) = val.parse() {
+                    gauge.add(count);
+                } else {
+                    warn!(
+                        "Unable to parse value from field {} with value {}",
+                        field.key, val
+                    );
                 }
             }
         }
