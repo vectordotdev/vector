@@ -17,6 +17,7 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
+    pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
 }
 
@@ -40,6 +41,7 @@ struct ValidatedConfig {
     healthcheck_uri: Option<Uri>,
     basic_auth: Option<BasicAuth>,
     headers: Option<IndexMap<String, String>>,
+    buffer_size: usize,
     compression: Compression,
 }
 
@@ -51,6 +53,7 @@ impl HttpSinkConfig {
             healthcheck_uri: self.healthcheck_uri()?,
             basic_auth: self.basic_auth.clone(),
             headers: self.headers.clone(),
+            buffer_size: self.buffer_size.unwrap_or(2 * 1024 * 1024),
             compression: self.compression.clone().unwrap_or(Compression::Gzip),
         })
     }

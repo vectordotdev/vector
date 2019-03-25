@@ -14,6 +14,7 @@ pub struct ElasticSearchConfig {
     pub index: String,
     pub doc_type: String,
     pub id_key: Option<String>,
+    pub buffer_size: Option<usize>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -26,6 +27,7 @@ impl crate::topology::config::SinkConfig for ElasticSearchConfig {
 fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
+    let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
     let sink = util::http::HttpSink::new()
         .with(move |body: Buffer| {
             let uri = format!("{}/_bulk", host);
@@ -38,7 +40,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 
             Ok(request)
         })
-        .batched(Buffer::new(true), 2 * 1024 * 1024)
+        .batched(Buffer::new(true), buffer_size)
         .with(move |record: Record| {
             let mut action = json!({
                 "index": {
@@ -154,6 +156,7 @@ mod integration_tests {
             index: index.clone(),
             doc_type: "log_lines".into(),
             id_key: None,
+            buffer_size: None,
         };
 
         let (sink, _hc) = config.build().unwrap();
