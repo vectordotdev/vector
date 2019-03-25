@@ -1,5 +1,5 @@
-use super::retries::{FixedRetryPolicy, RetryLogic};
-use futures::{Poll, Sink};
+use super::retries::RetryLogic;
+use futures::Poll;
 use http::{
     header::{HeaderName, HeaderValue},
     HeaderMap, Method, Uri,
@@ -9,11 +9,8 @@ use hyper::{
     Body, Client,
 };
 use hyper_tls::HttpsConnector;
-use std::time::Duration;
 use tokio::executor::DefaultExecutor;
-use tower::{Service, ServiceBuilder};
-use tower_retry::RetryLayer;
-use tower_timeout::TimeoutLayer;
+use tower::Service;
 
 #[derive(Clone)]
 pub struct HttpSink {
@@ -68,25 +65,12 @@ impl From<Request> for hyper::Request<Body> {
 }
 
 impl HttpSink {
-    pub fn new_svc() -> Self {
+    pub fn new() -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
         Self { client }
-    }
-
-    pub fn new() -> impl Sink<SinkItem = Request, SinkError = ()> {
-        let inner = Self::new_svc();
-        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), HttpRetryLogic);
-
-        let svc = ServiceBuilder::new()
-            .layer(RetryLayer::new(policy))
-            .layer(TimeoutLayer::new(Duration::from_secs(10)))
-            .build_service(inner)
-            .expect("This is a bug, no spawnning");
-
-        super::ServiceSink::new(svc)
     }
 }
 
@@ -123,6 +107,7 @@ impl RetryLogic for HttpRetryLogic {
 #[cfg(test)]
 mod test {
     use super::{HttpSink, Request};
+    use crate::sinks::util::ServiceSink;
     use futures::{Future, Sink, Stream};
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
@@ -135,7 +120,7 @@ mod test {
             .unwrap();
 
         let request = Request::post(uri, String::from("hello").into_bytes());
-        let sink = HttpSink::new();
+        let sink = ServiceSink::new(HttpSink::new());
 
         let req = sink.send(request);
 
