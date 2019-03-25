@@ -1,6 +1,14 @@
 use flate2::write::GzEncoder;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::mem;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Compression {
+    None,
+    Gzip,
+}
 
 pub enum Buffer {
     Plain(Vec<u8>),

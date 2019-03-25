@@ -1,4 +1,4 @@
-use super::util::{self, Buffer, SinkExt};
+use super::util::{self, Buffer, Compression, SinkExt};
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
@@ -17,6 +17,7 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
+    pub compression: Option<Compression>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -39,6 +40,7 @@ struct ValidatedConfig {
     healthcheck_uri: Option<Uri>,
     basic_auth: Option<BasicAuth>,
     headers: Option<IndexMap<String, String>>,
+    compression: Compression,
 }
 
 impl HttpSinkConfig {
@@ -49,6 +51,7 @@ impl HttpSinkConfig {
             healthcheck_uri: self.healthcheck_uri()?,
             basic_auth: self.basic_auth.clone(),
             headers: self.headers.clone(),
+            compression: self.compression.clone().unwrap_or(Compression::Gzip),
         })
     }
 
@@ -106,6 +109,10 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
 }
 
 fn http(config: ValidatedConfig) -> super::RouterSink {
+    let gzip = match config.compression {
+        Compression::None => false,
+        Compression::Gzip => true,
+    };
     let sink = util::http::HttpSink::new()
         .with(move |body: Buffer| {
             let mut request = util::http::Request::post(config.uri.clone(), body.into());
@@ -125,7 +132,7 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
 
             Ok(request)
         })
-        .batched(Buffer::new(true), 2 * 1024 * 1024)
+        .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
                 "msg": record.line,
