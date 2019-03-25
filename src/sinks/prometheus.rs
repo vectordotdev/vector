@@ -21,7 +21,7 @@ pub struct PrometheusSinkConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Counter {
-    key: String,
+    key: Atom,
     label: String,
     doc: String,
     parse_value: bool,
@@ -29,7 +29,7 @@ pub struct Counter {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Gauge {
-    key: String,
+    key: Atom,
     label: String,
     doc: String,
 }
@@ -157,8 +157,7 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         for (field, counter) in &self.counters {
-            let atom = Atom::from(field.key.as_str());
-            if let Some(val) = record.custom.get(&atom) {
+            if let Some(val) = record.custom.get(&field.key) {
                 if field.parse_value {
                     if let Ok(count) = val.parse() {
                         counter.inc_by(count);
@@ -175,8 +174,7 @@ impl Sink for PrometheusSink {
         }
 
         for (field, gauge) in &self.gauges {
-            let atom = Atom::from(field.key.as_str());
-            if let Some(val) = record.custom.get(&atom) {
+            if let Some(val) = record.custom.get(&field.key) {
                 if let Ok(count) = val.parse() {
                     gauge.add(count);
                 } else {
