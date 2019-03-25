@@ -1,4 +1,4 @@
-use super::util::{self, Buffer, SinkExt};
+use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
 use crate::record::Record;
 use futures::{Future, Sink};
 use http::Uri;
@@ -6,6 +6,10 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Duration;
+use tower_in_flight_limit::InFlightLimit;
+use tower_retry::Retry;
+use tower_timeout::Timeout;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -15,6 +19,10 @@ pub struct ElasticSearchConfig {
     pub doc_type: String,
     pub id_key: Option<String>,
     pub buffer_size: Option<usize>,
+    pub compression: Option<Compression>,
+    pub request_timeout_secs: Option<u64>,
+    pub retries: Option<usize>,
+    pub in_flight_request_limit: Option<usize>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -28,7 +36,22 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
     let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
-    let sink = util::http::HttpSink::new()
+    let gzip = match config.compression.clone().unwrap_or(Compression::Gzip) {
+        Compression::None => false,
+        Compression::Gzip => true,
+    };
+    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
+    let retries = config.retries.unwrap_or(5);
+    let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
+
+    let inner = util::http::HttpSink::new_svc();
+    let timeout = Timeout::new(inner, Duration::from_secs(timeout_secs));
+    let limited = InFlightLimit::new(timeout, in_flight_limit);
+
+    let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
+    let service = Retry::new(policy, limited);
+
+    let sink = ServiceSink::new(service)
         .with(move |body: Buffer| {
             let uri = format!("{}/_bulk", host);
             let uri: Uri = uri.parse().unwrap();
@@ -40,7 +63,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 
             Ok(request)
         })
-        .batched(Buffer::new(true), buffer_size)
+        .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut action = json!({
                 "index": {
@@ -157,6 +180,10 @@ mod integration_tests {
             doc_type: "log_lines".into(),
             id_key: None,
             buffer_size: None,
+            compression: None,
+            request_timeout_secs: None,
+            retries: None,
+            in_flight_request_limit: None,
         };
 
         let (sink, _hc) = config.build().unwrap();

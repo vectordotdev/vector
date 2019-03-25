@@ -1,4 +1,4 @@
-use super::util::{self, Buffer, Compression, SinkExt};
+use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
@@ -6,6 +6,10 @@ use hyper::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Duration;
+use tower_in_flight_limit::InFlightLimit;
+use tower_retry::Retry;
+use tower_timeout::Timeout;
 
 use crate::record::Record;
 
@@ -19,6 +23,9 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
+    pub request_timeout_secs: Option<u64>,
+    pub retries: Option<usize>,
+    pub in_flight_request_limit: Option<usize>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -43,6 +50,9 @@ struct ValidatedConfig {
     headers: Option<IndexMap<String, String>>,
     buffer_size: usize,
     compression: Compression,
+    request_timeout_secs: u64,
+    retries: usize,
+    in_flight_request_limit: usize,
 }
 
 impl HttpSinkConfig {
@@ -55,6 +65,9 @@ impl HttpSinkConfig {
             headers: self.headers.clone(),
             buffer_size: self.buffer_size.unwrap_or(2 * 1024 * 1024),
             compression: self.compression.clone().unwrap_or(Compression::Gzip),
+            request_timeout_secs: self.request_timeout_secs.unwrap_or(10),
+            retries: self.retries.unwrap_or(5),
+            in_flight_request_limit: self.in_flight_request_limit.unwrap_or(1),
         })
     }
 
@@ -116,7 +129,19 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let sink = util::http::HttpSink::new()
+
+    let inner = util::http::HttpSink::new_svc();
+    let timeout = Timeout::new(inner, Duration::from_secs(config.request_timeout_secs));
+    let limited = InFlightLimit::new(timeout, config.in_flight_request_limit);
+
+    let policy = FixedRetryPolicy::new(
+        config.retries,
+        Duration::from_secs(1),
+        util::http::HttpRetryLogic,
+    );
+    let service = Retry::new(policy, limited);
+
+    let sink = ServiceSink::new(service)
         .with(move |body: Buffer| {
             let mut request = util::http::Request::post(config.uri.clone(), body.into());
             request

@@ -3177,7 +3177,6 @@ dependencies = [
  "tower-hyper 0.1.0 (git+https://github.com/tower-rs/tower-hyper?rev=c7a04bf)",
  "tower-in-flight-limit 0.1.0 (git+https://github.com/tower-rs/tower?rev=8f3a5ea)",
  "tower-retry 0.1.0 (git+https://github.com/tower-rs/tower?rev=8f3a5ea)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-timeout 0.1.0 (git+https://github.com/tower-rs/tower?rev=8f3a5ea)",
  "trace-metrics 0.1.0",
  "typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",

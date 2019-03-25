@@ -1,8 +1,12 @@
-use super::util::{self, Buffer, Compression, SinkExt};
+use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Duration;
+use tower_in_flight_limit::InFlightLimit;
+use tower_retry::Retry;
+use tower_timeout::Timeout;
 
 use crate::record::Record;
 
@@ -13,6 +17,9 @@ pub struct HecSinkConfig {
     pub host: String,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
+    pub request_timeout_secs: Option<u64>,
+    pub retries: Option<usize>,
+    pub in_flight_request_limit: Option<usize>,
 }
 
 #[typetag::serde(name = "splunk_hec")]
@@ -33,7 +40,18 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let sink = util::http::HttpSink::new()
+    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
+    let retries = config.retries.unwrap_or(5);
+    let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
+
+    let inner = util::http::HttpSink::new_svc();
+    let timeout = Timeout::new(inner, Duration::from_secs(timeout_secs));
+    let limited = InFlightLimit::new(timeout, in_flight_limit);
+
+    let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
+    let service = Retry::new(policy, limited);
+
+    let sink = ServiceSink::new(service)
         .with(move |body: Buffer| {
             let uri = format!("{}/services/collector/event", host);
             let uri: Uri = uri.parse().unwrap();
@@ -304,6 +322,9 @@ mod tests {
             token: get_token(),
             buffer_size: None,
             compression: None,
+            request_timeout_secs: None,
+            retries: None,
+            in_flight_request_limit: None,
         }
     }
 

@@ -68,15 +68,17 @@ impl From<Request> for hyper::Request<Body> {
 }
 
 impl HttpSink {
-    pub fn new() -> impl Sink<SinkItem = Request, SinkError = ()> {
+    pub fn new_svc() -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
+        Self { client }
+    }
 
+    pub fn new() -> impl Sink<SinkItem = Request, SinkError = ()> {
+        let inner = Self::new_svc();
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), HttpRetryLogic);
-
-        let inner = Self { client };
 
         let svc = ServiceBuilder::new()
             .layer(RetryLayer::new(policy))
@@ -103,7 +105,7 @@ impl Service<Request> for HttpSink {
 }
 
 #[derive(Clone)]
-struct HttpRetryLogic;
+pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
