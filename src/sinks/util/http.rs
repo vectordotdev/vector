@@ -11,9 +11,9 @@ use hyper::{
 use hyper_tls::HttpsConnector;
 use std::time::Duration;
 use tokio::executor::DefaultExecutor;
-use tower_retry::Retry;
-use tower_service::Service;
-use tower_timeout::Timeout;
+use tower::{Service, ServiceBuilder};
+use tower_retry::RetryLayer;
+use tower_timeout::TimeoutLayer;
 
 #[derive(Clone)]
 pub struct HttpSink {
@@ -77,10 +77,14 @@ impl HttpSink {
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), HttpRetryLogic);
 
         let inner = Self { client };
-        let timeout = Timeout::new(inner, Duration::from_secs(10));
-        let service = Retry::new(policy, timeout);
 
-        super::ServiceSink::new(service)
+        let svc = ServiceBuilder::new()
+            .layer(RetryLayer::new(policy))
+            .layer(TimeoutLayer::new(Duration::from_secs(10)))
+            .build_service(inner)
+            .expect("This is a bug, no spawnning");
+
+        super::ServiceSink::new(svc)
     }
 }
 

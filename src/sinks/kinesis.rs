@@ -12,10 +12,10 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc, time::Duration};
-use tower_in_flight_limit::InFlightLimit;
-use tower_retry::Retry;
-use tower_service::Service;
-use tower_timeout::Timeout;
+use tower::{Service, ServiceBuilder};
+use tower_in_flight_limit::InFlightLimitLayer;
+use tower_retry::RetryLayer;
+use tower_timeout::TimeoutLayer;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -36,15 +36,18 @@ impl KinesisService {
         let client = Arc::new(KinesisClient::new(config.region.clone()));
 
         let batch_size = config.batch_size;
-        let inner = KinesisService { client, config };
+        let kinesis = KinesisService { client, config };
 
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), KinesisRetryLogic);
 
-        let service = Timeout::new(inner, Duration::from_secs(10));
-        let retries = Retry::new(policy, service);
-        let limited = InFlightLimit::new(retries, 1);
+        let svc = ServiceBuilder::new()
+            .layer(InFlightLimitLayer::new(1))
+            .layer(RetryLayer::new(policy))
+            .layer(TimeoutLayer::new(Duration::from_secs(10)))
+            .build_service(kinesis)
+            .expect("This is a bug, no spawning done");
 
-        ServiceSink::new(limited)
+        ServiceSink::new(svc)
             .batched(Vec::new(), batch_size)
             .with(|record: Record| Ok(record.into()))
     }
