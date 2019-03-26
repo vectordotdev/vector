@@ -13,7 +13,7 @@ use tokio::executor::DefaultExecutor;
 use tower::Service;
 
 #[derive(Clone)]
-pub struct HttpSink {
+pub struct HttpService {
     client: Client<HttpsConnector<HttpConnector>, Body>,
 }
 
@@ -64,7 +64,7 @@ impl From<Request> for hyper::Request<Body> {
     }
 }
 
-impl HttpSink {
+impl HttpService {
     pub fn new() -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
@@ -74,7 +74,7 @@ impl HttpSink {
     }
 }
 
-impl Service<Request> for HttpSink {
+impl Service<Request> for HttpService {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
     type Future = ResponseFuture;
@@ -106,7 +106,7 @@ impl RetryLogic for HttpRetryLogic {
 
 #[cfg(test)]
 mod test {
-    use super::{HttpSink, Request};
+    use super::{HttpService, Request};
     use crate::sinks::util::ServiceSink;
     use futures::{Future, Sink, Stream};
     use hyper::service::service_fn;
@@ -120,7 +120,7 @@ mod test {
             .unwrap();
 
         let request = Request::post(uri, String::from("hello").into_bytes());
-        let sink = ServiceSink::new(HttpSink::new());
+        let sink = ServiceSink::new(HttpService::new());
 
         let req = sink.send(request);
 

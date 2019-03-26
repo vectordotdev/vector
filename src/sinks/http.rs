@@ -130,7 +130,7 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         Compression::Gzip => true,
     };
 
-    let inner = util::http::HttpSink::new();
+    let inner = util::http::HttpService::new();
     let timeout = Timeout::new(inner, Duration::from_secs(config.request_timeout_secs));
     let limited = InFlightLimit::new(timeout, config.in_flight_request_limit);
 

@@ -44,7 +44,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let retries = config.retries.unwrap_or(5);
     let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
 
-    let inner = util::http::HttpSink::new();
+    let inner = util::http::HttpService::new();
     let timeout = Timeout::new(inner, Duration::from_secs(timeout_secs));
     let limited = InFlightLimit::new(timeout, in_flight_limit);
 
