@@ -243,6 +243,8 @@ impl RunningTopology {
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn(&name, &mut new_pieces, rt);
         }
+
+        self.config = new_config;
     }
 
     fn spawn(
