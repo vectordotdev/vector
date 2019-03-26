@@ -72,7 +72,6 @@ rusoto_credential = "0.15.0"
 
 # Tower
 tower = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-service = "0.2"
 tower-retry = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
 tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
