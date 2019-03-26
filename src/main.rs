@@ -1,5 +1,5 @@
 use clap::{App, Arg};
-use futures::{Future, Stream};
+use futures::{future, Future, Stream};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
@@ -99,15 +99,13 @@ fn main() {
         let sigquit = Signal::new(SIGQUIT).flatten_stream();
         let sighup = Signal::new(SIGHUP).flatten_stream();
 
-        let signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+        let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
-        let mut signals = signals.wait();
         let signal = loop {
-            let signal = signals.next().unwrap();
-            let signal = match signal {
-                Ok(signal) => signal,
-                Err(_) => continue,
-            };
+            let signal = future::poll_fn(|| signals.poll())
+                .wait()
+                .expect("Signal streams don't error")
+                .expect("Signal streams never end");
 
             if signal != SIGHUP {
                 break signal;
@@ -139,7 +137,6 @@ fn main() {
                 }
             }
         };
-        let signals = signals.into_inner();
 
         if signal == SIGINT || signal == SIGTERM {
             use futures::future::Either;
