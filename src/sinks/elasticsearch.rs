@@ -36,7 +36,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
     let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
-    let gzip = match config.compression.clone().unwrap_or(Compression::Gzip) {
+    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };

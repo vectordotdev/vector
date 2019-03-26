@@ -64,7 +64,7 @@ impl HttpSinkConfig {
             basic_auth: self.basic_auth.clone(),
             headers: self.headers.clone(),
             buffer_size: self.buffer_size.unwrap_or(2 * 1024 * 1024),
-            compression: self.compression.clone().unwrap_or(Compression::Gzip),
+            compression: self.compression.unwrap_or(Compression::Gzip),
             request_timeout_secs: self.request_timeout_secs.unwrap_or(10),
             retries: self.retries.unwrap_or(5),
             in_flight_request_limit: self.in_flight_request_limit.unwrap_or(1),
