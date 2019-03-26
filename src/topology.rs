@@ -121,7 +121,7 @@ impl RunningTopology {
         info!("Reloading config");
 
         if self.config.data_dir != new_config.data_dir {
-            error!("data_dir cannot be changed while reloading config file; reload aborted");
+            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
             return;
         }
 
