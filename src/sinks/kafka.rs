@@ -132,7 +132,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 #[cfg(test)]
 mod test {
     use super::{KafkaSink, KafkaSinkConfig};
-    use crate::test_util::{block_on, random_lines_with_stream, random_string};
+    use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
@@ -169,6 +169,14 @@ mod test {
 
         let consumer: BaseConsumer = client_config.create().unwrap();
         consumer.assign(&tpl).unwrap();
+
+        // wait for messages to show up
+        wait_for(|| {
+            let (_low, high) = consumer
+                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
+                .unwrap();
+            high > 0
+        });
 
         // check we have the expected number of messages in the topic
         let (low, high) = consumer
