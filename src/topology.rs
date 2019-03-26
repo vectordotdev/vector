@@ -120,6 +120,11 @@ impl RunningTopology {
     fn reload_config(&mut self, new_config: Config, rt: &mut tokio::runtime::Runtime) {
         info!("Reloading config");
 
+        if self.config.data_dir != new_config.data_dir {
+            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
+            return;
+        }
+
         let mut new_pieces = match builder::build_pieces(&new_config) {
             Err(errors) => {
                 for error in errors {
@@ -243,6 +248,8 @@ impl RunningTopology {
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn(&name, &mut new_pieces, rt);
         }
+
+        self.config = new_config;
     }
 
     fn spawn(
@@ -1056,5 +1063,34 @@ mod tests {
         assert!(num_after < num_lines);
 
         assert!(num_before > num_after);
+    }
+
+    #[test]
+    fn topology_doesnt_reload_new_data_dir() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        use std::path::Path;
+
+        let mut old_config = Config::empty();
+        old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
+        let mut new_config = old_config.clone();
+        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+
+        topology.start(&mut rt);
+
+        new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
+
+        topology.reload_config(new_config, &mut rt);
+
+        let current_config = if let super::State::Running(running) = topology.state {
+            running.config
+        } else {
+            panic!();
+        };
+
+        assert_eq!(
+            current_config.data_dir,
+            Some(Path::new("/asdf").to_path_buf())
+        );
     }
 }
