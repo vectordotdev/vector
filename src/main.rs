@@ -1,6 +1,6 @@
 use clap::{App, Arg};
-use futures::{Future, Stream};
-use tokio_signal::unix::{Signal, SIGINT, SIGQUIT, SIGTERM};
+use futures::{future, Future, Stream};
+use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
 use vector::topology::Topology;
@@ -26,7 +26,7 @@ fn main() {
         );
     let matches = app.get_matches();
 
-    let config = matches.value_of("config").unwrap();
+    let config_path = matches.value_of("config").unwrap();
 
     let (metrics_sink, metrics_server) = metrics::metrics();
 
@@ -41,11 +41,11 @@ fn main() {
     let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
 
     tokio_trace::subscriber::with_default(subscriber, || {
-        let file = match std::fs::File::open(config) {
+        let file = match std::fs::File::open(config_path) {
             Ok(f) => f,
             Err(e) => {
                 if let std::io::ErrorKind::NotFound = e.kind() {
-                    error!("Config file not found in: {}", config);
+                    error!("Config file not found in: {}", config_path);
                     std::process::exit(1);
                 } else {
                     panic!("Error opening config file: {}", e)
@@ -97,11 +97,46 @@ fn main() {
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
         let sigquit = Signal::new(SIGQUIT).flatten_stream();
+        let sighup = Signal::new(SIGHUP).flatten_stream();
 
-        let signals = sigint.select(sigterm.select(sigquit));
+        let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
-        let (signal, signals) = rt.block_on(signals.into_future()).ok().unwrap();
-        let signal = signal.unwrap();
+        let signal = loop {
+            let signal = future::poll_fn(|| signals.poll())
+                .wait()
+                .expect("Signal streams don't error")
+                .expect("Signal streams never end");
+
+            if signal != SIGHUP {
+                break signal;
+            }
+
+            // Reload config
+            let file = match std::fs::File::open(config_path) {
+                Ok(f) => f,
+                Err(e) => {
+                    if let std::io::ErrorKind::NotFound = e.kind() {
+                        error!("Config file not found in: {}", config_path);
+                        continue;
+                    } else {
+                        error!("Error opening config file: {}", e);
+                        continue;
+                    }
+                }
+            };
+            let config = vector::topology::Config::load(file);
+
+            match config {
+                Ok(config) => {
+                    topology.reload_config(config, &mut rt);
+                }
+                Err(errors) => {
+                    for error in errors {
+                        error!("Configuration error: {}", error);
+                    }
+                }
+            }
+        };
 
         if signal == SIGINT || signal == SIGTERM {
             use futures::future::Either;
