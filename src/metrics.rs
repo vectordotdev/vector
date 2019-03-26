@@ -6,9 +6,9 @@ use hotmic::{
 use hyper::{Body, Request, Response};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
+use tower::Service;
 use tower_hyper::body::LiftBody;
 use tower_hyper::server::Server;
-use tower_service::Service;
 
 /// Create the metrics sink and provide the server Service
 pub fn metrics() -> (Sink<String>, MetricsServer) {

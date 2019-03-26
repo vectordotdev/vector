@@ -7,9 +7,9 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_trace_futures::{Instrument, Instrumented};
-use tower_in_flight_limit::InFlightLimit;
-use tower_service::Service;
-use tower_timeout::Timeout;
+use tower::{Service, ServiceBuilder};
+use tower_in_flight_limit::InFlightLimitLayer;
+use tower_timeout::TimeoutLayer;
 
 pub struct S3Sink {
     config: S3SinkInnerConfig,
@@ -42,6 +42,55 @@ impl crate::topology::config::SinkConfig for S3SinkConfig {
     fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
         Ok((new(self.config()?), healthcheck(self.config()?)))
     }
+}
+
+pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
+    let gzip = config.gzip;
+    let buffer_size = config.buffer_size;
+    let max_linger_secs = config.max_linger_secs;
+
+    let s3 = S3Sink { config };
+
+    let svc = ServiceBuilder::new()
+        .layer(InFlightLimitLayer::new(1))
+        .layer(TimeoutLayer::new(Duration::from_secs(10)))
+        .build_service(s3)
+        .expect("This is a bug, no spawnning");
+
+    let sink = ServiceSink::new(svc)
+        .batched_with_min(
+            Buffer::new(gzip),
+            buffer_size,
+            Duration::from_secs(max_linger_secs),
+        )
+        .with(|record: Record| {
+            let mut bytes: Vec<u8> = record.into();
+            bytes.push(b'\n');
+            Ok(bytes)
+        });
+
+    Box::new(sink)
+}
+
+pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
+    use rusoto_s3::{HeadBucketError, HeadBucketRequest};
+
+    let request = HeadBucketRequest {
+        bucket: config.bucket,
+    };
+
+    let response = config.client.head_bucket(request);
+
+    let healthcheck = response.map_err(|err| match err {
+        HeadBucketError::Unknown(response) => match response.status {
+            http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
+            http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
+            status => format!("Unknown error: Status code: {}", status),
+        },
+        err => err.to_string(),
+    });
+
+    Box::new(healthcheck)
 }
 
 impl S3SinkConfig {
@@ -117,52 +166,6 @@ impl Service<Buffer> for S3Sink {
         self.send_body(buf.into())
             .instrument(span!(level: tokio_trace::Level::ERROR, "s3_request"))
     }
-}
-
-pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
-    let gzip = config.gzip;
-    let buffer_size = config.buffer_size;
-    let max_linger_secs = config.max_linger_secs;
-
-    let inner = S3Sink { config };
-
-    let timeout = Timeout::new(inner, Duration::from_secs(10));
-    let limited = InFlightLimit::new(timeout, 1);
-
-    let sink = ServiceSink::new(limited)
-        .batched_with_min(
-            Buffer::new(gzip),
-            buffer_size,
-            Duration::from_secs(max_linger_secs),
-        )
-        .with(|record: Record| {
-            let mut bytes: Vec<u8> = record.into();
-            bytes.push(b'\n');
-            Ok(bytes)
-        });
-
-    Box::new(sink)
-}
-
-pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
-    use rusoto_s3::{HeadBucketError, HeadBucketRequest};
-
-    let request = HeadBucketRequest {
-        bucket: config.bucket,
-    };
-
-    let response = config.client.head_bucket(request);
-
-    let healthcheck = response.map_err(|err| match err {
-        HeadBucketError::Unknown(response) => match response.status {
-            http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
-            http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
-            status => format!("Unknown error: Status code: {}", status),
-        },
-        err => err.to_string(),
-    });
-
-    Box::new(healthcheck)
 }
 
 #[cfg(test)]

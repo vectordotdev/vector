@@ -6,7 +6,7 @@ pub mod retries;
 use batch::{Batch, BatchSink};
 use futures::{stream::FuturesUnordered, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 use std::time::Duration;
-use tower_service::Service;
+use tower::Service;
 
 pub use buffer::Buffer;
 

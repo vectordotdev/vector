@@ -1,14 +1,11 @@
 use super::Error;
 use futures::{try_ready, Async, Future, Poll};
-use std::{
-    error::Error as StdError,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tower_retry::Policy;
 
 pub trait RetryLogic: Clone {
-    type Error: StdError + 'static;
+    type Error: std::error::Error + Send + Sync + 'static;
     type Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
@@ -75,7 +72,7 @@ where
                     return None;
                 }
 
-                if let Some(expected) = error.downcast_ref() {
+                if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
                         warn!("retrying after error: {}", expected);
                         Some(self.build_retry())
