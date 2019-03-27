@@ -107,9 +107,14 @@ impl Topology {
         self.state = State::Stopped;
     }
 
-    pub fn reload_config(&mut self, new_config: Config, rt: &mut tokio::runtime::Runtime) {
+    pub fn reload_config(
+        &mut self,
+        new_config: Config,
+        rt: &mut tokio::runtime::Runtime,
+        require_healthy: bool,
+    ) {
         if let State::Running(running) = &mut self.state {
-            running.reload_config(new_config, rt);
+            running.reload_config(new_config, rt, require_healthy);
         } else {
             panic!("Can only reload config on a running Topology");
         }
@@ -117,7 +122,12 @@ impl Topology {
 }
 
 impl RunningTopology {
-    fn reload_config(&mut self, new_config: Config, rt: &mut tokio::runtime::Runtime) {
+    fn reload_config(
+        &mut self,
+        new_config: Config,
+        rt: &mut tokio::runtime::Runtime,
+        require_healthy: bool,
+    ) {
         info!("Reloading config");
 
         if self.config.data_dir != new_config.data_dir {
@@ -164,6 +174,29 @@ impl RunningTopology {
             let to_add = &new_names - &old_names;
 
             (to_remove, to_change, to_add)
+        }
+
+        // Healthchecks
+        let (_, sinks_to_change, sinks_to_add) =
+            to_remove_change_add(&self.config.sinks, &new_config.sinks);
+
+        let healthchecks = (&sinks_to_change | &sinks_to_add)
+            .into_iter()
+            .map(|name| new_pieces.healthchecks.remove(&name).unwrap())
+            .collect::<Vec<_>>();
+        let healthchecks = futures::future::join_all(healthchecks).map(|_| ());
+
+        if require_healthy {
+            let success = rt.block_on(healthchecks);
+
+            if success.is_ok() {
+                info!("All healthchecks passed");
+            } else {
+                error!("Sinks unhealthy; reload aborted");
+                return;
+            }
+        } else {
+            rt.spawn(healthchecks);
         }
 
         // Sources
@@ -388,13 +421,14 @@ mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{
-        next_addr, random_lines, receive_lines, receive_lines_with_count, send_lines,
+        block_on, next_addr, random_lines, receive_lines, receive_lines_with_count, send_lines,
         shutdown_on_idle, wait_for, wait_for_tcp,
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
     use crate::transforms::sampler::SamplerConfig;
-    use futures::{stream, Future, Stream};
+    use futures::{future::Either, stream, Future, Stream};
+    use matches::assert_matches;
     use std::collections::HashSet;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -435,7 +469,7 @@ mod tests {
 
         wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -489,7 +523,7 @@ mod tests {
 
         wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         // out2 should disconnect after the reload
         let output_lines2 = output_lines2.wait().unwrap();
@@ -544,7 +578,7 @@ mod tests {
 
         wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -611,7 +645,7 @@ mod tests {
 
             wait_for(|| output_lines1_count.load(Ordering::Relaxed) > 0);
 
-            topology.reload_config(new_config, &mut rt);
+            topology.reload_config(new_config, &mut rt, false);
             wait_for(|| output_lines2_count.load(Ordering::Relaxed) > 0);
 
             // Shut down server
@@ -657,7 +691,7 @@ mod tests {
             .inputs
             .push("in".to_string());
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         wait_for_tcp(in_addr);
 
@@ -702,7 +736,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
@@ -747,7 +781,7 @@ mod tests {
         new_config.add_source("in2", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait().unwrap();
@@ -815,7 +849,7 @@ mod tests {
             max_length: 10,
         });
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         wait_for_tcp(in_addr);
@@ -899,7 +933,7 @@ mod tests {
 
         wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= num_lines);
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait().unwrap();
@@ -962,7 +996,7 @@ mod tests {
         wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait().unwrap();
@@ -1030,7 +1064,7 @@ mod tests {
             pass_list: vec![],
         });
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -1080,7 +1114,7 @@ mod tests {
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config(new_config, &mut rt);
+        topology.reload_config(new_config, &mut rt, false);
 
         let current_config = if let super::State::Running(running) = topology.state {
             running.config
@@ -1092,5 +1126,102 @@ mod tests {
             current_config.data_dir,
             Some(Path::new("/asdf").to_path_buf())
         );
+    }
+
+    #[test]
+    fn topology_reload_healthchecks() {
+        fn receive_one(
+            addr1: &std::net::SocketAddr,
+            addr2: &std::net::SocketAddr,
+        ) -> impl Future<Item = Either<String, String>, Error = ()> {
+            use tokio::codec::{FramedRead, LinesCodec};
+            use tokio::net::TcpListener;
+
+            let listener1 = TcpListener::bind(addr1).unwrap();
+            let listener2 = TcpListener::bind(addr2).unwrap();
+
+            let future1 = listener1
+                .incoming()
+                .take(1)
+                .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+                .flatten()
+                .map_err(|e| panic!("{:?}", e))
+                .into_future()
+                .map(|(i, _)| i.unwrap());
+
+            let future2 = listener2
+                .incoming()
+                .take(1)
+                .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+                .flatten()
+                .map_err(|e| panic!("{:?}", e))
+                .into_future()
+                .map(|(i, _)| i.unwrap());
+
+            future1
+                .select2(future2)
+                .map_err(|_| panic!())
+                .map(|either| match either {
+                    Either::A((result, _)) => Either::A(result),
+                    Either::B((result, _)) => Either::B(result),
+                })
+        }
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let in_addr = next_addr();
+        let out1_addr = next_addr();
+        let out2_addr = next_addr();
+
+        let mut config = Config::empty();
+        config.add_source("in", TcpConfig::new(in_addr));
+        config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
+        let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
+
+        topology.start(&mut rt);
+
+        // Require-healthy reload with failing healthcheck
+        {
+            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out2_addr });
+
+            topology.reload_config(config.clone(), &mut rt, true);
+
+            let receive = receive_one(&out1_addr, &out2_addr);
+
+            block_on(send_lines(in_addr, vec!["hello".to_string()].into_iter())).unwrap();
+
+            let received = block_on(receive).unwrap();
+            assert_matches!(received, Either::A(_));
+        }
+
+        // Require-healthy reload with passing healthcheck
+        {
+            let _healthcheck_receiver = receive_lines(&out2_addr, &rt.executor());
+
+            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out2_addr });
+
+            topology.reload_config(config.clone(), &mut rt, true);
+
+            let receive = receive_one(&out1_addr, &out2_addr);
+
+            block_on(send_lines(in_addr, vec!["hello".to_string()].into_iter())).unwrap();
+
+            let received = block_on(receive).unwrap();
+            assert_matches!(received, Either::B(_));
+        }
+
+        // non-require-healthy reload with failing healthcheck
+        {
+            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out1_addr });
+
+            topology.reload_config(config.clone(), &mut rt, false);
+
+            let receive = receive_one(&out1_addr, &out2_addr);
+
+            block_on(send_lines(in_addr, vec!["hello".to_string()].into_iter())).unwrap();
+
+            let received = block_on(receive).unwrap();
+            assert_matches!(received, Either::A(_));
+        }
     }
 }

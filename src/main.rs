@@ -79,7 +79,9 @@ fn main() {
 
         rt.spawn(metrics_serve);
 
-        if matches.is_present("require-healthy") {
+        let require_healthy = matches.is_present("require-healthy");
+
+        if require_healthy {
             let success = rt.block_on(topology.healthchecks());
 
             if success.is_ok() {
@@ -128,7 +130,7 @@ fn main() {
 
             match config {
                 Ok(config) => {
-                    topology.reload_config(config, &mut rt);
+                    topology.reload_config(config, &mut rt, require_healthy);
                 }
                 Err(errors) => {
                     for error in errors {
