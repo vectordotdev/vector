@@ -79,7 +79,12 @@ fn main() {
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
-        rt.spawn(metrics_serve.select(metrics_tripwire).map(|_| ()).map_err(|_| ()));
+        rt.spawn(
+            metrics_serve
+                .select(metrics_tripwire)
+                .map(|_| ())
+                .map_err(|_| ()),
+        );
 
         let require_healthy = matches.is_present("require-healthy");
 
