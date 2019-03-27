@@ -421,8 +421,8 @@ mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{
-        block_on, next_addr, random_lines, receive_lines, receive_lines_with_count, send_lines,
-        shutdown_on_idle, wait_for, wait_for_tcp,
+        block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for,
+        wait_for_tcp,
     };
     use crate::topology::config::Config;
     use crate::topology::Topology;
@@ -446,9 +446,8 @@ mod tests {
         let out1_addr = next_addr();
         let out2_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out1_addr, &rt.executor());
-        let output_lines2 = receive_lines(&out2_addr, &rt.executor());
+        let output_lines1 = receive(&out1_addr);
+        let output_lines2 = receive(&out2_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -467,7 +466,7 @@ mod tests {
 
         new_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
+        wait_for(|| output_lines1.count() >= 100);
 
         topology.reload_config(new_config, &mut rt, false);
 
@@ -479,12 +478,12 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines1 = output_lines1.wait().unwrap();
+        let output_lines1 = output_lines1.wait();
         assert_eq!(num_lines * 2, output_lines1.len());
         assert_eq!(input_lines1, &output_lines1[..num_lines]);
         assert_eq!(input_lines2, &output_lines1[num_lines..]);
 
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
     }
@@ -499,9 +498,8 @@ mod tests {
         let out1_addr = next_addr();
         let out2_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out1_addr, &rt.executor());
-        let output_lines2 = receive_lines(&out2_addr, &rt.executor());
+        let output_lines1 = receive(&out1_addr);
+        let output_lines2 = receive(&out2_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -521,12 +519,12 @@ mod tests {
 
         new_config.sinks.remove(&"out2".to_string());
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
+        wait_for(|| output_lines1.count() >= 100);
 
         topology.reload_config(new_config, &mut rt, false);
 
         // out2 should disconnect after the reload
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -536,7 +534,7 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines1 = output_lines1.wait().unwrap();
+        let output_lines1 = output_lines1.wait();
         assert_eq!(num_lines * 2, output_lines1.len());
         assert_eq!(input_lines1, &output_lines1[..num_lines]);
         assert_eq!(input_lines2, &output_lines1[num_lines..]);
@@ -555,9 +553,8 @@ mod tests {
         let out1_addr = next_addr();
         let out2_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out1_addr, &rt.executor());
-        let output_lines2 = receive_lines(&out2_addr, &rt.executor());
+        let output_lines1 = receive(&out1_addr);
+        let output_lines2 = receive(&out2_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -576,7 +573,7 @@ mod tests {
 
         new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig { address: out2_addr });
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 100);
+        wait_for(|| output_lines1.count() >= 100);
 
         topology.reload_config(new_config, &mut rt, false);
 
@@ -588,11 +585,11 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines1 = output_lines1.wait().unwrap();
+        let output_lines1 = output_lines1.wait();
         assert_eq!(num_lines, output_lines1.len());
         assert_eq!(input_lines1, output_lines1);
 
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
     }
@@ -609,10 +606,8 @@ mod tests {
         for _ in 0..10 {
             let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-            let (output_lines1, output_lines1_count) =
-                receive_lines_with_count(&out1_addr, &rt.executor());
-            let (output_lines2, output_lines2_count) =
-                receive_lines_with_count(&out2_addr, &rt.executor());
+            let output_lines1 = receive(&out1_addr);
+            let output_lines2 = receive(&out2_addr);
 
             let mut old_config = Config::empty();
             old_config.add_source("in", TcpConfig::new(in_addr));
@@ -643,16 +638,16 @@ mod tests {
             new_config.sinks[&"out".to_string()].inner =
                 Box::new(TcpSinkConfig { address: out2_addr });
 
-            wait_for(|| output_lines1_count.load(Ordering::Relaxed) > 0);
+            wait_for(|| output_lines1.count() > 0);
 
             topology.reload_config(new_config, &mut rt, false);
-            wait_for(|| output_lines2_count.load(Ordering::Relaxed) > 0);
+            wait_for(|| output_lines2.count() > 0);
 
             // Shut down server
             input_trigger.cancel();
             topology.stop();
-            let output_lines1 = output_lines1.wait().unwrap();
-            let output_lines2 = output_lines2.wait().unwrap();
+            let output_lines1 = output_lines1.wait();
+            let output_lines2 = output_lines2.wait();
             shutdown_on_idle(rt);
 
             assert!(output_lines1.len() > 0);
@@ -674,7 +669,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let output_lines = receive_lines(&out_addr, &rt.executor());
+        let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_sink("out", &[], TcpSinkConfig { address: out_addr });
@@ -703,7 +698,7 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines = output_lines.wait().unwrap();
+        let output_lines = output_lines.wait();
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
@@ -717,7 +712,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let output_lines = receive_lines(&out_addr, &rt.executor());
+        let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -744,7 +739,7 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines = output_lines.wait().unwrap();
+        let output_lines = output_lines.wait();
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
@@ -758,8 +753,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out_addr, &rt.executor());
+        let output_lines1 = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", TcpConfig::new(in_addr));
@@ -775,7 +769,7 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= num_lines);
+        wait_for(|| output_lines1.count() >= num_lines);
 
         new_config.sources.remove(&"in1".to_string());
         new_config.add_source("in2", TcpConfig::new(in_addr));
@@ -784,8 +778,8 @@ mod tests {
         topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
-        let output_lines1 = output_lines1.wait().unwrap();
-        let output_lines2 = receive_lines(&out_addr, &rt.executor());
+        let output_lines1 = output_lines1.wait();
+        let output_lines2 = receive(&out_addr);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -798,7 +792,7 @@ mod tests {
         assert_eq!(num_lines, output_lines1.len());
         assert_eq!(input_lines1, output_lines1);
 
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
     }
@@ -810,8 +804,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let (output_lines, output_lines_count) =
-            receive_lines_with_count(&out_addr, &rt.executor());
+        let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source(
@@ -842,7 +835,7 @@ mod tests {
                 .unwrap();
         }
 
-        wait_for(|| output_lines_count.load(Ordering::Relaxed) >= 4);
+        wait_for(|| output_lines.count() >= 4);
 
         new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
             address: in_addr,
@@ -872,11 +865,7 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines = output_lines
-            .wait()
-            .unwrap()
-            .into_iter()
-            .collect::<HashSet<_>>();
+        let output_lines = output_lines.wait().into_iter().collect::<HashSet<_>>();
         assert_eq!(
             output_lines,
             vec![
@@ -903,8 +892,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out_addr, &rt.executor());
+        let output_lines1 = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -931,13 +919,13 @@ mod tests {
         );
         new_config.sinks[&"out".to_string()].inputs = vec!["sampler".to_string()];
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= num_lines);
+        wait_for(|| output_lines1.count() >= num_lines);
 
         topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
-        let output_lines1 = output_lines1.wait().unwrap();
-        let output_lines2 = receive_lines(&out_addr, &rt.executor());
+        let output_lines1 = output_lines1.wait();
+        let output_lines2 = receive(&out_addr);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -950,7 +938,7 @@ mod tests {
         assert_eq!(num_lines, output_lines1.len());
         assert_eq!(input_lines1, output_lines1);
 
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
         assert!(output_lines2.len() > 0);
         assert!(output_lines2.len() < num_lines);
     }
@@ -964,8 +952,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let (output_lines1, output_lines1_count) =
-            receive_lines_with_count(&out_addr, &rt.executor());
+        let output_lines1 = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -993,14 +980,14 @@ mod tests {
         new_config.transforms.remove(&"sampler".to_string());
         new_config.sinks[&"out".to_string()].inputs = vec!["in".to_string()];
 
-        wait_for(|| output_lines1_count.load(Ordering::Relaxed) >= 1);
+        wait_for(|| output_lines1.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
         topology.reload_config(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
-        let output_lines1 = output_lines1.wait().unwrap();
-        let output_lines2 = receive_lines(&out_addr, &rt.executor());
+        let output_lines1 = output_lines1.wait();
+        let output_lines2 = receive(&out_addr);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -1013,7 +1000,7 @@ mod tests {
         assert!(output_lines1.len() > 0);
         assert!(output_lines1.len() < num_lines);
 
-        let output_lines2 = output_lines2.wait().unwrap();
+        let output_lines2 = output_lines2.wait();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
     }
@@ -1027,8 +1014,7 @@ mod tests {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let (output_lines, output_lines_count) =
-            receive_lines_with_count(&out_addr, &rt.executor());
+        let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
@@ -1056,7 +1042,7 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        wait_for(|| output_lines_count.load(Ordering::Relaxed) >= 1);
+        wait_for(|| output_lines.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
         new_config.transforms[&"sampler".to_string()].inner = Box::new(SamplerConfig {
@@ -1079,7 +1065,7 @@ mod tests {
         topology.stop();
         shutdown_on_idle(rt);
 
-        let output_lines = output_lines.wait().unwrap();
+        let output_lines = output_lines.wait();
 
         let num_before = output_lines
             .iter()
@@ -1196,11 +1182,12 @@ mod tests {
 
         // Require-healthy reload with passing healthcheck
         {
-            let _healthcheck_receiver = receive_lines(&out2_addr, &rt.executor());
+            let healthcheck_receiver = receive(&out2_addr);
 
             config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out2_addr });
 
             topology.reload_config(config.clone(), &mut rt, true);
+            healthcheck_receiver.wait();
 
             let receive = receive_one(&out1_addr, &out2_addr);
 

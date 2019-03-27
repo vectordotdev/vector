@@ -3,8 +3,10 @@ use futures::{stream, Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
 use tokio::util::FutureExt;
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
@@ -134,7 +136,7 @@ where
     R: Send + 'static,
     E: Send + 'static,
 {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
 
     rt.block_on(future)
 }
@@ -143,7 +145,7 @@ pub fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| std::net::TcpStream::connect(addr).is_ok())
 }
 
-pub fn shutdown_on_idle(runtime: tokio::runtime::Runtime) {
+pub fn shutdown_on_idle(runtime: Runtime) {
     block_on(
         runtime
             .shutdown_on_idle()
@@ -191,5 +193,53 @@ where
         } else {
             panic!("Future already completed");
         }
+    }
+}
+
+pub struct Receiver {
+    handle: futures::sync::oneshot::SpawnHandle<Vec<String>, ()>,
+    count: Arc<AtomicUsize>,
+    trigger: Trigger,
+    _runtime: Runtime,
+}
+
+impl Receiver {
+    pub fn count(&self) -> usize {
+        self.count.load(Ordering::Relaxed)
+    }
+
+    pub fn wait(self) -> Vec<String> {
+        self.trigger.cancel();
+        self.handle.wait().unwrap()
+    }
+}
+
+pub fn receive(addr: &SocketAddr) -> Receiver {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let count = Arc::new(AtomicUsize::new(0));
+    let count_clone = Arc::clone(&count);
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    let lines = listener
+        .incoming()
+        .take_until(tripwire)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .flatten()
+        .inspect(move |_| {
+            count_clone.fetch_add(1, Ordering::Relaxed);
+        })
+        .map_err(|e| panic!("{:?}", e))
+        .collect();
+
+    let handle = futures::sync::oneshot::spawn(lines, &runtime.executor());
+    Receiver {
+        handle,
+        count,
+        trigger,
+        _runtime: runtime,
     }
 }
