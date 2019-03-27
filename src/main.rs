@@ -77,7 +77,7 @@ fn main() {
         let metrics_addr = "127.0.0.1:8888".parse().unwrap();
         let metrics_serve = metrics::serve(metrics_addr, metrics_server);
 
-        rt.spawn(metrics_serve);
+        let metrics_serve_handle = futures::sync::oneshot::spawn(metrics_serve, &rt.executor());
 
         let require_healthy = matches.is_present("require-healthy");
 
@@ -145,6 +145,7 @@ fn main() {
 
             info!("Shutting down");
             topology.stop();
+            drop(metrics_serve_handle);
 
             let shutdown = rt.shutdown_on_idle();
 
