@@ -89,6 +89,7 @@ tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
 elastic = { git = "https://github.com/elastic-rs/elastic" }
+matches = "0.1.8"
 
 [features]
 "default" = ["rdkafka", "leveldb"]

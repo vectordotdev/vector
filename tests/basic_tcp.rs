@@ -5,7 +5,7 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{
-    next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    next_addr, random_lines, receive, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
@@ -28,7 +28,7 @@ fn test_pipe() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     topology.start(&mut rt);
     // Wait for server to accept traffic
@@ -40,9 +40,9 @@ fn test_pipe() {
 
     // Shut down server
     topology.stop();
-
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
