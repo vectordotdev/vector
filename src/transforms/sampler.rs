@@ -39,17 +39,19 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if self.pass_list.is_match(&record.line) {
-            return Some(record);
+        if let Ok(raw_line) = std::str::from_utf8(&record.raw[..]) {
+            if self.pass_list.is_match(&raw_line) {
+                return Some(record);
+            }
         }
 
         let mut hasher = DefaultHasher::new();
-        hasher.write(record.line.as_bytes());
+        hasher.write(&record.raw[..]);
         let hash = hasher.finish();
 
         if hash % self.rate == 0 {
             record
-                .custom
+                .structured
                 .insert(Atom::from("sample_rate"), self.rate.to_string());
 
             Some(record)

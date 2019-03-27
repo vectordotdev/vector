@@ -2,6 +2,7 @@ use crate::record::Record;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use string_cache::DefaultAtom as Atom;
 use tokio::{
     self,
     codec::{FramedRead, LinesCodec},
@@ -55,7 +56,9 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .map(Record::from)
                     .map(move |mut record| {
-                        record.host = host.clone();
+                        if let Some(host) = &host {
+                            record.structured.insert(Atom::from("host"), host.clone());
+                        }
                         record
                     })
                     .map_err(|e| error!("error reading line: {:?}", e));

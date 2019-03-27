@@ -85,7 +85,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
-    let id = key.and_then(|k| record.custom.get(&k.as_ref().into()));
+    let id = key.and_then(|k| record.structured.get(&k.as_ref().into()));
     if let Some(val) = id {
         doc.as_object_mut()
             .unwrap()

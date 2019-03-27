@@ -1,4 +1,5 @@
 use crate::record::Record;
+use bytes::Bytes;
 use chrono::TimeZone;
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -140,13 +141,11 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     let line = raw.as_ref().trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| Record {
-            line: line.to_owned(),
+            raw: Bytes::from(line.as_bytes()),
             timestamp: parsed
                 .timestamp
-                .map(|ts| chrono::Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                .unwrap_or(chrono::Utc::now()),
-            custom: Default::default(),
-            host: parsed.hostname,
+                .map(|ts| chrono::Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32)),
+            ..Default::default()
         })
         .ok()
 }

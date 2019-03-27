@@ -2,6 +2,7 @@ use super::Transform;
 use crate::record::Record;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::str;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -30,12 +31,14 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Some(captures) = self.regex.captures(&record.line) {
-            for name in self.regex.capture_names().filter_map(|c| c) {
-                if let Some(capture) = captures.name(name) {
-                    record
-                        .custom
-                        .insert(name.into(), capture.as_str().to_owned());
+        if let Ok(raw_line) = str::from_utf8(&record.raw[..]) {
+            if let Some(captures) = self.regex.captures(&raw_line) {
+                for name in self.regex.capture_names().filter_map(|c| c) {
+                    if let Some(capture) = captures.name(name) {
+                        record
+                            .structured
+                            .insert(name.into(), capture.as_str().to_owned());
+                    }
                 }
             }
         }
