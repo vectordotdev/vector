@@ -2,7 +2,7 @@ use crate::{record::Record, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 mod vars;
 
@@ -94,7 +94,12 @@ impl Config {
             .read_to_string(&mut source_string)
             .map_err(|e| vec![e.to_string()])?;
 
-        let vars = std::collections::HashMap::new();
+        let mut vars = std::env::vars().collect::<HashMap<_, _>>();
+        if !vars.contains_key("HOST") {
+            if let Some(hostname) = hostname::get_hostname() {
+                vars.insert("HOST".into(), hostname);
+            }
+        }
         let with_vars = vars::interpolate(&source_string, &vars);
 
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
