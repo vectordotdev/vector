@@ -39,17 +39,19 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if self.pass_list.is_match(&record.line) {
-            return Some(record);
+        if let Ok(raw_line) = std::str::from_utf8(&record.raw[..]) {
+            if self.pass_list.is_match(&raw_line) {
+                return Some(record);
+            }
         }
 
         let mut hasher = DefaultHasher::new();
-        hasher.write(record.line.as_bytes());
+        hasher.write(&record.raw[..]);
         let hash = hasher.finish();
 
         if hash % self.rate == 0 {
             record
-                .custom
+                .structured
                 .insert(Atom::from("sample_rate"), self.rate.to_string());
 
             Some(record)
@@ -128,25 +130,25 @@ mod tests {
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !s.line.contains("na"))
+            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.custom[&Atom::from("sample_rate")], "10");
+        assert_eq!(passing.structured[&Atom::from("sample_rate")], "10");
 
         let records = random_records(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !s.line.contains("na"))
+            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.custom[&Atom::from("sample_rate")], "25");
+        assert_eq!(passing.structured[&Atom::from("sample_rate")], "25");
 
         // If the record passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let record = Record::from("nananana");
         let passing = sampler.transform(record).unwrap();
-        assert!(!passing.custom.contains_key(&Atom::from("sample_rate")));
+        assert!(!passing.structured.contains_key(&Atom::from("sample_rate")));
     }
 
     fn random_records(n: usize) -> Vec<Record> {

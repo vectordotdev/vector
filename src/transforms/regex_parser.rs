@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::record::Record;
-use regex::Regex;
+use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
+use std::str;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -30,12 +31,12 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Some(captures) = self.regex.captures(&record.line) {
+        if let Some(captures) = self.regex.captures(&record.raw[..]) {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    record
-                        .custom
-                        .insert(name.into(), capture.as_str().to_owned());
+                    let capture = String::from_utf8_lossy(capture.as_bytes()).into_owned();
+
+                    record.structured.insert(name.into(), capture);
                 }
             }
         }
@@ -49,7 +50,7 @@ mod tests {
     use super::RegexParser;
     use crate::record::Record;
     use crate::transforms::Transform;
-    use regex::Regex;
+    use regex::bytes::Regex;
 
     #[test]
     fn regex_parser_adds_parsed_field_to_record() {
@@ -59,8 +60,8 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.custom[&"status".into()], "1234");
-        assert_eq!(record.custom[&"time".into()], "5678");
+        assert_eq!(record.structured[&"status".into()], "1234");
+        assert_eq!(record.structured[&"time".into()], "5678");
     }
 
     #[test]
@@ -70,6 +71,6 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.custom.get(&"status".into()), None);
+        assert_eq!(record.structured.get(&"status".into()), None);
     }
 }

@@ -36,7 +36,7 @@ impl FieldFilter {
 
 impl Transform for FieldFilter {
     fn transform(&self, record: Record) -> Option<Record> {
-        if record.custom.get(&self.field_name) == Some(&self.value) {
+        if record.structured.get(&self.field_name) == Some(&self.value) {
             Some(record)
         } else {
             None

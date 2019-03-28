@@ -22,7 +22,7 @@ uuid = { version = "0.7.1", features = ["v4"] }
 chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.0.5"
-bytes = "0.4.10"
+bytes = { version = "0.4.10", features = ["serde"] }
 futures = "0.1.25"
 stream-cancel = "0.4.3"
 prometheus = "0.4.2"

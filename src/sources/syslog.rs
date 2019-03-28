@@ -1,5 +1,6 @@
 use crate::record::Record;
-use chrono::TimeZone;
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -139,14 +140,21 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
 fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     let line = raw.as_ref().trim();
     syslog_rfc5424::parse_message(line)
-        .map(|parsed| Record {
-            line: line.to_owned(),
-            timestamp: parsed
-                .timestamp
-                .map(|ts| chrono::Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                .unwrap_or(chrono::Utc::now()),
-            custom: Default::default(),
-            host: parsed.hostname,
+        .map(|parsed| {
+            let mut record = Record {
+                raw: Bytes::from(line.as_bytes()),
+                timestamp: parsed
+                    .timestamp
+                    .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
+                    .unwrap_or(Utc::now()),
+                ..Default::default()
+            };
+
+            if let Some(host) = parsed.hostname {
+                record.structured.insert("host".into(), host);
+            }
+
+            record
         })
         .ok()
 }
@@ -192,15 +200,17 @@ mod test {
     fn syslog_ng_network_syslog_protocol() {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let raw = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
-        assert_eq!(
-            Record {
-                line: raw.to_owned(),
-                timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
-                custom: Default::default(),
-                host: Some(String::from("74794bfb6795")),
-            },
-            record_from_str(raw).unwrap()
-        );
+
+        let mut expected = Record {
+            raw: bytes::Bytes::from(raw),
+            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+            ..Default::default()
+        };
+        expected
+            .structured
+            .insert("host".into(), "74794bfb6795".into());
+
+        assert_eq!(expected, record_from_str(raw).unwrap());
     }
 
     #[test]
@@ -210,59 +220,67 @@ mod test {
             <13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
-        assert_eq!(
-            Record {
-                line: cleaned.to_owned(),
-                timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
-                custom: Default::default(),
-                host: Some(String::from("74794bfb6795")),
-            },
-            record_from_str(raw).unwrap()
-        );
+
+        let mut expected = Record {
+            raw: bytes::Bytes::from(cleaned),
+            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
+            ..Default::default()
+        };
+        expected
+            .structured
+            .insert("host".into(), "74794bfb6795".into());
+
+        assert_eq!(expected, record_from_str(raw).unwrap());
     }
 
     #[test]
     #[ignore]
     fn syslog_ng_default_network() {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
-        assert_eq!(
-            Record {
-                line: raw.to_owned(),
-                timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
-                custom: Default::default(),
-                host: Some(String::from("74794bfb6795")),
-            },
-            record_from_str(raw).unwrap()
-        );
+
+        let mut expected = Record {
+            raw: bytes::Bytes::from(raw),
+            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
+            ..Default::default()
+        };
+        expected
+            .structured
+            .insert("host".into(), "74794bfb6795".into());
+
+        assert_eq!(expected, record_from_str(raw).unwrap());
     }
 
     #[test]
     #[ignore]
     fn rsyslog_omfwd_tcp_default() {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
-        assert_eq!(
-            Record {
-                line: raw.to_owned(),
-                timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
-                custom: Default::default(),
-                host: Some(String::from("74794bfb6795")),
-            },
-            record_from_str(raw).unwrap()
-        );
+
+        let mut expected = Record {
+            raw: bytes::Bytes::from(raw),
+            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
+            ..Default::default()
+        };
+        expected
+            .structured
+            .insert("host".into(), "74794bfb6795".into());
+
+        assert_eq!(expected, record_from_str(raw).unwrap());
     }
 
     #[test]
     #[ignore]
     fn rsyslog_omfwd_tcp_forward_format() {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
-        assert_eq!(
-            Record {
-                line: raw.to_owned(),
-                timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
-                custom: Default::default(),
-                host: Some(String::from("74794bfb6795")),
-            },
-            record_from_str(raw).unwrap()
-        );
+
+        let mut expected = Record {
+            raw: bytes::Bytes::from(raw),
+            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
+            ..Default::default()
+        };
+        expected
+            .structured
+            .insert("host".into(), "74794bfb6795".into());
+
+        assert_eq!(expected, record_from_str(raw).unwrap());
     }
 }

@@ -32,7 +32,7 @@ impl AddFields {
 impl Transform for AddFields {
     fn transform(&self, mut record: Record) -> Option<Record> {
         for (key, value) in self.fields.clone() {
-            record.custom.insert(key, value);
+            record.structured.insert(key, value);
         }
 
         Some(record)
@@ -56,7 +56,7 @@ mod tests {
         let new_record = augment.transform(record).unwrap();
 
         let key = Atom::from("some_key".to_string());
-        let kv = new_record.custom.get(&key);
+        let kv = new_record.structured.get(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val));

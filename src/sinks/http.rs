@@ -1,4 +1,5 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
@@ -7,6 +8,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
+use string_cache::DefaultAtom as Atom;
 use tower_in_flight_limit::InFlightLimit;
 use tower_retry::Retry;
 use tower_timeout::Timeout;
@@ -163,11 +165,12 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
-                "msg": record.line,
-                "ts": record.timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                "fields": record.custom,
+                "msg": String::from_utf8_lossy(&record.raw[..]),
+                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+                "fields": record.structured,
             });
-            if let Some(host) = record.host {
+
+            if let Some(host) = record.structured.get(&Atom::from("host")) {
                 body["host"] = json!(host);
             }
             let mut body = serde_json::to_vec(&body).unwrap();

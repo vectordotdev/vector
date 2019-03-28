@@ -4,6 +4,7 @@ use hyper::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
+use string_cache::DefaultAtom as Atom;
 use tower_in_flight_limit::InFlightLimit;
 use tower_retry::Retry;
 use tower_timeout::Timeout;
@@ -67,10 +68,10 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut body = json!({
-                "event": record.line,
-                "fields": record.custom,
+                "event": String::from_utf8_lossy(&record.raw[..]),
+                "fields": record.structured,
             });
-            if let Some(host) = record.host {
+            if let Some(host) = record.structured.get(&Atom::from("host")) {
                 body["host"] = json!(host);
             }
             let body = serde_json::to_vec(&body).unwrap();
@@ -199,7 +200,7 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.custom.insert("asdf".into(), "hello".to_owned());
+        record.structured.insert("asdf".into(), "hello".to_owned());
 
         let pump = sink.send(record);
 
@@ -229,8 +230,10 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.custom.insert("asdf".into(), "hello".to_owned());
-        record.host = Some("example.com:1234".to_owned());
+        record.structured.insert("asdf".into(), "hello".to_owned());
+        record
+            .structured
+            .insert("host".into(), "example.com:1234".to_owned());
 
         let pump = sink.send(record);
 

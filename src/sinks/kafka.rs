@@ -61,7 +61,7 @@ impl Sink for KafkaSink {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
-        let record = FutureRecord::to(&topic).key(&()).payload(&item.line);
+        let record = FutureRecord::to(&topic).key(&()).payload(&item.raw[..]);
 
         let future = match self.producer.send_result(record) {
             Ok(f) => f,

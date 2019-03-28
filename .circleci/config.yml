@@ -115,7 +115,7 @@ jobs:
       - run:
           name: Test
           command: |
-            cargo test --all --features docker
+            cargo test --all --features docker -- --test-threads 2
       - store_test_results:
           path: ./test-results
       - save_cache:

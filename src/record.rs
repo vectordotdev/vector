@@ -1,3 +1,6 @@
+use bytes::Bytes;
+use chrono::{offset::TimeZone, DateTime, Utc};
+use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
@@ -10,64 +13,76 @@ pub mod proto {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
-    pub line: String,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-    pub custom: HashMap<Atom, String>,
-    pub host: Option<String>,
+    pub raw: Bytes,
+    pub timestamp: DateTime<Utc>,
+    pub structured: HashMap<Atom, String>,
+}
+
+impl Record {
+    pub fn to_string_lossy(&self) -> String {
+        String::from_utf8_lossy(&self.raw[..]).into_owned()
+    }
+}
+
+impl Default for Record {
+    fn default() -> Self {
+        Record {
+            raw: Bytes::new(),
+            timestamp: Utc::now(),
+            structured: HashMap::new(),
+        }
+    }
 }
 
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
-        use chrono::offset::TimeZone;
-        let timestamp = proto.timestamp.unwrap();
-        let timestamp = chrono::Utc.timestamp(timestamp.seconds, timestamp.nanos as _);
+        let raw = Bytes::from(proto.raw);
 
-        let host = if proto.host.is_empty() {
-            None
-        } else {
-            Some(proto.host)
-        };
+        let timestamp = proto
+            .timestamp
+            .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
+            .unwrap_or_else(|| Utc::now());
 
-        let custom = proto
-            .custom
+        let structured = proto
+            .structured
             .into_iter()
             .map(|(k, v)| (Atom::from(k), v))
             .collect::<HashMap<_, _>>();
 
         Self {
-            line: proto.line,
+            raw,
             timestamp,
-            custom,
-            host,
+            structured,
         }
     }
 }
 
 impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
-        let timestamp = ::prost_types::Timestamp {
+        let raw = record.raw.into_iter().collect::<Vec<u8>>();
+
+        let timestamp = Some(Timestamp {
             seconds: record.timestamp.timestamp(),
             nanos: record.timestamp.timestamp_subsec_nanos() as _,
-        };
+        });
 
-        let custom = record
-            .custom
+        let structured = record
+            .structured
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
             .collect::<HashMap<_, _>>();
 
         Self {
-            line: record.line,
-            timestamp: Some(timestamp),
-            custom,
-            host: record.host.unwrap_or_else(|| "".to_string()),
+            raw,
+            timestamp,
+            structured,
         }
     }
 }
 
 impl From<Record> for Vec<u8> {
     fn from(record: Record) -> Vec<u8> {
-        record.line.into_bytes()
+        record.raw.into_iter().collect()
     }
 }
 
@@ -79,11 +94,12 @@ impl From<&str> for Record {
 
 impl From<String> for Record {
     fn from(line: String) -> Self {
+        let raw = Bytes::from(line);
+
         Record {
-            line: line.into(),
-            timestamp: chrono::Utc::now(),
-            custom: HashMap::new(),
-            host: None,
+            raw,
+            timestamp: Utc::now(),
+            structured: HashMap::new(),
         }
     }
 }

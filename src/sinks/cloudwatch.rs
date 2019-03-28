@@ -216,6 +216,16 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
     Box::new(fut)
 }
 
+impl From<Record> for InputLogEvent {
+    fn from(record: Record) -> InputLogEvent {
+        let message = String::from_utf8_lossy(&record.raw[..]).into_owned();
+
+        let timestamp = record.timestamp.timestamp_millis();
+
+        InputLogEvent { message, timestamp }
+    }
+}
+
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -231,15 +241,6 @@ impl fmt::Display for CloudwatchError {
 }
 
 impl std::error::Error for CloudwatchError {}
-
-impl From<Record> for InputLogEvent {
-    fn from(record: Record) -> InputLogEvent {
-        InputLogEvent {
-            message: record.line,
-            timestamp: record.timestamp.timestamp_millis(),
-        }
-    }
-}
 
 impl From<PutLogEventsError> for CloudwatchError {
     fn from(e: PutLogEventsError) -> Self {
