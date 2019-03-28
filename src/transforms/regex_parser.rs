@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::record::Record;
-use regex::Regex;
+use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
 
@@ -31,14 +31,12 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Ok(raw_line) = str::from_utf8(&record.raw[..]) {
-            if let Some(captures) = self.regex.captures(&raw_line) {
-                for name in self.regex.capture_names().filter_map(|c| c) {
-                    if let Some(capture) = captures.name(name) {
-                        record
-                            .structured
-                            .insert(name.into(), capture.as_str().to_owned());
-                    }
+        if let Some(captures) = self.regex.captures(&record.raw[..]) {
+            for name in self.regex.capture_names().filter_map(|c| c) {
+                if let Some(capture) = captures.name(name) {
+                    let capture = String::from_utf8_lossy(capture.as_bytes()).into_owned();
+
+                    record.structured.insert(name.into(), capture);
                 }
             }
         }
