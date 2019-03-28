@@ -5,9 +5,13 @@ mod fanout;
 pub use self::config::Config;
 
 use crate::buffers;
-use futures::{sync::oneshot, Future};
+use futures::{
+    sync::{mpsc, oneshot},
+    Future,
+};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
+use std::panic::AssertUnwindSafe;
 use stream_cancel::Trigger;
 use tokio_trace_futures::Instrument;
 
@@ -28,6 +32,7 @@ struct RunningTopology {
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     shutdown_triggers: HashMap<String, Trigger>,
     config: Config,
+    abort_tx: mpsc::UnboundedSender<()>,
 }
 
 impl Topology {
@@ -55,7 +60,7 @@ impl Topology {
         }
     }
 
-    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) {
+    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) -> mpsc::UnboundedReceiver<()> {
         let state = std::mem::replace(&mut self.state, State::Stopped);
         let (components, config) = if let State::Ready(components, config) = state {
             (components, config)
@@ -83,8 +88,21 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
+        let (abort_tx, abort_rx) = mpsc::unbounded();
+
         for (name, task) in tasks.into_iter() {
             info!("Starting sink {}", name);
+            let abort_tx = abort_tx.clone();
+            let name_clone = name.clone();
+            let task = AssertUnwindSafe(task)
+                .catch_unwind()
+                .map_err(|_| ())
+                .and_then(|inner| inner)
+                .or_else(move |err| {
+                    error!("Error in {}", name_clone);
+                    let _ = abort_tx.unbounded_send(());
+                    Err(err)
+                });
             rt.spawn(task.instrument(span!("sink", name = name.as_str())));
         }
 
@@ -99,7 +117,10 @@ impl Topology {
             config,
             shutdown_triggers,
             source_tasks,
+            abort_tx,
         });
+
+        abort_rx
     }
 
     pub fn stop(&mut self) {

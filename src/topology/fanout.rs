@@ -80,10 +80,20 @@ impl Sink for Fanout {
 
         while self.i < self.sinks.len() {
             let (_name, sink) = &mut self.sinks[self.i];
-            if let AsyncSink::NotReady(item) = sink.start_send(item.clone())? {
-                return Ok(AsyncSink::NotReady(item));
-            } else {
-                self.i += 1;
+            match sink.start_send(item.clone()) {
+                Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
+                Ok(AsyncSink::Ready) => self.i += 1,
+                Err(_) => {
+                    // If there's only one sink, propogate the error to the source ASAP
+                    // so it stops reading from its input. If there are multiple sinks,
+                    // keep pushing to the non-errored ones (while the errored sink
+                    // triggers a more graceful shutdown).
+                    if self.sinks.len() == 1 {
+                        return Err(());
+                    } else {
+                        self.sinks.remove(self.i);
+                    }
+                }
             }
         }
 
