@@ -50,7 +50,7 @@ mod tests {
     use super::RegexParser;
     use crate::record::Record;
     use crate::transforms::Transform;
-    use regex::Regex;
+    use regex::bytes::Regex;
 
     #[test]
     fn regex_parser_adds_parsed_field_to_record() {
