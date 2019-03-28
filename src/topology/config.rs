@@ -4,6 +4,8 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+mod vars;
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
     #[serde(default)]
@@ -92,7 +94,10 @@ impl Config {
             .read_to_string(&mut source_string)
             .map_err(|e| vec![e.to_string()])?;
 
-        toml::from_str(&source_string).map_err(|e| vec![e.to_string()])
+        let vars = std::collections::HashMap::new();
+        let with_vars = vars::interpolate(&source_string, &vars);
+
+        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 }
 
