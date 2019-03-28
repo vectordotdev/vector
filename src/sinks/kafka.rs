@@ -138,7 +138,7 @@ mod test {
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
     };
-    use std::time::Duration;
+    use std::{thread, time::Duration};
 
     #[test]
     fn kafka_happy_path() {
@@ -185,10 +185,20 @@ mod test {
         assert_eq!((0, num_records as i64), (low, high));
 
         // loop instead of iter so we can set a timeout
+        let mut failures = 0;
         let mut out = Vec::new();
-        while let Some(Ok(msg)) = consumer.poll(Duration::from_secs(3)) {
-            let s: &str = msg.payload_view().unwrap().unwrap();
-            out.push(s.to_owned());
+        while failures < 100 {
+            match consumer.poll(Duration::from_secs(3)) {
+                Some(Ok(msg)) => {
+                    let s: &str = msg.payload_view().unwrap().unwrap();
+                    out.push(s.to_owned());
+                }
+                None if out.len() >= input.len() => break,
+                _ => {
+                    failures += 1;
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
         }
 
         assert_eq!(out.len(), input.len());
