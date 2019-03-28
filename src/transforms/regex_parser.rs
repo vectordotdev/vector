@@ -62,8 +62,8 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.custom[&"status".into()], "1234");
-        assert_eq!(record.custom[&"time".into()], "5678");
+        assert_eq!(record.structured[&"status".into()], "1234");
+        assert_eq!(record.structured[&"time".into()], "5678");
     }
 
     #[test]
@@ -73,6 +73,6 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.custom.get(&"status".into()), None);
+        assert_eq!(record.structured.get(&"status".into()), None);
     }
 }

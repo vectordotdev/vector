@@ -11,11 +11,27 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
     pub raw: Bytes,
-    pub timestamp: Option<DateTime<chrono::Utc>>,
+    pub timestamp: DateTime<Utc>,
     pub structured: HashMap<Atom, String>,
+}
+
+impl Record {
+    pub fn to_string_lossy(&self) -> String {
+        String::from_utf8_lossy(&self.raw[..]).into_owned()
+    }
+}
+
+impl Default for Record {
+    fn default() -> Self {
+        Record {
+            raw: Bytes::new(),
+            timestamp: Utc::now(),
+            structured: HashMap::new(),
+        }
+    }
 }
 
 impl From<proto::Record> for Record {
@@ -24,7 +40,8 @@ impl From<proto::Record> for Record {
 
         let timestamp = proto
             .timestamp
-            .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _));
+            .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
+            .unwrap_or_else(|| Utc::now());
 
         let structured = proto
             .structured
@@ -44,9 +61,9 @@ impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
         let raw = record.raw.into_iter().collect::<Vec<u8>>();
 
-        let timestamp = record.timestamp.map(|timestamp| Timestamp {
-            seconds: timestamp.timestamp(),
-            nanos: timestamp.timestamp_subsec_nanos() as _,
+        let timestamp = Some(Timestamp {
+            seconds: record.timestamp.timestamp(),
+            nanos: record.timestamp.timestamp_subsec_nanos() as _,
         });
 
         let structured = record
@@ -81,8 +98,7 @@ impl From<String> for Record {
 
         Record {
             raw,
-            // TODO(lucio): should this be `None`?
-            timestamp: Some(chrono::Utc::now()),
+            timestamp: Utc::now(),
             structured: HashMap::new(),
         }
     }

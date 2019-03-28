@@ -44,13 +44,14 @@ fn happy_path() {
     let mut goodbye_i = 0;
 
     for record in received {
-        if record.line.starts_with("hello") {
-            assert_eq!(record.line, format!("hello {}", hello_i));
-            assert_eq!(record.custom[&"file".into()], path1.to_str().unwrap());
+        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        if line.starts_with("hello") {
+            assert_eq!(line, format!("hello {}", hello_i));
+            assert_eq!(record.structured[&"file".into()], path1.to_str().unwrap());
             hello_i += 1;
         } else {
-            assert_eq!(record.line, format!("goodbye {}", goodbye_i));
-            assert_eq!(record.custom[&"file".into()], path2.to_str().unwrap());
+            assert_eq!(line, format!("goodbye {}", goodbye_i));
+            assert_eq!(record.structured[&"file".into()], path2.to_str().unwrap());
             goodbye_i += 1;
         }
     }
@@ -103,11 +104,14 @@ fn truncate() {
     let mut pre_trunc = true;
 
     for record in received {
-        assert_eq!(record.custom[&"file".into()], path.to_str().unwrap());
+        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+
+        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+
         if pre_trunc {
-            assert_eq!(record.line, format!("pretrunc {}", i));
+            assert_eq!(line, format!("pretrunc {}", i));
         } else {
-            assert_eq!(record.line, format!("posttrunc {}", i));
+            assert_eq!(line, format!("posttrunc {}", i));
         }
 
         i += 1;
@@ -164,11 +168,14 @@ fn rotate() {
     let mut pre_rot = true;
 
     for record in received {
-        assert_eq!(record.custom[&"file".into()], path.to_str().unwrap());
+        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+
+        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+
         if pre_rot {
-            assert_eq!(record.line, format!("prerot {}", i));
+            assert_eq!(line, format!("prerot {}", i));
         } else {
-            assert_eq!(record.line, format!("postrot {}", i));
+            assert_eq!(line, format!("postrot {}", i));
         }
 
         i += 1;
@@ -223,7 +230,8 @@ fn multiple_paths() {
     let mut is = [0; 3];
 
     for record in received {
-        let mut split = record.line.split(" ");
+        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
         let i = split.next().unwrap().parse::<usize>().unwrap();
@@ -262,7 +270,7 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert_eq!(received.custom[&"file".into()], path.to_str().unwrap());
+        assert_eq!(received.structured[&"file".into()], path.to_str().unwrap());
     }
 
     // Custom
@@ -287,7 +295,10 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert_eq!(received.custom[&"source".into()], path.to_str().unwrap());
+        assert_eq!(
+            received.structured[&"source".into()],
+            path.to_str().unwrap()
+        );
     }
 
     // Hidden
@@ -312,7 +323,7 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert!(received.custom.is_empty());
+        assert!(received.structured.is_empty());
     }
 
     drop(trigger);
@@ -346,7 +357,10 @@ fn start_position() {
 
         drop(trigger);
         let received = rx.collect().wait().unwrap();
-        let lines = received.into_iter().map(|r| r.line).collect::<Vec<_>>();
+        let lines = received
+            .into_iter()
+            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
 
@@ -377,7 +391,10 @@ fn start_position() {
 
         drop(trigger);
         let received = rx.collect().wait().unwrap();
-        let lines = received.into_iter().map(|r| r.line).collect::<Vec<_>>();
+        let lines = received
+            .into_iter()
+            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
 
@@ -448,13 +465,13 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let before_lines = received
             .iter()
-            .filter(|r| r.custom[&"file".into()].ends_with("before"))
-            .map(|r| r.line.clone())
+            .filter(|r| r.structured[&"file".into()].ends_with("before"))
+            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|r| r.custom[&"file".into()].ends_with("after"))
-            .map(|r| r.line.clone())
+            .filter(|r| r.structured[&"file".into()].ends_with("after"))
+            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);

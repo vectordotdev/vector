@@ -123,7 +123,7 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.custom.insert("foo".into(), "bar".into());
+        record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -135,7 +135,7 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.custom.insert("not_foo".into(), "bar".into());
+        record.structured.insert("not_foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -147,7 +147,7 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut record = Record::from("butts");
-        record.custom.insert("foo".into(), "bar".into());
+        record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);

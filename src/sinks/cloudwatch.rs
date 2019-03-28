@@ -220,10 +220,7 @@ impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
         let message = String::from_utf8_lossy(&record.raw[..]).into_owned();
 
-        let timestamp = record
-            .timestamp
-            .unwrap_or_else(|| chrono::Utc::now())
-            .timestamp_millis();
+        let timestamp = record.timestamp.timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }

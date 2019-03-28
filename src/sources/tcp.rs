@@ -91,7 +91,10 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record.host, Some("127.0.0.1".to_owned()));
+        assert_eq!(
+            record.structured.get(&"host".into()),
+            Some(&"127.0.0.1".to_owned())
+        );
     }
 
     #[test]

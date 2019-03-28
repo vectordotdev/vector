@@ -1,4 +1,5 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
@@ -165,9 +166,7 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         .with(move |record: Record| {
             let mut body = json!({
                 "msg": String::from_utf8_lossy(&record.raw[..]),
-                "ts": record.timestamp
-                    .unwrap_or_else(|| chrono::Utc::now())
-                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
                 "fields": record.structured,
             });
 

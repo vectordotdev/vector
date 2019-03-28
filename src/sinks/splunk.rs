@@ -200,7 +200,7 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.custom.insert("asdf".into(), "hello".to_owned());
+        record.structured.insert("asdf".into(), "hello".to_owned());
 
         let pump = sink.send(record);
 
@@ -230,8 +230,10 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.custom.insert("asdf".into(), "hello".to_owned());
-        record.host = Some("example.com:1234".to_owned());
+        record.structured.insert("asdf".into(), "hello".to_owned());
+        record
+            .structured
+            .insert("host".into(), "example.com:1234".to_owned());
 
         let pump = sink.send(record);
 
