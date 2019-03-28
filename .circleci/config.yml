@@ -115,6 +115,7 @@ jobs:
       - run:
           name: Test
           command: |
+            sleep 120
             cargo test --all --features docker -- --test-threads 2
       - store_test_results:
           path: ./test-results
