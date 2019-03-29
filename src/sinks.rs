@@ -1,6 +1,6 @@
 use futures::{Future, Sink};
 
-pub mod cloudwatch;
+pub mod cloudwatch_logs;
 pub mod console;
 pub mod elasticsearch;
 pub mod http;
