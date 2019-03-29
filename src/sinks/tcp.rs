@@ -1,8 +1,10 @@
-use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink};
+use bytes::Bytes;
+use codec::BytesDelimitedCodec;
+use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
-use tokio::codec::{FramedWrite, LinesCodec};
+use tokio::codec::FramedWrite;
 use tokio::net::TcpStream;
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -30,7 +32,7 @@ struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(tokio::net::tcp::ConnectFuture),
-    Connected(FramedWrite<TcpStream, LinesCodec>),
+    Connected(FramedWrite<TcpStream, BytesDelimitedCodec>),
     Backoff(tokio::timer::Delay),
 }
 
@@ -50,7 +52,7 @@ impl TcpSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, LinesCodec>, ()> {
+    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, BytesDelimitedCodec>, ()> {
         loop {
             match self.state {
                 TcpSinkState::Disconnected => {
@@ -66,8 +68,10 @@ impl TcpSink {
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::Ready(socket)) => {
-                        self.state =
-                            TcpSinkState::Connected(FramedWrite::new(socket, LinesCodec::new()));
+                        self.state = TcpSinkState::Connected(FramedWrite::new(
+                            socket,
+                            BytesDelimitedCodec::new(b'\n'),
+                        ));
                         self.backoff = Self::fresh_backoff();
                     }
                     Ok(Async::NotReady) => {
@@ -89,13 +93,10 @@ impl TcpSink {
 }
 
 impl Sink for TcpSink {
-    type SinkItem = String;
+    type SinkItem = Bytes;
     type SinkError = ();
 
-    fn start_send(
-        &mut self,
-        line: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+    fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => match connection.start_send(line) {
                 Err(err) => {
@@ -131,10 +132,7 @@ impl Sink for TcpSink {
 }
 
 pub fn raw_tcp(addr: SocketAddr) -> super::RouterSink {
-    Box::new(
-        TcpSink::new(addr)
-            .with(|record: Record| Ok(String::from_utf8_lossy(&record.raw[..]).into_owned())),
-    )
+    Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.raw)))
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {

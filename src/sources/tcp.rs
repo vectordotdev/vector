@@ -1,13 +1,10 @@
 use crate::record::Record;
+use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
-use tokio::{
-    self,
-    codec::{FramedRead, LinesCodec},
-    net::TcpListener,
-};
+use tokio::{self, codec::FramedRead, net::TcpListener};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -53,15 +50,18 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                 let out = out.clone();
 
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .map(Record::from)
-                    .map(move |mut record| {
-                        if let Some(host) = &host {
-                            record.structured.insert(Atom::from("host"), host.clone());
-                        }
-                        record
-                    })
-                    .map_err(|e| error!("error reading line: {:?}", e));
+                let lines_in = FramedRead::new(
+                    socket,
+                    BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
+                )
+                .map(Record::from)
+                .map(move |mut record| {
+                    if let Some(host) = &host {
+                        record.structured.insert(Atom::from("host"), host.clone());
+                    }
+                    record
+                })
+                .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
@@ -77,7 +77,7 @@ mod test {
     use futures::Stream;
 
     #[test]
-    fn it_includes_host() {
+    fn tcp_it_includes_host() {
         let (tx, rx) = mpsc::channel(1);
 
         let addr = next_addr();
@@ -98,7 +98,7 @@ mod test {
     }
 
     #[test]
-    fn it_defaults_max_length() {
+    fn tcp_it_defaults_max_length() {
         let with: super::TcpConfig = toml::from_str(
             r#"
             address = "127.0.0.1:1234"

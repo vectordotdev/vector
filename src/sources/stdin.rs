@@ -1,8 +1,9 @@
 use crate::{record::Record, topology::config::SourceConfig};
+use codec::BytesDelimitedCodec;
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::{
-    codec::{FramedRead, LinesCodec},
+    codec::FramedRead,
     io::{stdin, AsyncRead},
 };
 
@@ -38,11 +39,14 @@ where
 {
     info!("Capturing STDIN");
 
-    let source = FramedRead::new(stream, LinesCodec::new_with_max_length(config.max_length))
-        .map(Record::from)
-        .map_err(|e| error!("error reading line: {:?}", e))
-        .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-        .map(|_| info!("finished sending"));
+    let source = FramedRead::new(
+        stream,
+        BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
+    )
+    .map(Record::from)
+    .map_err(|e| error!("error reading line: {:?}", e))
+    .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
+    .map(|_| info!("finished sending"));
 
     Box::new(source)
 }

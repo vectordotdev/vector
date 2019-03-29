@@ -9,11 +9,13 @@ publish = false
 members = [
   ".",
   "lib/file-source",
-  "lib/trace-metrics"
+  "lib/trace-metrics",
+  "lib/codec",
 ]
 
 [dependencies]
 # Internal libs
+codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
 trace-metrics = { path = "lib/trace-metrics" }
 

@@ -86,6 +86,16 @@ impl From<Record> for Vec<u8> {
     }
 }
 
+impl From<Bytes> for Record {
+    fn from(raw: Bytes) -> Self {
+        Record {
+            raw,
+            timestamp: Utc::now(),
+            ..Default::default()
+        }
+    }
+}
+
 impl From<&str> for Record {
     fn from(line: &str) -> Self {
         line.to_owned().into()
