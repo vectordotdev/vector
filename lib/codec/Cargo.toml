@@ -1,0 +1,9 @@
+[package]
+name = "codec"
+version = "0.1.0"
+authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bytes = "0.4"
+tokio-codec = "0.1"
