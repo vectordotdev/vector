@@ -72,8 +72,8 @@ impl Topology {
             inputs,
             outputs,
             shutdown_triggers,
-            tasks,
-            source_tasks,
+            mut tasks,
+            mut source_tasks,
             healthchecks: _healthchecks,
         } = components;
 
@@ -90,26 +90,48 @@ impl Topology {
 
         let (abort_tx, abort_rx) = mpsc::unbounded();
 
-        for (name, task) in tasks.into_iter() {
+        for name in config.sinks.keys() {
             info!("Starting sink {}", name);
+            let task = tasks.remove(name).unwrap();
             let task = handle_errors(task, abort_tx.clone());
-            rt.spawn(task.instrument(span!("sink", name = name.as_str())));
+            let task = task.instrument(span!("sink", name = name.as_str()));
+            rt.spawn(task);
         }
 
-        let source_tasks = source_tasks
-            .into_iter()
-            .map(|(name, task)| {
+        for name in config.transforms.keys() {
+            info!("Starting transform {}", name);
+            let task = tasks.remove(name).unwrap();
+            let task = handle_errors(task, abort_tx.clone());
+            let task = task.instrument(span!("transform", name = name.as_str()));
+            rt.spawn(task);
+        }
+
+        let mut spawned_source_tasks = HashMap::new();
+        for name in config.sources.keys() {
+            info!("Starting source {}", name);
+
+            {
+                let task = tasks.remove(name).unwrap();
                 let task = handle_errors(task, abort_tx.clone());
-                (name, oneshot::spawn(task, &rt.executor()))
-            })
-            .collect();
+                let task = task.instrument(span!("source-pump", name = name.as_str()));
+                rt.spawn(task);
+            }
+
+            {
+                let task = source_tasks.remove(name).unwrap();
+                let task = handle_errors(task, abort_tx.clone());
+                let task = task.instrument(span!("source", name = name.as_str()));
+                let spawned = oneshot::spawn(task, &rt.executor());
+                spawned_source_tasks.insert(name.clone(), spawned);
+            }
+        }
 
         self.state = State::Running(RunningTopology {
             inputs: new_inputs,
             outputs,
             config,
             shutdown_triggers,
-            source_tasks,
+            source_tasks: spawned_source_tasks,
             abort_tx,
         });
 
@@ -233,7 +255,6 @@ impl RunningTopology {
             self.setup_outputs(&name, &mut new_pieces);
 
             self.spawn_source(&name, &mut new_pieces, rt);
-            self.spawn(&name, &mut new_pieces, rt);
         }
 
         for name in sources_to_add {
@@ -241,7 +262,6 @@ impl RunningTopology {
 
             self.setup_outputs(&name, &mut new_pieces);
             self.spawn_source(&name, &mut new_pieces, rt);
-            self.spawn(&name, &mut new_pieces, rt);
         }
 
         // Transforms
@@ -258,7 +278,7 @@ impl RunningTopology {
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
-            self.spawn(&name, &mut new_pieces, rt);
+            self.spawn_transform(&name, &mut new_pieces, rt);
 
             self.setup_outputs(&name, &mut new_pieces);
             self.replace_inputs(&name, &mut new_pieces);
@@ -268,7 +288,7 @@ impl RunningTopology {
             info!("Adding transform {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
-            self.spawn(&name, &mut new_pieces, rt);
+            self.spawn_transform(&name, &mut new_pieces, rt);
             self.setup_outputs(&name, &mut new_pieces);
         }
 
@@ -285,7 +305,7 @@ impl RunningTopology {
         for name in sinks_to_change {
             info!("Rebuilding sink {:?}", name);
 
-            self.spawn(&name, &mut new_pieces, rt);
+            self.spawn_sink(&name, &mut new_pieces, rt);
             self.replace_inputs(&name, &mut new_pieces);
         }
 
@@ -293,13 +313,13 @@ impl RunningTopology {
             info!("Adding sink {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
-            self.spawn(&name, &mut new_pieces, rt);
+            self.spawn_sink(&name, &mut new_pieces, rt);
         }
 
         self.config = new_config;
     }
 
-    fn spawn(
+    fn spawn_sink(
         &mut self,
         name: &String,
         new_pieces: &mut builder::Pieces,
@@ -307,6 +327,19 @@ impl RunningTopology {
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
+        let task = task.instrument(span!("sink", name = name.as_str()));
+        rt.spawn(task);
+    }
+
+    fn spawn_transform(
+        &mut self,
+        name: &String,
+        new_pieces: &mut builder::Pieces,
+        rt: &mut tokio::runtime::Runtime,
+    ) {
+        let task = new_pieces.tasks.remove(name).unwrap();
+        let task = handle_errors(task, self.abort_tx.clone());
+        let task = task.instrument(span!("transform", name = name.as_str()));
         rt.spawn(task);
     }
 
@@ -316,6 +349,11 @@ impl RunningTopology {
         new_pieces: &mut builder::Pieces,
         rt: &mut tokio::runtime::Runtime,
     ) {
+        let task = new_pieces.tasks.remove(name).unwrap();
+        let task = handle_errors(task, self.abort_tx.clone());
+        let task = task.instrument(span!("source-pump", name = name.as_str()));
+        rt.spawn(task);
+
         let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
         self.shutdown_triggers
             .insert(name.clone(), shutdown_trigger);
