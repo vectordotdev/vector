@@ -3,11 +3,11 @@ use crate::sinks::util::{
     retries::{FixedRetryPolicy, RetryLogic},
     ServiceSink, SinkExt,
 };
-use futures::{Poll, Sink};
+use futures::{Future, Poll, Sink};
 use rand::random;
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_kinesis::{
-    Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput,
+    Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,15 @@ pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub region: Region,
     pub batch_size: usize,
+}
+
+#[typetag::serde(name = "kinesis")]
+impl crate::topology::config::SinkConfig for KinesisSinkConfig {
+    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        let config = self.clone();
+        let sink = KinesisService::new(config);
+        Ok((Box::new(sink), healthcheck(self.clone())))
+    }
 }
 
 impl KinesisService {
@@ -112,6 +121,38 @@ impl RetryLogic for KinesisRetryLogic {
             _ => false,
         }
     }
+}
+
+fn healthcheck(config: KinesisSinkConfig) -> super::Healthcheck {
+    let client = KinesisClient::new(config.region);
+    let stream_name = config.stream_name;
+
+    let fut = client
+        .list_streams(ListStreamsInput {
+            exclusive_start_stream_name: Some(stream_name.clone()),
+            limit: Some(1),
+        })
+        .map_err(|e| format!("ListStreams failed: {}", e))
+        .and_then(move |res| Ok(res.stream_names.into_iter().next()))
+        .and_then(move |name| {
+            if let Some(name) = name {
+                if name == stream_name {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "Stream names do not match, got {}, expected {}",
+                        name, stream_name
+                    ))
+                }
+            } else {
+                Err(format!(
+                    "Stream returned does not contain any streams that match {}",
+                    stream_name
+                ))
+            }
+        });
+
+    Box::new(fut)
 }
 
 #[cfg(test)]
