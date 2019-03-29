@@ -108,7 +108,20 @@ impl Topology {
 
         let source_tasks = source_tasks
             .into_iter()
-            .map(|(name, task)| (name, oneshot::spawn(task, &rt.executor())))
+            .map(|(name, task)| {
+                let abort_tx = abort_tx.clone();
+                let name_clone = name.clone();
+                let task = AssertUnwindSafe(task)
+                    .catch_unwind()
+                    .map_err(|_| ())
+                    .and_then(|inner| inner)
+                    .or_else(move |err| {
+                        error!("Error in {}", name_clone);
+                        let _ = abort_tx.unbounded_send(());
+                        Err(err)
+                    });
+                (name, oneshot::spawn(task, &rt.executor()))
+            })
             .collect();
 
         self.state = State::Running(RunningTopology {
