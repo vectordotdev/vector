@@ -38,11 +38,17 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
-        let listener = TcpListener::bind(&addr).expect("failed to bind to listener socket");
+        let listener = match TcpListener::bind(&addr) {
+            Ok(listener) => listener,
+            Err(err) => {
+                error!("Failed to bind to listener socket: {}", err);
+                return future::Either::B(future::err(()));
+            }
+        };
 
         info!("listening on {:?}", listener.local_addr());
 
-        listener
+        let future = listener
             .incoming()
             .map_err(|e| error!("failed to accept socket; error = {:?}", e))
             .for_each(move |socket| {
@@ -66,7 +72,8 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
                 tokio::spawn(handler)
-            })
+            });
+        future::Either::A(future)
     }))
 }
 
