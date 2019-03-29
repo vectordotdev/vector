@@ -92,34 +92,14 @@ impl Topology {
 
         for (name, task) in tasks.into_iter() {
             info!("Starting sink {}", name);
-            let abort_tx = abort_tx.clone();
-            let name_clone = name.clone();
-            let task = AssertUnwindSafe(task)
-                .catch_unwind()
-                .map_err(|_| ())
-                .and_then(|inner| inner)
-                .or_else(move |err| {
-                    error!("Error in {}", name_clone);
-                    let _ = abort_tx.unbounded_send(());
-                    Err(err)
-                });
+            let task = handle_errors(task, abort_tx.clone());
             rt.spawn(task.instrument(span!("sink", name = name.as_str())));
         }
 
         let source_tasks = source_tasks
             .into_iter()
             .map(|(name, task)| {
-                let abort_tx = abort_tx.clone();
-                let name_clone = name.clone();
-                let task = AssertUnwindSafe(task)
-                    .catch_unwind()
-                    .map_err(|_| ())
-                    .and_then(|inner| inner)
-                    .or_else(move |err| {
-                        error!("Error in {}", name_clone);
-                        let _ = abort_tx.unbounded_send(());
-                        Err(err)
-                    });
+                let task = handle_errors(task, abort_tx.clone());
                 (name, oneshot::spawn(task, &rt.executor()))
             })
             .collect();
@@ -326,6 +306,7 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
+        let task = handle_errors(task, self.abort_tx.clone());
         rt.spawn(task);
     }
 
@@ -340,6 +321,7 @@ impl RunningTopology {
             .insert(name.clone(), shutdown_trigger);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
+        let source_task = handle_errors(source_task, self.abort_tx.clone());
         self.source_tasks
             .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
     }
@@ -448,6 +430,21 @@ impl RunningTopology {
 
         self.inputs.insert(name.clone(), tx);
     }
+}
+
+fn handle_errors(
+    task: builder::Task,
+    abort_tx: mpsc::UnboundedSender<()>,
+) -> impl Future<Item = (), Error = ()> {
+    AssertUnwindSafe(task)
+        .catch_unwind()
+        .map_err(|_| ())
+        .flatten()
+        .or_else(move |err| {
+            error!("Unhandled error");
+            let _ = abort_tx.unbounded_send(());
+            Err(err)
+        })
 }
 
 #[cfg(test)]
