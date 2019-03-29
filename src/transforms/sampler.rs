@@ -2,12 +2,6 @@ use super::Transform;
 use crate::record::Record;
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
-// TODO: The DefaultHasher algorithm is liable to change across rust versions, so if we want
-// long term consistency, this should be set to something more stable. It also currently
-// uses an algorithm that's collision resistent (which doesn't seem needed for this use case)
-// but is slightly slower than some alternatives (which might matter for this use case).
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -45,11 +39,7 @@ impl Transform for Sampler {
             }
         }
 
-        let mut hasher = DefaultHasher::new();
-        hasher.write(&record.raw[..]);
-        let hash = hasher.finish();
-
-        if hash % self.rate == 0 {
+        if seahash::hash(&record.raw[..]) % self.rate == 0 {
             record
                 .structured
                 .insert(Atom::from("sample_rate"), self.rate.to_string());

@@ -78,6 +78,7 @@ tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
 tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
 tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
 tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", rev = "c7a04bf" }
+seahash = "3.0.6"
 
 [build-dependencies]
 prost-build = "0.4.0"
