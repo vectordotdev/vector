@@ -80,7 +80,10 @@ impl Decoder for BytesDelimitedCodec {
             } else {
                 return if let Some(pos) = newline_pos {
                     // We found a correct frame
-                    let frame = buf.split_to(pos + 1);
+
+                    let newpos_index = pos + self.next_index;
+                    self.next_index = 0;
+                    let frame = buf.split_to(newpos_index + 1);
                     let frame = &frame[..frame.len() - 1];
 
                     Ok(Some(frame.into()))
