@@ -95,9 +95,9 @@ impl Config {
             .map_err(|e| vec![e.to_string()])?;
 
         let mut vars = std::env::vars().collect::<HashMap<_, _>>();
-        if !vars.contains_key("HOST") {
+        if !vars.contains_key("HOSTNAME") {
             if let Some(hostname) = hostname::get_hostname() {
-                vars.insert("HOST".into(), hostname);
+                vars.insert("HOSTNAME".into(), hostname);
             }
         }
         let with_vars = vars::interpolate(&source_string, &vars);
