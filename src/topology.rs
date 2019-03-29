@@ -5,9 +5,13 @@ mod fanout;
 pub use self::config::Config;
 
 use crate::buffers;
-use futures::{sync::oneshot, Future};
+use futures::{
+    sync::{mpsc, oneshot},
+    Future,
+};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
+use std::panic::AssertUnwindSafe;
 use stream_cancel::Trigger;
 use tokio_trace_futures::Instrument;
 
@@ -28,6 +32,7 @@ struct RunningTopology {
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     shutdown_triggers: HashMap<String, Trigger>,
     config: Config,
+    abort_tx: mpsc::UnboundedSender<()>,
 }
 
 impl Topology {
@@ -55,7 +60,7 @@ impl Topology {
         }
     }
 
-    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) {
+    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) -> mpsc::UnboundedReceiver<()> {
         let state = std::mem::replace(&mut self.state, State::Stopped);
         let (components, config) = if let State::Ready(components, config) = state {
             (components, config)
@@ -83,14 +88,20 @@ impl Topology {
             new_inputs.insert(name, tx);
         }
 
+        let (abort_tx, abort_rx) = mpsc::unbounded();
+
         for (name, task) in tasks.into_iter() {
             info!("Starting sink {}", name);
+            let task = handle_errors(task, abort_tx.clone());
             rt.spawn(task.instrument(span!("sink", name = name.as_str())));
         }
 
         let source_tasks = source_tasks
             .into_iter()
-            .map(|(name, task)| (name, oneshot::spawn(task, &rt.executor())))
+            .map(|(name, task)| {
+                let task = handle_errors(task, abort_tx.clone());
+                (name, oneshot::spawn(task, &rt.executor()))
+            })
             .collect();
 
         self.state = State::Running(RunningTopology {
@@ -99,7 +110,10 @@ impl Topology {
             config,
             shutdown_triggers,
             source_tasks,
+            abort_tx,
         });
+
+        abort_rx
     }
 
     pub fn stop(&mut self) {
@@ -292,6 +306,7 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
+        let task = handle_errors(task, self.abort_tx.clone());
         rt.spawn(task);
     }
 
@@ -306,6 +321,7 @@ impl RunningTopology {
             .insert(name.clone(), shutdown_trigger);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
+        let source_task = handle_errors(source_task, self.abort_tx.clone());
         self.source_tasks
             .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
     }
@@ -414,6 +430,21 @@ impl RunningTopology {
 
         self.inputs.insert(name.clone(), tx);
     }
+}
+
+fn handle_errors(
+    task: builder::Task,
+    abort_tx: mpsc::UnboundedSender<()>,
+) -> impl Future<Item = (), Error = ()> {
+    AssertUnwindSafe(task)
+        .catch_unwind()
+        .map_err(|_| ())
+        .flatten()
+        .or_else(move |err| {
+            error!("Unhandled error");
+            let _ = abort_tx.unbounded_send(());
+            Err(err)
+        })
 }
 
 #[cfg(test)]

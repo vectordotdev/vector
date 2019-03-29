@@ -101,7 +101,7 @@ fn main() {
             rt.spawn(topology.healthchecks());
         }
 
-        topology.start(&mut rt);
+        let mut graceful_crash = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -111,10 +111,19 @@ fn main() {
         let mut signals = sigint.select(sigterm.select(sigquit.select(sighup)));
 
         let signal = loop {
-            let signal = future::poll_fn(|| signals.poll())
+            let signal = future::poll_fn(|| signals.poll());
+            let crash = future::poll_fn(|| graceful_crash.poll());
+
+            let next = signal
+                .select2(crash)
                 .wait()
-                .expect("Signal streams don't error")
-                .expect("Signal streams never end");
+                .map_err(|_| ())
+                .expect("Neither stream errors");
+
+            let signal = match next {
+                future::Either::A((signal, _)) => signal.expect("Signal streams never end"),
+                future::Either::B((_crash, _)) => SIGINT, // Trigger graceful shutdown if a component crashed
+            };
 
             if signal != SIGHUP {
                 break signal;
