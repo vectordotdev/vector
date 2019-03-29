@@ -259,7 +259,7 @@ mod tests {
     #![cfg(feature = "cloudwatch-integration-tests")]
 
     use crate::{
-        sinks::cloudwatch::CloudwatchLogsSinkConfig,
+        sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };
