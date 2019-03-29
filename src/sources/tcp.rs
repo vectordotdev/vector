@@ -45,8 +45,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
             Ok(listener) => listener,
             Err(err) => {
                 error!("Failed to bind to listener socket: {}", err);
-                let future: super::Source = Box::new(future::err(()));
-                return future;
+                return future::Either::B(future::err(()));
             }
         };
 
@@ -74,7 +73,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                 tokio::spawn(handler)
             });
-        Box::new(future)
+        future::Either::A(future)
     }))
 }
 
