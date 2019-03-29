@@ -74,12 +74,9 @@ rusoto_kinesis = "0.36.0"
 rusoto_credential = "0.15.0"
 
 # Tower
-tower = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-retry = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-buffer = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-timeout = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-in-flight-limit = { git = "https://github.com/tower-rs/tower", rev = "8f3a5ea" }
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", rev = "c7a04bf" }
+tower = { git = "https://github.com/tower-rs/tower" }
+tower-retry = { git = "https://github.com/tower-rs/tower" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 seahash = "3.0.6"
 
 [build-dependencies]

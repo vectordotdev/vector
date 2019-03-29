@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::fmt;
 use std::time::Duration;
-use tower::{Service, ServiceBuilder};
-use tower_timeout::TimeoutLayer;
+use tower::{layer::TimeoutLayer, Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,

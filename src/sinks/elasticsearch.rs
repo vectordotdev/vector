@@ -7,9 +7,10 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use tower_in_flight_limit::InFlightLimit;
-use tower_retry::Retry;
-use tower_timeout::Timeout;
+use tower::{
+    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
+    ServiceBuilder,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -44,12 +45,15 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     let retries = config.retries.unwrap_or(5);
     let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
 
-    let inner = util::http::HttpService::new();
-    let timeout = Timeout::new(inner, Duration::from_secs(timeout_secs));
-    let limited = InFlightLimit::new(timeout, in_flight_limit);
-
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
-    let service = Retry::new(policy, limited);
+
+    let http_service = util::http::HttpService::new();
+    let service = ServiceBuilder::new()
+        .layer(InFlightLimitLayer::new(in_flight_limit))
+        .layer(RetryLayer::new(policy))
+        .layer(TimeoutLayer::new(Duration::from_secs(timeout_secs)))
+        .build_service(http_service)
+        .expect("This is a bug, there is no spawning");
 
     let sink = ServiceSink::new(service)
         .with(move |body: Buffer| {

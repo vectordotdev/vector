@@ -12,10 +12,10 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc, time::Duration};
-use tower::{Service, ServiceBuilder};
-use tower_in_flight_limit::InFlightLimitLayer;
-use tower_retry::RetryLayer;
-use tower_timeout::TimeoutLayer;
+use tower::{
+    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
+    Service, ServiceBuilder,
+};
 
 #[derive(Clone)]
 pub struct KinesisService {
