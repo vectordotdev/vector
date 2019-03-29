@@ -70,7 +70,7 @@ impl TcpSink {
                     Ok(Async::Ready(socket)) => {
                         self.state = TcpSinkState::Connected(FramedWrite::new(
                             socket,
-                            BytesDelimitedCodec::new(b"\n"[0]),
+                            BytesDelimitedCodec::new(b'\n'),
                         ));
                         self.backoff = Self::fresh_backoff();
                     }

@@ -8,7 +8,7 @@ use tokio_codec::{Decoder, Encoder};
 
 #[test]
 fn bytes_delim_decod() {
-    let mut codec = BytesDelimitedCodec::new(b"\n"[0]);
+    let mut codec = BytesDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
     buf.put_slice(b"abc\n");
     assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
@@ -16,7 +16,7 @@ fn bytes_delim_decod() {
 
 #[test]
 fn bytes_delim_encode() {
-    let mut codec = BytesDelimitedCodec::new(b"\n"[0]);
+    let mut codec = BytesDelimitedCodec::new(b'\n');
 
     let mut buf = BytesMut::new();
     codec.encode("abc".into(), &mut buf).unwrap();
@@ -28,7 +28,7 @@ fn bytes_delim_encode() {
 fn bytes_decode_max_length() {
     const MAX_LENGTH: usize = 6;
 
-    let mut codec = BytesDelimitedCodec::new_with_max_length(b"\n"[0], MAX_LENGTH);
+    let mut codec = BytesDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);

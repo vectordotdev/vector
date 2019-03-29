@@ -41,7 +41,7 @@ where
 
     let source = FramedRead::new(
         stream,
-        BytesDelimitedCodec::new_with_max_length(b"\n"[0], config.max_length),
+        BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
     )
     .map(Record::from)
     .map_err(|e| error!("error reading line: {:?}", e))

@@ -52,7 +52,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                 let lines_in = FramedRead::new(
                     socket,
-                    BytesDelimitedCodec::new_with_max_length(b"\n"[0], max_length),
+                    BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
                 )
                 .map(Record::from)
                 .map(move |mut record| {
