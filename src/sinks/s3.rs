@@ -7,9 +7,10 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_trace_futures::{Instrument, Instrumented};
-use tower::{Service, ServiceBuilder};
-use tower_in_flight_limit::InFlightLimitLayer;
-use tower_timeout::TimeoutLayer;
+use tower::{
+    layer::{InFlightLimitLayer, TimeoutLayer},
+    Service, ServiceBuilder,
+};
 
 pub struct S3Sink {
     config: S3SinkInnerConfig,
