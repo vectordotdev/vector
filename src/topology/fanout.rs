@@ -96,7 +96,7 @@ impl Sink for Fanout {
             match sink.start_send(item.clone()) {
                 Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
                 Ok(AsyncSink::Ready) => self.i += 1,
-                Err(_) => self.handle_sink_error()?,
+                Err(()) => self.handle_sink_error()?,
             }
         }
 
@@ -117,7 +117,7 @@ impl Sink for Fanout {
                 Ok(Async::NotReady) => {
                     all_complete = false;
                 }
-                Err(_) => self.handle_sink_error()?,
+                Err(()) => self.handle_sink_error()?,
             }
         }
 
