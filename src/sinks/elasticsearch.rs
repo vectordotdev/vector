@@ -1,5 +1,6 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
-use crate::record::Record;
+use crate::{buf::BufExt, record::Record};
+use bytes::IntoBuf;
 use futures::{Future, Sink};
 use http::Uri;
 use hyper::{Body, Client, Request};
@@ -68,14 +69,14 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
             Ok(request)
         })
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |record: Record| {
+        .with(move |mut record: Record| {
             let mut action = json!({
                 "index": {
                     "_index": config.index,
                     "_type": config.doc_type,
                 }
             });
-            maybe_set_id(id_key.as_ref(), &mut action, &record);
+            maybe_set_id(id_key.as_ref(), &mut action, &mut record);
 
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
@@ -88,9 +89,11 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
-    let id = key.and_then(|k| record.structured.get(&k.as_ref().into()));
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &mut Record) {
+    let id = key.and_then(|k| record.structured.remove(&k.as_ref().into()));
     if let Some(val) = id {
+        let val = val.into_buf().into_string_lossy();
+
         doc.as_object_mut()
             .unwrap()
             .insert("_id".into(), json!(val));
@@ -130,7 +133,7 @@ mod tests {
         record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &mut record);
 
         assert_eq!(json!({"_id": "bar"}), action);
     }
@@ -142,7 +145,7 @@ mod tests {
         record.structured.insert("not_foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &mut record);
 
         assert_eq!(json!({}), action);
     }
@@ -154,7 +157,7 @@ mod tests {
         record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &mut record);
 
         assert_eq!(json!({}), action);
     }
