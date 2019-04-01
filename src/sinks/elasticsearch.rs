@@ -68,14 +68,14 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
             Ok(request)
         })
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |mut record: Record| {
+        .with(move |record: Record| {
             let mut action = json!({
                 "index": {
                     "_index": config.index,
                     "_type": config.doc_type,
                 }
             });
-            maybe_set_id(id_key.as_ref(), &mut action, &mut record);
+            maybe_set_id(id_key.as_ref(), &mut action, &record);
 
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
@@ -88,9 +88,8 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
     Box::new(sink)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &mut Record) {
-    let id = key.and_then(|k| record.structured.remove(&k.as_ref().into()));
-    if let Some(val) = id {
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
+    if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
         let val = val.as_utf8_lossy();
 
         doc.as_object_mut()
@@ -132,7 +131,7 @@ mod tests {
         record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut record);
+        maybe_set_id(id_key, &mut action, &record);
 
         assert_eq!(json!({"_id": "bar"}), action);
     }
@@ -144,7 +143,7 @@ mod tests {
         record.structured.insert("not_foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut record);
+        maybe_set_id(id_key, &mut action, &record);
 
         assert_eq!(json!({}), action);
     }
@@ -156,7 +155,7 @@ mod tests {
         record.structured.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut record);
+        maybe_set_id(id_key, &mut action, &record);
 
         assert_eq!(json!({}), action);
     }
