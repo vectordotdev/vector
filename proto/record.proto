@@ -7,5 +7,5 @@ package record.proto;
 message Record {
   bytes raw = 1;
   google.protobuf.Timestamp timestamp = 2;
-  map<string, string> structured = 3;
+  map<string, bytes> structured = 3;
 }

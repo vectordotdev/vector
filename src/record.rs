@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ pub mod proto {
 pub struct Record {
     pub raw: Bytes,
     pub timestamp: DateTime<Utc>,
-    pub structured: HashMap<Atom, String>,
+    pub structured: HashMap<Atom, Bytes>,
 }
 
 impl Record {
@@ -46,10 +46,10 @@ impl From<proto::Record> for Record {
         let structured = proto
             .structured
             .into_iter()
-            .map(|(k, v)| (Atom::from(k), v))
+            .map(|(k, v)| (Atom::from(k), Bytes::from(v)))
             .collect::<HashMap<_, _>>();
 
-        Self {
+        Record {
             raw,
             timestamp,
             structured,
@@ -69,10 +69,10 @@ impl From<Record> for proto::Record {
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.to_string(), v.into_buf().collect()))
             .collect::<HashMap<_, _>>();
 
-        Self {
+        proto::Record {
             raw,
             timestamp,
             structured,

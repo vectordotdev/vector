@@ -40,16 +40,17 @@ impl Transform for RemoveFields {
 mod tests {
     use super::RemoveFields;
     use crate::{record::Record, transforms::Transform};
+    use bytes::Bytes;
 
     #[test]
     fn remove_fields() {
         let mut record = Record::from("message");
         record
             .structured
-            .insert("to_remove".into(), "some value".to_string());
+            .insert("to_remove".into(), "some value".into());
         record
             .structured
-            .insert("to_keep".into(), "another value".to_string());
+            .insert("to_keep".into(), "another value".into());
 
         let transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 
@@ -57,6 +58,9 @@ mod tests {
 
         assert!(!new_record.structured.contains_key(&"to_remove".into()));
         assert!(!new_record.structured.contains_key(&"unknown".into()));
-        assert_eq!(new_record.structured[&"to_keep".into()], "another value");
+        assert_eq!(
+            new_record.structured[&"to_keep".into()],
+            Bytes::from("another value")
+        );
     }
 }

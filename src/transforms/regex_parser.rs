@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::record::Record;
+use bytes::Bytes;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
@@ -34,9 +35,9 @@ impl Transform for RegexParser {
         if let Some(captures) = self.regex.captures(&record.raw[..]) {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    let capture = String::from_utf8_lossy(capture.as_bytes()).into_owned();
-
-                    record.structured.insert(name.into(), capture);
+                    record
+                        .structured
+                        .insert(name.into(), Bytes::from(capture.as_bytes()));
                 }
             }
         }

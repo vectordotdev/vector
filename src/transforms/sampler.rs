@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::record::Record;
+use bytes::Bytes;
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -40,9 +41,10 @@ impl Transform for Sampler {
         }
 
         if seahash::hash(&record.raw[..]) % self.rate == 0 {
-            record
-                .structured
-                .insert(Atom::from("sample_rate"), self.rate.to_string());
+            record.structured.insert(
+                Atom::from("sample_rate"),
+                Bytes::from(self.rate.to_string()),
+            );
 
             Some(record)
         } else {

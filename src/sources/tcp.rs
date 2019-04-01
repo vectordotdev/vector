@@ -63,7 +63,9 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 .map(Record::from)
                 .map(move |mut record| {
                     if let Some(host) = &host {
-                        record.structured.insert(Atom::from("host"), host.clone());
+                        record
+                            .structured
+                            .insert(Atom::from("host"), host.clone().into());
                     }
                     record
                 })
@@ -80,6 +82,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 #[cfg(test)]
 mod test {
     use crate::test_util::{next_addr, send_lines, wait_for_tcp};
+    use bytes::Bytes;
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -100,7 +103,7 @@ mod test {
         let record = rx.wait().next().unwrap().unwrap();
         assert_eq!(
             record.structured.get(&"host".into()),
-            Some(&"127.0.0.1".to_owned())
+            Some(&Bytes::from("127.0.0.1"))
         );
     }
 
