@@ -1,10 +1,9 @@
-use bytes::IntoBuf;
 use futures::{Future, Stream};
 use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
-use vector::buf::BufExt;
+use vector::bytes::BytesExt;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -50,20 +49,14 @@ fn happy_path() {
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
-                record.structured[&"file".into()]
-                    .clone()
-                    .into_buf()
-                    .into_string_lossy(),
+                record.structured[&"file".into()].as_utf8_lossy(),
                 path1.to_str().unwrap()
             );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
             assert_eq!(
-                record.structured[&"file".into()]
-                    .clone()
-                    .into_buf()
-                    .into_string_lossy(),
+                record.structured[&"file".into()].as_utf8_lossy(),
                 path2.to_str().unwrap()
             );
             goodbye_i += 1;
@@ -481,9 +474,7 @@ fn start_position() {
             .iter()
             .filter(|r| {
                 r.structured[&"file".into()]
-                    .clone()
-                    .into_buf()
-                    .into_string_lossy()
+                    .as_utf8_lossy()
                     .ends_with("before")
             })
             .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
@@ -492,9 +483,7 @@ fn start_position() {
             .iter()
             .filter(|r| {
                 r.structured[&"file".into()]
-                    .clone()
-                    .into_buf()
-                    .into_string_lossy()
+                    .as_utf8_lossy()
                     .ends_with("after")
             })
             .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())

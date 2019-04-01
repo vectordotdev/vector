@@ -1,6 +1,5 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
-use crate::buf::BufExt;
-use bytes::IntoBuf;
+use crate::bytes::BytesExt;
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
@@ -80,12 +79,12 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
                 "event": String::from_utf8_lossy(&record.raw[..]),
                 "fields": record.structured
                     .into_iter()
-                    .map(|(k, v)| (k, v.into_buf().into_string_lossy()))
+                    .map(|(k, v)| (k, v.as_utf8_lossy().into_owned()))
                     .collect::<HashMap<Atom, String>>(),
             });
 
             if let Some(host) = host {
-                let host = host.into_buf().into_string_lossy();
+                let host = host.as_utf8_lossy();
                 body["host"] = json!(host);
             }
             let body = serde_json::to_vec(&body).unwrap();

@@ -1,6 +1,5 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
-use crate::{buf::BufExt, record::Record};
-use bytes::IntoBuf;
+use crate::{bytes::BytesExt, record::Record};
 use futures::{Future, Sink};
 use http::Uri;
 use hyper::{Body, Client, Request};
@@ -92,7 +91,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &mut Record) {
     let id = key.and_then(|k| record.structured.remove(&k.as_ref().into()));
     if let Some(val) = id {
-        let val = val.into_buf().into_string_lossy();
+        let val = val.as_utf8_lossy();
 
         doc.as_object_mut()
             .unwrap()

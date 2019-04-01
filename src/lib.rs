@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
 
-pub mod buf;
 pub mod buffers;
+pub mod bytes;
 pub mod metrics;
 pub mod record;
 pub mod sinks;
