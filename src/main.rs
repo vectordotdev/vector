@@ -28,21 +28,19 @@ fn main() {
             Arg::with_name("metrics-addr")
                 .short("m")
                 .long("metrics-addr")
+                .default_value("127.0.0.1:8888")
                 .help("The address that metrics will be served from")
         );
     let matches = app.get_matches();
 
     let config_path = matches.value_of("config").unwrap();
 
-    let metrics_addr = if let Some(addr) = matches.value_of("metrics-addr") {
-        if let Ok(addr) = addr.parse() {
-            addr
-        } else {
-            error!("Unable to parse metrics address {}", addr);
-            std::process::exit(1);
-        }
+    let addr = matches.value_of("metrics-addr").unwrap();
+    let metrics_addr = if let Ok(addr) = addr.parse() {
+        addr
     } else {
-        "127.0.0.1:8888".parse().unwrap()
+        error!("Unable to parse metrics address {}", addr);
+        std::process::exit(1);
     };
 
     let (metrics_sink, metrics_server) = metrics::metrics();
