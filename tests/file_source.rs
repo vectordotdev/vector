@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
+use vector::bytes::BytesExt;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -47,11 +48,17 @@ fn happy_path() {
         let line = std::str::from_utf8(&record.raw[..]).unwrap();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
-            assert_eq!(record.structured[&"file".into()], path1.to_str().unwrap());
+            assert_eq!(
+                record.structured[&"file".into()].as_utf8_lossy(),
+                path1.to_str().unwrap()
+            );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
-            assert_eq!(record.structured[&"file".into()], path2.to_str().unwrap());
+            assert_eq!(
+                record.structured[&"file".into()].as_utf8_lossy(),
+                path2.to_str().unwrap()
+            );
             goodbye_i += 1;
         }
     }
@@ -465,12 +472,20 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let before_lines = received
             .iter()
-            .filter(|r| r.structured[&"file".into()].ends_with("before"))
+            .filter(|r| {
+                r.structured[&"file".into()]
+                    .as_utf8_lossy()
+                    .ends_with("before")
+            })
             .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|r| r.structured[&"file".into()].ends_with("after"))
+            .filter(|r| {
+                r.structured[&"file".into()]
+                    .as_utf8_lossy()
+                    .ends_with("after")
+            })
             .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);

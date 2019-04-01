@@ -85,7 +85,7 @@ fn test_max_size() {
 
     let num_lines: usize = 1000;
     let line_size = 1000;
-    let max_size = num_lines * (line_size + 32/* protobuf encoding takes a few extra bytes */) / 2;
+    let max_size = num_lines * (line_size + 35/* protobuf encoding takes a few extra bytes */) / 2;
 
     let in_addr = next_addr();
     let out_addr = next_addr();

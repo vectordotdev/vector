@@ -1,4 +1,5 @@
 use crate::record::Record;
+use bytes::Bytes;
 use file_source::file_server::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
@@ -57,7 +58,9 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
     let out = out.sink_map_err(|_| ()).with(move |(line, file)| {
         let mut record = Record::from(line);
         if let Some(ref context_key) = context_key {
-            record.structured.insert(context_key.clone(), file);
+            record
+                .structured
+                .insert(context_key.clone(), Bytes::from(file));
         }
         future::ok(record)
     });

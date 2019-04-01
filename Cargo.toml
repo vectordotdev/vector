@@ -44,9 +44,9 @@ tokio-uds = "0.2.5"
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8.4", optional = true }
 db-key = "0.0.5"
-prost = "0.4.0"
-prost-derive = "0.4.0"
-prost-types = "0.4.0"
+prost = "0.5"
+prost-derive = "0.5"
+prost-types = "0.5"
 headers = "0.2.1"
 rdkafka = { version = "0.20.0", optional = true }
 hostname = "0.1.5"

@@ -1,4 +1,5 @@
-use bytes::Bytes;
+use self::proto::{record::Event, Log};
+use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -6,8 +7,6 @@ use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod proto {
-    use prost_derive::Message;
-
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
@@ -15,7 +14,7 @@ pub mod proto {
 pub struct Record {
     pub raw: Bytes,
     pub timestamp: DateTime<Utc>,
-    pub structured: HashMap<Atom, String>,
+    pub structured: HashMap<Atom, Bytes>,
 }
 
 impl Record {
@@ -36,23 +35,29 @@ impl Default for Record {
 
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
-        let raw = Bytes::from(proto.raw);
+        let event = proto.event.unwrap();
 
-        let timestamp = proto
-            .timestamp
-            .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
-            .unwrap_or_else(|| Utc::now());
+        match event {
+            Event::Log(proto) => {
+                let raw = Bytes::from(proto.raw);
 
-        let structured = proto
-            .structured
-            .into_iter()
-            .map(|(k, v)| (Atom::from(k), v))
-            .collect::<HashMap<_, _>>();
+                let timestamp = proto
+                    .timestamp
+                    .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
+                    .unwrap_or_else(|| Utc::now());
 
-        Self {
-            raw,
-            timestamp,
-            structured,
+                let structured = proto
+                    .structured
+                    .into_iter()
+                    .map(|(k, v)| (Atom::from(k), Bytes::from(v)))
+                    .collect::<HashMap<_, _>>();
+
+                Record {
+                    raw,
+                    timestamp,
+                    structured,
+                }
+            }
         }
     }
 }
@@ -69,14 +74,16 @@ impl From<Record> for proto::Record {
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.to_string(), v.into_buf().collect()))
             .collect::<HashMap<_, _>>();
 
-        Self {
+        let event = Event::Log(Log {
             raw,
             timestamp,
             structured,
-        }
+        });
+
+        proto::Record { event: Some(event) }
     }
 }
 

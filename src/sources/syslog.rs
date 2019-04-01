@@ -151,7 +151,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
             };
 
             if let Some(host) = parsed.hostname {
-                record.structured.insert("host".into(), host);
+                record.structured.insert("host".into(), host.into());
             }
 
             record
