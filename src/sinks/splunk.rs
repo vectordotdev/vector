@@ -1,8 +1,11 @@
 use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use crate::buf::BufExt;
+use bytes::IntoBuf;
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::{
@@ -71,11 +74,18 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         })
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
+            let host = record.structured.get(&"host".into()).map(|h| h.clone());
+
             let mut body = json!({
                 "event": String::from_utf8_lossy(&record.raw[..]),
-                "fields": record.structured,
+                "fields": record.structured
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into_buf().into_string_lossy()))
+                    .collect::<HashMap<Atom, String>>(),
             });
-            if let Some(host) = record.structured.get(&Atom::from("host")) {
+
+            if let Some(host) = host {
+                let host = host.into_buf().into_string_lossy();
                 body["host"] = json!(host);
             }
             let body = serde_json::to_vec(&body).unwrap();
