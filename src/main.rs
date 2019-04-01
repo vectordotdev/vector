@@ -23,10 +23,25 @@ fn main() {
                 .short("r")
                 .long("require-healthy")
                 .help("Causes vector to immediate exit on startup if any sinks having failing healthchecks")
+        )
+        .arg(
+            Arg::with_name("metrics-addr")
+                .short("m")
+                .long("metrics-addr")
+                .default_value("127.0.0.1:8888")
+                .help("The address that metrics will be served from")
         );
     let matches = app.get_matches();
 
     let config_path = matches.value_of("config").unwrap();
+
+    let addr = matches.value_of("metrics-addr").unwrap();
+    let metrics_addr = if let Ok(addr) = addr.parse() {
+        addr
+    } else {
+        error!("Unable to parse metrics address {}", addr);
+        std::process::exit(1);
+    };
 
     let (metrics_sink, metrics_server) = metrics::metrics();
 
@@ -74,7 +89,6 @@ fn main() {
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let metrics_addr = "127.0.0.1:8888".parse().unwrap();
         let metrics_serve = metrics::serve(metrics_addr, metrics_server);
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
