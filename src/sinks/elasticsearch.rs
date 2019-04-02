@@ -1,4 +1,6 @@
-use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use super::util::{
+    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+};
 use crate::record::Record;
 use futures::{Future, Sink};
 use http::Uri;
@@ -66,7 +68,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
         .build_service(http_service)
         .expect("This is a bug, there is no spawning");
 
-    let sink = ServiceSink::new(service)
+    let sink = BatchServiceSink::new(service)
         .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {

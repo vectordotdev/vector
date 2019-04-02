@@ -1,7 +1,7 @@
 use super::Record;
 use crate::sinks::util::{
     retries::{FixedRetryPolicy, RetryLogic},
-    ServiceSink, SinkExt,
+    BatchServiceSink, SinkExt,
 };
 use futures::{Poll, Sink};
 use rand::random;
@@ -47,7 +47,7 @@ impl KinesisService {
             .build_service(kinesis)
             .expect("This is a bug, no spawning done");
 
-        ServiceSink::new(svc)
+        BatchServiceSink::new(svc)
             .batched(Vec::new(), batch_size)
             .with(|record: Record| Ok(record.into()))
     }

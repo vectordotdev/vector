@@ -31,13 +31,13 @@ where
 {
 }
 
-pub struct ServiceSink<T, S: Service<T>> {
+pub struct BatchServiceSink<T, S: Service<T>> {
     service: S,
     in_flight: FuturesUnordered<S::Future>,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, S: Service<T>> ServiceSink<T, S> {
+impl<T, S: Service<T>> BatchServiceSink<T, S> {
     pub fn new(service: S) -> Self {
         Self {
             service,
@@ -49,7 +49,7 @@ impl<T, S: Service<T>> ServiceSink<T, S> {
 
 type Error = Box<std::error::Error + 'static + Send + Sync>;
 
-impl<T, S> Sink for ServiceSink<T, S>
+impl<T, S> Sink for BatchServiceSink<T, S>
 where
     S: Service<T>,
     S::Error: Into<Error>,

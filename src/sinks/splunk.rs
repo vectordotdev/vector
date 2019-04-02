@@ -1,4 +1,6 @@
-use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use super::util::{
+    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+};
 use futures::{Future, Sink};
 use hyper::Uri;
 use serde::{Deserialize, Serialize};
@@ -67,7 +69,7 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         .build_service(http_service)
         .expect("This is a bug, no spawning");
 
-    let sink = ServiceSink::new(service)
+    let sink = BatchServiceSink::new(service)
         .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {

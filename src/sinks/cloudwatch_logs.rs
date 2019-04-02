@@ -1,6 +1,6 @@
 use crate::{
     record::Record,
-    sinks::util::{ServiceSink, SinkExt},
+    sinks::util::{BatchServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
@@ -56,7 +56,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             .expect("This is a bug, no service spawning");
 
         let sink = {
-            let svc_sink = ServiceSink::new(svc).batched(Vec::new(), self.buffer_size);
+            let svc_sink = BatchServiceSink::new(svc).batched(Vec::new(), self.buffer_size);
             Box::new(svc_sink)
         };
 

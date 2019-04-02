@@ -112,10 +112,10 @@ impl RetryLogic for HttpRetryLogic {
 #[cfg(test)]
 mod test {
     use super::{HttpService, Request};
-    use crate::sinks::util::ServiceSink;
     use futures::{Future, Sink, Stream};
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
+    use tower::Service;
 
     #[test]
     fn it_makes_http_requests() {
@@ -125,11 +125,9 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let sink = ServiceSink::new(HttpService::new(move |body| {
-            Request::post(uri.clone(), body)
-        }));
+        let mut service = HttpService::new(move |body| Request::post(uri.clone(), body));
 
-        let req = sink.send(request);
+        let req = service.call(request);
 
         let (tx, rx) = futures::sync::mpsc::channel(10);
 

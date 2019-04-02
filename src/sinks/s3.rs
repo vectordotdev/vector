@@ -1,5 +1,5 @@
 use crate::record::Record;
-use crate::sinks::util::{Buffer, ServiceSink, SinkExt};
+use crate::sinks::util::{BatchServiceSink, Buffer, SinkExt};
 use futures::{Future, Poll, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
@@ -58,7 +58,7 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
         .build_service(s3)
         .expect("This is a bug, no spawnning");
 
-    let sink = ServiceSink::new(svc)
+    let sink = BatchServiceSink::new(svc)
         .batched_with_min(
             Buffer::new(gzip),
             buffer_size,
