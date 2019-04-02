@@ -48,7 +48,18 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
 
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
 
-    let http_service = util::http::HttpService::new();
+    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
+        let uri = format!("{}/services/collector/event", host);
+        let uri: Uri = uri.parse().unwrap();
+
+        let mut request = util::http::Request::post(uri, body.into());
+        request
+            .header("Content-Type", "application/json")
+            .header("Content-Encoding", "gzip")
+            .header("Authorization", format!("Splunk {}", token));
+
+        request
+    });
     let service = ServiceBuilder::new()
         .layer(RetryLayer::new(policy))
         .layer(InFlightLimitLayer::new(in_flight_limit))
@@ -57,18 +68,7 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         .expect("This is a bug, no spawning");
 
     let sink = ServiceSink::new(service)
-        .with(move |body: Buffer| {
-            let uri = format!("{}/services/collector/event", host);
-            let uri: Uri = uri.parse().unwrap();
-
-            let mut request = util::http::Request::post(uri, body.into());
-            request
-                .header("Content-Type", "application/json")
-                .header("Content-Encoding", "gzip")
-                .header("Authorization", format!("Splunk {}", token));
-
-            Ok(request)
-        })
+        .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut body = json!({

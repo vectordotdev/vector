@@ -9,18 +9,19 @@ use hyper::{
     Body, Client,
 };
 use hyper_tls::HttpsConnector;
+use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
+
+type RequestBuilder = Box<dyn Fn(Vec<u8>) -> Request + Sync + Send>;
 
 #[derive(Clone)]
 pub struct HttpService {
     client: Client<HttpsConnector<HttpConnector>, Body>,
+    request_builder: Arc<RequestBuilder>,
 }
 
-// We need our Request to be Clone to support retries. Hyper's Request type is not Clone because it
-// supports streaming/chunked bodies and the extensions type map. We don't use either of those
-// features, so we can do something a bit simpler than libraries like tower-hyper.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Request {
     pub method: Method,
     pub uri: Uri,
@@ -65,16 +66,19 @@ impl From<Request> for hyper::Request<Body> {
 }
 
 impl HttpService {
-    pub fn new() -> Self {
+    pub fn new(request_builder: impl Fn(Vec<u8>) -> Request + Sync + Send + 'static) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
-        Self { client }
+        Self {
+            client,
+            request_builder: Arc::new(Box::new(request_builder)),
+        }
     }
 }
 
-impl Service<Request> for HttpService {
+impl Service<Vec<u8>> for HttpService {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
     type Future = ResponseFuture;
@@ -83,7 +87,8 @@ impl Service<Request> for HttpService {
         Ok(().into())
     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
+    fn call(&mut self, body: Vec<u8>) -> Self::Future {
+        let request = (self.request_builder)(body);
         self.client.request(request.into())
     }
 }
@@ -119,8 +124,10 @@ mod test {
             .parse::<Uri>()
             .unwrap();
 
-        let request = Request::post(uri, String::from("hello").into_bytes());
-        let sink = ServiceSink::new(HttpService::new());
+        let request = b"hello".to_vec();
+        let sink = ServiceSink::new(HttpService::new(move |body| {
+            Request::post(uri.clone(), body)
+        }));
 
         let req = sink.send(request);
 

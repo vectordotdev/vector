@@ -139,35 +139,35 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         util::http::HttpRetryLogic,
     );
 
-    let http_service = util::http::HttpService::new();
+    let in_flight_request_limit = config.in_flight_request_limit;
+    let request_timeout_secs = config.request_timeout_secs;
+    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
+        let mut request = util::http::Request::post(config.uri.clone(), body.into());
+        request
+            .header("Content-Type", "application/x-ndjson")
+            .header("Content-Encoding", "gzip");
+
+        if let Some(headers) = &config.headers {
+            for (header, value) in headers.iter() {
+                request.header(header, value);
+            }
+        }
+
+        if let Some(auth) = &config.basic_auth {
+            auth.apply(&mut request.headers);
+        }
+
+        request
+    });
     let service = ServiceBuilder::new()
         .layer(RetryLayer::new(policy))
-        .layer(InFlightLimitLayer::new(config.in_flight_request_limit))
-        .layer(TimeoutLayer::new(Duration::from_secs(
-            config.request_timeout_secs,
-        )))
+        .layer(InFlightLimitLayer::new(in_flight_request_limit))
+        .layer(TimeoutLayer::new(Duration::from_secs(request_timeout_secs)))
         .build_service(http_service)
         .expect("This is a bug, there is no spawning");
 
     let sink = ServiceSink::new(service)
-        .with(move |body: Buffer| {
-            let mut request = util::http::Request::post(config.uri.clone(), body.into());
-            request
-                .header("Content-Type", "application/x-ndjson")
-                .header("Content-Encoding", "gzip");
-
-            if let Some(headers) = &config.headers {
-                for (header, value) in headers.iter() {
-                    request.header(header, value);
-                }
-            }
-
-            if let Some(auth) = &config.basic_auth {
-                auth.apply(&mut request.headers);
-            }
-
-            Ok(request)
-        })
+        .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
