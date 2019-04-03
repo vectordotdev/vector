@@ -220,6 +220,8 @@ mod integration_tests {
         assert_eq!(1, response.total());
 
         let hit = response.into_hits().next().unwrap();
+        assert_eq!("42", hit.id());
+
         let value = hit.into_document().unwrap();
         let expected = json!({
             "message": "raw log line",
