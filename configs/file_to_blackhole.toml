@@ -1,0 +1,9 @@
+[sources.in]
+type = "file"
+include = ["test-data/*"]
+start_at_beginning = true
+
+[sinks.out]
+inputs = ["in"]
+type = "blackhole"
+print_amount = 10000
