@@ -1,5 +1,6 @@
 use futures::{Future, Sink};
 
+pub mod blackhole;
 pub mod cloudwatch_logs;
 pub mod console;
 pub mod elasticsearch;
