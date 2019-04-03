@@ -50,6 +50,7 @@ prost-types = "0.5"
 headers = "0.2.1"
 rdkafka = { version = "0.20.0", optional = true }
 hostname = "0.1.5"
+seahash = "3.0.6"
 
 # Tokio
 tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
@@ -67,17 +68,15 @@ tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nurser
 hotmic = "0.8"
 
 # Aws
-rusoto_core = "0.36.0"
-rusoto_s3 = "0.36.0"
-rusoto_logs = "0.36.0"
-rusoto_kinesis = "0.36.0"
-rusoto_credential = "0.15.0"
+rusoto_core = "0.37.0"
+rusoto_s3 = "0.37.0"
+rusoto_logs = "0.37.0"
+rusoto_kinesis = "0.37.0"
+rusoto_credential = "0.16.0"
 
 # Tower
 tower = { git = "https://github.com/tower-rs/tower" }
-tower-retry = { git = "https://github.com/tower-rs/tower" }
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
-seahash = "3.0.6"
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", default-features = false }
 
 [build-dependencies]
 prost-build = "0.4.0"

@@ -10,7 +10,7 @@ use hotmic::Receiver;
 use std::thread;
 
 fn shave(yak: usize) -> bool {
-    span!("shave", yak = yak).enter(|| {
+    trace_span!("shave", yak = yak).enter(|| {
         debug!(
             message = "hello! I'm gonna shave a yak.",
             excitement = "yay!"
@@ -43,7 +43,7 @@ fn main() {
         let mut number_shaved = 0;
         debug!("preparing to shave {} yaks", number_of_yaks);
 
-        span!("shaving_yaks", yaks_to_shave = number_of_yaks).enter(|| {
+        trace_span!("shaving_yaks", yaks_to_shave = number_of_yaks).enter(|| {
             info!("shaving yaks");
 
             for yak in 1..=number_of_yaks {
