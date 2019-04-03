@@ -2,7 +2,7 @@ use self::proto::{record::Event, Log};
 use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use prost_types::Timestamp;
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -12,9 +12,29 @@ pub mod proto {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
+    #[serde(rename = "message", serialize_with = "serialize_bytes")]
     pub raw: Bytes,
     pub timestamp: DateTime<Utc>,
+    #[serde(flatten, serialize_with = "serialize_bytes_map")]
     pub structured: HashMap<Atom, Bytes>,
+}
+
+fn serialize_bytes<S>(b: &Bytes, ser: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    ser.serialize_str(&String::from_utf8_lossy(&b[..]))
+}
+
+fn serialize_bytes_map<S>(m: &HashMap<Atom, Bytes>, ser: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut map = ser.serialize_map(Some(m.len()))?;
+    for (k, v) in m {
+        map.serialize_entry(k, &String::from_utf8_lossy(&v[..]))?;
+    }
+    map.end()
 }
 
 impl Record {
@@ -118,5 +138,26 @@ impl From<String> for Record {
             timestamp: Utc::now(),
             structured: HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Record;
+
+    #[test]
+    fn serialization() {
+        let mut record = Record::from("raw log line");
+        record.structured.insert("foo".into(), "bar".into());
+        record.structured.insert("bar".into(), "baz".into());
+
+        let expected = serde_json::json!({
+            "message": "raw log line",
+            "foo": "bar",
+            "bar": "baz",
+            "timestamp": record.timestamp,
+        });
+
+        assert_eq!(expected, serde_json::to_value(record).unwrap());
     }
 }
