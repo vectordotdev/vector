@@ -1,17 +1,16 @@
-use futures::{future, Future, Poll, Stream};
+use futures::Future;
 use hotmic::{
     snapshot::{Snapshot, TypedMeasurement},
-    Controller, Receiver, Sink,
+    Receiver, Sink,
 };
-use hyper::{Body, Request, Response};
+use hyper::{
+    service::{make_service_fn, service_fn_ok},
+    Body, Request, Response, Server,
+};
 use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use tower::Service;
-use tower_hyper::body::LiftBody;
-use tower_hyper::server::Server;
 
 /// Create the metrics sink and provide the server Service
-pub fn metrics() -> (Sink<String>, MetricsServer) {
+pub fn build(addr: &SocketAddr) -> (Sink<String>, impl Future<Item = (), Error = ()>) {
     let mut receiver = Receiver::builder().build();
     let controller = receiver.get_controller();
     let sink = receiver.get_sink();
@@ -20,77 +19,20 @@ pub fn metrics() -> (Sink<String>, MetricsServer) {
         receiver.run();
     });
 
-    let server = MetricsServer { controller };
+    let make_svc = make_service_fn(move |_| {
+        let controller = controller.clone();
+        service_fn_ok(move |_: Request<Body>| {
+            let snapshot = controller.get_snapshot().unwrap();
+            let output = process_snapshot(snapshot).unwrap();
+            Response::new(Body::from(output))
+        })
+    });
+
+    let server = Server::bind(&addr)
+        .serve(make_svc)
+        .map_err(|e| error!("metrics server error: {}", e));
 
     (sink, server)
-}
-
-/// Represents the Server that serves the metrics
-pub struct MetricsServer {
-    controller: Controller,
-}
-
-pub struct MetricsServerSvc {
-    snapshot: Option<Snapshot>,
-}
-
-/// Start a Tcplistener and serve the metrics server on that socket
-pub fn serve(addr: SocketAddr, svc: MetricsServer) -> impl Future<Item = (), Error = ()> {
-    let bind = TcpListener::bind(&addr).expect("Unable to bind metrics server address");
-
-    info!("Serving metrics on: {}", addr);
-
-    let server = Server::new(svc);
-
-    bind.incoming()
-        .fold(server, |mut server, stream| {
-            if let Err(e) = stream.set_nodelay(true) {
-                return Err(e);
-            }
-
-            tokio::spawn(
-                server
-                    .serve(stream)
-                    .map_err(|e| panic!("Server error {:?}", e)),
-            );
-
-            Ok(server)
-        })
-        .map_err(|e| panic!("metrics serve error: {:?}", e))
-        .map(|_| {})
-}
-
-impl Service<()> for MetricsServer {
-    type Response = MetricsServerSvc;
-    type Error = hyper::Error;
-    type Future = future::FutureResult<Self::Response, Self::Error>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
-    }
-
-    fn call(&mut self, _: ()) -> Self::Future {
-        let snapshot = Some(self.controller.get_snapshot().unwrap());
-        future::ok(MetricsServerSvc { snapshot })
-    }
-}
-
-impl Service<Request<Body>> for MetricsServerSvc {
-    type Response = Response<LiftBody<Body>>;
-    type Error = hyper::Error;
-    type Future = future::FutureResult<Self::Response, Self::Error>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
-    }
-
-    fn call(&mut self, _req: Request<Body>) -> Self::Future {
-        let snapshot = self.snapshot.take().unwrap();
-        let snapshot = process_snapshot(snapshot).unwrap();
-        let body = LiftBody::new(Body::from(snapshot));
-        let res = Response::new(body);
-        future::ok(res)
-    }
 }
 
 // taken from https://github.com/nuclearfurnace/hotmic-prometheus/blob/master/src/lib.rs
