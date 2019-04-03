@@ -1,5 +1,6 @@
-use std::borrow::Cow;
-use std::string::FromUtf8Error;
+use serde::ser::{SerializeMap, Serializer};
+use std::{borrow::Cow, collections::HashMap, string::FromUtf8Error};
+use string_cache::DefaultAtom as Atom;
 
 pub use bytes::{Buf, BufMut, Bytes, BytesMut, IntoBuf};
 
@@ -21,6 +22,24 @@ impl BytesExt for Bytes {
         let buf = self.into_buf().collect::<Vec<u8>>();
         String::from_utf8(buf)
     }
+}
+
+pub fn serialize<S>(b: &Bytes, ser: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    ser.serialize_str(&String::from_utf8_lossy(&b[..]))
+}
+
+pub fn serialize_map<S>(m: &HashMap<Atom, Bytes>, ser: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut map = ser.serialize_map(Some(m.len()))?;
+    for (k, v) in m {
+        map.serialize_entry(k, &String::from_utf8_lossy(&v[..]))?;
+    }
+    map.end()
 }
 
 #[cfg(test)]
