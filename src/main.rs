@@ -43,7 +43,7 @@ fn main() {
         std::process::exit(1);
     };
 
-    let (metrics_sink, metrics_server) = metrics::metrics();
+    let (metrics_sink, metrics_server) = metrics::build(&metrics_addr);
 
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
         .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
@@ -89,12 +89,10 @@ fn main() {
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let metrics_serve = metrics::serve(metrics_addr, metrics_server);
-
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
         rt.spawn(
-            metrics_serve
+            metrics_server
                 .select(metrics_tripwire)
                 .map(|_| ())
                 .map_err(|_| ()),
