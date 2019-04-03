@@ -75,7 +75,11 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
                     "_type": config.doc_type,
                 }
             });
-            maybe_set_id(id_key.as_ref(), &mut action, &record);
+            maybe_set_id(
+                id_key.as_ref(),
+                action.pointer_mut("/index").unwrap(),
+                &record,
+            );
 
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
@@ -175,6 +179,56 @@ mod integration_tests {
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
     use serde_json::{json, Value};
+
+    #[test]
+    fn structures_records_correctly() {
+        let index = gen_index();
+        let config = ElasticSearchConfig {
+            host: "http://localhost:9200/".into(),
+            index: index.clone(),
+            doc_type: "log_lines".into(),
+            id_key: Some("my_id".into()),
+            buffer_size: None,
+            compression: None,
+            request_timeout_secs: None,
+            retries: None,
+            in_flight_request_limit: None,
+        };
+
+        let (sink, _hc) = config.build().unwrap();
+
+        let mut input_record = Record::from("raw log line");
+        input_record.structured.insert("my_id".into(), "42".into());
+        input_record.structured.insert("foo".into(), "bar".into());
+
+        let pump = sink.send(input_record.clone());
+        block_on(pump).unwrap();
+
+        // make sure writes all all visible
+        block_on(flush(config.host)).unwrap();
+
+        let client = SyncClientBuilder::new().build().unwrap();
+
+        let response = client
+            .search::<Value>()
+            .index(index)
+            .body(json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .unwrap();
+        assert_eq!(1, response.total());
+
+        let hit = response.into_hits().next().unwrap();
+        let value = hit.into_document().unwrap();
+        let expected = json!({
+            "message": "raw log line",
+            "my_id": "42",
+            "foo": "bar",
+            "timestamp": input_record.timestamp,
+        });
+        assert_eq!(expected, value);
+    }
 
     #[test]
     fn insert_records() {

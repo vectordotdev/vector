@@ -12,8 +12,10 @@ pub mod proto {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
+    #[serde(rename = "message", serialize_with = "crate::bytes::serialize")]
     pub raw: Bytes,
     pub timestamp: DateTime<Utc>,
+    #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
     pub structured: HashMap<Atom, Bytes>,
 }
 
@@ -118,5 +120,30 @@ impl From<String> for Record {
             timestamp: Utc::now(),
             structured: HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Record;
+    use regex::Regex;
+
+    #[test]
+    fn serialization() {
+        let mut record = Record::from("raw log line");
+        record.structured.insert("foo".into(), "bar".into());
+        record.structured.insert("bar".into(), "baz".into());
+
+        let expected = serde_json::json!({
+            "message": "raw log line",
+            "foo": "bar",
+            "bar": "baz",
+            "timestamp": record.timestamp,
+        });
+        let actual = serde_json::to_value(record).unwrap();
+        assert_eq!(expected, actual);
+
+        let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
+        assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
     }
 }
