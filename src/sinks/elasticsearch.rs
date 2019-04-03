@@ -69,7 +69,6 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
         .expect("This is a bug, there is no spawning");
 
     let sink = BatchServiceSink::new(service)
-        .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut action = json!({

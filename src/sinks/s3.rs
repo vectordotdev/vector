@@ -154,7 +154,7 @@ impl S3Sink {
     }
 }
 
-impl Service<Buffer> for S3Sink {
+impl Service<Vec<u8>> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -163,8 +163,8 @@ impl Service<Buffer> for S3Sink {
         Ok(().into())
     }
 
-    fn call(&mut self, buf: Buffer) -> Self::Future {
-        self.send_body(buf.into())
+    fn call(&mut self, body: Vec<u8>) -> Self::Future {
+        self.send_body(body)
             .instrument(span!(level: tokio_trace::Level::ERROR, "s3_request"))
     }
 }

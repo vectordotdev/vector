@@ -169,7 +169,6 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         .expect("This is a bug, there is no spawning");
 
     let sink = BatchServiceSink::new(service)
-        .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({

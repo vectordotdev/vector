@@ -70,7 +70,6 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         .expect("This is a bug, no spawning");
 
     let sink = BatchServiceSink::new(service)
-        .with(|body: Buffer| Ok(body.into()))
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut body = json!({

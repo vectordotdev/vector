@@ -31,13 +31,13 @@ where
 {
 }
 
-pub struct BatchServiceSink<T, S: Service<T>> {
+pub struct BatchServiceSink<T, S: Service<T>, B: Batch<Output = T>> {
     service: S,
     in_flight: FuturesUnordered<S::Future>,
-    _phantom: std::marker::PhantomData<T>,
+    _phantom: std::marker::PhantomData<(T, B)>,
 }
 
-impl<T, S: Service<T>> BatchServiceSink<T, S> {
+impl<T, S: Service<T>, B: Batch<Output = T>> BatchServiceSink<T, S, B> {
     pub fn new(service: S) -> Self {
         Self {
             service,
@@ -49,27 +49,28 @@ impl<T, S: Service<T>> BatchServiceSink<T, S> {
 
 type Error = Box<std::error::Error + 'static + Send + Sync>;
 
-impl<T, S> Sink for BatchServiceSink<T, S>
+impl<T, S, B> Sink for BatchServiceSink<T, S, B>
 where
     S: Service<T>,
     S::Error: Into<Error>,
     S::Response: std::fmt::Debug,
+    B: Batch<Output = T>,
 {
-    type SinkItem = T;
+    type SinkItem = B;
     type SinkError = ();
 
-    fn start_send(&mut self, item: T) -> StartSend<T, Self::SinkError> {
+    fn start_send(&mut self, batch: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let mut tried_once = false;
         loop {
             match self.service.poll_ready() {
                 Ok(Async::Ready(())) => {
-                    self.in_flight.push(self.service.call(item));
+                    self.in_flight.push(self.service.call(batch.finish()));
                     return Ok(AsyncSink::Ready);
                 }
 
                 Ok(Async::NotReady) => {
                     if tried_once {
-                        return Ok(AsyncSink::NotReady(item));
+                        return Ok(AsyncSink::NotReady(batch));
                     } else {
                         self.poll_complete()?;
                         tried_once = true;

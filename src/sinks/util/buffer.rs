@@ -68,13 +68,14 @@ impl Buffer {
 }
 
 impl super::batch::Batch for Buffer {
-    type Item = Vec<u8>;
+    type Input = Vec<u8>;
+    type Output = Vec<u8>;
 
     fn len(&self) -> usize {
         self.size()
     }
 
-    fn push(&mut self, item: Self::Item) {
+    fn push(&mut self, item: Self::Input) {
         self.push(&item)
     }
 
@@ -90,11 +91,9 @@ impl super::batch::Batch for Buffer {
             }
         }
     }
-}
 
-impl From<Buffer> for Vec<u8> {
-    fn from(buffer: Buffer) -> Self {
-        match buffer {
+    fn finish(self) -> Self::Output {
+        match self {
             Buffer::Plain(inner) => inner,
             Buffer::Gzip(inner) => inner
                 .finish()
@@ -106,7 +105,7 @@ impl From<Buffer> for Vec<u8> {
 #[cfg(test)]
 mod test {
     use super::Buffer;
-    use crate::sinks::util::batch::BatchSink;
+    use crate::sinks::util::batch::{Batch, BatchSink};
     use futures::{Future, Sink};
     use std::io::Read;
 
@@ -129,7 +128,7 @@ mod test {
         let output = buffered
             .into_inner()
             .into_iter()
-            .map(|buf| buf.into())
+            .map(|buf| buf.finish())
             .collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
