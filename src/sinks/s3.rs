@@ -165,7 +165,7 @@ impl Service<Buffer> for S3Sink {
 
     fn call(&mut self, buf: Buffer) -> Self::Future {
         self.send_body(buf.into())
-            .instrument(span!(level: tokio_trace::Level::ERROR, "s3_request"))
+            .instrument(info_span!("s3_request"))
     }
 }
 

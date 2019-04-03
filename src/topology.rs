@@ -94,7 +94,7 @@ impl Topology {
             info!("Starting sink {}", name);
             let task = tasks.remove(name).unwrap();
             let task = handle_errors(task, abort_tx.clone());
-            let task = task.instrument(span!("sink", name = name.as_str()));
+            let task = task.instrument(info_span!("sink", name = name.as_str()));
             rt.spawn(task);
         }
 
@@ -102,7 +102,7 @@ impl Topology {
             info!("Starting transform {}", name);
             let task = tasks.remove(name).unwrap();
             let task = handle_errors(task, abort_tx.clone());
-            let task = task.instrument(span!("transform", name = name.as_str()));
+            let task = task.instrument(info_span!("transform", name = name.as_str()));
             rt.spawn(task);
         }
 
@@ -113,14 +113,14 @@ impl Topology {
             {
                 let task = tasks.remove(name).unwrap();
                 let task = handle_errors(task, abort_tx.clone());
-                let task = task.instrument(span!("source-pump", name = name.as_str()));
+                let task = task.instrument(info_span!("source-pump", name = name.as_str()));
                 rt.spawn(task);
             }
 
             {
                 let task = source_tasks.remove(name).unwrap();
                 let task = handle_errors(task, abort_tx.clone());
-                let task = task.instrument(span!("source", name = name.as_str()));
+                let task = task.instrument(info_span!("source", name = name.as_str()));
                 let spawned = oneshot::spawn(task, &rt.executor());
                 spawned_source_tasks.insert(name.clone(), spawned);
             }
@@ -327,7 +327,7 @@ impl RunningTopology {
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(span!("sink", name = name.as_str()));
+        let task = task.instrument(info_span!("sink", name = name.as_str()));
         rt.spawn(task);
     }
 
@@ -339,7 +339,7 @@ impl RunningTopology {
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(span!("transform", name = name.as_str()));
+        let task = task.instrument(info_span!("transform", name = name.as_str()));
         rt.spawn(task);
     }
 
@@ -351,7 +351,7 @@ impl RunningTopology {
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
-        let task = task.instrument(span!("source-pump", name = name.as_str()));
+        let task = task.instrument(info_span!("source-pump", name = name.as_str()));
         rt.spawn(task);
 
         let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
