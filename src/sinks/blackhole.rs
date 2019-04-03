@@ -46,6 +46,8 @@ impl Sink for BlackholeSink {
         self.total_records += 1;
         self.total_raw_bytes += item.raw.len();
 
+        trace!(raw_bytes_counter = item.raw.len(), records_counter = 1);
+
         if self.total_records % self.config.print_amount == 0 {
             info!({
                 records = self.total_records,
