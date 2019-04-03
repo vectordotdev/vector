@@ -78,7 +78,6 @@ rusoto_credential = "0.16.0"
 tower = { git = "https://github.com/tower-rs/tower" }
 tower-hyper = { git = "https://github.com/tower-rs/tower-hyper", default-features = false }
 
-
 [build-dependencies]
 prost-build = "0.4.0"
 
