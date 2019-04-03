@@ -126,6 +126,7 @@ impl From<String> for Record {
 #[cfg(test)]
 mod test {
     use super::Record;
+    use regex::Regex;
 
     #[test]
     fn serialization() {
@@ -139,7 +140,10 @@ mod test {
             "bar": "baz",
             "timestamp": record.timestamp,
         });
+        let actual = serde_json::to_value(record).unwrap();
+        assert_eq!(expected, actual);
 
-        assert_eq!(expected, serde_json::to_value(record).unwrap());
+        let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
+        assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
     }
 }
