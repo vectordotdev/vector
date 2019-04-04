@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::fmt;
 use std::time::Duration;
-use tower::{layer::TimeoutLayer, Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
@@ -51,8 +51,8 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
 
         let svc = ServiceBuilder::new()
-            .layer(TimeoutLayer::new(Duration::from_secs(10)))
-            .build_service(cloudwatch)
+            .timeout(Duration::from_secs(10))
+            .service(cloudwatch)
             .expect("This is a bug, no service spawning");
 
         let sink = {

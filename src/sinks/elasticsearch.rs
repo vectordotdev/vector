@@ -7,10 +7,7 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -49,10 +46,10 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 
     let http_service = util::http::HttpService::new();
     let service = ServiceBuilder::new()
-        .layer(InFlightLimitLayer::new(in_flight_limit))
-        .layer(RetryLayer::new(policy))
-        .layer(TimeoutLayer::new(Duration::from_secs(timeout_secs)))
-        .build_service(http_service)
+        .in_flight_limit(in_flight_limit)
+        .retry(policy)
+        .timeout(Duration::from_secs(timeout_secs))
+        .service(http_service)
         .expect("This is a bug, there is no spawning");
 
     let sink = ServiceSink::new(service)
