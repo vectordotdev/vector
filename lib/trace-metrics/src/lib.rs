@@ -86,23 +86,7 @@ impl<S> MetricsSubscriber<S> {
 
 impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        if metadata.name().contains("event")
-            && metadata
-                .fields()
-                .iter()
-                .any(|f| f.name().contains("counter") || f.name().contains("gauge"))
-            && !metadata
-                .fields()
-                .iter()
-                .any(|f| f.name().contains("message"))
-        {
-            self.interest.write().unwrap().insert(metadata.name());
-            true
-        } else if metadata.name().contains("event") {
-            self.inner.enabled(metadata)
-        } else {
-            true
-        }
+        self.inner.enabled(metadata)
     }
 
     fn new_span(&self, span: &Attributes) -> Id {
@@ -190,11 +174,13 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
                 .iter()
                 .any(|f| f.name().contains("message"))
         {
+            self.inner.register_callsite(metadata);
             self.interest.write().unwrap().insert(metadata.name());
             Interest::always()
         } else if metadata.name().contains("event") {
             self.inner.register_callsite(metadata)
         } else {
+            self.inner.register_callsite(metadata);
             Interest::always()
         }
     }
