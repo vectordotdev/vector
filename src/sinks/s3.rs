@@ -28,8 +28,8 @@ pub struct S3SinkInnerConfig {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
-    pub region: Option<String>,
-    pub endpoint: Option<String>,
+    #[serde(deserialize_with = "crate::region::deserialize")]
+    pub region: Region,
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,
@@ -93,26 +93,9 @@ pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
 }
 
 impl S3SinkConfig {
-    fn region(&self) -> Result<Region, String> {
-        if self.region.is_some() && self.endpoint.is_some() {
-            Err("Only one of 'region' or 'endpoint' can be specified".to_string())
-        } else if let Some(region) = &self.region {
-            region.parse::<Region>().map_err(|e| e.to_string())
-        } else if let Some(endpoint) = &self.endpoint {
-            Ok(Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint.clone(),
-            })
-        } else {
-            Err("Must set 'region' or 'endpoint'".to_string())
-        }
-    }
-
     fn config(&self) -> Result<S3SinkInnerConfig, String> {
-        let region = self.region()?;
-
         Ok(S3SinkInnerConfig {
-            client: rusoto_s3::S3Client::new(region),
+            client: rusoto_s3::S3Client::new(self.region.clone()),
             gzip: self.gzip,
             buffer_size: self.buffer_size,
             key_prefix: self.key_prefix.clone(),

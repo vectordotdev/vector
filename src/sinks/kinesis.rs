@@ -25,6 +25,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
+    #[serde(deserialize_with = "crate::region::deserialize")]
     pub region: Region,
     pub batch_size: usize,
 }

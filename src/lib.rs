@@ -10,6 +10,7 @@ pub mod buffers;
 pub mod bytes;
 pub mod metrics;
 pub mod record;
+pub mod region;
 pub mod sinks;
 pub mod sources;
 pub mod test_util;

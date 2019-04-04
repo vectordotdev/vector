@@ -26,6 +26,7 @@ pub struct CloudwatchLogsSvc {
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
+    #[serde(deserialize_with = "crate::region::deserialize")]
     pub region: Region,
     pub buffer_size: usize,
 }
