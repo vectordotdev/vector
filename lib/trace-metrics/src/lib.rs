@@ -33,7 +33,11 @@ extern crate hotmic;
 extern crate tokio_trace_core;
 
 use hotmic::Sink;
-use std::{collections::HashMap, fmt, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    sync::{Mutex, RwLock},
+};
 use tokio_trace_core::{
     field::{Field, Visit},
     span::{Attributes, Id, Record},
@@ -48,6 +52,7 @@ pub type Collector = Sink<String>;
 pub struct MetricsSubscriber<S> {
     inner: S,
     spans: Mutex<HashMap<Id, Span>>,
+    interest: RwLock<HashSet<&'static str>>,
     collector: Collector,
 }
 
@@ -73,6 +78,7 @@ impl<S> MetricsSubscriber<S> {
         MetricsSubscriber {
             inner,
             collector,
+            interest: RwLock::new(HashSet::new()),
             spans: Mutex::new(HashMap::new()),
         }
     }
@@ -80,12 +86,7 @@ impl<S> MetricsSubscriber<S> {
 
 impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        // TODO(lucio): also enable all callsites taht contain `counter` and `gauge`
-        if metadata.name().contains("event") {
-            self.inner.enabled(metadata)
-        } else {
-            true
-        }
+        self.inner.enabled(metadata)
     }
 
     fn new_span(&self, span: &Attributes) -> Id {
@@ -115,7 +116,18 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     fn event(&self, event: &Event) {
         let mut recorder = MetricVisitor::new(self.collector.clone());
         event.record(&mut recorder);
-        self.inner.event(event);
+
+        let selective_interest = {
+            self.interest
+                .read()
+                .unwrap()
+                .contains(event.metadata().name())
+        };
+
+        // we marked this as only the metrics sub being interested in it
+        if !selective_interest {
+            self.inner.event(event);
+        }
     }
 
     fn enter(&self, span: &Id) {
@@ -152,9 +164,23 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
 
     // extra non required fn
     fn register_callsite(&self, metadata: &Metadata) -> Interest {
-        if metadata.name().contains("event") {
+        if metadata.name().contains("event")
+            && metadata
+                .fields()
+                .iter()
+                .any(|f| f.name().contains("counter") || f.name().contains("gauge"))
+            && !metadata
+                .fields()
+                .iter()
+                .any(|f| f.name().contains("message"))
+        {
+            self.inner.register_callsite(metadata);
+            self.interest.write().unwrap().insert(metadata.name());
+            Interest::always()
+        } else if metadata.name().contains("event") {
             self.inner.register_callsite(metadata)
         } else {
+            self.inner.register_callsite(metadata);
             Interest::always()
         }
     }
