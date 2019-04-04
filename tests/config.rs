@@ -190,6 +190,7 @@ fn bad_s3_region() {
         gzip = true
         bucket = "asdf"
         key_prefix = "logs/"
+        region = "us-east-1"
 
         [sinks.out2]
         type = "s3"
@@ -208,7 +209,6 @@ fn bad_s3_region() {
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
-        endpoint = "https://example.com"
       "#,
     )
     .unwrap_err();
@@ -216,9 +216,7 @@ fn bad_s3_region() {
     assert_eq!(
         err,
         vec![
-            "Sink \"out1\": Must set 'region' or 'endpoint'",
-            "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
-            "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
+            "Not a valid region, please use one of the provided regions https://docs.aws.amazon.com/general/latest/gr/rande.html for key `sinks.out2`"
         ]
     )
 }
