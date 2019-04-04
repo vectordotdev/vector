@@ -9,10 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 use crate::record::Record;
 
@@ -141,12 +138,10 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
 
     let http_service = util::http::HttpService::new();
     let service = ServiceBuilder::new()
-        .layer(RetryLayer::new(policy))
-        .layer(InFlightLimitLayer::new(config.in_flight_request_limit))
-        .layer(TimeoutLayer::new(Duration::from_secs(
-            config.request_timeout_secs,
-        )))
-        .build_service(http_service)
+        .retry(policy)
+        .in_flight_limit(config.in_flight_request_limit)
+        .timeout(Duration::from_secs(config.request_timeout_secs))
+        .service(http_service)
         .expect("This is a bug, there is no spawning");
 
     let sink = ServiceSink::new(service)

@@ -80,7 +80,7 @@ fn echo(req: Request<Body>) -> Instrumented<BoxFut> {
             // future, waiting on concatenating the full body, so that
             // it can be reversed. Only then can we return a `Response`.
             (&Method::POST, "/echo/reversed") => {
-                let mut span = trace_span!("response", response_kind = "reversed");
+                let span = trace_span!("response", response_kind = "reversed");
                 let reversed = span.enter(|| {
                     req.into_body().concat2().map(move |chunk| {
                         let body = chunk.iter().rev().cloned().collect::<Vec<u8>>();
@@ -141,7 +141,7 @@ fn main() {
 
     tokio_trace::subscriber::with_default(subscriber, || {
         let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
-        let mut server_span = trace_span!("server", local = &field::debug(addr));
+        let server_span = trace_span!("server", local = &field::debug(addr));
         let server = tokio::net::TcpListener::bind(&addr)
             .expect("bind")
             .incoming()

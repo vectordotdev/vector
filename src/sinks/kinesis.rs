@@ -12,10 +12,7 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc, time::Duration};
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    Service, ServiceBuilder,
-};
+use tower::{Service, ServiceBuilder};
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -50,10 +47,10 @@ impl KinesisService {
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), KinesisRetryLogic);
 
         let svc = ServiceBuilder::new()
-            .layer(InFlightLimitLayer::new(1))
-            .layer(RetryLayer::new(policy))
-            .layer(TimeoutLayer::new(Duration::from_secs(10)))
-            .build_service(kinesis)
+            .in_flight_limit(1)
+            .retry(policy)
+            .timeout(Duration::from_secs(10))
+            .service(kinesis)
             .expect("This is a bug, no spawning done");
 
         ServiceSink::new(svc)

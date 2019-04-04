@@ -7,10 +7,7 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_trace_futures::{Instrument, Instrumented};
-use tower::{
-    layer::{InFlightLimitLayer, TimeoutLayer},
-    Service, ServiceBuilder,
-};
+use tower::{Service, ServiceBuilder};
 
 pub struct S3Sink {
     config: S3SinkInnerConfig,
@@ -53,9 +50,9 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
     let s3 = S3Sink { config };
 
     let svc = ServiceBuilder::new()
-        .layer(InFlightLimitLayer::new(1))
-        .layer(TimeoutLayer::new(Duration::from_secs(10)))
-        .build_service(s3)
+        .in_flight_limit(1)
+        .timeout(Duration::from_secs(10))
+        .service(s3)
         .expect("This is a bug, no spawnning");
 
     let sink = ServiceSink::new(svc)

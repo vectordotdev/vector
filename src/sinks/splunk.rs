@@ -7,10 +7,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 use crate::record::Record;
 
@@ -52,10 +49,10 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
 
     let http_service = util::http::HttpService::new();
     let service = ServiceBuilder::new()
-        .layer(RetryLayer::new(policy))
-        .layer(InFlightLimitLayer::new(in_flight_limit))
-        .layer(TimeoutLayer::new(Duration::from_secs(timeout_secs)))
-        .build_service(http_service)
+        .retry(policy)
+        .in_flight_limit(in_flight_limit)
+        .timeout(Duration::from_secs(timeout_secs))
+        .service(http_service)
         .expect("This is a bug, no spawning");
 
     let sink = ServiceSink::new(service)
