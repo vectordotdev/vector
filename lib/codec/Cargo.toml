@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 bytes = "0.4"
 tokio-codec = "0.1"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }

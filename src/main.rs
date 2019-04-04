@@ -47,7 +47,7 @@ fn main() {
 
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
         .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
-            "vector=info,vector[sink]=info",
+            "vector=info,vector[sink]=info,vector[transform]=info,vector[source]=info",
         ))
         .full()
         .finish();
@@ -56,6 +56,8 @@ fn main() {
     let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
 
     tokio_trace::subscriber::with_default(subscriber, || {
+        debug!("Loading config from {}", config_path);
+
         let file = match std::fs::File::open(config_path) {
             Ok(f) => f,
             Err(e) => {
@@ -67,9 +69,13 @@ fn main() {
                 }
             }
         };
-        let config = vector::topology::Config::load(file);
 
-        let topology = config.and_then(Topology::build);
+        trace!("Parsing config");
+
+        let topology = vector::topology::Config::load(file).and_then(|f| {
+            debug!("Building config from file");
+            Topology::build(f)
+        });
 
         let mut topology = match topology {
             Ok((topology, warnings)) => {
@@ -87,10 +93,11 @@ fn main() {
             }
         };
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
+        debug!("Attempting to spawn metrics server");
         rt.spawn(
             metrics_server
                 .select(metrics_tripwire)
@@ -101,6 +108,7 @@ fn main() {
         let require_healthy = matches.is_present("require-healthy");
 
         if require_healthy {
+            info!("Running healthchecks and waiting to start sinks");
             let success = rt.block_on(topology.healthchecks());
 
             if success.is_ok() {
@@ -110,9 +118,11 @@ fn main() {
                 std::process::exit(1);
             }
         } else {
+            info!("Running healthchecks");
             rt.spawn(topology.healthchecks());
         }
 
+        info!("Vector is starting...");
         let mut graceful_crash = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
@@ -142,6 +152,7 @@ fn main() {
             }
 
             // Reload config
+            info!("Reloading config from {}", config_path);
             let file = match std::fs::File::open(config_path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -154,10 +165,13 @@ fn main() {
                     }
                 }
             };
+
+            trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
             match config {
                 Ok(config) => {
+                    debug!("Reloading topology");
                     topology.reload_config(config, &mut rt, require_healthy);
                 }
                 Err(errors) => {
