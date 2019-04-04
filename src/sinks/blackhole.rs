@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     fn blackhole() {
-        let config = BlackholeConfig { print_amount: 10 }
+        let config = BlackholeConfig { print_amount: 10 };
         let (sink, _) = config.build().unwrap();
 
         let (_input_lines, records) = random_records_with_stream(100, 10);
