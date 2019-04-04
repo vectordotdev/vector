@@ -34,10 +34,10 @@ impl<'de> Visitor<'de> for RegionVisitor {
     {
         let entry1: (String, String) = map
             .next_entry()?
-            .ok_or_else(|| Error::custom("Expected either `name` or `endpoint`"));
+            .ok_or_else(|| Error::custom("Expected either `name` or `endpoint`"))?;
         let entry2: (String, String) = map
             .next_entry()?
-            .ok_or_else(|| Error::custom("Expected either `name` or `endpoint`"));;
+            .ok_or_else(|| Error::custom("Expected either `name` or `endpoint`"))?;
 
         if entry1.0.as_str() == "name" {
             if entry2.0.as_str() == "endpoint" {
