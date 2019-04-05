@@ -89,7 +89,7 @@ impl Decoder for BytesDelimitedCodec {
                     let frame = buf.split_to(newpos_index + 1);
 
                     trace!(
-                        message = "decoding the frame",
+                        message = "decoding the frame.",
                         bytes_proccesed = frame.len()
                     );
 

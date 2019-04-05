@@ -10,6 +10,7 @@ use tokio::{
     codec::{BytesCodec, FramedRead, LinesCodec},
     net::{TcpListener, UdpFramed, UdpSocket},
 };
+use tokio_trace::field;
 use tokio_uds::UnixListener;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -86,7 +87,7 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
         future::lazy(move || {
             let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
 
-            info!("listening on {:?}", socket.local_addr());
+            info!(message = "listening.", addr = field::display(addr));
 
             future::ok(socket)
         })

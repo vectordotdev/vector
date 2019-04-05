@@ -59,7 +59,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
     let out = out
         .sink_map_err(|_| ())
         .with(move |(line, file): (String, String)| {
-            trace!(message = "Recieved one record", file = file.as_str());
+            trace!(message = "Recieved one record.", file = file.as_str());
             let mut record = Record::from(line);
             if let Some(ref context_key) = context_key {
                 record
@@ -73,7 +73,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
     let exclude = config.exclude.clone();
     Box::new(future::lazy(move || {
         info!(
-            message = "Starting file server",
+            message = "Starting file server.",
             include = field::debug(include),
             execlude = field::debug(exclude)
         );

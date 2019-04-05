@@ -48,23 +48,23 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
             }
         };
 
-        info!("listening on {}", addr);
+        info!(message = "listening.", addr = field::display(&addr));
 
         let future = listener
             .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+            .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
 
                 let span = if let Some(addr) = peer_addr {
-                    info_span!("connection", peer_addr = &field::debug(&addr))
+                    info_span!("connection", peer_addr = &field::display(&addr))
                 } else {
                     info_span!("connection")
                 };
 
                 let inner_span = span.clone();
                 span.enter(|| {
-                    debug!("accepted a new socket");
+                    debug!("accepted a new socket.");
 
                     let out = out.clone();
 
@@ -80,7 +80,10 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                                 .insert(Atom::from("host"), host.clone().to_string().into());
                         }
 
-                        trace!("Received one line {:?}", record);
+                        trace!(
+                            message = "Received one line.",
+                            record = field::debug(&record)
+                        );
                         record
                     })
                     .map_err(|e| error!("error reading line: {:?}", e));
