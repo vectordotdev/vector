@@ -75,7 +75,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         info!(
             message = "Starting file server.",
             include = field::debug(include),
-            execlude = field::debug(exclude)
+            exclude = field::debug(exclude)
         );
 
         let span = info_span!("file-server");
