@@ -1,3 +1,4 @@
+use crate::buffers::Acker;
 use crate::record::Record;
 use crate::sinks::util::{BatchServiceSink, Buffer, SinkExt};
 use futures::{Future, Poll, Sink};
@@ -40,12 +41,12 @@ pub struct S3SinkConfig {
 
 #[typetag::serde(name = "s3")]
 impl crate::topology::config::SinkConfig for S3SinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((new(self.config()?), healthcheck(self.config()?)))
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((new(self.config()?, acker), healthcheck(self.config()?)))
     }
 }
 
-pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
+pub fn new(config: S3SinkInnerConfig, acker: Acker) -> super::RouterSink {
     let gzip = config.gzip;
     let buffer_size = config.buffer_size;
     let max_linger_secs = config.max_linger_secs;
@@ -58,7 +59,7 @@ pub fn new(config: S3SinkInnerConfig) -> super::RouterSink {
         .build_service(s3)
         .expect("This is a bug, no spawnning");
 
-    let sink = BatchServiceSink::new(svc)
+    let sink = BatchServiceSink::new(svc, acker)
         .batched_with_min(
             Buffer::new(gzip),
             buffer_size,
@@ -173,6 +174,7 @@ impl Service<Vec<u8>> for S3Sink {
 mod tests {
     #![cfg(feature = "s3-integration-tests")]
 
+    use crate::buffers::Acker;
     use crate::{
         sinks::{self, s3::S3SinkInnerConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
@@ -190,7 +192,7 @@ mod tests {
     fn s3_insert_message_into() {
         let config = config();
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config);
+        let sink = sinks::s3::new(config, Acker::Null);
 
         let (lines, records) = random_lines_with_stream(100, 10);
 
@@ -219,7 +221,7 @@ mod tests {
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config);
+        let sink = sinks::s3::new(config, Acker::Null);
 
         let (lines, records) = random_lines_with_stream(100, 30);
 
@@ -248,7 +250,7 @@ mod tests {
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config);
+        let sink = sinks::s3::new(config, Acker::Null);
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -295,7 +297,7 @@ mod tests {
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config);
+        let sink = sinks::s3::new(config, Acker::Null);
 
         let (lines, records) = random_lines_with_stream(100, 500);
 

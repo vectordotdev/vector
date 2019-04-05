@@ -1,6 +1,8 @@
 use super::util::{
     self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
 };
+use crate::buffers::Acker;
+use crate::record::Record;
 use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
@@ -15,8 +17,6 @@ use tower::{
     layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
     ServiceBuilder,
 };
-
-use crate::record::Record;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -117,9 +117,9 @@ fn build_uri(raw: &str) -> Result<Uri, String> {
 
 #[typetag::serde(name = "http")]
 impl crate::topology::config::SinkConfig for HttpSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let config = self.validated()?;
-        let sink = http(config.clone());
+        let sink = http(config.clone(), acker);
 
         if let Some(healthcheck_uri) = config.healthcheck_uri {
             Ok((sink, healthcheck(healthcheck_uri, config.basic_auth)))
@@ -129,7 +129,7 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: ValidatedConfig) -> super::RouterSink {
+fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
     let gzip = match config.compression {
         Compression::None => false,
         Compression::Gzip => true,
@@ -168,7 +168,7 @@ fn http(config: ValidatedConfig) -> super::RouterSink {
         .build_service(http_service)
         .expect("This is a bug, there is no spawning");
 
-    let sink = BatchServiceSink::new(service)
+    let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
@@ -218,6 +218,7 @@ fn healthcheck(uri: Uri, auth: Option<BasicAuth>) -> super::Healthcheck {
 
 #[cfg(test)]
 mod tests {
+    use crate::buffers::Acker;
     use crate::{
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
@@ -272,7 +273,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let (sink, _healthcheck) = config.build().unwrap();
+        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, records) = random_lines_with_stream(100, num_lines);
@@ -328,7 +329,7 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let (sink, _healthcheck) = config.build().unwrap();
+        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
         let (input_lines, records) = random_lines_with_stream(100, num_lines);

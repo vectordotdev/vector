@@ -1,5 +1,6 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use vector::buffers::Acker;
 use vector::test_util::{
     next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
@@ -12,7 +13,7 @@ struct PanicSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for PanicSink {
-    fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
 }
@@ -78,7 +79,7 @@ struct ErrorSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for ErrorSink {
-    fn build(&self) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
 }

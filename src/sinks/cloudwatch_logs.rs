@@ -1,3 +1,4 @@
+use crate::buffers::Acker;
 use crate::{
     record::Record,
     sinks::util::{BatchServiceSink, SinkExt},
@@ -46,7 +47,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let cloudwatch =
             CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
 
@@ -56,7 +57,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             .expect("This is a bug, no service spawning");
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc).batched(Vec::new(), self.buffer_size);
+            let svc_sink = BatchServiceSink::new(svc, acker).batched(Vec::new(), self.buffer_size);
             Box::new(svc_sink)
         };
 
@@ -257,6 +258,7 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
 mod tests {
     #![cfg(feature = "cloudwatch-integration-tests")]
 
+    use crate::buffers::Acker;
     use crate::{
         sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
         test_util::{block_on, random_lines_with_stream},
@@ -288,7 +290,7 @@ mod tests {
             buffer_size: 1,
         };
 
-        let (sink, _) = config.build().unwrap();
+        let (sink, _) = config.build(Acker::Null).unwrap();
 
         let timestamp = chrono::Utc::now();
 

@@ -1,4 +1,5 @@
 use super::Record;
+use crate::buffers::Acker;
 use crate::sinks::util::{
     retries::{FixedRetryPolicy, RetryLogic},
     BatchServiceSink, SinkExt,
@@ -32,7 +33,10 @@ pub struct KinesisSinkConfig {
 }
 
 impl KinesisService {
-    pub fn new(config: KinesisSinkConfig) -> impl Sink<SinkItem = Record, SinkError = ()> {
+    pub fn new(
+        config: KinesisSinkConfig,
+        acker: Acker,
+    ) -> impl Sink<SinkItem = Record, SinkError = ()> {
         let client = Arc::new(KinesisClient::new(config.region.clone()));
 
         let batch_size = config.batch_size;
@@ -47,7 +51,7 @@ impl KinesisService {
             .build_service(kinesis)
             .expect("This is a bug, no spawning done");
 
-        BatchServiceSink::new(svc)
+        BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
             .with(|record: Record| Ok(record.into()))
     }
@@ -118,6 +122,7 @@ impl RetryLogic for KinesisRetryLogic {
 mod tests {
     #![cfg(feature = "kinesis-integration-tests")]
 
+    use crate::buffers::Acker;
     use crate::sinks::kinesis::{KinesisService, KinesisSinkConfig};
     use crate::test_util::random_lines_with_stream;
     use futures::{Future, Sink};
@@ -147,7 +152,7 @@ mod tests {
 
         let mut rt = Runtime::new().unwrap();
 
-        let sink = KinesisService::new(config);
+        let sink = KinesisService::new(config, Acker::Null);
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
