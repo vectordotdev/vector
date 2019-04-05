@@ -82,7 +82,7 @@ impl FileServer {
                             if let Ok(fw) =
                                 FileWatcher::new(&path, self.start_at_beginning, self.ignore_before)
                             {
-                                debug!(
+                                info!(
                                     message = "Found file to watch.",
                                     path = field::debug(&path),
                                     start_at_beginning = field::debug(&self.start_at_beginning)
