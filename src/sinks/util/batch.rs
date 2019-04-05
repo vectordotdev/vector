@@ -10,6 +10,7 @@ pub trait Batch {
     fn is_empty(&self) -> bool;
     fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
+    fn num_items(&self) -> usize;
 }
 
 impl<T> Batch for Vec<T> {
@@ -34,6 +35,10 @@ impl<T> Batch for Vec<T> {
 
     fn finish(self) -> Self::Output {
         self
+    }
+
+    fn num_items(&self) -> usize {
+        self.len()
     }
 }
 
