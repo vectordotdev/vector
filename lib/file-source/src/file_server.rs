@@ -6,6 +6,7 @@ use std::mem;
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
+use tokio_trace::field;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -81,6 +82,11 @@ impl FileServer {
                             if let Ok(fw) =
                                 FileWatcher::new(&path, self.start_at_beginning, self.ignore_before)
                             {
+                                debug!(
+                                    message = "Found file to watch.",
+                                    path = field::debug(&path),
+                                    start_at_beginning = field::debug(&self.start_at_beginning)
+                                );
                                 fp_map.insert(path, fw);
                             };
                         }
@@ -92,6 +98,12 @@ impl FileServer {
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut buffer) {
                     if sz > 0 {
+                        trace!(
+                            message = "Read bytes.",
+                            path = field::debug(&path),
+                            bytes = field::debug(sz)
+                        );
+
                         bytes_read += sz;
                         lines.push((
                             buffer.clone(),

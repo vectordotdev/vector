@@ -1,7 +1,7 @@
 [package]
 name = "vector"
 version = "0.1.0"
-authors = ["Luke Steensen <luke.steensen@gmail.com>"]
+authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 publish = false
 
@@ -28,9 +28,9 @@ tokio-threadpool = "0.1.8"
 
 # Tracing
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
-tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
-tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "722edd3" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 
 # Metrics
 hotmic = "0.8"

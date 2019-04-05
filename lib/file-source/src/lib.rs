@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate tokio_trace;
+
 pub mod file_server;
 mod file_watcher;
 

@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::{dispatcher, field};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
@@ -45,7 +46,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         .ignore_older
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
 
-    let cernan_server = FileServer {
+    let file_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
         max_read_bytes: 2048,
@@ -55,19 +56,37 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
 
     let context_key = config.context_key.clone().map(Atom::from);
 
-    let out = out.sink_map_err(|_| ()).with(move |(line, file)| {
-        let mut record = Record::from(line);
-        if let Some(ref context_key) = context_key {
-            record
-                .structured
-                .insert(context_key.clone(), Bytes::from(file));
-        }
-        future::ok(record)
-    });
+    let out = out
+        .sink_map_err(|_| ())
+        .with(move |(line, file): (String, String)| {
+            trace!(message = "Recieved one record.", file = file.as_str());
+            let mut record = Record::from(line);
+            if let Some(ref context_key) = context_key {
+                record
+                    .structured
+                    .insert(context_key.clone(), Bytes::from(file));
+            }
+            future::ok(record)
+        });
 
-    Box::new(future::lazy(|| {
+    let include = config.include.clone();
+    let exclude = config.exclude.clone();
+    Box::new(future::lazy(move || {
+        info!(
+            message = "Starting file server.",
+            include = field::debug(include),
+            execlude = field::debug(exclude)
+        );
+
+        let span = info_span!("file-server");
+        let dispatcher = dispatcher::get_default(|d| d.clone());
         thread::spawn(move || {
-            cernan_server.run(out, shutdown_rx);
+            let dispatcher = dispatcher;
+            dispatcher::with_default(&dispatcher, || {
+                span.enter(|| {
+                    file_server.run(out, shutdown_rx);
+                })
+            });
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,

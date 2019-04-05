@@ -1,6 +1,9 @@
 extern crate bytes;
 extern crate tokio_codec;
 
+#[macro_use]
+extern crate tokio_trace;
+
 use bytes::{BufMut, Bytes, BytesMut};
 use std::{cmp, fmt, io, usize};
 use tokio_codec::{Decoder, Encoder};
@@ -84,6 +87,12 @@ impl Decoder for BytesDelimitedCodec {
                     let newpos_index = pos + self.next_index;
                     self.next_index = 0;
                     let frame = buf.split_to(newpos_index + 1);
+
+                    trace!(
+                        message = "decoding the frame.",
+                        bytes_proccesed = frame.len()
+                    );
+
                     let frame = &frame[..frame.len() - 1];
 
                     Ok(Some(frame.into()))

@@ -90,39 +90,56 @@ impl Topology {
 
         let (abort_tx, abort_rx) = mpsc::unbounded();
 
-        for name in config.sinks.keys() {
-            info!("Starting sink {}", name);
+        for (name, sink) in &config.sinks {
+            let name = name.as_str();
+            let typetag = sink.inner.typetag_name();
+
+            info!("Starting sink {:?} of type {}", name, typetag);
             let task = tasks.remove(name).unwrap();
             let task = handle_errors(task, abort_tx.clone());
-            let task = task.instrument(info_span!("sink", name = name.as_str()));
+
+            let span = info_span!("sink", name = name, r#type = typetag);
+            let task = task.instrument(span);
             rt.spawn(task);
         }
 
-        for name in config.transforms.keys() {
-            info!("Starting transform {}", name);
+        for (name, transform) in &config.transforms {
+            let name = name.as_str();
+            let typetag = transform.inner.typetag_name();
+
+            info!("Starting transform {:?} of type {}", name, typetag);
             let task = tasks.remove(name).unwrap();
             let task = handle_errors(task, abort_tx.clone());
-            let task = task.instrument(info_span!("transform", name = name.as_str()));
+
+            let span = info_span!("transform", name = name, r#type = typetag);
+            let task = task.instrument(span);
             rt.spawn(task);
         }
 
         let mut spawned_source_tasks = HashMap::new();
-        for name in config.sources.keys() {
-            info!("Starting source {}", name);
+        for (name, source) in &config.sources {
+            let name = name.as_str();
+            let typetag = source.typetag_name();
+
+            info!("Starting source {:?} of type {}", name, typetag);
 
             {
                 let task = tasks.remove(name).unwrap();
                 let task = handle_errors(task, abort_tx.clone());
-                let task = task.instrument(info_span!("source-pump", name = name.as_str()));
+
+                let span = info_span!("source-pump", name = name, r#type = typetag);
+                let task = task.instrument(span);
                 rt.spawn(task);
             }
 
             {
                 let task = source_tasks.remove(name).unwrap();
                 let task = handle_errors(task, abort_tx.clone());
-                let task = task.instrument(info_span!("source", name = name.as_str()));
+
+                let span = info_span!("source", name = name, r#type = typetag);
+                let task = task.instrument(span);
                 let spawned = oneshot::spawn(task, &rt.executor());
-                spawned_source_tasks.insert(name.clone(), spawned);
+                spawned_source_tasks.insert(name.to_string(), spawned);
             }
         }
 

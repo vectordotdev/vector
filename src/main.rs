@@ -1,12 +1,14 @@
+#[macro_use]
+extern crate tokio_trace;
+
 use clap::{App, Arg};
 use futures::{future, Future, Stream};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+use tokio_trace::field;
+use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
 use vector::topology::Topology;
-
-#[macro_use]
-extern crate tokio_trace;
 
 fn main() {
     let app = App::new("Vector").version("1.0").author("timber.io")
@@ -36,40 +38,66 @@ fn main() {
     let config_path = matches.value_of("config").unwrap();
 
     let addr = matches.value_of("metrics-addr").unwrap();
-    let metrics_addr = if let Ok(addr) = addr.parse() {
-        addr
-    } else {
-        error!("Unable to parse metrics address {}", addr);
-        std::process::exit(1);
+
+    let mut levels = ["vector=info", "codec=info", "file_source=info"]
+        .join(",")
+        .to_string();
+
+    if let Ok(level) = std::env::var("LOG") {
+        let additional_level = ",".to_owned() + level.as_str();
+        levels.push_str(&additional_level);
     };
 
-    let (metrics_sink, metrics_server) = metrics::build(&metrics_addr);
-
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
-        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
-            "vector=info,vector[sink]=info",
-        ))
+        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(levels.as_str()))
         .full()
         .finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
+    let (metrics_controller, metrics_sink) = metrics::build();
     let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
 
     tokio_trace::subscriber::with_default(subscriber, || {
+        let metrics_addr = if let Ok(addr) = addr.parse() {
+            addr
+        } else {
+            error!(
+                message = "Unable to parse metrics address.",
+                addr = field::display(&addr)
+            );
+            std::process::exit(1);
+        };
+
+        debug!(
+            message = "Loading config.",
+            path = field::debug(&config_path)
+        );
+
         let file = match std::fs::File::open(config_path) {
             Ok(f) => f,
             Err(e) => {
                 if let std::io::ErrorKind::NotFound = e.kind() {
-                    error!("Config file not found in: {}", config_path);
+                    error!(
+                        message = "Config file not found.",
+                        path = field::debug(&config_path)
+                    );
                     std::process::exit(1);
                 } else {
-                    panic!("Error opening config file: {}", e)
+                    error!("Error opening config file: {}", e);
+                    std::process::exit(1);
                 }
             }
         };
-        let config = vector::topology::Config::load(file);
 
-        let topology = config.and_then(Topology::build);
+        trace!(
+            message = "Parsing config.",
+            path = field::debug(&config_path)
+        );
+
+        let topology = vector::topology::Config::load(file).and_then(|f| {
+            debug!(message = "Building config from file.");
+            Topology::build(f)
+        });
 
         let mut topology = match topology {
             Ok((topology, warnings)) => {
@@ -87,12 +115,15 @@ fn main() {
             }
         };
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
+        debug!("Attempting to spawn metrics server");
+
         rt.spawn(
-            metrics_server
+            metrics::serve(&metrics_addr, metrics_controller)
+                .instrument(info_span!("metrics", addr = field::display(&metrics_addr)))
                 .select(metrics_tripwire)
                 .map(|_| ())
                 .map_err(|_| ()),
@@ -101,18 +132,21 @@ fn main() {
         let require_healthy = matches.is_present("require-healthy");
 
         if require_healthy {
+            info!("Running healthchecks and waiting to start sinks.");
             let success = rt.block_on(topology.healthchecks());
 
             if success.is_ok() {
-                info!("All healthchecks passed");
+                info!("All healthchecks passed.");
             } else {
-                error!("Sinks unhealthy; shutting down");
+                error!("Sinks unhealthy; shutting down.");
                 std::process::exit(1);
             }
         } else {
+            info!("Running healthchecks.");
             rt.spawn(topology.healthchecks());
         }
 
+        info!("Vector is starting.");
         let mut graceful_crash = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
@@ -142,6 +176,10 @@ fn main() {
             }
 
             // Reload config
+            info!(
+                message = "Reloading config.",
+                path = field::debug(&config_path)
+            );
             let file = match std::fs::File::open(config_path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -154,10 +192,13 @@ fn main() {
                     }
                 }
             };
+
+            trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
             match config {
                 Ok(config) => {
+                    debug!("Reloading topology.");
                     topology.reload_config(config, &mut rt, require_healthy);
                 }
                 Err(errors) => {
@@ -171,7 +212,7 @@ fn main() {
         if signal == SIGINT || signal == SIGTERM {
             use futures::future::Either;
 
-            info!("Shutting down");
+            info!("Shutting down.");
             topology.stop();
             metrics_trigger.cancel();
 
@@ -180,7 +221,7 @@ fn main() {
             match shutdown.select2(signals.into_future()).wait() {
                 Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
                 Ok(Either::B(_)) => {
-                    info!("Shutting down immediately");
+                    info!("Shutting down immediately.");
                     // Dropping the shutdown future will immediately shut the server down
                 }
                 Err(_) => unreachable!(),

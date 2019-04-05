@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tokio::{self, codec::FramedRead, net::TcpListener};
+use tokio_trace::field;
+use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -46,34 +48,50 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
             }
         };
 
-        info!("listening on {:?}", listener.local_addr());
+        info!(message = "listening.", addr = field::display(&addr));
 
         let future = listener
             .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+            .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
-                let host = socket.peer_addr().ok().map(|s| s.ip().to_string());
+                let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
 
-                let out = out.clone();
+                let span = if let Some(addr) = peer_addr {
+                    info_span!("connection", peer_addr = &field::display(&addr))
+                } else {
+                    info_span!("connection")
+                };
 
-                let lines_in = FramedRead::new(
-                    socket,
-                    BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
-                )
-                .map(Record::from)
-                .map(move |mut record| {
-                    if let Some(host) = &host {
+                let inner_span = span.clone();
+                span.enter(|| {
+                    debug!("accepted a new socket.");
+
+                    let out = out.clone();
+
+                    let lines_in = FramedRead::new(
+                        socket,
+                        BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
+                    )
+                    .map(Record::from)
+                    .map(move |mut record| {
+                        if let Some(host) = &peer_addr {
+                            record
+                                .structured
+                                .insert(Atom::from("host"), host.clone().to_string().into());
+                        }
+
+                        trace!(
+                            message = "Received one line.",
+                            record = field::debug(&record)
+                        );
                         record
-                            .structured
-                            .insert(Atom::from("host"), host.clone().into());
-                    }
-                    record
+                    })
+                    .map_err(|e| error!("error reading line: {:?}", e));
+
+                    let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
+
+                    tokio::spawn(handler.instrument(inner_span))
                 })
-                .map_err(|e| error!("error reading line: {:?}", e));
-
-                let handler = lines_in.forward(out).map(|_| info!("finished sending"));
-
-                tokio::spawn(handler)
             });
         future::Either::A(future)
     }))
