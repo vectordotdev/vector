@@ -45,10 +45,24 @@ fn main() {
 
     let (metrics_sink, metrics_server) = metrics::build(&metrics_addr);
 
+    let mut levels = [
+        "vector=info",
+        "vector[sink]=info",
+        "vector[transform]=info",
+        "vector[source]=info",
+        "codec=info",
+        "file_source=info",
+    ]
+    .join(",")
+    .to_string();
+
+    if let Ok(level) = std::env::var("LOG") {
+        let additional_level = ",".to_owned() + level.as_str();
+        levels.push_str(&additional_level);
+    };
+
     let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
-        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(
-            "vector=info,vector[sink]=info,vector[transform]=info,vector[source]=info",
-        ))
+        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(levels.as_str()))
         .full()
         .finish();
     tokio_trace_env_logger::try_init().expect("init log adapter");

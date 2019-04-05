@@ -6,4 +6,4 @@ start_at_beginning = true
 [sinks.out]
 inputs = ["in"]
 type = "blackhole"
-print_amount = 10000
+print_amount = 50000
