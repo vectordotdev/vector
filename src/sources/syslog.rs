@@ -11,6 +11,7 @@ use tokio::{
     net::{TcpListener, UdpFramed, UdpSocket},
 };
 use tokio_trace::field;
+use tokio_trace_futures::Instrument;
 use tokio_uds::UnixListener;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -61,21 +62,44 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
     Box::new(future::lazy(move || {
         let listener = TcpListener::bind(&addr).expect("failed to bind to tcp listener socket");
 
-        info!("listening on tcp {:?}", listener.local_addr());
+        info!(
+            message = "listening.",
+            addr = &field::display(addr),
+            r#type = "tcp"
+        );
 
         listener
             .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+            .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
+
+                let span = if let Some(addr) = peer_addr {
+                    info_span!("connection", peer_addr = &field::display(&addr))
+                } else {
+                    info_span!("connection")
+                };
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
+                    .inspect(|s| {
+                        trace!(
+                            message = "Received bytes.",
+                            bytes = &field::display(s.len())
+                        )
+                    })
                     .filter_map(record_from_str)
+                    .inspect(|record| {
+                        trace!(
+                            message = "Processed one record.",
+                            record = &field::debug(record)
+                        )
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(handler)
+                tokio::spawn(handler.instrument(span))
             })
     }))
 }
@@ -87,13 +111,30 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
         future::lazy(move || {
             let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
 
-            info!(message = "listening.", addr = field::display(addr));
+            info!(
+                message = "listening.",
+                addr = &field::display(addr),
+                r#type = "udp"
+            );
 
             future::ok(socket)
         })
         .and_then(|socket| {
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
+                .inspect(|(b, s)| {
+                    trace!(
+                        message = "Received bytes.",
+                        bytes = &field::display(b.len()),
+                        remote_addr = &field::display(s)
+                    )
+                })
                 .filter_map(|(bytes, _sock)| record_from_bytes(&bytes))
+                .inspect(|record| {
+                    trace!(
+                        message = "Processed one record.",
+                        record = &field::debug(record)
+                    )
+                })
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
@@ -107,21 +148,48 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
 
-        info!("listening on {:?}", listener.local_addr());
+        info!(
+            message = "listening.",
+            path = &field::debug(path),
+            r#type = "unix"
+        );
 
         listener
             .incoming()
             .map_err(|e| error!("failed to accept socket; error = {:?}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let peer_addr = socket.peer_addr().ok();
+
+                let span = if let Some(addr) = &peer_addr {
+                    if let Some(path) = addr.as_pathname() {
+                        info_span!("connection", peer_path = &field::debug(&path))
+                    } else {
+                        info_span!("connection")
+                    }
+                } else {
+                    info_span!("connection")
+                };
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
+                    .inspect(|s| {
+                        trace!(
+                            message = "Received bytes.",
+                            bytes = &field::display(s.len())
+                        )
+                    })
                     .filter_map(record_from_str)
+                    .inspect(|record| {
+                        trace!(
+                            message = "Processed one record.",
+                            record = &field::debug(record)
+                        )
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(handler)
+                tokio::spawn(handler.instrument(span))
             })
     }))
 }
