@@ -98,7 +98,11 @@ pub struct BatchServiceSink<T, S: Service<T>, B: Batch<Output = T>> {
     pending_acks: HashMap<usize, usize>,
 }
 
-impl<T, S: Service<T>, B: Batch<Output = T>> BatchServiceSink<T, S, B> {
+impl<T, S, B> BatchServiceSink<T, S, B>
+where
+    S: Service<T>,
+    B: Batch<Output = T>,
+{
     pub fn new(service: S, acker: Acker) -> Self {
         Self {
             service,
