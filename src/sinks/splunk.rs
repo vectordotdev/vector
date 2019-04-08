@@ -4,7 +4,7 @@ use super::util::{
 use crate::buffers::Acker;
 use crate::record::Record;
 use futures::{Future, Sink};
-use hyper::Uri;
+use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
@@ -54,13 +54,15 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
         let uri = format!("{}/services/collector/event", host);
         let uri: Uri = uri.parse().unwrap();
 
-        let mut request = util::http::Request::post(uri, body.into());
-        request
-            .header("Content-Type", "application/json")
-            .header("Content-Encoding", "gzip")
-            .header("Authorization", format!("Splunk {}", token));
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri);
 
-        request
+        builder.header("Content-Type", "application/json");
+        builder.header("Content-Encoding", "gzip");
+        builder.header("Authorization", format!("Splunk {}", token));
+
+        builder.body(body.into()).unwrap()
     });
     let service = ServiceBuilder::new()
         .layer(RetryLayer::new(policy))

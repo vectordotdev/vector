@@ -7,7 +7,7 @@ use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
-use hyper::Uri;
+use http::{Method, Uri};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -144,19 +144,23 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
     let in_flight_request_limit = config.in_flight_request_limit;
     let request_timeout_secs = config.request_timeout_secs;
     let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
-        let mut request = util::http::Request::post(config.uri.clone(), body.into());
-        request
-            .header("Content-Type", "application/x-ndjson")
-            .header("Content-Encoding", "gzip");
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(config.uri.clone());
+
+        builder.header("Content-Type", "application/x-ndjson");
+        builder.header("Content-Encoding", "gzip");
 
         if let Some(headers) = &config.headers {
             for (header, value) in headers.iter() {
-                request.header(header, value);
+                builder.header(header.as_str(), value.as_str());
             }
         }
 
+        let mut request = builder.body(body.into()).unwrap();
+
         if let Some(auth) = &config.basic_auth {
-            auth.apply(&mut request.headers);
+            auth.apply(request.headers_mut());
         }
 
         request

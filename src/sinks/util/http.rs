@@ -1,9 +1,9 @@
 use super::retries::RetryLogic;
 use futures::Poll;
-use http::{
-    header::{HeaderName, HeaderValue},
-    HeaderMap, Method, Uri,
-};
+// use http::{
+//     header::{HeaderName, HeaderValue},
+//     HeaderMap, Method, Uri,
+// };
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client,
@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
 
-type RequestBuilder = Box<dyn Fn(Vec<u8>) -> Request + Sync + Send>;
+type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send>;
 
 #[derive(Clone)]
 pub struct HttpService {
@@ -21,52 +21,10 @@ pub struct HttpService {
     request_builder: Arc<RequestBuilder>,
 }
 
-#[derive(Debug)]
-pub struct Request {
-    pub method: Method,
-    pub uri: Uri,
-    pub headers: HeaderMap<HeaderValue>,
-    pub body: Vec<u8>,
-}
-
-impl Request {
-    pub fn post(uri: Uri, body: Vec<u8>) -> Self {
-        Request {
-            method: Method::POST,
-            uri,
-            headers: Default::default(),
-            body,
-        }
-    }
-
-    pub fn header<T, U>(&mut self, name: T, value: U) -> &mut Self
-    where
-        T: AsRef<[u8]>,
-        U: AsRef<[u8]>,
-    {
-        let name = HeaderName::from_bytes(name.as_ref()).unwrap();
-        let value = HeaderValue::from_bytes(value.as_ref()).unwrap();
-        self.headers.append(name, value);
-        self
-    }
-}
-
-impl From<Request> for hyper::Request<Body> {
-    fn from(req: Request) -> Self {
-        let mut builder = hyper::Request::builder();
-        builder.method(req.method);
-        builder.uri(req.uri);
-
-        for (k, v) in req.headers.iter() {
-            builder.header(k, v.as_ref());
-        }
-
-        builder.body(req.body.into()).unwrap()
-    }
-}
-
 impl HttpService {
-    pub fn new(request_builder: impl Fn(Vec<u8>) -> Request + Sync + Send + 'static) -> Self {
+    pub fn new(
+        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send + 'static,
+    ) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
@@ -111,8 +69,9 @@ impl RetryLogic for HttpRetryLogic {
 
 #[cfg(test)]
 mod test {
-    use super::{HttpService, Request};
+    use super::HttpService;
     use futures::{Future, Sink, Stream};
+    use http::Method;
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
     use tower::Service;
@@ -125,7 +84,12 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpService::new(move |body| Request::post(uri.clone(), body));
+        let mut service = HttpService::new(move |body| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
+            builder.body(body.into()).unwrap()
+        });
 
         let req = service.call(request);
 

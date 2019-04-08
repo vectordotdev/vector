@@ -4,7 +4,7 @@ use super::util::{
 use crate::buffers::Acker;
 use crate::record::Record;
 use futures::{Future, Sink};
-use http::Uri;
+use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -54,12 +54,14 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         let uri = format!("{}/_bulk", host);
         let uri: Uri = uri.parse().unwrap();
 
-        let mut request = util::http::Request::post(uri, body);
-        request
-            .header("Content-Type", "application/x-ndjson")
-            .header("Content-Encoding", "gzip");
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri);
 
-        request
+        builder.header("Content-Type", "application/x-ndjson");
+        builder.header("Content-Encoding", "gzip");
+
+        builder.body(body.into()).unwrap()
     });
 
     let service = ServiceBuilder::new()
