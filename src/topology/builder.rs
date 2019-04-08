@@ -87,7 +87,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let sink_inputs = &sink.inputs;
 
         let buffer = sink.buffer.build(&config.data_dir, &name);
-        let (tx, rx) = match buffer {
+        let (tx, rx, acker) = match buffer {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;
@@ -95,7 +95,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
             Ok(buffer) => buffer,
         };
 
-        let (sink, healthcheck) = match sink.inner.build() {
+        let (sink, healthcheck) = match sink.inner.build(acker) {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

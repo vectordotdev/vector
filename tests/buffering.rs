@@ -73,9 +73,9 @@ fn test_buffering() {
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait().unwrap();
-    assert_eq!(num_lines * 2 - 1, output_lines.len());
-    assert_eq!(&input_lines[1..], &output_lines[..num_lines - 1]);
-    assert_eq!(input_lines2, &output_lines[num_lines - 1..]);
+    assert_eq!(num_lines * 2, output_lines.len());
+    assert_eq!(input_lines, &output_lines[..num_lines]);
+    assert_eq!(input_lines2, &output_lines[num_lines..]);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn test_max_size() {
 
     let num_lines: usize = 1000;
     let line_size = 1000;
-    let max_size = num_lines * (line_size + 35/* protobuf encoding takes a few extra bytes */) / 2;
+    let max_size = num_lines * (line_size + 39/* protobuf encoding takes a few extra bytes */) / 2;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -142,7 +142,7 @@ fn test_max_size() {
 
     let output_lines = output_lines.wait().unwrap();
     assert_eq!(num_lines / 2, output_lines.len());
-    assert_eq!(&input_lines[1..num_lines / 2 + 1], &output_lines[..]);
+    assert_eq!(&input_lines[..num_lines / 2], &output_lines[..]);
 }
 
 #[test]

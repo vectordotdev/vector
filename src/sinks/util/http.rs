@@ -1,80 +1,42 @@
 use super::retries::RetryLogic;
 use futures::Poll;
-use http::{
-    header::{HeaderName, HeaderValue},
-    HeaderMap, Method, Uri,
-};
+// use http::{
+//     header::{HeaderName, HeaderValue},
+//     HeaderMap, Method, Uri,
+// };
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client,
 };
 use hyper_tls::HttpsConnector;
+use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
+
+type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send>;
 
 #[derive(Clone)]
 pub struct HttpService {
     client: Client<HttpsConnector<HttpConnector>, Body>,
-}
-
-// We need our Request to be Clone to support retries. Hyper's Request type is not Clone because it
-// supports streaming/chunked bodies and the extensions type map. We don't use either of those
-// features, so we can do something a bit simpler than libraries like tower-hyper.
-#[derive(Debug, Clone)]
-pub struct Request {
-    pub method: Method,
-    pub uri: Uri,
-    pub headers: HeaderMap<HeaderValue>,
-    pub body: Vec<u8>,
-}
-
-impl Request {
-    pub fn post(uri: Uri, body: Vec<u8>) -> Self {
-        Request {
-            method: Method::POST,
-            uri,
-            headers: Default::default(),
-            body,
-        }
-    }
-
-    pub fn header<T, U>(&mut self, name: T, value: U) -> &mut Self
-    where
-        T: AsRef<[u8]>,
-        U: AsRef<[u8]>,
-    {
-        let name = HeaderName::from_bytes(name.as_ref()).unwrap();
-        let value = HeaderValue::from_bytes(value.as_ref()).unwrap();
-        self.headers.append(name, value);
-        self
-    }
-}
-
-impl From<Request> for hyper::Request<Body> {
-    fn from(req: Request) -> Self {
-        let mut builder = hyper::Request::builder();
-        builder.method(req.method);
-        builder.uri(req.uri);
-
-        for (k, v) in req.headers.iter() {
-            builder.header(k, v.as_ref());
-        }
-
-        builder.body(req.body.into()).unwrap()
-    }
+    request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
-    pub fn new() -> Self {
+    pub fn new(
+        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send + 'static,
+    ) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
-        Self { client }
+        Self {
+            client,
+            request_builder: Arc::new(Box::new(request_builder)),
+        }
     }
 }
 
-impl Service<Request> for HttpService {
+impl Service<Vec<u8>> for HttpService {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
     type Future = ResponseFuture;
@@ -83,7 +45,8 @@ impl Service<Request> for HttpService {
         Ok(().into())
     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
+    fn call(&mut self, body: Vec<u8>) -> Self::Future {
+        let request = (self.request_builder)(body);
         self.client.request(request.into())
     }
 }
@@ -106,11 +69,12 @@ impl RetryLogic for HttpRetryLogic {
 
 #[cfg(test)]
 mod test {
-    use super::{HttpService, Request};
-    use crate::sinks::util::ServiceSink;
+    use super::HttpService;
     use futures::{Future, Sink, Stream};
+    use http::Method;
     use hyper::service::service_fn;
     use hyper::{Body, Response, Server, Uri};
+    use tower::Service;
 
     #[test]
     fn it_makes_http_requests() {
@@ -119,10 +83,15 @@ mod test {
             .parse::<Uri>()
             .unwrap();
 
-        let request = Request::post(uri, String::from("hello").into_bytes());
-        let sink = ServiceSink::new(HttpService::new());
+        let request = b"hello".to_vec();
+        let mut service = HttpService::new(move |body| {
+            let mut builder = hyper::Request::builder();
+            builder.method(Method::POST);
+            builder.uri(uri.clone());
+            builder.body(body.into()).unwrap()
+        });
 
-        let req = sink.send(request);
+        let req = service.call(request);
 
         let (tx, rx) = futures::sync::mpsc::channel(10);
 

@@ -14,6 +14,7 @@ use leveldb::database::{
     Database,
 };
 use prost::Message;
+use std::collections::VecDeque;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -81,7 +82,8 @@ impl Sink for Writer {
         proto::Record::from(record).encode(&mut value).unwrap(); // This will not error when writing to a Vec
         let record_size = value.len();
 
-        if self.current_size.fetch_add(record_size, Ordering::Relaxed) > self.max_size {
+        if self.current_size.fetch_add(record_size, Ordering::Relaxed) + record_size > self.max_size
+        {
             self.blocked_write_tasks
                 .lock()
                 .unwrap()
@@ -143,13 +145,13 @@ impl Drop for Writer {
 
 pub struct Reader {
     db: Arc<Database<Key>>,
-    offset: usize,
+    read_offset: usize,
+    delete_offset: usize,
     write_notifier: Arc<AtomicTask>,
     blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
-    advance: bool,
-    delete_batch: Writebatch<Key>,
-    batch_size: usize,
     current_size: Arc<AtomicUsize>,
+    ack_counter: Arc<AtomicUsize>,
+    unacked_sizes: VecDeque<usize>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -160,38 +162,28 @@ impl Stream for Reader {
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        // If the previous call to `poll` succeeded, `forward` won't call `poll` again
-        // until the sink has accepted the write.
-        if self.advance {
-            self.delete_batch.delete(Key(self.offset));
-            self.batch_size += 1;
-            self.offset += 1;
-            self.advance = false;
-        }
+        self.delete_acked();
 
-        if self.batch_size >= 10000 {
-            self.delete_batch();
-        }
-
-        // If there's no value at offset, we return NotReady and rely on Writer
+        // If there's no value at read_offset, we return NotReady and rely on Writer
         // using write_notifier to wake this task up after the next write.
         self.write_notifier.register();
 
         // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
         // the app), this will have to go to disk.
         let next = tokio_threadpool::blocking(|| {
-            self.db.get(ReadOptions::new(), Key(self.offset)).unwrap()
+            self.db
+                .get(ReadOptions::new(), Key(self.read_offset))
+                .unwrap()
         })
         .unwrap();
 
         if let Async::Ready(Some(value)) = next {
-            self.current_size.fetch_sub(value.len(), Ordering::Relaxed);
+            self.unacked_sizes.push_back(value.len());
+            self.read_offset += 1;
 
             match proto::Record::decode(value) {
                 Ok(record) => {
                     let record = Record::from(record);
-                    self.advance = true;
-
                     Ok(Async::Ready(Some(record)))
                 }
                 Err(err) => {
@@ -204,8 +196,6 @@ impl Stream for Reader {
             // There are no writers left
             Ok(Async::Ready(None))
         } else {
-            self.delete_batch();
-
             Ok(Async::NotReady)
         }
     }
@@ -213,21 +203,35 @@ impl Stream for Reader {
 
 impl Drop for Reader {
     fn drop(&mut self) {
-        self.delete_batch();
+        self.delete_acked();
     }
 }
 
 impl Reader {
-    fn delete_batch(&mut self) {
-        if self.batch_size > 0 {
-            self.db
-                .write(WriteOptions::new(), &self.delete_batch)
-                .unwrap();
+    fn delete_acked(&mut self) {
+        let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
-            self.db.compact(&Key(0), &Key(self.offset));
+        if num_to_delete > 0 {
+            let new_offset = self.delete_offset + num_to_delete;
+            assert!(
+                new_offset <= self.read_offset,
+                "Tried to ack beyond read offset"
+            );
 
-            self.delete_batch = Writebatch::new();
-            self.batch_size = 0;
+            let mut delete_batch = Writebatch::new();
+
+            for i in self.delete_offset..new_offset {
+                delete_batch.delete(Key(i));
+            }
+
+            self.db.write(WriteOptions::new(), &delete_batch).unwrap();
+
+            self.delete_offset = new_offset;
+
+            self.db.compact(&Key(0), &Key(self.delete_offset));
+
+            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
+            self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
         }
 
         for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
@@ -236,7 +240,7 @@ impl Reader {
     }
 }
 
-pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
+pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader, super::Acker) {
     let mut options = Options::new();
     options.create_if_missing = true;
 
@@ -259,6 +263,9 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
 
     let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 
+    let ack_counter = Arc::new(AtomicUsize::new(0));
+    let acker = super::Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
+
     let writer = Writer {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
@@ -273,12 +280,12 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader) {
         db: Arc::clone(&db),
         write_notifier: Arc::clone(&write_notifier),
         blocked_write_tasks,
-        offset: head,
-        advance: false,
-        delete_batch: Writebatch::new(),
-        batch_size: 0,
+        read_offset: head,
+        delete_offset: head,
         current_size,
+        ack_counter,
+        unacked_sizes: VecDeque::new(),
     };
 
-    (writer, reader)
+    (writer, reader, acker)
 }

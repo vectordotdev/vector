@@ -1,6 +1,7 @@
+use crate::buffers::Acker;
 use crate::record::Record;
 use futures::{
-    future::{poll_fn, IntoFuture},
+    future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
     Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
@@ -9,6 +10,7 @@ use rdkafka::{
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -20,13 +22,18 @@ struct KafkaSinkConfig {
 struct KafkaSink {
     producer: FutureProducer,
     topic: String,
-    in_flight: FuturesUnordered<DeliveryFuture>,
+    in_flight: FuturesUnordered<super::util::MetadataFuture<DeliveryFuture, usize>>,
+
+    acker: Acker,
+    seq_head: usize,
+    seq_tail: usize,
+    pending_acks: HashSet<usize>,
 }
 
 #[typetag::serde(name = "kafka")]
 impl crate::topology::config::SinkConfig for KafkaSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = KafkaSink::new(self.clone())?;
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
     }
@@ -42,7 +49,7 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig) -> Result<Self, String> {
+    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, String> {
         config
             .to_rdkafka()
             .create()
@@ -51,6 +58,10 @@ impl KafkaSink {
                 producer,
                 topic: config.topic,
                 in_flight: FuturesUnordered::new(),
+                acker,
+                seq_head: 0,
+                seq_tail: 0,
+                pending_acks: HashSet::new(),
             })
     }
 }
@@ -81,7 +92,10 @@ impl Sink for KafkaSink {
             }
         };
 
-        self.in_flight.push(future);
+        let seqno = self.seq_head;
+        self.seq_head += 1;
+
+        self.in_flight.push(future.join(future::ok(seqno)));
         Ok(AsyncSink::Ready)
     }
 
@@ -95,14 +109,25 @@ impl Sink for KafkaSink {
                 Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
 
                 // request finished, check for success
-                Ok(Async::Ready(Some(result))) => match result {
-                    Ok((partition, offset)) => trace!(
-                        "produced message to partition {} at offset {}",
-                        partition,
-                        offset
-                    ),
-                    Err((e, _msg)) => error!("kafka error: {}", e),
-                },
+                Ok(Async::Ready(Some((result, seqno)))) => {
+                    match result {
+                        Ok((partition, offset)) => trace!(
+                            "produced message to partition {} at offset {}",
+                            partition,
+                            offset
+                        ),
+                        Err((e, _msg)) => error!("kafka error: {}", e),
+                    };
+
+                    self.pending_acks.insert(seqno);
+
+                    let mut num_to_ack = 0;
+                    while self.pending_acks.remove(&self.seq_tail) {
+                        num_to_ack += 1;
+                        self.seq_tail += 1
+                    }
+                    self.acker.ack(num_to_ack);
+                }
 
                 // request got canceled (according to docs)
                 Err(e) => error!("delivery future canceled: {}", e),
@@ -132,6 +157,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 #[cfg(test)]
 mod test {
     use super::{KafkaSink, KafkaSinkConfig};
+    use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
     use rdkafka::{
@@ -149,7 +175,8 @@ mod test {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
         };
-        let sink = KafkaSink::new(config).unwrap();
+        let (acker, ack_counter) = Acker::new_for_testing();
+        let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_records = 1000;
         let (input, records) = random_lines_with_stream(100, num_records);
@@ -203,5 +230,10 @@ mod test {
 
         assert_eq!(out.len(), input.len());
         assert_eq!(out, input);
+
+        assert_eq!(
+            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+            num_records
+        );
     }
 }

@@ -1,3 +1,5 @@
+use super::util::SinkExt;
+use crate::buffers::Acker;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -18,8 +20,8 @@ pub struct TcpSinkConfig {
 
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SinkConfig for TcpSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((raw_tcp(self.address), tcp_healthcheck(self.address)))
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((raw_tcp(self.address, acker), tcp_healthcheck(self.address)))
     }
 }
 
@@ -131,8 +133,12 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr) -> super::RouterSink {
-    Box::new(TcpSink::new(addr).with(|record: Record| Ok(record.raw)))
+pub fn raw_tcp(addr: SocketAddr, acker: Acker) -> super::RouterSink {
+    Box::new(
+        TcpSink::new(addr)
+            .stream_ack(acker)
+            .with(|record: Record| Ok(record.raw)),
+    )
 }
 
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {

@@ -1,3 +1,4 @@
+use crate::buffers::Acker;
 use crate::{bytes::BytesExt, Record};
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
@@ -42,11 +43,12 @@ pub fn default_address() -> SocketAddr {
 
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = Box::new(PrometheusSink::new(
             self.address,
             self.counters.clone(),
             self.gauges.clone(),
+            acker,
         ));
         let healthcheck = Box::new(future::ok(()));
 
@@ -60,6 +62,7 @@ struct PrometheusSink {
     address: SocketAddr,
     counters: HashMap<Counter, prometheus::Counter>,
     gauges: HashMap<Gauge, prometheus::Gauge>,
+    acker: Acker,
 }
 
 fn handle(
@@ -90,7 +93,7 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>) -> Self {
+    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>, acker: Acker) -> Self {
         let registry = Registry::new();
 
         let counters = counters
@@ -121,6 +124,7 @@ impl PrometheusSink {
             address,
             counters,
             gauges,
+            acker,
         }
     }
 
@@ -191,6 +195,8 @@ impl Sink for PrometheusSink {
                 }
             }
         }
+
+        self.acker.ack(1);
 
         Ok(AsyncSink::Ready)
     }

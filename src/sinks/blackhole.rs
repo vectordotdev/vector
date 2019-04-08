@@ -1,12 +1,13 @@
+use crate::buffers::Acker;
 use crate::record::Record;
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
 pub struct BlackholeSink {
     total_records: usize,
     total_raw_bytes: usize,
     config: BlackholeConfig,
+    acker: Acker,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -16,8 +17,8 @@ pub struct BlackholeConfig {
 
 #[typetag::serde(name = "blackhole")]
 impl crate::topology::config::SinkConfig for BlackholeConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(BlackholeSink::new(self.clone()));
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        let sink = Box::new(BlackholeSink::new(self.clone(), acker));
         let healthcheck = Box::new(healthcheck());
 
         Ok((sink, healthcheck))
@@ -29,11 +30,12 @@ fn healthcheck() -> impl Future<Item = (), Error = String> {
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig) -> Self {
+    pub fn new(config: BlackholeConfig, acker: Acker) -> Self {
         BlackholeSink {
             config,
             total_records: 0,
             total_raw_bytes: 0,
+            acker,
         }
     }
 }
@@ -55,6 +57,8 @@ impl Sink for BlackholeSink {
             }, "Total records collected");
         }
 
+        self.acker.ack(1);
+
         Ok(AsyncSink::Ready)
     }
 
@@ -66,13 +70,14 @@ impl Sink for BlackholeSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::buffers::Acker;
     use crate::test_util::random_records_with_stream;
     use crate::topology::config::SinkConfig;
 
     #[test]
     fn blackhole() {
         let config = BlackholeConfig { print_amount: 10 };
-        let (sink, _) = config.build().unwrap();
+        let (sink, _) = config.build(Acker::Null).unwrap();
 
         let (_input_lines, records) = random_records_with_stream(100, 10);
 

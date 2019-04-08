@@ -1,15 +1,17 @@
-use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use super::util::{
+    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+};
+use crate::buffers::Acker;
 use crate::bytes::BytesExt;
+use crate::record::Record;
 use futures::{Future, Sink};
-use hyper::Uri;
+use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
-
-use crate::record::Record;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -25,15 +27,15 @@ pub struct HecSinkConfig {
 
 #[typetag::serde(name = "splunk_hec")]
 impl crate::topology::config::SinkConfig for HecSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         Ok((
-            hec(self.clone()),
+            hec(self.clone(), acker),
             hec_healthcheck(self.token.clone(), self.host.clone()),
         ))
     }
 }
 
-pub fn hec(config: HecSinkConfig) -> super::RouterSink {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
     let host = config.host.clone();
     let token = config.token.clone();
     let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
@@ -47,7 +49,20 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
 
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
 
-    let http_service = util::http::HttpService::new();
+    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
+        let uri = format!("{}/services/collector/event", host);
+        let uri: Uri = uri.parse().unwrap();
+
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri);
+
+        builder.header("Content-Type", "application/json");
+        builder.header("Content-Encoding", "gzip");
+        builder.header("Authorization", format!("Splunk {}", token));
+
+        builder.body(body.into()).unwrap()
+    });
     let service = ServiceBuilder::new()
         .retry(policy)
         .in_flight_limit(in_flight_limit)
@@ -55,19 +70,7 @@ pub fn hec(config: HecSinkConfig) -> super::RouterSink {
         .service(http_service)
         .expect("This is a bug, no spawning");
 
-    let sink = ServiceSink::new(service)
-        .with(move |body: Buffer| {
-            let uri = format!("{}/services/collector/event", host);
-            let uri: Uri = uri.parse().unwrap();
-
-            let mut request = util::http::Request::post(uri, body.into());
-            request
-                .header("Content-Type", "application/json")
-                .header("Content-Encoding", "gzip")
-                .header("Authorization", format!("Splunk {}", token));
-
-            Ok(request)
-        })
+    let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let host = record.structured.get(&"host".into()).map(|h| h.clone());
@@ -129,6 +132,7 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
 mod tests {
     #![cfg(feature = "splunk-integration-tests")]
 
+    use crate::buffers::Acker;
     use crate::{
         sinks,
         test_util::{random_lines_with_stream, random_string},
@@ -144,7 +148,7 @@ mod tests {
     fn splunk_insert_message() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config());
+        let sink = sinks::splunk::hec(config(), Acker::Null);
 
         let message = random_string(100);
         let record = Record::from(message.clone());
@@ -174,7 +178,7 @@ mod tests {
     fn splunk_insert_many() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config());
+        let sink = sinks::splunk::hec(config(), Acker::Null);
 
         let (messages, records) = random_lines_with_stream(100, 10);
 
@@ -206,7 +210,7 @@ mod tests {
     fn splunk_custom_fields() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config());
+        let sink = sinks::splunk::hec(config(), Acker::Null);
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -236,7 +240,7 @@ mod tests {
     fn splunk_hostname() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config());
+        let sink = sinks::splunk::hec(config(), Acker::Null);
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());

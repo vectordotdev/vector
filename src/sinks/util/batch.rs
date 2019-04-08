@@ -3,21 +3,25 @@ use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 
 pub trait Batch {
-    type Item;
+    type Input;
+    type Output;
     fn len(&self) -> usize;
-    fn push(&mut self, item: Self::Item);
+    fn push(&mut self, item: Self::Input);
     fn is_empty(&self) -> bool;
     fn fresh(&self) -> Self;
+    fn finish(self) -> Self::Output;
+    fn num_items(&self) -> usize;
 }
 
 impl<T> Batch for Vec<T> {
-    type Item = T;
+    type Input = T;
+    type Output = Self;
 
     fn len(&self) -> usize {
         self.len()
     }
 
-    fn push(&mut self, item: Self::Item) {
+    fn push(&mut self, item: Self::Input) {
         self.push(item)
     }
 
@@ -27,6 +31,14 @@ impl<T> Batch for Vec<T> {
 
     fn fresh(&self) -> Self {
         Self::new()
+    }
+
+    fn finish(self) -> Self::Output {
+        self
+    }
+
+    fn num_items(&self) -> usize {
+        self.len()
     }
 }
 
@@ -106,7 +118,7 @@ where
     B: Batch,
     S: Sink<SinkItem = B, SinkError = E>,
 {
-    type SinkItem = B::Item;
+    type SinkItem = B::Input;
     type SinkError = E;
 
     // When used with Stream::forward, a successful call to start_send will always be followed
@@ -184,7 +196,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::BatchSink;
+    use super::{Batch, BatchSink};
     use crate::sinks::util::Buffer;
     use futures::{Future, Sink};
 
@@ -239,7 +251,7 @@ mod test {
         let output = buffered
             .into_inner()
             .into_iter()
-            .map(|buf| buf.into())
+            .map(|buf| buf.finish())
             .collect::<Vec<Vec<u8>>>();
 
         assert_eq!(

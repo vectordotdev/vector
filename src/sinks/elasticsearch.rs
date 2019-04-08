@@ -1,7 +1,10 @@
-use super::util::{self, retries::FixedRetryPolicy, Buffer, Compression, ServiceSink, SinkExt};
+use super::util::{
+    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+};
+use crate::buffers::Acker;
 use crate::{bytes::BytesExt, record::Record};
 use futures::{Future, Sink};
-use http::Uri;
+use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -25,12 +28,12 @@ pub struct ElasticSearchConfig {
 
 #[typetag::serde(name = "elasticsearch")]
 impl crate::topology::config::SinkConfig for ElasticSearchConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((es(self.clone()), healthcheck(self.host.clone())))
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        Ok((es(self.clone(), acker), healthcheck(self.host.clone())))
     }
 }
 
-fn es(config: ElasticSearchConfig) -> super::RouterSink {
+fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
     let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
@@ -44,7 +47,20 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
 
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
 
-    let http_service = util::http::HttpService::new();
+    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
+        let uri = format!("{}/_bulk", host);
+        let uri: Uri = uri.parse().unwrap();
+
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri);
+
+        builder.header("Content-Type", "application/x-ndjson");
+        builder.header("Content-Encoding", "gzip");
+
+        builder.body(body.into()).unwrap()
+    });
+
     let service = ServiceBuilder::new()
         .in_flight_limit(in_flight_limit)
         .retry(policy)
@@ -52,18 +68,7 @@ fn es(config: ElasticSearchConfig) -> super::RouterSink {
         .service(http_service)
         .expect("This is a bug, there is no spawning");
 
-    let sink = ServiceSink::new(service)
-        .with(move |body: Buffer| {
-            let uri = format!("{}/_bulk", host);
-            let uri: Uri = uri.parse().unwrap();
-
-            let mut request = util::http::Request::post(uri, body.into());
-            request
-                .header("Content-Type", "application/x-ndjson")
-                .header("Content-Encoding", "gzip");
-
-            Ok(request)
-        })
+    let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
             let mut action = json!({
@@ -166,6 +171,7 @@ mod tests {
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
     use super::ElasticSearchConfig;
+    use crate::buffers::Acker;
     use crate::{
         test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
@@ -192,7 +198,7 @@ mod integration_tests {
             in_flight_request_limit: None,
         };
 
-        let (sink, _hc) = config.build().unwrap();
+        let (sink, _hc) = config.build(Acker::Null).unwrap();
 
         let mut input_record = Record::from("raw log line");
         input_record.structured.insert("my_id".into(), "42".into());
@@ -244,7 +250,7 @@ mod integration_tests {
             in_flight_request_limit: None,
         };
 
-        let (sink, _hc) = config.build().unwrap();
+        let (sink, _hc) = config.build(Acker::Null).unwrap();
 
         let (input, records) = random_records_with_stream(100, 100);
 

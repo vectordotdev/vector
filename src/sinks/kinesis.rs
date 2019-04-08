@@ -1,7 +1,8 @@
 use super::Record;
+use crate::buffers::Acker;
 use crate::sinks::util::{
     retries::{FixedRetryPolicy, RetryLogic},
-    ServiceSink, SinkExt,
+    BatchServiceSink, SinkExt,
 };
 use futures::{Future, Poll, Sink};
 use rand::random;
@@ -30,15 +31,18 @@ pub struct KinesisSinkConfig {
 
 #[typetag::serde(name = "kinesis")]
 impl crate::topology::config::SinkConfig for KinesisSinkConfig {
-    fn build(&self) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let config = self.clone();
-        let sink = KinesisService::new(config);
+        let sink = KinesisService::new(config, acker);
         Ok((Box::new(sink), healthcheck(self.clone())))
     }
 }
 
 impl KinesisService {
-    pub fn new(config: KinesisSinkConfig) -> impl Sink<SinkItem = Record, SinkError = ()> {
+    pub fn new(
+        config: KinesisSinkConfig,
+        acker: Acker,
+    ) -> impl Sink<SinkItem = Record, SinkError = ()> {
         let client = Arc::new(KinesisClient::new(config.region.clone()));
 
         let batch_size = config.batch_size;
@@ -53,7 +57,7 @@ impl KinesisService {
             .service(kinesis)
             .expect("This is a bug, no spawning done");
 
-        ServiceSink::new(svc)
+        BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
             .with(|record: Record| Ok(record.into()))
     }
@@ -156,6 +160,7 @@ fn healthcheck(config: KinesisSinkConfig) -> super::Healthcheck {
 mod tests {
     #![cfg(feature = "kinesis-integration-tests")]
 
+    use crate::buffers::Acker;
     use crate::sinks::kinesis::{KinesisService, KinesisSinkConfig};
     use crate::test_util::random_lines_with_stream;
     use futures::{Future, Sink};
@@ -185,7 +190,7 @@ mod tests {
 
         let mut rt = Runtime::new().unwrap();
 
-        let sink = KinesisService::new(config);
+        let sink = KinesisService::new(config, Acker::Null);
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
