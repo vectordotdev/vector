@@ -1,4 +1,4 @@
-use super::util::SinkExt2;
+use super::util::SinkExt;
 use crate::buffers::Acker;
 use crate::record::Record;
 use futures::{future, Sink};

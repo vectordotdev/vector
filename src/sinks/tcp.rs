@@ -1,4 +1,4 @@
-use super::util::SinkExt2;
+use super::util::SinkExt;
 use crate::buffers::Acker;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;

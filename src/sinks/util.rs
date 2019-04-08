@@ -14,37 +14,30 @@ use tower::Service;
 
 pub use buffer::{Buffer, Compression};
 
-pub trait SinkExt<B>
+pub trait SinkExt<T>
 where
-    B: Batch,
-    Self: Sink<SinkItem = B> + Sized,
-{
-    fn batched(self, batch: B, limit: usize) -> BatchSink<B, Self> {
-        BatchSink::new(self, batch, limit)
-    }
-
-    fn batched_with_min(self, batch: B, min: usize, delay: Duration) -> BatchSink<B, Self> {
-        BatchSink::new_min(self, batch, min, Some(delay))
-    }
-}
-
-impl<B, S> SinkExt<B> for S
-where
-    B: Batch,
-    S: Sink<SinkItem = B> + Sized,
-{
-}
-
-pub trait SinkExt2
-where
-    Self: Sink + Sized,
+    Self: Sink<SinkItem = T> + Sized,
 {
     fn stream_ack(self, acker: Acker) -> StreamAck<Self> {
         StreamAck::new(self, acker)
     }
+
+    fn batched(self, batch: T, limit: usize) -> BatchSink<T, Self>
+    where
+        T: Batch,
+    {
+        BatchSink::new(self, batch, limit)
+    }
+
+    fn batched_with_min(self, batch: T, min: usize, delay: Duration) -> BatchSink<T, Self>
+    where
+        T: Batch,
+    {
+        BatchSink::new_min(self, batch, min, Some(delay))
+    }
 }
 
-impl<S> SinkExt2 for S where S: Sink + Sized {}
+impl<T, S> SinkExt<T> for S where S: Sink<SinkItem = T> + Sized {}
 
 pub struct StreamAck<T> {
     inner: T,
