@@ -22,12 +22,7 @@ struct KafkaSinkConfig {
 struct KafkaSink {
     producer: FutureProducer,
     topic: String,
-    in_flight: FuturesUnordered<
-        future::Join<
-            DeliveryFuture,
-            future::FutureResult<usize, <DeliveryFuture as Future>::Error>,
-        >,
-    >,
+    in_flight: FuturesUnordered<super::util::MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
     seq_head: usize,

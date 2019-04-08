@@ -85,10 +85,11 @@ impl<T: Sink> Sink for StreamAck<T> {
     }
 }
 
+pub type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
+
 pub struct BatchServiceSink<T, S: Service<T>, B: Batch<Output = T>> {
     service: S,
-    in_flight:
-        FuturesUnordered<future::Join<S::Future, future::FutureResult<(usize, usize), S::Error>>>,
+    in_flight: FuturesUnordered<MetadataFuture<S::Future, (usize, usize)>>,
     _phantom: std::marker::PhantomData<(T, B)>,
 
     acker: Acker,
