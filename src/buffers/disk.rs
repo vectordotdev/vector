@@ -213,7 +213,7 @@ impl Reader {
 
         if num_to_delete > 0 {
             let new_offset = self.delete_offset + num_to_delete;
-            assert!(new_offset <= self.read_offset);
+            assert!(new_offset <= self.read_offset, "Tried to ack beyond read offset");
 
             let mut delete_batch = Writebatch::new();
 
