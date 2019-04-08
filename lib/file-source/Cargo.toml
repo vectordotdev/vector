@@ -1,13 +1,14 @@
 [package]
 name = "file-source"
 version = "0.1.0"
-authors = ["Timber.io <devs@timber.io>"]
+authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 publish = false
 
 [dependencies]
 glob = "0.2.11"
 futures = "0.1.25"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 
 [dev-dependencies]
 tempdir = "0.3"

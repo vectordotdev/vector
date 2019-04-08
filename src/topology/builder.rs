@@ -4,6 +4,7 @@ use futures::prelude::*;
 use futures::{sync::mpsc, Future};
 use std::collections::HashMap;
 use stream_cancel::{Trigger, Tripwire};
+use tokio_trace_futures::Instrument;
 
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 
@@ -105,12 +106,11 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let task = rx.forward(sink).map(|_| ());
         let task: Task = Box::new(task);
 
-        let name2 = name.clone();
-        let name3 = name.clone();
         let healthcheck_task = healthcheck
-            .map(move |_| info!("Healthcheck for {}: Ok", name2))
-            .map_err(move |err| error!("Healthcheck for {}: ERROR: {}", name3, err));
-        let healthcheck_task: Task = Box::new(healthcheck_task);
+            .map(move |_| info!("Healthcheck: Passed."))
+            .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
+        let healthcheck_span = info_span!("healthcheck", name = name.as_str());
+        let healthcheck_task: Task = Box::new(healthcheck_task.instrument(healthcheck_span));
 
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(name.clone(), healthcheck_task);

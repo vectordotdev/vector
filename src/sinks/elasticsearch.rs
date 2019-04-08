@@ -2,7 +2,7 @@ use super::util::{
     self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
 };
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::{bytes::BytesExt, record::Record};
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -10,10 +10,7 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -65,10 +62,10 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     });
 
     let service = ServiceBuilder::new()
-        .layer(InFlightLimitLayer::new(in_flight_limit))
-        .layer(RetryLayer::new(policy))
-        .layer(TimeoutLayer::new(Duration::from_secs(timeout_secs)))
-        .build_service(http_service)
+        .in_flight_limit(in_flight_limit)
+        .retry(policy)
+        .timeout(Duration::from_secs(timeout_secs))
+        .service(http_service)
         .expect("This is a bug, there is no spawning");
 
     let sink = BatchServiceSink::new(service, acker)
@@ -80,7 +77,11 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
                     "_type": config.doc_type,
                 }
             });
-            maybe_set_id(id_key.as_ref(), &mut action, &record);
+            maybe_set_id(
+                id_key.as_ref(),
+                action.pointer_mut("/index").unwrap(),
+                &record,
+            );
 
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
@@ -94,8 +95,9 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
-    let id = key.and_then(|k| record.structured.get(&k.as_ref().into()));
-    if let Some(val) = id {
+    if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
+        let val = val.as_utf8_lossy();
+
         doc.as_object_mut()
             .unwrap()
             .insert("_id".into(), json!(val));
@@ -180,6 +182,58 @@ mod integration_tests {
     use hyper::{Body, Client, Request};
     use hyper_tls::HttpsConnector;
     use serde_json::{json, Value};
+
+    #[test]
+    fn structures_records_correctly() {
+        let index = gen_index();
+        let config = ElasticSearchConfig {
+            host: "http://localhost:9200/".into(),
+            index: index.clone(),
+            doc_type: "log_lines".into(),
+            id_key: Some("my_id".into()),
+            buffer_size: None,
+            compression: None,
+            request_timeout_secs: None,
+            retries: None,
+            in_flight_request_limit: None,
+        };
+
+        let (sink, _hc) = config.build(Acker::Null).unwrap();
+
+        let mut input_record = Record::from("raw log line");
+        input_record.structured.insert("my_id".into(), "42".into());
+        input_record.structured.insert("foo".into(), "bar".into());
+
+        let pump = sink.send(input_record.clone());
+        block_on(pump).unwrap();
+
+        // make sure writes all all visible
+        block_on(flush(config.host)).unwrap();
+
+        let client = SyncClientBuilder::new().build().unwrap();
+
+        let response = client
+            .search::<Value>()
+            .index(index)
+            .body(json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .unwrap();
+        assert_eq!(1, response.total());
+
+        let hit = response.into_hits().next().unwrap();
+        assert_eq!("42", hit.id());
+
+        let value = hit.into_document().unwrap();
+        let expected = json!({
+            "message": "raw log line",
+            "my_id": "42",
+            "foo": "bar",
+            "timestamp": input_record.timestamp,
+        });
+        assert_eq!(expected, value);
+    }
 
     #[test]
     fn insert_records() {

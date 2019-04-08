@@ -2,7 +2,7 @@ use super::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
-use tower_retry::Policy;
+use tower::retry::Policy;
 
 pub trait RetryLogic: Clone {
     type Error: std::error::Error + Send + Sync + 'static;

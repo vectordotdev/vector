@@ -5,7 +5,13 @@ import "google/protobuf/timestamp.proto";
 package record.proto;
 
 message Record {
+  oneof event {
+    Log log = 1;
+  }
+}
+
+message Log {
   bytes raw = 1;
   google.protobuf.Timestamp timestamp = 2;
-  map<string, string> structured = 3;
+  map<string, bytes> structured = 3;
 }

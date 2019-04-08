@@ -2,17 +2,16 @@ use super::util::{
     self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
 };
 use crate::buffers::Acker;
+use crate::bytes::BytesExt;
 use crate::record::Record;
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -65,20 +64,27 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
         builder.body(body.into()).unwrap()
     });
     let service = ServiceBuilder::new()
-        .layer(RetryLayer::new(policy))
-        .layer(InFlightLimitLayer::new(in_flight_limit))
-        .layer(TimeoutLayer::new(Duration::from_secs(timeout_secs)))
-        .build_service(http_service)
+        .retry(policy)
+        .in_flight_limit(in_flight_limit)
+        .timeout(Duration::from_secs(timeout_secs))
+        .service(http_service)
         .expect("This is a bug, no spawning");
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
+            let host = record.structured.get(&"host".into()).map(|h| h.clone());
+
             let mut body = json!({
                 "event": String::from_utf8_lossy(&record.raw[..]),
-                "fields": record.structured,
+                "fields": record.structured
+                    .into_iter()
+                    .map(|(k, v)| (k, v.as_utf8_lossy().into_owned()))
+                    .collect::<HashMap<Atom, String>>(),
             });
-            if let Some(host) = record.structured.get(&Atom::from("host")) {
+
+            if let Some(host) = host {
+                let host = host.as_utf8_lossy();
                 body["host"] = json!(host);
             }
             let body = serde_json::to_vec(&body).unwrap();
@@ -208,7 +214,7 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.structured.insert("asdf".into(), "hello".to_owned());
+        record.structured.insert("asdf".into(), "hello".into());
 
         let pump = sink.send(record);
 
@@ -238,10 +244,10 @@ mod tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.structured.insert("asdf".into(), "hello".to_owned());
+        record.structured.insert("asdf".into(), "hello".into());
         record
             .structured
-            .insert("host".into(), "example.com:1234".to_owned());
+            .insert("host".into(), "example.com:1234".into());
 
         let pump = sink.send(record);
 

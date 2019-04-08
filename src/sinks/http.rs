@@ -13,10 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tower::{
-    layer::{InFlightLimitLayer, RetryLayer, TimeoutLayer},
-    ServiceBuilder,
-};
+use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -166,10 +163,10 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
         request
     });
     let service = ServiceBuilder::new()
-        .layer(RetryLayer::new(policy))
-        .layer(InFlightLimitLayer::new(in_flight_request_limit))
-        .layer(TimeoutLayer::new(Duration::from_secs(request_timeout_secs)))
-        .build_service(http_service)
+        .retry(policy)
+        .in_flight_limit(in_flight_request_limit)
+        .timeout(Duration::from_secs(request_timeout_secs))
+        .service(http_service)
         .expect("This is a bug, there is no spawning");
 
     let sink = BatchServiceSink::new(service, acker)

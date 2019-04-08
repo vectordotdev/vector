@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::record::Record;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -45,7 +46,7 @@ impl Transform for JsonParser {
             .field
             .as_ref()
             .map_or(Some(record.raw.as_ref()), |field| {
-                record.structured.get(field).map(|s| s.as_bytes())
+                record.structured.get(field).map(|s| &s[..])
             });
 
         let parsed = to_parse
@@ -72,19 +73,19 @@ impl Transform for JsonParser {
     }
 }
 
-fn insert(structured: &mut HashMap<Atom, String>, name: String, value: Value) {
+fn insert(structured: &mut HashMap<Atom, Bytes>, name: String, value: Value) {
     match value {
         Value::String(string) => {
-            structured.insert(name.into(), string);
+            structured.insert(name.into(), Bytes::from(string));
         }
         Value::Number(number) => {
-            structured.insert(name.into(), number.to_string());
+            structured.insert(name.into(), Bytes::from(number.to_string()));
         }
         Value::Bool(b) => {
-            structured.insert(name.into(), b.to_string());
+            structured.insert(name.into(), Bytes::from(b.to_string()));
         }
         Value::Null => {
-            structured.insert(name.into(), "".to_string());
+            structured.insert(name.into(), Bytes::from(""));
         }
         Value::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {
@@ -106,6 +107,7 @@ mod test {
     use super::{JsonParser, JsonParserConfig};
     use crate::record::Record;
     use crate::transforms::Transform;
+    use bytes::Bytes;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -135,16 +137,19 @@ mod test {
         let mut record = Record::from("message");
         record.structured.insert(
             "data".into(),
-            r#"{"greeting": "hello", "name": "bob"}"#.to_string(),
+            r#"{"greeting": "hello", "name": "bob"}"#.into(),
         );
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("greeting")], "hello");
-        assert_eq!(record.structured[&Atom::from("name")], "bob");
+        assert_eq!(
+            record.structured[&Atom::from("greeting")],
+            Bytes::from("hello")
+        );
+        assert_eq!(record.structured[&Atom::from("name")], Bytes::from("bob"));
         assert_eq!(
             record.structured[&Atom::from("data")],
-            r#"{"greeting": "hello", "name": "bob"}"#.to_string()
+            Bytes::from(r#"{"greeting": "hello", "name": "bob"}"#)
         );
 
         // Field missing
@@ -179,11 +184,11 @@ mod test {
         });
 
         let mut record = Record::from("message");
-        record.structured.insert("data".into(), invalid.to_string());
+        record.structured.insert("data".into(), invalid.into());
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("data")], invalid);
+        assert_eq!(record.structured[&Atom::from("data")], Bytes::from(invalid));
         assert!(!record.structured.contains_key(&Atom::from("greeting")));
     }
 
@@ -217,17 +222,15 @@ mod test {
         });
 
         let mut record = Record::from("message");
-        record.structured.insert("data".into(), valid.to_string());
+        record.structured.insert("data".into(), valid.into());
         assert!(parser.transform(record).is_some());
 
         let mut record = Record::from("message");
-        record.structured.insert("data".into(), invalid.to_string());
+        record.structured.insert("data".into(), invalid.into());
         assert!(parser.transform(record).is_none());
 
         let mut record = Record::from("message");
-        record
-            .structured
-            .insert("data".into(), not_object.to_string());
+        record.structured.insert("data".into(), not_object.into());
         assert!(parser.transform(record).is_none());
 
         // Missing field
@@ -253,7 +256,7 @@ mod test {
         assert_eq!(record.structured[&Atom::from("name")], "bob");
         assert_eq!(
             record.structured[&Atom::from("message")],
-            "help i'm trapped under many layers of json"
+            Bytes::from("help i'm trapped under many layers of json")
         );
     }
 
@@ -278,19 +281,37 @@ mod test {
         );
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("string")], "this is text");
-        assert_eq!(record.structured[&Atom::from("null")], "");
-        assert_eq!(record.structured[&Atom::from("float")], "12.34");
-        assert_eq!(record.structured[&Atom::from("int")], "56");
-        assert_eq!(record.structured[&Atom::from("bool true")], "true");
-        assert_eq!(record.structured[&Atom::from("bool false")], "false");
-        assert_eq!(record.structured[&Atom::from("array[0]")], "z");
-        assert_eq!(record.structured[&Atom::from("array[1]")], "7");
-        assert_eq!(record.structured[&Atom::from("object.nested")], "data");
-        assert_eq!(record.structured[&Atom::from("object.more")], "values");
+        assert_eq!(
+            record.structured[&Atom::from("string")],
+            Bytes::from("this is text")
+        );
+        assert_eq!(record.structured[&Atom::from("null")], Bytes::from(""));
+        assert_eq!(
+            record.structured[&Atom::from("float")],
+            Bytes::from("12.34")
+        );
+        assert_eq!(record.structured[&Atom::from("int")], Bytes::from("56"));
+        assert_eq!(
+            record.structured[&Atom::from("bool true")],
+            Bytes::from("true")
+        );
+        assert_eq!(
+            record.structured[&Atom::from("bool false")],
+            Bytes::from("false")
+        );
+        assert_eq!(record.structured[&Atom::from("array[0]")], Bytes::from("z"));
+        assert_eq!(record.structured[&Atom::from("array[1]")], Bytes::from("7"));
+        assert_eq!(
+            record.structured[&Atom::from("object.nested")],
+            Bytes::from("data")
+        );
+        assert_eq!(
+            record.structured[&Atom::from("object.more")],
+            Bytes::from("values")
+        );
         assert_eq!(
             record.structured[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
-            "1234"
+            Bytes::from("1234")
         );
     }
 }

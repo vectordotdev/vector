@@ -1,4 +1,5 @@
-use bytes::Bytes;
+use self::proto::{record::Event, Log};
+use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{offset::TimeZone, DateTime, Utc};
 use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -6,16 +7,16 @@ use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod proto {
-    use prost_derive::Message;
-
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
+    #[serde(rename = "message", serialize_with = "crate::bytes::serialize")]
     pub raw: Bytes,
     pub timestamp: DateTime<Utc>,
-    pub structured: HashMap<Atom, String>,
+    #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
+    pub structured: HashMap<Atom, Bytes>,
 }
 
 impl Record {
@@ -36,23 +37,29 @@ impl Default for Record {
 
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
-        let raw = Bytes::from(proto.raw);
+        let event = proto.event.unwrap();
 
-        let timestamp = proto
-            .timestamp
-            .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
-            .unwrap_or_else(|| Utc::now());
+        match event {
+            Event::Log(proto) => {
+                let raw = Bytes::from(proto.raw);
 
-        let structured = proto
-            .structured
-            .into_iter()
-            .map(|(k, v)| (Atom::from(k), v))
-            .collect::<HashMap<_, _>>();
+                let timestamp = proto
+                    .timestamp
+                    .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
+                    .unwrap_or_else(|| Utc::now());
 
-        Self {
-            raw,
-            timestamp,
-            structured,
+                let structured = proto
+                    .structured
+                    .into_iter()
+                    .map(|(k, v)| (Atom::from(k), Bytes::from(v)))
+                    .collect::<HashMap<_, _>>();
+
+                Record {
+                    raw,
+                    timestamp,
+                    structured,
+                }
+            }
         }
     }
 }
@@ -69,14 +76,16 @@ impl From<Record> for proto::Record {
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.to_string(), v.into_buf().collect()))
             .collect::<HashMap<_, _>>();
 
-        Self {
+        let event = Event::Log(Log {
             raw,
             timestamp,
             structured,
-        }
+        });
+
+        proto::Record { event: Some(event) }
     }
 }
 
@@ -111,5 +120,30 @@ impl From<String> for Record {
             timestamp: Utc::now(),
             structured: HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Record;
+    use regex::Regex;
+
+    #[test]
+    fn serialization() {
+        let mut record = Record::from("raw log line");
+        record.structured.insert("foo".into(), "bar".into());
+        record.structured.insert("bar".into(), "baz".into());
+
+        let expected = serde_json::json!({
+            "message": "raw log line",
+            "foo": "bar",
+            "bar": "baz",
+            "timestamp": record.timestamp,
+        });
+        let actual = serde_json::to_value(record).unwrap();
+        assert_eq!(expected, actual);
+
+        let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
+        assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
     }
 }
