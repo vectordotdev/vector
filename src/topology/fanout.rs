@@ -91,13 +91,24 @@ impl Sink for Fanout {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         self.process_control_messages();
 
-        while self.i < self.sinks.len() {
+        if self.sinks.is_empty() {
+            return Ok(AsyncSink::Ready);
+        }
+
+        while self.i < self.sinks.len() - 1 {
             let (_name, sink) = &mut self.sinks[self.i];
             match sink.start_send(item.clone()) {
                 Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
                 Ok(AsyncSink::Ready) => self.i += 1,
                 Err(()) => self.handle_sink_error()?,
             }
+        }
+
+        let (_name, sink) = &mut self.sinks[self.i];
+        match sink.start_send(item) {
+            Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
+            Ok(AsyncSink::Ready) => self.i += 1,
+            Err(()) => self.handle_sink_error()?,
         }
 
         self.i = 0;
