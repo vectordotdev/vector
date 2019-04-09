@@ -12,6 +12,7 @@ message Record {
 
 message Log {
   bytes raw = 1;
-  google.protobuf.Timestamp timestamp = 2;
-  map<string, bytes> structured = 3;
+  bytes host = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, bytes> structured = 4;
 }

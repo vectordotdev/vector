@@ -1,9 +1,9 @@
 use crate::record::Record;
+use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use string_cache::DefaultAtom as Atom;
 use tokio::{self, codec::FramedRead, net::TcpListener};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
@@ -54,13 +54,15 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
             .incoming()
             .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
-                let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
+                let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
 
-                let span = if let Some(addr) = peer_addr {
-                    info_span!("connection", peer_addr = &field::display(&addr))
+                let span = if let Some(addr) = &peer_addr {
+                    info_span!("connection", peer_addr = field::display(addr))
                 } else {
                     info_span!("connection")
                 };
+
+                let host = peer_addr.map(Bytes::from);
 
                 let inner_span = span.clone();
                 span.enter(|| {
@@ -74,11 +76,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                     )
                     .map(Record::from)
                     .map(move |mut record| {
-                        if let Some(host) = &peer_addr {
-                            record
-                                .structured
-                                .insert(Atom::from("host"), host.clone().to_string().into());
-                        }
+                        record.host = host.clone();
 
                         trace!(
                             message = "Received one line.",
@@ -119,10 +117,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(
-            record.structured.get(&"host".into()),
-            Some(&Bytes::from("127.0.0.1"))
-        );
+        assert_eq!(record.host, Some(Bytes::from("127.0.0.1")));
     }
 
     #[test]
