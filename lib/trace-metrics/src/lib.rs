@@ -3,7 +3,7 @@
 //! This subscriber takes another subscriber like `tokio-trace-fmt` and wraps it
 //! with this basic subscriber. It will enable all spans and events that match the
 //! metric capturing criteria. This means every span is enabled regardless of its level
-//! and any event that contains a `counter` or a `gauge` field name.
+//! and any event with a field name ending with `_counter` or `_gauge`.
 //!
 //! # Example
 //!
@@ -169,7 +169,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
             && metadata
                 .fields()
                 .iter()
-                .any(|f| f.name().contains("counter") || f.name().contains("gauge"))
+                .any(|f| f.name().ends_with("_counter") || f.name().ends_with("_gauge"))
             && !metadata
                 .fields()
                 .iter()
@@ -231,17 +231,17 @@ impl Visit for MetricVisitor {
     fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name().contains("counter") {
+        if field.name().ends_with("_counter") {
             self.collector.update_count(field.name(), value as i64);
-        } else if field.name().contains("guage") {
+        } else if field.name().ends_with("_gauge") {
             self.collector.update_gauge(field.name(), value);
         }
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        if field.name().contains("counter") {
+        if field.name().ends_with("_counter") {
             self.collector.update_count(field.name(), value);
-        } else if field.name().contains("guage") {
+        } else if field.name().ends_with("_gauge") {
             self.collector.update_gauge(field.name(), value as u64);
         }
     }
