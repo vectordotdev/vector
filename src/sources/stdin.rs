@@ -1,13 +1,13 @@
 use crate::{record::Record, topology::config::SourceConfig};
 use codec::BytesDelimitedCodec;
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::{
     codec::FramedRead,
     io::{stdin, AsyncRead},
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
     #[serde(default = "default_max_length")]
@@ -29,26 +29,28 @@ fn default_max_length() -> usize {
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
-        Ok(stdin_source(stdin(), self, out))
+        Ok(stdin_source(stdin(), self.clone(), out))
     }
 }
 
-pub fn stdin_source<S>(stream: S, config: &StdinConfig, out: mpsc::Sender<Record>) -> super::Source
+pub fn stdin_source<S>(stream: S, config: StdinConfig, out: mpsc::Sender<Record>) -> super::Source
 where
     S: AsyncRead + Send + 'static,
 {
-    info!("Capturing STDIN");
+    Box::new(future::lazy(move || {
+        info!("Capturing STDIN");
 
-    let source = FramedRead::new(
-        stream,
-        BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
-    )
-    .map(Record::from)
-    .map_err(|e| error!("error reading line: {:?}", e))
-    .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-    .map(|_| info!("finished sending"));
+        let source = FramedRead::new(
+            stream,
+            BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
+        )
+        .map(Record::from)
+        .map_err(|e| error!("error reading line: {:?}", e))
+        .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
+        .map(|_| info!("finished sending"));
 
-    Box::new(source)
+        source
+    }))
 }
 
 #[cfg(test)]
@@ -66,7 +68,7 @@ mod tests {
         let buf = Cursor::new(String::from("hello world\nhello world again"));
 
         let mut rt = Runtime::new().unwrap();
-        let source = stdin_source(buf, &config, tx);
+        let source = stdin_source(buf, config, tx);
 
         rt.block_on(source).unwrap();
 
