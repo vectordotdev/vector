@@ -6,7 +6,7 @@ use futures::{future, Future, Stream};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
-use trace_metrics::MetricsSubscriber;
+use trace_metrics::{EitherSubscriber, MetricsSubscriber};
 use vector::metrics;
 use vector::topology::Topology;
 
@@ -55,7 +55,11 @@ fn main() {
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
     let (metrics_controller, metrics_sink) = metrics::build();
-    let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
+    let subscriber = if metrics_addr.is_some() {
+        EitherSubscriber::Left(MetricsSubscriber::new(subscriber, metrics_sink))
+    } else {
+        EitherSubscriber::Right(subscriber)
+    };
 
     tokio_trace::subscriber::with_default(subscriber, || {
         let metrics_addr = metrics_addr.map(|addr| {

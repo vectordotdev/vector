@@ -32,6 +32,10 @@
 extern crate hotmic;
 extern crate tokio_trace_core;
 
+mod either_subscriber;
+
+pub use either_subscriber::EitherSubscriber;
+
 use hotmic::Sink;
 use std::{
     collections::{HashMap, HashSet},
