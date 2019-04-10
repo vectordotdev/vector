@@ -23,6 +23,12 @@ pub struct HecSinkConfig {
     pub request_timeout_secs: Option<u64>,
     pub retries: Option<usize>,
     pub in_flight_request_limit: Option<usize>,
+    #[serde(default = "default_host_field")]
+    pub host_field: Atom,
+}
+
+fn default_host_field() -> Atom {
+    "host".into()
 }
 
 #[typetag::serde(name = "splunk_hec")]
@@ -46,6 +52,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
     let timeout_secs = config.request_timeout_secs.unwrap_or(10);
     let retries = config.retries.unwrap_or(5);
     let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
+    let host_field = config.host_field;
 
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
 
@@ -73,7 +80,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
-            let host = record.structured.get(&"host".into()).map(|h| h.clone());
+            let host = record.structured.get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
                 "event": String::from_utf8_lossy(&record.raw[..]),
@@ -165,7 +172,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -200,7 +207,7 @@ mod tests {
                 break;
             }
 
-            ::std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
         assert!(found_all);
@@ -226,7 +233,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -259,7 +266,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -268,6 +275,48 @@ mod tests {
         assert_eq!(message, entry["_raw"].as_str().unwrap());
         assert_eq!("hello", entry["asdf"].as_str().unwrap());
         assert_eq!("example.com:1234", entry["host"].as_str().unwrap());
+    }
+
+    #[test]
+    fn splunk_configure_hostname() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        let config = super::HecSinkConfig {
+            host_field: "roast".into(),
+            ..config()
+        };
+
+        let sink = sinks::splunk::hec(config, Acker::Null);
+
+        let message = random_string(100);
+        let mut record = Record::from(message.clone());
+        record.structured.insert("asdf".into(), "hello".into());
+        record
+            .structured
+            .insert("host".into(), "example.com:1234".into());
+        record
+            .structured
+            .insert("roast".into(), "beef.example.com:1234".into());
+
+        let pump = sink.send(record);
+
+        rt.block_on(pump).unwrap();
+
+        let entry = (0..20)
+            .find_map(|_| {
+                recent_entries()
+                    .into_iter()
+                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .or_else(|| {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        None
+                    })
+            })
+            .expect("Didn't find event in Splunk");
+
+        assert_eq!(message, entry["_raw"].as_str().unwrap());
+        assert_eq!("hello", entry["asdf"].as_str().unwrap());
+        assert_eq!("beef.example.com:1234", entry["host"].as_str().unwrap());
     }
 
     #[test]
@@ -342,6 +391,7 @@ mod tests {
             request_timeout_secs: None,
             retries: None,
             in_flight_request_limit: None,
+            host_field: "host".into(),
         }
     }
 
