@@ -39,18 +39,21 @@ save-git-cache: &save-cache
       paths:
         - "target"
 
+install-rust: &install-rust
+  - run:
+      name: Install Rust
+      command: |
+        set -e
+        curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+        export PATH="$HOME/.cargo/bin:$PATH"
+
 release-job-defaults: &release-job-defaults
   machine: true
   steps:
     - *restore-git-cache
     - *restore-cargo-cache
     - *restore-build-cache
-    - run:
-        name: Install Rust
-        command: |
-          set -e
-          curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-          export PATH="$HOME/.cargo/bin:$PATH"
+    - *install-rust
     - run:
         name: Install Cross
         command: |
@@ -174,12 +177,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
-      - run:
-          name: Install Rust
-          command: |
-            set -e
-            curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-            export PATH="$HOME/.cargo/bin:$PATH"
+      - *install-rust
       - checkout
       - run:
           name: Compile
