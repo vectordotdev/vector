@@ -170,7 +170,7 @@ mod tests {
         let valid = "http://localhost:8888".to_string();
         let invalid_scheme = "localhost:8888".to_string();
         let invalid_authority = "http:///".to_string();
-        let invalid_uri = "iminvalidohnoes";
+        let invalid_uri = "iminvalidohnoes".to_string();
 
         assert_eq!(validate_host(&valid), Ok(()));
         assert_eq!(
@@ -178,7 +178,7 @@ mod tests {
             Err("InvalidHost: A Uri Scheme must be supplied".to_string())
         );
         assert_eq!(
-            validate_host(&invalid_scheme),
+            validate_host(&invalid_authority),
             Err("InvalidHost: A Uri Authority must be supplied".to_string())
         );
         assert!(validate_host(&invalid_uri).is_err());
