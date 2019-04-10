@@ -142,8 +142,6 @@ pub fn validate_host(host: &String) -> Result<(), String> {
 
     if let None = uri.scheme_part() {
         Err("InvalidHost: A Uri Scheme must be supplied".into())
-    } else if let None = uri.authority_part() {
-        Err("InvalidHost: A Uri Authority must be supplied".into())
     } else {
         Ok(())
     }
@@ -151,11 +149,29 @@ pub fn validate_host(host: &String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    #![cfg(feature = "splunk-integration-tests")]
+    use super::*;
 
+    #[test]
+    fn splunk_validate_host() {
+        let valid = "http://localhost:8888".to_string();
+        let invalid_scheme = "localhost:8888".to_string();
+        let invalid_uri = "iminvalidohnoes".to_string();
+
+        assert_eq!(validate_host(&valid), Ok(()));
+        assert_eq!(
+            validate_host(&invalid_scheme),
+            Err("InvalidHost: A Uri Scheme must be supplied".to_string())
+        );
+        assert!(validate_host(&invalid_uri).is_err());
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "splunk-integration-tests")]
+mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
-        sinks::{self, splunk::validate_host},
+        sinks,
         test_util::{random_lines_with_stream, random_string},
         Record,
     };
@@ -164,25 +180,6 @@ mod tests {
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
-
-    #[test]
-    fn splunk_validate_host() {
-        let valid = "http://localhost:8888".to_string();
-        let invalid_scheme = "localhost:8888".to_string();
-        let invalid_authority = "http:///".to_string();
-        let invalid_uri = "iminvalidohnoes".to_string();
-
-        assert_eq!(validate_host(&valid), Ok(()));
-        assert_eq!(
-            validate_host(&invalid_scheme),
-            Err("InvalidHost: A Uri Scheme must be supplied".to_string())
-        );
-        assert_eq!(
-            validate_host(&invalid_authority),
-            Err("InvalidHost: A Uri Authority must be supplied".to_string())
-        );
-        assert!(validate_host(&invalid_uri).is_err());
-    }
 
     #[test]
     fn splunk_insert_message() {
