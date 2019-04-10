@@ -172,7 +172,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -207,7 +207,7 @@ mod tests {
                 break;
             }
 
-            ::std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
         assert!(found_all);
@@ -233,7 +233,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -266,7 +266,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
@@ -308,7 +308,7 @@ mod tests {
                     .into_iter()
                     .find(|entry| entry["_raw"].as_str().unwrap() == message)
                     .or_else(|| {
-                        ::std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         None
                     })
             })
