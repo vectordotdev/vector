@@ -1,8 +1,50 @@
 version: 2
 
+restore-git-cache: &restore-cache
+  - restore_cache:
+      keys:
+        - vector-git-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+        - vector-git-cache-{{ arch }}-{{ .Branch }}
+        - vector-git-cache-{{ arch }}
+
+save-git-cache: &save-cache
+  - save_cache:
+      key: vector-git-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+      paths:
+        - ".git"
+
+restore-cargo-cache: &restore-cache
+  - restore_cache:
+      keys:
+        - vector-cargo-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+        - vector-cargo-cache-{{ arch }}-{{ .Branch }}
+        - vector-cargo-cache-{{ arch }}
+
+save-git-cache: &save-cache
+  - save_cache:
+      key: vector-cargo-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+      paths:
+        - "~/.cargo"
+
+restore-build-cache: &restore-cache
+  - restore_cache:
+      keys:
+        - vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+        - vector-build-cache-{{ arch }}-{{ .Branch }}
+        - vector-build-cache-{{ arch }}
+
+save-git-cache: &save-cache
+  - save_cache:
+      key: vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+      paths:
+        - "target"
+
 release-job-defaults: &release-job-defaults
   machine: true
   steps:
+    - *restore-git-cache
+    - *restore-cargo-cache
+    - *restore-build-cache
     - run:
         name: Install Rust
         command: |
@@ -33,20 +75,17 @@ jobs:
       - image: rust:latest
 
     steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
       - checkout
-      - restore_cache:
-          key: project-cache
       - run:
           name: Check formatting
           command: |
             rustup component add rustfmt
             rustfmt --version
             cargo fmt -- --check
-      - save_cache:
-          key: project-cache
-          paths:
-            - "~/.cargo"
-            - "./target"
+      - *save-git-cache
+      - *save-cargo-cache
 
   check-stable:
     resource_class: large
@@ -54,9 +93,9 @@ jobs:
       - image: rust:latest
 
     steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
       - checkout
-      - restore_cache:
-          key: project-cache
       - run:
           name: Install make and friends
           command: |
@@ -68,11 +107,8 @@ jobs:
             RUSTFLAGS: "-D warnings"
           command: |
             cargo check --all --all-features --all-targets
-      - save_cache:
-          key: project-cache
-          paths:
-            - "~/.cargo"
-            - "./target"
+      - *save-git-cache
+      - *save-cargo-cache
 
   test-stable:
     resource_class: xlarge
@@ -104,9 +140,10 @@ jobs:
           - discovery.type=single-node
 
     steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
       - checkout
-      - restore_cache:
-          key: project-cache
       - run:
           name: Install make and friends
           command: |
@@ -118,11 +155,9 @@ jobs:
             cargo test --all --features docker -- --test-threads 2
       - store_test_results:
           path: ./test-results
-      - save_cache:
-          key: project-cache
-          paths:
-            - "~/.cargo"
-            - "./target"
+      - *save-git-cache
+      - *save-cargo-cache
+      - *save-build-cache
 
   release-x86_64-unknown-linux-gnu:
     <<: *release-job-defaults
@@ -136,6 +171,9 @@ jobs:
       TARGET: "x86_64-apple-darwin"
       BUILDER: "cargo"
     steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
       - run:
           name: Install Rust
           command: |
