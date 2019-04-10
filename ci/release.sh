@@ -21,15 +21,28 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
-VERSION="$(git describe --abbrev=0 --tags)"
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
     TARGET="$DEFAULT_TARGET"
 fi
 
+# Temporarily allow unset variables in order to construct the BUILDSTAMP based
+# on variables that only _might_ be set
+set +u
+if [ -n "$CIRCLE_TAG" ]
+then
+  BUILDSTAMP="$CIRCLE_TAG-$TARGET"
+elif [ -n "$CIRCLE_BRANCH" ]
+then
+  BUILDSTAMP="$CIRCLE_BRANCH-$CIRCLE_SHA1-$TARGET"
+else
+  BUILDSTAMP="$BUILDTIME-$TARGET"
+fi
+set -u
+
 S3_PREFIX="s3://packages.timber.io/vector"
-TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
+TAR_NAME="$APP_NAME.$BUILDSTAMP.tar.gz"
 
 BUILDER_COMMAND=${BUILDER:-"cross"}
 
