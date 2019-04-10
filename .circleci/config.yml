@@ -186,39 +186,20 @@ jobs:
             brew install awscli
             ./ci/release.sh
 
-release-workflow-filters: &release-workflow-filters
-  filters:
-    branches:
-      ignore: /.*/
-    tags:
-      only: /v.*/
-
-
 workflows:
   version: 2
 
-  test:
+  test_and_release:
     jobs:
       - rustfmt
       - check-stable
       - test-stable
-  
-  release:
-    jobs:
-      - rustfmt:
-          <<: *release-workflow-filters
-      - check-stable:
-          <<: *release-workflow-filters
-      - test-stable:
-          <<: *release-workflow-filters
       - release-x86_64-unknown-linux-gnu:
-          <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
       - release-x86_64-apple-darwin:
-          <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
