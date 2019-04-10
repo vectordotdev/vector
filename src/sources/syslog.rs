@@ -11,6 +11,7 @@ use tokio::{
     net::{TcpListener, UdpFramed, UdpSocket},
 };
 use tokio_trace::field;
+use tokio_trace_futures::Instrument;
 use tokio_uds::UnixListener;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -61,13 +62,24 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
     Box::new(future::lazy(move || {
         let listener = TcpListener::bind(&addr).expect("failed to bind to tcp listener socket");
 
-        info!("listening on tcp {:?}", listener.local_addr());
+        info!(
+            message = "listening.",
+            addr = &field::display(addr),
+            r#type = "tcp"
+        );
 
         listener
             .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
+            .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
+
+                let span = info_span!("connection");
+
+                if let Some(addr) = peer_addr {
+                    span.record("peer_addr", &field::display(&addr));
+                }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(record_from_str)
@@ -75,7 +87,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(handler)
+                tokio::spawn(handler.instrument(span))
             })
     }))
 }
@@ -87,7 +99,11 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
         future::lazy(move || {
             let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
 
-            info!(message = "listening.", addr = field::display(addr));
+            info!(
+                message = "listening.",
+                addr = &field::display(addr),
+                r#type = "udp"
+            );
 
             future::ok(socket)
         })
@@ -107,13 +123,25 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
 
-        info!("listening on {:?}", listener.local_addr());
+        info!(
+            message = "listening.",
+            path = &field::debug(path),
+            r#type = "unix"
+        );
 
         listener
             .incoming()
             .map_err(|e| error!("failed to accept socket; error = {:?}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let peer_addr = socket.peer_addr().ok();
+
+                let span = info_span!("connection");
+                if let Some(addr) = &peer_addr {
+                    if let Some(path) = addr.as_pathname() {
+                        span.record("peer_path", &field::debug(&path));
+                    }
+                }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(record_from_str)
@@ -121,7 +149,7 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
 
-                tokio::spawn(handler)
+                tokio::spawn(handler.instrument(span))
             })
     }))
 }
@@ -139,7 +167,13 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
 // null byte delimiter in place of newline
 
 fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
-    let line = raw.as_ref().trim();
+    let line = raw.as_ref();
+    trace!(
+        message = "Received line.",
+        bytes = &field::display(line.len())
+    );
+
+    let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
             let mut record = Record {
@@ -154,6 +188,11 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
             if let Some(host) = parsed.hostname {
                 record.structured.insert("host".into(), host.into());
             }
+
+            trace!(
+                message = "processing one record.",
+                record = &field::debug(&record)
+            );
 
             record
         })
