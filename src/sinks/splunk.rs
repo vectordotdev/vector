@@ -4,7 +4,9 @@ use super::util::{
 use crate::buffers::Acker;
 use crate::bytes::BytesExt;
 use crate::record::Record;
+use bytes::Bytes;
 use futures::{Future, Sink};
+use http::HttpTryFrom;
 use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -28,6 +30,8 @@ pub struct HecSinkConfig {
 #[typetag::serde(name = "splunk_hec")]
 impl crate::topology::config::SinkConfig for HecSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        validate_host(&self.host)?;
+
         Ok((
             hec(self.clone(), acker),
             hec_healthcheck(self.token.clone(), self.host.clone()),
@@ -43,29 +47,34 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
+    let timeout_secs = config.request_timeout_secs.unwrap_or(20);
     let retries = config.retries.unwrap_or(5);
     let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
 
     let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
 
-    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
-        let uri = format!("{}/services/collector/event", host);
-        let uri: Uri = uri.parse().unwrap();
+    let token = Bytes::from(format!("Splunk {}", token));
+    let uri = format!("{}/services/collector/event", host);
+    let uri = uri.parse::<Uri>().unwrap();
 
+    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri);
+        builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/json");
-        builder.header("Content-Encoding", "gzip");
-        builder.header("Authorization", format!("Splunk {}", token));
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
+
+        builder.header("Authorization", token.clone());
 
         builder.body(body.into()).unwrap()
     });
     let service = ServiceBuilder::new()
-        .retry(policy)
         .in_flight_limit(in_flight_limit)
+        .retry(policy)
         .timeout(Duration::from_secs(timeout_secs))
         .service(http_service)
         .expect("This is a bug, no spawning");
@@ -128,6 +137,18 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
+pub fn validate_host(host: &String) -> Result<(), String> {
+    let uri = Uri::try_from(host).map_err(|e| format!("InvalidHost: {}", e))?;
+
+    if let None = uri.scheme_part() {
+        Err("InvalidHost: A Uri Scheme must be supplied".into())
+    } else if let None = uri.authority_part() {
+        Err("InvalidHost: A Uri Authority must be supplied".into())
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![cfg(feature = "splunk-integration-tests")]
@@ -143,6 +164,25 @@ mod tests {
 
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
+
+    #[test]
+    fn splunk_validate_host() {
+        let valid = "http://localhost:8888".to_string();
+        let invalid_scheme = "localhost:8888".to_string();
+        let invalid_authority = "http:///".to_string();
+        let invalid_uri = "iminvalidohnoes";
+
+        assert_eq!(validate_host(&valid), Ok(()));
+        assert_eq!(
+            validate_host(&invalid_scheme),
+            Err("InvalidHost: A Uri Scheme must be supplied".to_string())
+        );
+        assert_eq!(
+            validate_host(&invalid_scheme),
+            Err("InvalidHost: A Uri Authority must be supplied".to_string())
+        );
+        assert!(validate_host(&invalid_uri).is_err());
+    }
 
     #[test]
     fn splunk_insert_message() {

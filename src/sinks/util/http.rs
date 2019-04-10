@@ -1,16 +1,14 @@
 use super::retries::RetryLogic;
-use futures::Poll;
-// use http::{
-//     header::{HeaderName, HeaderValue},
-//     HeaderMap, Method, Uri,
-// };
+use futures::{Async, Future, Poll};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client,
 };
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::executor::DefaultExecutor;
+use tokio_trace::{field, Span};
 use tower::Service;
 
 type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send>;
@@ -27,6 +25,7 @@ impl HttpService {
     ) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
+            // .http1_max_buf_size(400000000000)
             .executor(DefaultExecutor::current())
             .build(https);
         Self {
@@ -39,7 +38,7 @@ impl HttpService {
 impl Service<Vec<u8>> for HttpService {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
-    type Future = ResponseFuture;
+    type Future = Instrumented;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -47,7 +46,53 @@ impl Service<Vec<u8>> for HttpService {
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         let request = (self.request_builder)(body);
-        self.client.request(request.into())
+
+        let start = Instant::now();
+        let span = info_span!(
+            "request",
+            method = &field::debug(request.method()),
+            version = &field::debug(request.version()),
+            uri = &field::debug(request.uri()),
+        );
+        trace!(
+            message = "sending.",
+            headers = &field::debug(request.headers())
+        );
+        let inner = self.client.request(request.into());
+
+        Instrumented { inner, span, start }
+    }
+}
+
+pub struct Instrumented {
+    inner: ResponseFuture,
+    span: Span,
+    start: Instant,
+}
+
+impl Future for Instrumented {
+    type Item = <ResponseFuture as Future>::Item;
+    type Error = <ResponseFuture as Future>::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let span = self.span.clone();
+        let start = self.start;
+
+        span.enter(|| match self.inner.poll() {
+            Ok(Async::Ready(res)) => {
+                let end = Instant::now();
+                let duration = end.duration_since(start);
+                debug!(
+                    message = "response.",
+                    status = &field::display(res.status()),
+                    version = &field::debug(res.version()),
+                    duration_ms = &field::debug(duration.as_millis())
+                );
+                Ok(Async::Ready(res))
+            }
+
+            p => p,
+        })
     }
 }
 

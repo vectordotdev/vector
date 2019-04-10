@@ -2,7 +2,7 @@ use super::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
-use tower::retry::Policy;
+use tower::{retry::Policy, timeout};
 
 pub trait RetryLogic: Clone {
     type Error: std::error::Error + Send + Sync + 'static;
@@ -80,6 +80,9 @@ where
                         error!("encountered non-retriable error: {}", error);
                         None
                     }
+                } else if error.is::<timeout::error::Elapsed>() {
+                    warn!("request timed out retrying...");
+                    Some(self.build_retry())
                 } else {
                     warn!("unexpected error type: {}", error);
                     None
