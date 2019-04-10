@@ -44,6 +44,8 @@ impl Service<Vec<u8>> for HttpService {
     }
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
+        let bytes = body.len();
+
         let request = (self.request_builder)(body);
 
         let start = Instant::now();
@@ -53,10 +55,15 @@ impl Service<Vec<u8>> for HttpService {
             version = &field::debug(request.version()),
             uri = &field::debug(request.uri()),
         );
-        trace!(
-            message = "sending.",
-            headers = &field::debug(request.headers())
-        );
+
+        span.enter(|| {
+            debug!(
+                message = "sending.",
+                headers = &field::debug(request.headers()),
+                bytes = bytes
+            )
+        });
+
         let inner = self.client.request(request.into());
 
         Instrumented { inner, span, start }

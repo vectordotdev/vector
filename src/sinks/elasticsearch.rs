@@ -41,7 +41,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
+    let timeout_secs = config.request_timeout_secs.unwrap_or(20);
     let retries = config.retries.unwrap_or(5);
     let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
 
@@ -56,7 +56,10 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         builder.uri(uri);
 
         builder.header("Content-Type", "application/x-ndjson");
-        builder.header("Content-Encoding", "gzip");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
 
         builder.body(body.into()).unwrap()
     });
