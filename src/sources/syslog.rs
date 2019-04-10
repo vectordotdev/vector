@@ -75,26 +75,14 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
 
-                let span = if let Some(addr) = peer_addr {
-                    info_span!("connection", peer_addr = &field::display(&addr))
-                } else {
-                    info_span!("connection")
-                };
+                let span = info_span!("connection");
+
+                if let Some(addr) = peer_addr {
+                    span.record("peer_addr", &field::display(&addr));
+                }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .inspect(|s| {
-                        trace!(
-                            message = "Received bytes.",
-                            bytes = &field::display(s.len())
-                        )
-                    })
                     .filter_map(record_from_str)
-                    .inspect(|record| {
-                        trace!(
-                            message = "Processed one record.",
-                            record = &field::debug(record)
-                        )
-                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -121,20 +109,7 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
         })
         .and_then(|socket| {
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .inspect(|(b, s)| {
-                    trace!(
-                        message = "Received bytes.",
-                        bytes = &field::display(b.len()),
-                        remote_addr = &field::display(s)
-                    )
-                })
                 .filter_map(|(bytes, _sock)| record_from_bytes(&bytes))
-                .inspect(|record| {
-                    trace!(
-                        message = "Processed one record.",
-                        record = &field::debug(record)
-                    )
-                })
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
@@ -161,30 +136,15 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
 
-                let span = if let Some(addr) = &peer_addr {
+                let span = info_span!("connection");
+                if let Some(addr) = &peer_addr {
                     if let Some(path) = addr.as_pathname() {
-                        info_span!("connection", peer_path = &field::debug(&path))
-                    } else {
-                        info_span!("connection")
+                        span.record("peer_path", &field::debug(&path))
                     }
-                } else {
-                    info_span!("connection")
-                };
+                }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .inspect(|s| {
-                        trace!(
-                            message = "Received bytes.",
-                            bytes = &field::display(s.len())
-                        )
-                    })
                     .filter_map(record_from_str)
-                    .inspect(|record| {
-                        trace!(
-                            message = "Processed one record.",
-                            record = &field::debug(record)
-                        )
-                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -207,7 +167,13 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
 // null byte delimiter in place of newline
 
 fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
-    let line = raw.as_ref().trim();
+    let line = raw.as_ref();
+    trace!(
+        message = "Received line.",
+        bytes = &field::display(line.len())
+    );
+
+    let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
             let mut record = Record {
@@ -222,6 +188,11 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
             if let Some(host) = parsed.hostname {
                 record.structured.insert("host".into(), host.into());
             }
+
+            trace!(
+                message = "processing one record.",
+                record = &field::debug(&record)
+            );
 
             record
         })
