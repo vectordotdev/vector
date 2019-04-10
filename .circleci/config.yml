@@ -47,6 +47,13 @@ install-rust: &install-rust
         curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
         export PATH="$HOME/.cargo/bin:$PATH"
 
+install-make: &install-make
+  - run:
+      name: Install make and friends
+      command: |
+        apt-get update
+        apt-get -y install build-essential
+
 release-job-defaults: &release-job-defaults
   machine: true
   steps:
@@ -99,11 +106,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - checkout
-      - run:
-          name: Install make and friends
-          command: |
-            apt-get update
-            apt-get -y install build-essential
+      - *install-make
       - run:
           name: Build
           environment:
@@ -147,11 +150,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - checkout
-      - run:
-          name: Install make and friends
-          command: |
-            apt-get update
-            apt-get -y install build-essential
+      - *install-make
       - run:
           name: Test
           command: |
