@@ -4,7 +4,7 @@ extern crate tokio_trace;
 use clap::{App, Arg};
 use futures::{future, Future, Stream};
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-use tokio_trace::field;
+use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
@@ -30,14 +30,14 @@ fn main() {
             Arg::with_name("metrics-addr")
                 .short("m")
                 .long("metrics-addr")
-                .default_value("127.0.0.1:8888")
                 .help("The address that metrics will be served from")
+                .takes_value(true)
         );
     let matches = app.get_matches();
 
     let config_path = matches.value_of("config").unwrap();
 
-    let addr = matches.value_of("metrics-addr").unwrap();
+    let metrics_addr = matches.value_of("metrics-addr");
 
     let mut levels = ["vector=info", "codec=info", "file_source=info"]
         .join(",")
@@ -55,18 +55,24 @@ fn main() {
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
     let (metrics_controller, metrics_sink) = metrics::build();
-    let subscriber = MetricsSubscriber::new(subscriber, metrics_sink);
+    let dispatch = if metrics_addr.is_some() {
+        Dispatch::new(MetricsSubscriber::new(subscriber, metrics_sink))
+    } else {
+        Dispatch::new(subscriber)
+    };
 
-    tokio_trace::subscriber::with_default(subscriber, || {
-        let metrics_addr = if let Ok(addr) = addr.parse() {
-            addr
-        } else {
-            error!(
-                message = "Unable to parse metrics address.",
-                addr = field::display(&addr)
-            );
-            std::process::exit(1);
-        };
+    tokio_trace::dispatcher::with_default(&dispatch, || {
+        let metrics_addr = metrics_addr.map(|addr| {
+            if let Ok(addr) = addr.parse() {
+                addr
+            } else {
+                error!(
+                    message = "Unable to parse metrics address.",
+                    addr = field::display(&addr)
+                );
+                std::process::exit(1);
+            }
+        });
 
         debug!(
             message = "Loading config.",
@@ -119,15 +125,17 @@ fn main() {
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
-        debug!("Attempting to spawn metrics server");
+        if let Some(metrics_addr) = metrics_addr {
+            debug!("Starting metrics server");
 
-        rt.spawn(
-            metrics::serve(&metrics_addr, metrics_controller)
-                .instrument(info_span!("metrics", addr = field::display(&metrics_addr)))
-                .select(metrics_tripwire)
-                .map(|_| ())
-                .map_err(|_| ()),
-        );
+            rt.spawn(
+                metrics::serve(&metrics_addr, metrics_controller)
+                    .instrument(info_span!("metrics", addr = field::display(&metrics_addr)))
+                    .select(metrics_tripwire)
+                    .map(|_| ())
+                    .map_err(|_| ()),
+            );
+        }
 
         let require_healthy = matches.is_present("require-healthy");
 
