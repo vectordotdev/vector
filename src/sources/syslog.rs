@@ -139,7 +139,7 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
                 let span = info_span!("connection");
                 if let Some(addr) = &peer_addr {
                     if let Some(path) = addr.as_pathname() {
-                        span.record("peer_path", &field::debug(&path))
+                        span.record("peer_path", &field::debug(&path));
                     }
                 }
 
