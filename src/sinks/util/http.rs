@@ -25,7 +25,6 @@ impl HttpService {
     ) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client: Client<_, Body> = Client::builder()
-            // .http1_max_buf_size(400000000000)
             .executor(DefaultExecutor::current())
             .build(https);
         Self {

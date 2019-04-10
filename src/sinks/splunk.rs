@@ -155,7 +155,7 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
-        sinks,
+        sinks::{self, splunk::validate_host},
         test_util::{random_lines_with_stream, random_string},
         Record,
     };
