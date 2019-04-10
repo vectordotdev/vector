@@ -62,7 +62,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     });
 
     let service = ServiceBuilder::new()
-        .in_flight_limit(in_flight_limit)
+        .concurrency_limit(in_flight_limit)
         .retry(policy)
         .timeout(Duration::from_secs(timeout_secs))
         .service(http_service)

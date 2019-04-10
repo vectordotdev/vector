@@ -51,7 +51,7 @@ impl KinesisService {
         let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), KinesisRetryLogic);
 
         let svc = ServiceBuilder::new()
-            .in_flight_limit(1)
+            .concurrency_limit(1)
             .retry(policy)
             .timeout(Duration::from_secs(10))
             .service(kinesis)

@@ -51,7 +51,7 @@ pub fn new(config: S3SinkInnerConfig, acker: Acker) -> super::RouterSink {
     let s3 = S3Sink { config };
 
     let svc = ServiceBuilder::new()
-        .in_flight_limit(1)
+        .concurrency_limit(1)
         .timeout(Duration::from_secs(10))
         .service(s3)
         .expect("This is a bug, no spawnning");

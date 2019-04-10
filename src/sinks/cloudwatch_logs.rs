@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::fmt;
 use std::time::Duration;
+use tower::buffer::BufferLazyLayer;
 use tower::{Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
@@ -52,6 +53,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
 
         let svc = ServiceBuilder::new()
+            .layer(BufferLazyLayer::new(5))
             .timeout(Duration::from_secs(10))
             .service(cloudwatch)
             .expect("This is a bug, no service spawning");

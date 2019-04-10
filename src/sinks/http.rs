@@ -164,7 +164,7 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
     });
     let service = ServiceBuilder::new()
         .retry(policy)
-        .in_flight_limit(in_flight_request_limit)
+        .concurrency_limit(in_flight_request_limit)
         .timeout(Duration::from_secs(request_timeout_secs))
         .service(http_service)
         .expect("This is a bug, there is no spawning");
