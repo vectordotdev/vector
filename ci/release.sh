@@ -60,6 +60,7 @@ set +u
 
 TAG=$CIRCLE_TAG
 BRANCH=$CIRCLE_BRANCH
+COMMIT_SHA=$CIRCLE_SHA1
 
 if [ -n "$TAG" ]
 then
@@ -71,7 +72,7 @@ then
 elif [ -n "$BRANCH" ]
 then
   S3_PATH="branches/$BRANCH/"
-  TAR_NAME="$APP_NAME-$BRANCH-$CIRCLE_SHA1-$TARGET.tar.gz"
+  TAR_NAME="$APP_NAME-$BRANCH-$COMMIT_SHA-$TARGET.tar.gz"
   build_and_upload
 
   S3_PATH="branches/$BRANCH/"
