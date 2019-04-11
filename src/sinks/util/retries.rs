@@ -2,6 +2,7 @@ use super::Error;
 use futures::{try_ready, Async, Future, Poll};
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
+use tokio_trace::field;
 use tower::{retry::Policy, timeout};
 
 pub trait RetryLogic: Clone {
@@ -60,7 +61,10 @@ where
         match result {
             Ok(response) => {
                 if self.logic.should_retry_response(response) {
-                    warn!("retrying after response");
+                    warn!(
+                        message = "retrying after response.",
+                        total_retries = &field::display(self.remaining_attempts)
+                    );
                     Some(self.build_retry())
                 } else {
                     None
@@ -74,17 +78,24 @@ where
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!("retrying after error: {}", expected);
+                        warn!(
+                            message = "retrying request after error.",
+                            error = &field::display(&expected),
+                            total_retries = &field::display(self.remaining_attempts)
+                        );
                         Some(self.build_retry())
                     } else {
                         error!("encountered non-retriable error: {}", error);
                         None
                     }
                 } else if error.is::<timeout::error::Elapsed>() {
-                    warn!("request timed out retrying...");
+                    warn!(
+                        message = "request timed out retrying.",
+                        total_retries = &field::display(self.remaining_attempts)
+                    );
                     Some(self.build_retry())
                 } else {
-                    warn!("unexpected error type: {}", error);
+                    error!("unexpected error type: {}", error);
                     None
                 }
             }
