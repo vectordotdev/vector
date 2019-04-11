@@ -23,12 +23,7 @@ pub struct HecSinkConfig {
     pub request_timeout_secs: Option<u64>,
     pub retries: Option<usize>,
     pub in_flight_request_limit: Option<usize>,
-    #[serde(default = "default_host_field")]
-    pub host_field: Atom,
-}
-
-fn default_host_field() -> Atom {
-    "host".into()
+    pub host_field: Option<Atom>,
 }
 
 #[typetag::serde(name = "splunk_hec")]
@@ -80,7 +75,13 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
-            let host = record.structured.get(&host_field).map(|h| h.clone());
+            // try configured field, then "host", then builtin
+            let host = host_field
+                .as_ref()
+                .and_then(|field| record.structured.get(field))
+                .or_else(|| record.structured.get(&"host".into()))
+                .map(Clone::clone)
+                .or(record.host);
 
             let mut body = json!({
                 "event": String::from_utf8_lossy(&record.raw[..]),
@@ -142,7 +143,7 @@ mod tests {
     use crate::buffers::Acker;
     use crate::{
         sinks,
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{random_lines_with_stream, random_string, wait_for},
         Record,
     };
     use futures::Sink;
@@ -282,41 +283,58 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let config = super::HecSinkConfig {
-            host_field: "roast".into(),
+            host_field: Some("roast".into()),
             ..config()
         };
 
         let sink = sinks::splunk::hec(config, Acker::Null);
 
         let message = random_string(100);
+        let mut records = vec![];
+
         let mut record = Record::from(message.clone());
+        record.host = Some("localhost:1234".into());
         record.structured.insert("asdf".into(), "hello".into());
+        records.push(record.clone());
+
         record
             .structured
             .insert("host".into(), "example.com:1234".into());
+        records.push(record.clone());
+
         record
             .structured
             .insert("roast".into(), "beef.example.com:1234".into());
+        records.push(record);
 
-        let pump = sink.send(record);
+        let pump = sink.send_all(futures::stream::iter_ok(records.into_iter()));
 
         rt.block_on(pump).unwrap();
 
-        let entry = (0..20)
-            .find_map(|_| {
-                recent_entries()
-                    .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
-                    .or_else(|| {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        None
-                    })
-            })
-            .expect("Didn't find event in Splunk");
+        let mut entries = Vec::new();
+        wait_for(|| {
+            entries = recent_entries()
+                .into_iter()
+                .filter(|entry| entry["_raw"].as_str().unwrap() == message)
+                .collect::<Vec<_>>();
+            entries.len() == 3
+        });
+        entries.reverse();
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
-        assert_eq!("beef.example.com:1234", entry["host"].as_str().unwrap());
+        assert_eq!(message, entries[0]["_raw"].as_str().unwrap());
+        assert_eq!("hello", entries[0]["asdf"].as_str().unwrap());
+        assert_eq!("localhost:1234", entries[0]["host"].as_str().unwrap());
+
+        assert_eq!(message, entries[1]["_raw"].as_str().unwrap());
+        assert_eq!("hello", entries[1]["asdf"].as_str().unwrap());
+        assert_eq!("example.com:1234", entries[1]["host"].as_str().unwrap());
+
+        assert_eq!(message, entries[2]["_raw"].as_str().unwrap());
+        assert_eq!("hello", entries[2]["asdf"].as_str().unwrap());
+        assert_eq!(
+            "beef.example.com:1234",
+            entries[2]["host"].as_str().unwrap()
+        );
     }
 
     #[test]
@@ -391,7 +409,7 @@ mod tests {
             request_timeout_secs: None,
             retries: None,
             in_flight_request_limit: None,
-            host_field: "host".into(),
+            host_field: None,
         }
     }
 

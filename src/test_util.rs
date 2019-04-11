@@ -117,7 +117,7 @@ pub fn receive_lines_with_count(
     (futures::sync::oneshot::spawn(lines, executor), count)
 }
 
-pub fn wait_for(f: impl Fn() -> bool) {
+pub fn wait_for(mut f: impl FnMut() -> bool) {
     let wait = std::time::Duration::from_millis(5);
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;
