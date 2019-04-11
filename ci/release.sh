@@ -21,7 +21,7 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
-BUILDTIME=$(date +%Y-%m-%d.%s)
+BUILDTIMESTAMP=$(date +%s)
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
@@ -68,7 +68,7 @@ then
   upload_s3
 elif [ -n "$BRANCH" ]
 then
-  TAR_NAME="$APP_NAME-$BRANCH-$COMMIT_SHA-$TARGET.tar.gz"
+  TAR_NAME="$APP_NAME-$BRANCH-$BUILDTIMESTAMP-$COMMIT_SHA-$TARGET.tar.gz"
   build_release
   build_tar
 
