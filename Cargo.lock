@@ -2861,34 +2861,37 @@ dependencies = [
 [[package]]
 name = "tower"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-buffer 0.1.0",
- "tower-discover 0.1.0",
- "tower-layer 0.1.0",
- "tower-limit 0.1.0",
- "tower-load-shed 0.1.0",
- "tower-reconnect 0.1.0",
- "tower-retry 0.1.0",
+ "tower-buffer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-discover 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-limit 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-load-shed 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-reconnect 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-retry 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-timeout 0.1.0",
- "tower-util 0.1.0",
+ "tower-timeout 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
+ "tower-util 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
 ]
 
 [[package]]
 name = "tower-buffer"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-sync 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-discover"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2897,6 +2900,7 @@ dependencies = [
 [[package]]
 name = "tower-layer"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2905,40 +2909,44 @@ dependencies = [
 [[package]]
 name = "tower-limit"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-sync 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-load-shed"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-reconnect"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-util 0.1.0",
+ "tower-util 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
 ]
 
 [[package]]
 name = "tower-retry"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2953,20 +2961,22 @@ dependencies = [
 [[package]]
 name = "tower-timeout"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-util"
 version = "0.1.0"
+source = "git+https://github.com/LucioFranco/tower?branch=buffer-lazy#74cec82bb7b7f817e4e5ed560d3c5b4d1e1c42df"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0",
+ "tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -3180,7 +3190,7 @@ dependencies = [
  "tokio-trace-futures 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
  "tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower 0.1.0",
+ "tower 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)",
  "trace-metrics 0.1.0",
  "typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3618,7 +3628,17 @@ dependencies = [
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
 "checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
+"checksum tower 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-buffer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-discover 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-layer 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-limit 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-load-shed 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-reconnect 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-retry 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
 "checksum tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2cc0c98637d23732f8de6dfd16494c9f1559c3b9e20b4a46462c8f9b9e827bfa"
+"checksum tower-timeout 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
+"checksum tower-util 0.1.0 (git+https://github.com/LucioFranco/tower?branch=buffer-lazy)" = "<none>"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "204be70778085341a7d3a0e8bb7330dd237ac5b7ea3eb29d1c201fa713510b43"

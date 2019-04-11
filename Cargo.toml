@@ -43,8 +43,7 @@ rusoto_kinesis = "0.37.0"
 rusoto_credential = "0.16.0"
 
 # Tower
-# tower = { git = "https://github.com/tower-rs/tower" }
-tower = { path = "../tower/tower" }
+tower = { git = "https://github.com/LucioFranco/tower", branch = "buffer-lazy" }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
