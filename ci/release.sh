@@ -16,8 +16,6 @@
 
 set -eou pipefail
 
-. ./semver.sh  
-
 DEFAULT_TARGET="$(rustup target list | grep '(default)' | awk '{print $1}')"
 ARGS=${EXTRA_ARGS:-}
 
@@ -67,21 +65,8 @@ if [ -n "$TAG" ]
 then
   echo "Building release for tag $TAG"
 
-  semverParseInto $TAG MAJOR MINOR PATCH SPECIAL
-
-  # Release this exact version
   S3_PATH="tags/$TAG/"
   TAR_NAME="$APP_NAME-$TAG-$TARGET.tar.gz"
-  build_and_upload
-
-  # Release the latest minor version
-  S3_PATH="tags/$MAJOR.$MINOR.X/"
-  TAR_NAME="$APP_NAME-$MAJOR.$MINOR.X-$TARGET.tar.gz"
-  build_and_upload
-
-  # Release the latest major version
-  S3_PATH="tags/$MAJOR.X.X/"
-  TAR_NAME="$APP_NAME-$MAJOR.X.X-$TARGET.tar.gz"
   build_and_upload
 elif [ -n "$BRANCH" ]
 then
