@@ -208,6 +208,13 @@ jobs:
             brew install awscli
             ./ci/release.sh
 
+test-workflow-filters: &test-workflow-filters
+  filters:
+    branches:
+      ignore: master
+    tags:
+      ignore: /.*/
+
 release-workflow-filters: &release-workflow-filters
   filters:
     branches:
@@ -220,9 +227,12 @@ workflows:
 
   test:
     jobs:
-      - rustfmt
-      - check-stable
-      - test-stable
+      - rustfmt:
+          <<: *test-workflow-filters
+      - check-stable:
+          <<: *test-workflow-filters
+      - test-stable:
+          <<: *test-workflow-filters
   
   release:
     jobs:
