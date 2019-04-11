@@ -1,0 +1,15 @@
+[package]
+name = "buffer-lazy"
+version = "0.1.0"
+authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.1.25"
+tokio-executor = "0.1"
+tower-buffer = { git = "https://github.com/tower-rs/tower" }
+tower-layer = { git = "https://github.com/tower-rs/tower" }
+tower-service = "0.2"
+
+[dev-dependencies]
+tower-test = { git = "https://github.com/tower-rs/tower" }
