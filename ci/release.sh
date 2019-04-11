@@ -21,7 +21,6 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
-BUILDTIMESTAMP=$(date +%s)
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
@@ -55,6 +54,7 @@ set +u
 TAG=$CIRCLE_TAG
 BRANCH=$CIRCLE_BRANCH
 COMMIT_SHA=$CIRCLE_SHA1
+COMMIT_TIMESTAMP=$(git show -s --format=%ct $COMMIT_SHA)
 
 if [ -n "$TAG" ]
 then
@@ -69,7 +69,7 @@ then
 elif [ -n "$BRANCH" ]
 then
   SHORT_COMMIT_SHA=$(echo $COMMIT_SHA | cut -c1-7)
-  TAR_NAME="$APP_NAME-$BRANCH-$BUILDTIMESTAMP-$SHORT_COMMIT_SHA-$TARGET.tar.gz"
+  TAR_NAME="$APP_NAME-$BRANCH-$COMMIT_TIMESTAMP-$SHORT_COMMIT_SHA-$TARGET.tar.gz"
   build_release
   build_tar
 
