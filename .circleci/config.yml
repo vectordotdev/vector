@@ -130,7 +130,7 @@ jobs:
       - checkout
       - *install-make
       - run:
-          name: Build
+          name: Check
           environment:
             RUSTFLAGS: "-D warnings"
           command: |

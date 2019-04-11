@@ -21,6 +21,7 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
+BUILDTIME=$(date +%Y-%m-%d.%s)
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
