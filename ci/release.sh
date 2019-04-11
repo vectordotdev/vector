@@ -68,7 +68,8 @@ then
   upload_s3
 elif [ -n "$BRANCH" ]
 then
-  TAR_NAME="$APP_NAME-$BRANCH-$BUILDTIMESTAMP-$COMMIT_SHA-$TARGET.tar.gz"
+  SHORT_COMMIT_SHA=$(echo $COMMIT_SHA | cut -c1-7)
+  TAR_NAME="$APP_NAME-$BRANCH-$BUILDTIMESTAMP-$SHORT_COMMIT_SHA-$TARGET.tar.gz"
   build_release
   build_tar
 
