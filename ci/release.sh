@@ -31,19 +31,26 @@ fi
 # Temporarily allow unset variables in order to construct the BUILDSTAMP based
 # on variables that only _might_ be set
 set +u
-if [ -n "$CIRCLE_TAG" ]
+
+TAG=$CIRCLE_TAG
+BRANCH=$CIRCLE_BRANCH
+
+if [ -n "$TAG" ]
 then
-  BUILDSTAMP="$CIRCLE_TAG-$TARGET"
-elif [ -n "$CIRCLE_BRANCH" ]
+  S3_PATH="tags/$TAG/"
+  BUILDSTAMP="$TAG-$TARGET"
+elif [ -n "$BRANCH" ]
 then
-  BUILDSTAMP="$CIRCLE_BRANCH-$CIRCLE_SHA1-$TARGET"
+  S3_PATH="branches/$BRANCH/"
+  BUILDSTAMP="$BRANCH-$CIRCLE_SHA1-$TARGET"
 else
-  BUILDSTAMP="$BUILDTIME-$TARGET"
+  echo "error: neither TAG nor BRANCH was set"
+  exit 1
 fi
 set -u
 
-S3_PREFIX="s3://packages.timber.io/vector"
-TAR_NAME="$APP_NAME.$BUILDSTAMP.tar.gz"
+S3_PREFIX="s3://packages.timber.io/vector/$S3_PATH"
+TAR_NAME="$APP_NAME-$BUILDSTAMP.tar.gz"
 
 BUILDER_COMMAND=${BUILDER:-"cross"}
 
@@ -61,8 +68,8 @@ function build_tar() {
 }
 
 function upload_s3() {
-    S3_PATH="$S3_PREFIX/$TAR_NAME"
-    aws s3 cp "$DIST_DIR/$TAR_NAME" "$S3_PATH"
+    S3_URI="$S3_PREFIX/$TAR_NAME"
+    aws s3 cp "$DIST_DIR/$TAR_NAME" "$S3_URI"
 }
 
 build_release
