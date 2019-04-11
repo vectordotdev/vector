@@ -114,3 +114,6 @@ matches = "0.1.8"
 [[bench]]
 name = "bench"
 harness = false
+
+[patch.'https://github.com/tokio-rs/tokio']
+tokio-trace = { git = "https://github.com/LucioFranco/tokio", branch = "tracing-breaking" }

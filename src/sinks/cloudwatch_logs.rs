@@ -1,7 +1,10 @@
 use crate::buffers::Acker;
 use crate::{
     record::Record,
-    sinks::util::{BatchServiceSink, SinkExt},
+    sinks::util::{
+        retries::{FixedRetryPolicy, RetryLogic},
+        BatchServiceSink, SinkExt,
+    },
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
@@ -11,10 +14,7 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error as _;
-use std::fmt;
-use std::time::Duration;
-use tower::buffer::BufferLazyLayer;
+use std::{error::Error, fmt, time::Duration};
 use tower::{Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
@@ -46,17 +46,25 @@ pub enum CloudwatchError {
     ServiceDropped,
 }
 
+#[derive(Debug, Clone)]
+struct CloudwatchRetryLogic;
+
 #[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let cloudwatch =
             CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
 
+        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), CloudwatchRetryLogic);
+
         let svc = ServiceBuilder::new()
-            .layer(BufferLazyLayer::new(5))
+            .concurrency_limit(5)
+            .rate_limit(30, Duration::from_secs(1))
+            .retry(policy)
+            .buffer_lazy(5)
             .timeout(Duration::from_secs(10))
             .service(cloudwatch)
-            .expect("This is a bug, no service spawning");
+            .expect("This is a bug, no service spawning at this stage");
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker).batched(Vec::new(), self.buffer_size);
@@ -216,6 +224,18 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
         });
 
     Box::new(fut)
+}
+
+impl RetryLogic for CloudwatchRetryLogic {
+    type Response = ();
+    type Error = CloudwatchError;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            CloudwatchError::Put(PutLogEventsError::ServiceUnavailable(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl From<Record> for InputLogEvent {
