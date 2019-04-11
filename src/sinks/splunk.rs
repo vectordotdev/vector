@@ -138,10 +138,10 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
 }
 
 pub fn validate_host(host: &String) -> Result<(), String> {
-    let uri = Uri::try_from(host).map_err(|e| format!("InvalidHost: {}", e))?;
+    let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
 
     if let None = uri.scheme_part() {
-        Err("InvalidHost: A Uri Scheme must be supplied".into())
+        Err("A Uri Scheme must be supplied".into())
     } else {
         Ok(())
     }
@@ -160,7 +160,7 @@ mod tests {
         assert_eq!(validate_host(&valid), Ok(()));
         assert_eq!(
             validate_host(&invalid_scheme),
-            Err("InvalidHost: A Uri Scheme must be supplied".to_string())
+            Err("A Uri Scheme must be supplied".to_string())
         );
         assert!(validate_host(&invalid_uri).is_err());
     }
