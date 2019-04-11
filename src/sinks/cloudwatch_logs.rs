@@ -3,7 +3,7 @@ use crate::{
     record::Record,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, SinkExt,
+        BatchServiceSink, ServiceBuilderExt, SinkExt,
     },
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};

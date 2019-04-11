@@ -2,6 +2,7 @@ pub mod batch;
 pub mod buffer;
 pub mod http;
 pub mod retries;
+pub mod service_builder;
 
 use crate::buffers::Acker;
 use batch::{Batch, BatchSink};
@@ -13,6 +14,7 @@ use std::time::Duration;
 use tower::Service;
 
 pub use buffer::{Buffer, Compression};
+pub use service_builder::ServiceBuilderExt;
 
 pub trait SinkExt<T>
 where
