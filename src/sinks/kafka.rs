@@ -74,6 +74,7 @@ impl Sink for KafkaSink {
         let topic = self.topic.clone();
         let record = FutureRecord::to(&topic).key(&()).payload(&item.raw[..]);
 
+        debug!(message = "sending record.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
             Err((e, record)) => {
