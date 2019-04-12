@@ -15,6 +15,7 @@ use leveldb::database::{
 };
 use prost::Message;
 use std::collections::VecDeque;
+use std::convert::TryInto;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -25,12 +26,7 @@ struct Key(usize);
 
 impl db_key::Key for Key {
     fn from_u8(key: &[u8]) -> Self {
-        assert_eq!(key.len(), 8);
-
-        // TODO: replace with try_from once it's stable
-        let bytes = [
-            key[0], key[1], key[2], key[3], key[4], key[5], key[6], key[7],
-        ];
+        let bytes: [u8; 8] = key.try_into().expect("Key should be the right size");
 
         Self(usize::from_be_bytes(bytes))
     }
