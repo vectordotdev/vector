@@ -80,6 +80,7 @@ headers = "0.2.1"
 rdkafka = { version = "0.20.0", optional = true }
 hostname = "0.1.5"
 seahash = "3.0.6"
+matches = "0.1.8"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -92,7 +93,6 @@ tempfile = "3.0.6"
 libc = "0.2.43"
 walkdir = "2.2.7"
 elastic = { git = "https://github.com/elastic-rs/elastic" }
-matches = "0.1.8"
 
 [features]
 "default" = ["rdkafka", "leveldb"]

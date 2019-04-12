@@ -6,13 +6,17 @@ pub use self::config::Config;
 
 use crate::buffers;
 use futures::{
+    future,
     sync::{mpsc, oneshot},
-    Future,
+    Async, Future, Stream,
 };
 use indexmap::IndexMap;
+use matches::matches;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
+use std::time::{Duration, Instant};
 use stream_cancel::Trigger;
+use tokio::timer;
 use tokio_trace_futures::Instrument;
 
 pub struct Topology {
@@ -30,6 +34,7 @@ struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
+    tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
     shutdown_triggers: HashMap<String, Trigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
@@ -90,6 +95,8 @@ impl Topology {
 
         let (abort_tx, abort_rx) = mpsc::unbounded();
 
+        let mut spawned_tasks = HashMap::new();
+
         for (name, sink) in &config.sinks {
             let name = name.as_str();
             let typetag = sink.inner.typetag_name();
@@ -100,7 +107,8 @@ impl Topology {
 
             let span = info_span!("sink", name = name, r#type = typetag);
             let task = task.instrument(span);
-            rt.spawn(task);
+            let spawned = oneshot::spawn(task, &rt.executor());
+            spawned_tasks.insert(name.to_string(), spawned);
         }
 
         for (name, transform) in &config.transforms {
@@ -113,7 +121,8 @@ impl Topology {
 
             let span = info_span!("transform", name = name, r#type = typetag);
             let task = task.instrument(span);
-            rt.spawn(task);
+            let spawned = oneshot::spawn(task, &rt.executor());
+            spawned_tasks.insert(name.to_string(), spawned);
         }
 
         let mut spawned_source_tasks = HashMap::new();
@@ -129,7 +138,8 @@ impl Topology {
 
                 let span = info_span!("source-pump", name = name, r#type = typetag);
                 let task = task.instrument(span);
-                rt.spawn(task);
+                let spawned = oneshot::spawn(task, &rt.executor());
+                spawned_tasks.insert(name.to_string(), spawned);
             }
 
             {
@@ -149,15 +159,85 @@ impl Topology {
             config,
             shutdown_triggers,
             source_tasks: spawned_source_tasks,
+            tasks: spawned_tasks,
             abort_tx,
         });
 
         abort_rx
     }
 
-    pub fn stop(&mut self) {
-        // Dropping inputs and shutdown_triggers will cause everything to start shutting down
-        self.state = State::Stopped;
+    #[must_use]
+    pub fn stop(&mut self) -> impl Future<Item = (), Error = ()> {
+        let old_state = std::mem::replace(&mut self.state, State::Stopped);
+        let running = if let State::Running(running) = old_state {
+            running
+        } else {
+            unreachable!()
+        };
+
+        let mut running_tasks = running.tasks;
+
+        let mut wait_handles = vec![];
+        let mut check_handles = HashMap::new();
+
+        for (name, task) in running_tasks.drain() {
+            let task = task
+                .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
+                .shared();
+
+            wait_handles.push(task.clone());
+            check_handles.insert(name, task);
+        }
+        let mut check_handles2 = check_handles.clone();
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+
+        let timeout = timer::Delay::new(deadline)
+            .map(move |_| {
+                check_handles.retain(|_name, handle| matches!(handle.poll(), Ok(Async::NotReady)));
+                let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
+
+                error!(
+                    "Failed to gracefully shut down in time. Killing: {}",
+                    remaining_components.join(", ")
+                );
+            })
+            .map_err(|err| panic!("Timer error: {:?}", err));
+
+        let reporter = timer::Interval::new_interval(Duration::from_secs(5))
+            .inspect(move |_| {
+                check_handles2.retain(|_name, handle| matches!(handle.poll(), Ok(Async::NotReady)));
+                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+
+                // TODO: replace with checked_duration_since once it's stable
+                let time_remaining = if deadline > Instant::now() {
+                    format!("{} seconds left", (deadline - Instant::now()).as_secs())
+                } else {
+                    "overdue".to_string()
+                };
+
+                info!(
+                    "Shutting down... Waiting on: {}. {}",
+                    remaining_components.join(", "),
+                    time_remaining
+                );
+            })
+            .filter(|_| false) // Run indefinitely without emitting items
+            .into_future()
+            .map(|_| ())
+            .map_err(|(err, _)| panic!("Timer error: {:?}", err));
+
+        let success = future::join_all(wait_handles)
+            .map(|_| ())
+            .map_err(|_: future::SharedError<()>| ());
+
+        future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
+            Box::new(timeout),
+            Box::new(reporter),
+            Box::new(success),
+        ])
+        .map(|_| ())
+        .map_err(|_| ())
     }
 
     pub fn reload_config(
@@ -259,6 +339,8 @@ impl RunningTopology {
         for name in sources_to_remove {
             info!("Removing source {:?}", name);
 
+            self.tasks.remove(&name).unwrap().forget();
+
             self.remove_outputs(&name);
             self.shutdown_source(&name);
         }
@@ -288,6 +370,8 @@ impl RunningTopology {
         for name in transforms_to_remove {
             info!("Removing transform {:?}", name);
 
+            self.tasks.remove(&name).unwrap().forget();
+
             self.remove_inputs(&name);
             self.remove_outputs(&name);
         }
@@ -315,6 +399,8 @@ impl RunningTopology {
 
         for name in sinks_to_remove {
             info!("Removing sink {:?}", name);
+
+            self.tasks.remove(&name).unwrap().forget();
 
             self.remove_inputs(&name);
         }
@@ -345,7 +431,10 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("sink", name = name.as_str()));
-        rt.spawn(task);
+        let spawned = oneshot::spawn(task, &rt.executor());
+        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+            previous.forget();
+        }
     }
 
     fn spawn_transform(
@@ -357,7 +446,10 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("transform", name = name.as_str()));
-        rt.spawn(task);
+        let spawned = oneshot::spawn(task, &rt.executor());
+        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+            previous.forget();
+        }
     }
 
     fn spawn_source(
@@ -369,7 +461,10 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("source-pump", name = name.as_str()));
-        rt.spawn(task);
+        let spawned = oneshot::spawn(task, &rt.executor());
+        if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
+            previous.forget();
+        }
 
         let shutdown_trigger = new_pieces.shutdown_triggers.remove(name).unwrap();
         self.shutdown_triggers
@@ -561,7 +656,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines1 = output_lines1.wait();
@@ -617,7 +712,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines1 = output_lines1.wait();
@@ -668,7 +763,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines1 = output_lines1.wait();
@@ -731,7 +826,7 @@ mod tests {
 
             // Shut down server
             input_trigger.cancel();
-            topology.stop();
+            block_on(topology.stop()).unwrap();
             let output_lines1 = output_lines1.wait();
             let output_lines2 = output_lines2.wait();
             shutdown_on_idle(rt);
@@ -781,7 +876,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines = output_lines.wait();
@@ -822,7 +917,7 @@ mod tests {
         wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines = output_lines.wait();
@@ -872,7 +967,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         assert_eq!(num_lines, output_lines1.len());
@@ -948,7 +1043,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines = output_lines.wait().into_iter().collect::<HashSet<_>>();
@@ -1018,7 +1113,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         assert_eq!(num_lines, output_lines1.len());
@@ -1080,7 +1175,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         assert!(output_lines1.len() > 0);
@@ -1148,7 +1243,7 @@ mod tests {
         rt.block_on(send).unwrap();
 
         // Shut down server
-        topology.stop();
+        block_on(topology.stop()).unwrap();
         shutdown_on_idle(rt);
 
         let output_lines = output_lines.wait();

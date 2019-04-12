@@ -1,7 +1,7 @@
 use futures::Future;
 use tempfile::tempdir;
 use vector::test_util::{
-    next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{buffers::BufferConfig, sinks, sources};
@@ -68,7 +68,7 @@ fn test_buffering() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
@@ -136,7 +136,7 @@ fn test_max_size() {
 
     wait_for_tcp(in_addr);
 
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
@@ -189,7 +189,7 @@ fn test_max_size_resume() {
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
@@ -273,7 +273,7 @@ fn test_reclaim_disk_space() {
 
     std::thread::sleep(std::time::Duration::from_millis(1000));
 
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
