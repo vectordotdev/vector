@@ -141,7 +141,7 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
 
     if let None = uri.scheme_part() {
-        Err("A Uri Scheme must be supplied".into())
+        Err("A Uri Scheme must be supplied, host must include a scheme (https or http)".into())
     } else {
         Ok(())
     }
@@ -158,10 +158,7 @@ mod tests {
         let invalid_uri = "iminvalidohnoes".to_string();
 
         assert_eq!(validate_host(&valid), Ok(()));
-        assert_eq!(
-            validate_host(&invalid_scheme),
-            Err("A Uri Scheme must be supplied".to_string())
-        );
+        assert!(validate_host(&invalid_scheme).is_err());
         assert!(validate_host(&invalid_uri).is_err());
     }
 }
