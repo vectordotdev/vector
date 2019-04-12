@@ -213,12 +213,7 @@ fn bad_s3_region() {
     )
     .unwrap_err();
 
-    assert_eq!(
-        err,
-        vec![
-            "Not a valid region, please use one of the provided regions https://docs.aws.amazon.com/general/latest/gr/rande.html for key `sinks.out2`"
-        ]
-    )
+    assert_eq!(err, vec!["unknown field `region` for key `sinks.out1`"])
 }
 
 #[test]
