@@ -164,6 +164,7 @@ mod tests {
     #![cfg(feature = "kinesis-integration-tests")]
 
     use crate::buffers::Acker;
+    use crate::region::RegionOrEndpoint;
     use crate::sinks::kinesis::{KinesisService, KinesisSinkConfig};
     use crate::test_util::random_lines_with_stream;
     use futures::{Future, Sink};
@@ -187,7 +188,7 @@ mod tests {
 
         let config = KinesisSinkConfig {
             stream_name: STREAM_NAME.into(),
-            region: region.clone(),
+            region: RegionOrEndpoint::Region(region.clone()),
             batch_size: 2,
         };
 

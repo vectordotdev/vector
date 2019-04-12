@@ -96,8 +96,6 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Config {
-        #[serde(deserialize_with = "crate::region::deserialize")]
-        #[serde(flatten)]
         region: RegionOrEndpoint,
     }
 

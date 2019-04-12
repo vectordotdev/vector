@@ -261,6 +261,7 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
+        region::RegionOrEndpoint,
         sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
@@ -287,7 +288,7 @@ mod tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
-            region: region.clone(),
+            region: RegionOrEndpoint::Region(region.clone()),
             buffer_size: 1,
         };
 
