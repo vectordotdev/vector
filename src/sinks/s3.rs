@@ -30,6 +30,7 @@ pub struct S3SinkInnerConfig {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
+    #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
     pub gzip: bool,

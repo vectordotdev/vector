@@ -96,6 +96,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Config {
+        #[serde(flatten)]
         region: RegionOrEndpoint,
     }
 
@@ -123,7 +124,7 @@ mod tests {
 
         let expected_region = Region::Custom {
             name: "custom".into(),
-            endpoint: "http://localhost:9000".into(),
+            endpoint: "http://localhost:9000/".into(),
         };
         let region = Region::from(config.region);
         assert_eq!(region, expected_region);

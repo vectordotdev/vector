@@ -28,6 +28,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
+    #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: usize,
 }

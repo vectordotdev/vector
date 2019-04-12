@@ -27,6 +27,7 @@ pub struct CloudwatchLogsSvc {
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
+    #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
 }
