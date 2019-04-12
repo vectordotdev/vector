@@ -1,8 +1,10 @@
-use crate::buffers::Acker;
-use crate::record::Record;
-use crate::sinks::util::{BatchServiceSink, Buffer, SinkExt};
+use crate::{
+    buffers::Acker,
+    record::Record,
+    region::RegionOrEndpoint,
+    sinks::util::{BatchServiceSink, Buffer, SinkExt},
+};
 use futures::{Future, Poll, Sink};
-use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
@@ -28,8 +30,7 @@ pub struct S3SinkInnerConfig {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
-    #[serde(deserialize_with = "crate::region::deserialize")]
-    pub region: Region,
+    pub region: RegionOrEndpoint,
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,
@@ -95,7 +96,7 @@ pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
 impl S3SinkConfig {
     fn config(&self) -> Result<S3SinkInnerConfig, String> {
         Ok(S3SinkInnerConfig {
-            client: rusoto_s3::S3Client::new(self.region.clone()),
+            client: rusoto_s3::S3Client::new(self.region.clone().into()),
             gzip: self.gzip,
             buffer_size: self.buffer_size,
             key_prefix: self.key_prefix.clone(),

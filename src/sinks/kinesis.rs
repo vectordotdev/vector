@@ -1,12 +1,15 @@
-use super::Record;
-use crate::buffers::Acker;
-use crate::sinks::util::{
-    retries::{FixedRetryPolicy, RetryLogic},
-    BatchServiceSink, SinkExt,
+use crate::{
+    buffers::Acker,
+    record::Record,
+    region::RegionOrEndpoint,
+    sinks::util::{
+        retries::{FixedRetryPolicy, RetryLogic},
+        BatchServiceSink, SinkExt,
+    },
 };
 use futures::{Future, Poll, Sink};
 use rand::random;
-use rusoto_core::{Region, RusotoFuture};
+use rusoto_core::RusotoFuture;
 use rusoto_kinesis::{
     Kinesis, KinesisClient, ListStreamsInput, PutRecordsError, PutRecordsInput, PutRecordsOutput,
     PutRecordsRequestEntry,
@@ -25,8 +28,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
-    #[serde(deserialize_with = "crate::region::deserialize")]
-    pub region: Region,
+    pub region: RegionOrEndpoint,
     pub batch_size: usize,
 }
 
@@ -44,7 +46,7 @@ impl KinesisService {
         config: KinesisSinkConfig,
         acker: Acker,
     ) -> impl Sink<SinkItem = Record, SinkError = ()> {
-        let client = Arc::new(KinesisClient::new(config.region.clone()));
+        let client = Arc::new(KinesisClient::new(config.region.clone().into()));
 
         let batch_size = config.batch_size;
         let kinesis = KinesisService { client, config };
@@ -126,7 +128,7 @@ impl RetryLogic for KinesisRetryLogic {
 }
 
 fn healthcheck(config: KinesisSinkConfig) -> super::Healthcheck {
-    let client = KinesisClient::new(config.region);
+    let client = KinesisClient::new(config.region.into());
     let stream_name = config.stream_name;
 
     let fut = client

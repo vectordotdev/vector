@@ -1,10 +1,11 @@
 use crate::buffers::Acker;
 use crate::{
     record::Record,
+    region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
-use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
+use rusoto_core::{region::ParseRegionError, RusotoFuture};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
     DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError, PutLogEventsRequest,
@@ -26,8 +27,7 @@ pub struct CloudwatchLogsSvc {
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
-    #[serde(deserialize_with = "crate::region::deserialize")]
-    pub region: Region,
+    pub region: RegionOrEndpoint,
     pub buffer_size: usize,
 }
 
@@ -70,7 +70,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 
 impl CloudwatchLogsSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
-        let client = CloudWatchLogsClient::new(config.region.clone());
+        let client = CloudWatchLogsClient::new(config.region.clone().into());
 
         Ok(CloudwatchLogsSvc {
             client,
@@ -173,7 +173,7 @@ impl Service<Vec<Record>> for CloudwatchLogsSvc {
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
     let region = config.region.clone();
 
-    let client = CloudWatchLogsClient::new(region);
+    let client = CloudWatchLogsClient::new(region.into());
 
     let request = DescribeLogStreamsRequest {
         limit: Some(1),
