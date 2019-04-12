@@ -5,7 +5,7 @@ use futures::{future, Future, Stream};
 use std::net::SocketAddr;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
-use vector::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
+use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
 use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
 
@@ -24,13 +24,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -51,7 +45,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -77,13 +71,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -104,7 +92,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -130,13 +118,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -157,7 +139,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -184,13 +166,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -219,7 +195,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines * num_writers, output_lines.wait().unwrap());
@@ -249,20 +225,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in1",
-                        sources::tcp::TcpConfig {
-                            address: in_addr1,
-                            max_length: 102400,
-                        },
-                    );
-                    config.add_source(
-                        "in2",
-                        sources::tcp::TcpConfig {
-                            address: in_addr2,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+                    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
                     config.add_sink(
                         "out1",
                         &["in1", "in2"],
@@ -292,7 +256,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines * 2, output_lines1.wait().unwrap());
@@ -319,13 +283,7 @@ fn benchmark_transforms(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_transform(
                         "parser",
                         &["in"],
@@ -365,7 +323,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     );
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -397,20 +355,8 @@ fn benchmark_complex(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in1",
-                        sources::tcp::TcpConfig {
-                            address: in_addr1,
-                            max_length: 102400,
-                        },
-                    );
-                    config.add_source(
-                        "in2",
-                        sources::tcp::TcpConfig {
-                            address: in_addr2,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in1", sources::tcp::TcpConfig::new(in_addr1));
+                    config.add_source("in2", sources::tcp::TcpConfig::new(in_addr2));
                     config.add_transform(
                         "parser",
                         &["in1", "in2"],
@@ -537,7 +483,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     let sends = vec![send1, send2];
                     rt.block_on(future::join_all(sends)).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
 
