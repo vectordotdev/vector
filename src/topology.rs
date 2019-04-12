@@ -993,6 +993,7 @@ mod tests {
             TcpConfig {
                 address: in_addr,
                 max_length: 20,
+                shutdown_timeout_secs: 30,
             },
         );
         old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
@@ -1021,6 +1022,7 @@ mod tests {
         new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
             address: in_addr,
             max_length: 10,
+            shutdown_timeout_secs: 30,
         });
 
         topology.reload_config(new_config, &mut rt, false);

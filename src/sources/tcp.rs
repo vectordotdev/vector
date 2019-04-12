@@ -134,6 +134,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
 
 #[cfg(test)]
 mod test {
+    use super::TcpConfig;
     use crate::test_util::{next_addr, send_lines, wait_for_tcp};
     use bytes::Bytes;
     use futures::sync::mpsc;
@@ -145,7 +146,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::tcp(addr, super::default_max_length(), tx);
+        let server = super::tcp(TcpConfig::new(addr), tx);
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
