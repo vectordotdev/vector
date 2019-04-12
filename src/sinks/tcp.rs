@@ -107,18 +107,24 @@ impl Sink for TcpSink {
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.poll_connection() {
-            Ok(Async::Ready(connection)) => match connection.start_send(line) {
-                Err(err) => {
-                    debug!(
-                        message = "disconnected.",
-                        addr = &field::display(&self.addr)
-                    );
-                    error!("Error in connection {}: {}", self.addr, err);
-                    self.state = TcpSinkState::Disconnected;
-                    Ok(AsyncSink::Ready)
+            Ok(Async::Ready(connection)) => {
+                debug!(
+                    message = "sending record.",
+                    bytes = &field::display(line.len())
+                );
+                match connection.start_send(line) {
+                    Err(err) => {
+                        debug!(
+                            message = "disconnected.",
+                            addr = &field::display(&self.addr)
+                        );
+                        error!("Error in connection {}: {}", self.addr, err);
+                        self.state = TcpSinkState::Disconnected;
+                        Ok(AsyncSink::Ready)
+                    }
+                    Ok(ok) => Ok(ok),
                 }
-                Ok(ok) => Ok(ok),
-            },
+            }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
             Err(_) => unreachable!(),
         }
