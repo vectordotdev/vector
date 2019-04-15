@@ -177,7 +177,7 @@ impl Topology {
 
         let mut running_tasks = running.tasks;
 
-        let mut wait_handles = vec![];
+        let mut wait_handles = Vec::new();
         let mut check_handles = HashMap::new();
 
         for (name, task) in running_tasks.drain() {
