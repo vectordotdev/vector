@@ -154,7 +154,14 @@ fn main() {
             rt.spawn(topology.healthchecks());
         }
 
-        info!("Vector is starting.");
+        info!(
+            message = "Vector is starting.",
+            version = built_info::PKG_VERSION,
+            git_version = built_info::GIT_VERSION.unwrap_or(""),
+            released = built_info::BUILT_TIME_UTC,
+            arch = built_info::CFG_TARGET_ARCH
+        );
+
         let mut graceful_crash = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
@@ -241,4 +248,9 @@ fn main() {
             unreachable!();
         }
     });
+}
+
+#[allow(unused)]
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
