@@ -5,7 +5,8 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{
-    next_addr, random_lines, receive, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, receive_lines, send_lines, shutdown_on_idle,
+    wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
@@ -39,7 +40,7 @@ fn test_pipe() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -84,7 +85,7 @@ fn test_sample() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -153,7 +154,7 @@ fn test_parse() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -195,7 +196,7 @@ fn test_merge() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -255,7 +256,7 @@ fn test_fork() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
@@ -310,7 +311,7 @@ fn test_merge_and_fork() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
@@ -397,7 +398,7 @@ fn test_merge_and_fork_json() {
     rt.block_on(send).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines1 = output_lines1.wait().unwrap();
@@ -463,7 +464,7 @@ fn test_reconnect() {
     rt.block_on(send).unwrap();
 
     // Shut down server and wait for it to fully flush
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     drop(output_trigger);

@@ -3,21 +3,28 @@ use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use tokio::{self, codec::FramedRead, net::TcpListener};
+use std::time::{Duration, Instant};
+use stream_cancel::{StreamExt, Tripwire};
+use tokio::{self, codec::FramedRead, net::TcpListener, timer};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
     pub address: std::net::SocketAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    #[serde(default = "default_shutdown_timeout_secs")]
+    pub shutdown_timeout_secs: u64,
 }
 
 fn default_max_length() -> usize {
     100 * 1024
+}
+
+fn default_shutdown_timeout_secs() -> u64 {
+    30
 }
 
 impl TcpConfig {
@@ -25,6 +32,7 @@ impl TcpConfig {
         Self {
             address: addr,
             max_length: default_max_length(),
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
 }
@@ -32,12 +40,18 @@ impl TcpConfig {
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
-        Ok(tcp(self.address, self.max_length, out))
+        Ok(tcp(self.clone(), out))
     }
 }
 
-pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+
+    let TcpConfig {
+        address: addr,
+        max_length,
+        shutdown_timeout_secs,
+    } = config;
 
     Box::new(future::lazy(move || {
         let listener = match TcpListener::bind(&addr) {
@@ -49,6 +63,14 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
         };
 
         info!(message = "listening.", addr = field::display(&addr));
+
+        let (trigger, tripwire) = Tripwire::new();
+        let tripwire = tripwire
+            .and_then(move |_| {
+                timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
+                    .map_err(|err| panic!("Timer error: {:?}", err))
+            })
+            .shared();
 
         let future = listener
             .incoming()
@@ -65,6 +87,16 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 let host = peer_addr.map(Bytes::from);
 
                 let inner_span = span.clone();
+                let tripwire = tripwire
+                    .clone()
+                    .map(move |_| {
+                        info!(
+                            "Resetting connection (still open after {} seconds).",
+                            shutdown_timeout_secs
+                        )
+                    })
+                    .map_err(|_| ());
+
                 span.enter(|| {
                     debug!("accepted a new socket.");
 
@@ -74,6 +106,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                         socket,
                         BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
                     )
+                    .take_until(tripwire)
                     .map(Record::from)
                     .map(move |mut record| {
                         record.host = host.clone();
@@ -90,13 +123,15 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
 
                     tokio::spawn(handler.instrument(inner_span))
                 })
-            });
+            })
+            .inspect(|_| trigger.cancel());
         future::Either::A(future)
     }))
 }
 
 #[cfg(test)]
 mod test {
+    use super::TcpConfig;
     use crate::test_util::{next_addr, send_lines, wait_for_tcp};
     use bytes::Bytes;
     use futures::sync::mpsc;
@@ -108,7 +143,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::tcp(addr, super::default_max_length(), tx);
+        let server = super::tcp(TcpConfig::new(addr), tx);
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);

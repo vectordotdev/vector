@@ -228,12 +228,10 @@ fn main() {
             use futures::future::Either;
 
             info!("Shutting down.");
-            topology.stop();
+            let shutdown = topology.stop();
             metrics_trigger.cancel();
 
-            let shutdown = rt.shutdown_on_idle();
-
-            match shutdown.select2(signals.into_future()).wait() {
+            match rt.block_on(shutdown.select2(signals.into_future())) {
                 Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
                 Ok(Either::B(_)) => {
                     info!("Shutting down immediately.");
@@ -243,10 +241,12 @@ fn main() {
             }
         } else if signal == SIGQUIT {
             info!("Shutting down immediately");
-            rt.shutdown_now().wait().unwrap();
+            drop(topology);
         } else {
             unreachable!();
         }
+
+        rt.shutdown_now().wait().unwrap();
     });
 }
 

@@ -1,6 +1,6 @@
 [sources.in]
   type = "tcp"
-  address = "127.0.0.1:9000"
+  address = "127.0.0.1:6789"
 
 [sinks.out]
   type = "blackhole"
