@@ -7,6 +7,7 @@ use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tokio_trace::field;
 use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
 
@@ -122,18 +123,26 @@ impl S3SinkConfig {
     }
 }
 
-impl S3Sink {
-    fn send_body(&mut self, body: Vec<u8>) -> RusotoFuture<PutObjectOutput, PutObjectError> {
+impl Service<Vec<u8>> for S3Sink {
+    type Response = PutObjectOutput;
+    type Error = PutObjectError;
+    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, body: Vec<u8>) -> Self::Future {
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
         let extension = if self.config.gzip { ".log.gz" } else { ".log" };
         let key = format!("{}{}{}", self.config.key_prefix, filename, extension);
 
-        info!(
-            { s3_sink_bytes_flushed_counter = body.len() },
-            "Flushing {} to S3 ({} bytes)",
-            key,
-            body.len()
+        debug!(
+            message = "sending records.",
+            bytes = &field::debug(body.len()),
+            bucket = &field::debug(&self.config.bucket),
+            key = &field::debug(&key)
         );
 
         let request = PutObjectRequest {
@@ -148,21 +157,10 @@ impl S3Sink {
             ..Default::default()
         };
 
-        self.config.client.put_object(request)
-    }
-}
-
-impl Service<Vec<u8>> for S3Sink {
-    type Response = PutObjectOutput;
-    type Error = PutObjectError;
-    type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
-    }
-
-    fn call(&mut self, body: Vec<u8>) -> Self::Future {
-        self.send_body(body).instrument(info_span!("s3_request"))
+        self.config
+            .client
+            .put_object(request)
+            .instrument(info_span!("request"))
     }
 }
 

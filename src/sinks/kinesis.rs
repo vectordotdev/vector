@@ -13,6 +13,8 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc, time::Duration};
+use tokio_trace::field;
+use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
 
 #[derive(Clone)]
@@ -75,13 +77,18 @@ impl KinesisService {
 impl Service<Vec<Vec<u8>>> for KinesisService {
     type Response = PutRecordsOutput;
     type Error = PutRecordsError;
-    type Future = RusotoFuture<PutRecordsOutput, PutRecordsError>;
+    type Future = Instrumented<RusotoFuture<PutRecordsOutput, PutRecordsError>>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
     }
 
     fn call(&mut self, items: Vec<Vec<u8>>) -> Self::Future {
+        debug!(
+            message = "sending records.",
+            records = &field::debug(items.len())
+        );
+
         let records = items
             .into_iter()
             .map(|data| PutRecordsRequestEntry {
@@ -96,7 +103,9 @@ impl Service<Vec<Vec<u8>>> for KinesisService {
             stream_name: self.config.stream_name.clone(),
         };
 
-        self.client.put_records(request)
+        self.client
+            .put_records(request)
+            .instrument(info_span!("request"))
     }
 }
 
