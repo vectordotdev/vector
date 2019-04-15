@@ -87,13 +87,12 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                 let inner_span = span.clone();
                 let tripwire = tripwire
                     .clone()
-                    .inspect(move |_| {
+                    .map(move |_| {
                         info!(
                             "Resetting connection (still open after {} seconds).",
                             shutdown_timeout_secs
-                        );
+                        )
                     })
-                    .map(|_| ())
                     .map_err(|_| ());
 
                 span.enter(|| {
