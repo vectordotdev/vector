@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use tokio_trace::field;
 
 /// Build the metrics receiver, controller and sink
-pub fn build() -> (Controller, Sink<String>) {
+pub fn build() -> (Controller, Sink<&'static str>) {
     let mut receiver = Receiver::builder().build();
     let controller = receiver.get_controller();
     let sink = receiver.get_sink();

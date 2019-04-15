@@ -3,7 +3,7 @@
 //! This subscriber takes another subscriber like `tokio-trace-fmt` and wraps it
 //! with this basic subscriber. It will enable all spans and events that match the
 //! metric capturing criteria. This means every span is enabled regardless of its level
-//! and any event that contains a `counter` or a `gauge` field name.
+//! and any event with a field name ending with `_counter` or `_gauge`.
 //!
 //! # Example
 //!
@@ -46,7 +46,7 @@ use tokio_trace_core::{
 
 /// Metrics collector
 // TODO(lucio): move this to a trait
-pub type Collector = Sink<String>;
+pub type Collector = Sink<&'static str>;
 
 /// The subscriber that wraps another subscriber and produces metrics
 pub struct MetricsSubscriber<S> {
@@ -65,7 +65,7 @@ pub struct MetricVisitor {
 
 #[derive(Debug, Default)]
 struct Span {
-    key: String,
+    key: &'static str,
     start_duration: Option<u64>,
     start_execution: Option<u64>,
     end_duration: Option<u64>,
@@ -93,7 +93,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
         let metadata = span.metadata();
 
         let id = self.inner.new_span(span);
-        let key = metadata.name().to_string();
+        let key = metadata.name();
 
         let span = Span {
             key,
@@ -151,10 +151,11 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
         if let Some(span) = &mut spans.get_mut(span) {
             let end = self.collector.clock().end();
 
-            if let Some(start) = span.start_execution {
-                self.collector
-                    .update_timing(span.key.clone() + "_execution", start, end);
-            }
+            // TODO: bring this back when we can do it without an allocation
+            // if let Some(start) = span.start_execution {
+            // self.collector
+            // .update_timing(span.key.clone() + "_execution", start, end);
+            // }
 
             if let Some(_start) = span.start_duration {
                 span.end_duration = Some(end);
@@ -168,7 +169,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
             && metadata
                 .fields()
                 .iter()
-                .any(|f| f.name().contains("counter") || f.name().contains("gauge"))
+                .any(|f| f.name().ends_with("_counter") || f.name().ends_with("_gauge"))
             && !metadata
                 .fields()
                 .iter()
@@ -206,8 +207,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
             if span.ref_count == 0 {
                 if let Some(start) = span.start_duration {
                     if let Some(end) = span.end_duration {
-                        self.collector
-                            .update_timing(span.key.clone() + "_duration", start, end);
+                        self.collector.update_timing(span.key, start, end);
                     }
                 }
             }
@@ -231,20 +231,18 @@ impl Visit for MetricVisitor {
     fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name().contains("counter") {
-            self.collector
-                .update_count(field.name().to_string(), value as i64);
-        } else if field.name().contains("guage") {
-            self.collector.update_gauge(field.name().to_string(), value);
+        if field.name().ends_with("_counter") {
+            self.collector.update_count(field.name(), value as i64);
+        } else if field.name().ends_with("_gauge") {
+            self.collector.update_gauge(field.name(), value);
         }
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        if field.name().contains("counter") {
-            self.collector.update_count(field.name().to_string(), value);
-        } else if field.name().contains("guage") {
-            self.collector
-                .update_gauge(field.name().to_string(), value as u64);
+        if field.name().ends_with("_counter") {
+            self.collector.update_count(field.name(), value);
+        } else if field.name().ends_with("_gauge") {
+            self.collector.update_gauge(field.name(), value as u64);
         }
     }
 }

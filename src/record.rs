@@ -14,6 +14,8 @@ pub mod proto {
 pub struct Record {
     #[serde(rename = "message", serialize_with = "crate::bytes::serialize")]
     pub raw: Bytes,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<Bytes>,
     pub timestamp: DateTime<Utc>,
     #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
     pub structured: HashMap<Atom, Bytes>,
@@ -29,6 +31,7 @@ impl Default for Record {
     fn default() -> Self {
         Record {
             raw: Bytes::new(),
+            host: None,
             timestamp: Utc::now(),
             structured: HashMap::new(),
         }
@@ -43,6 +46,12 @@ impl From<proto::Record> for Record {
             Event::Log(proto) => {
                 let raw = Bytes::from(proto.raw);
 
+                let host = if proto.host.len() > 0 {
+                    Some(Bytes::from(proto.host))
+                } else {
+                    None
+                };
+
                 let timestamp = proto
                     .timestamp
                     .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
@@ -56,6 +65,7 @@ impl From<proto::Record> for Record {
 
                 Record {
                     raw,
+                    host,
                     timestamp,
                     structured,
                 }
@@ -67,6 +77,11 @@ impl From<proto::Record> for Record {
 impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
         let raw = record.raw.into_iter().collect::<Vec<u8>>();
+
+        let host = record
+            .host
+            .map(|b| b.into_iter().collect::<Vec<u8>>())
+            .unwrap_or_else(|| Vec::new());
 
         let timestamp = Some(Timestamp {
             seconds: record.timestamp.timestamp(),
@@ -81,6 +96,7 @@ impl From<Record> for proto::Record {
 
         let event = Event::Log(Log {
             raw,
+            host,
             timestamp,
             structured,
         });
@@ -117,8 +133,7 @@ impl From<String> for Record {
 
         Record {
             raw,
-            timestamp: Utc::now(),
-            structured: HashMap::new(),
+            ..Default::default()
         }
     }
 }

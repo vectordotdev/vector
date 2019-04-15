@@ -83,6 +83,7 @@ seahash = "3.0.6"
 
 [build-dependencies]
 prost-build = "0.4.0"
+built = "0.3"
 
 [dev-dependencies]
 approx = "0.3.0"

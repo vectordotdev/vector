@@ -1,5 +1,6 @@
 use super::util::SinkExt;
 use crate::buffers::Acker;
+use crate::record::Record;
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -8,9 +9,9 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use tokio::codec::FramedWrite;
 use tokio::net::TcpStream;
+use tokio::timer::Delay;
 use tokio_retry::strategy::ExponentialBackoff;
-
-use crate::record::Record;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -58,6 +59,7 @@ impl TcpSink {
         loop {
             match self.state {
                 TcpSinkState::Disconnected => {
+                    debug!(message = "connecting", addr = &field::display(&self.addr));
                     self.state = TcpSinkState::Connecting(TcpStream::connect(&self.addr));
                 }
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
@@ -65,11 +67,17 @@ impl TcpSink {
                     // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
                     Err(err) => unreachable!(err),
                     Ok(Async::Ready(())) => {
+                        debug!(
+                            message = "disconnected.",
+                            addr = &field::display(&self.addr)
+                        );
                         self.state = TcpSinkState::Disconnected;
                     }
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::Ready(socket)) => {
+                        let addr = socket.peer_addr().unwrap_or(self.addr);
+                        debug!(message = "connected", addr = &field::display(&addr));
                         self.state = TcpSinkState::Connected(FramedWrite::new(
                             socket,
                             BytesDelimitedCodec::new(b'\n'),
@@ -81,8 +89,7 @@ impl TcpSink {
                     }
                     Err(err) => {
                         error!("Error connecting to {}: {}", self.addr, err);
-                        let delay =
-                            tokio::timer::Delay::new(Instant::now() + self.backoff.next().unwrap());
+                        let delay = Delay::new(Instant::now() + self.backoff.next().unwrap());
                         self.state = TcpSinkState::Backoff(delay);
                     }
                 },
@@ -100,14 +107,24 @@ impl Sink for TcpSink {
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.poll_connection() {
-            Ok(Async::Ready(connection)) => match connection.start_send(line) {
-                Err(err) => {
-                    error!("Error in connection {}: {}", self.addr, err);
-                    self.state = TcpSinkState::Disconnected;
-                    Ok(AsyncSink::Ready)
+            Ok(Async::Ready(connection)) => {
+                debug!(
+                    message = "sending record.",
+                    bytes = &field::display(line.len())
+                );
+                match connection.start_send(line) {
+                    Err(err) => {
+                        debug!(
+                            message = "disconnected.",
+                            addr = &field::display(&self.addr)
+                        );
+                        error!("Error in connection {}: {}", self.addr, err);
+                        self.state = TcpSinkState::Disconnected;
+                        Ok(AsyncSink::Ready)
+                    }
+                    Ok(ok) => Ok(ok),
                 }
-                Ok(ok) => Ok(ok),
-            },
+            }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
             Err(_) => unreachable!(),
         }
@@ -124,6 +141,10 @@ impl Sink for TcpSink {
 
         match connection.poll_complete() {
             Err(err) => {
+                debug!(
+                    message = "disconnected.",
+                    addr = &field::display(&self.addr)
+                );
                 error!("Error in connection {}: {}", self.addr, err);
                 self.state = TcpSinkState::Disconnected;
                 Ok(Async::Ready(()))
