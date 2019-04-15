@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
 use stream_cancel::Trigger;
-use tokio::timer;
+use tokio::{runtime::TaskExecutor, timer};
 use tokio_trace_futures::Instrument;
 
 pub struct Topology {
@@ -40,8 +40,15 @@ struct RunningTopology {
 }
 
 impl Topology {
-    pub fn build(config: Config) -> Result<(Self, Vec<String>), Vec<String>> {
-        let (components, warnings) = builder::build_pieces(&config)?;
+    pub fn build(
+        config: Config,
+        exec: &mut TaskExecutor,
+    ) -> Result<(Self, Vec<String>), Vec<String>> {
+        let mut enter =
+            tokio_executor::enter().map_err(|e| vec![format!("Executor Error: {}", e)])?;
+
+        let (components, warnings) =
+            tokio_executor::with_default(exec, &mut enter, |_| builder::build_pieces(&config))?;
 
         let topology = Self {
             state: State::Ready(components, config),

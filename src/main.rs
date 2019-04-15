@@ -100,9 +100,12 @@ fn main() {
             path = field::debug(&config_path)
         );
 
+        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
+        let mut exec = rt.executor();
+
         let topology = vector::topology::Config::load(file).and_then(|f| {
             debug!(message = "Building config from file.");
-            Topology::build(f)
+            Topology::build(f, &mut exec)
         });
 
         let mut topology = match topology {
@@ -120,8 +123,6 @@ fn main() {
                 return;
             }
         };
-
-        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 

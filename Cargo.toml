@@ -25,6 +25,7 @@ tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
+tokio-executor = "0.1"
 
 # Tracing
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
