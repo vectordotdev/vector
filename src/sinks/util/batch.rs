@@ -1,4 +1,6 @@
-use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::sync::mpsc::{channel, Sender};
+use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 
@@ -13,49 +15,21 @@ pub trait Batch {
     fn num_items(&self) -> usize;
 }
 
-impl<T> Batch for Vec<T> {
-    type Input = T;
-    type Output = Self;
-
-    fn len(&self) -> usize {
-        self.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        self.push(item)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self::new()
-    }
-
-    fn finish(self) -> Self::Output {
-        self
-    }
-
-    fn num_items(&self) -> usize {
-        self.len()
-    }
-}
-
 pub struct BatchSink<B, S> {
     batch: B,
-    inner: S,
+    inner: Sender<B>,
     max_size: usize,
     min_size: usize,
     closing: bool,
     max_linger: Option<Duration>,
     linger_deadline: Option<Delay>,
+    _pd: PhantomData<S>,
 }
 
 impl<B, S> BatchSink<B, S>
 where
-    B: Batch,
-    S: Sink<SinkItem = B>,
+    B: Batch + Send + 'static,
+    S: Sink<SinkItem = B> + Send + 'static,
 {
     pub fn new(inner: S, batch: B, max_size: usize) -> Self {
         Self::build(inner, batch, 0, max_size, None)
@@ -73,20 +47,31 @@ where
         max_linger: Option<Duration>,
     ) -> Self {
         assert!(max_size >= min_size);
+
+        let (tx, rx) = channel(100);
+
+        let fut = rx
+            .map_err(|_| ())
+            .forward(inner.sink_map_err(|_| ()))
+            .map(|_| ())
+            .map_err(|_| ());
+        tokio::spawn(fut);
+
         BatchSink {
             batch,
-            inner,
+            inner: tx,
             max_size,
             min_size,
             closing: false,
             max_linger,
             linger_deadline: None,
+            _pd: PhantomData,
         }
     }
 
-    pub fn into_inner(self) -> S {
-        self.inner
-    }
+    // pub fn into_inner(self) -> S {
+    //     self.inner
+    // }
 
     fn should_send(&mut self) -> bool {
         self.closing || self.batch.len() >= self.min_size || self.linger_elapsed()
@@ -103,7 +88,7 @@ where
     fn poll_send(&mut self) -> Poll<(), S::SinkError> {
         let fresh = self.batch.fresh();
         let batch = std::mem::replace(&mut self.batch, fresh);
-        if let AsyncSink::NotReady(batch) = self.inner.start_send(batch)? {
+        if let AsyncSink::NotReady(batch) = self.inner.start_send(batch).unwrap() {
             self.batch = batch;
             Ok(Async::NotReady)
         } else {
@@ -115,11 +100,12 @@ where
 
 impl<B, E, S> Sink for BatchSink<B, S>
 where
-    B: Batch,
-    S: Sink<SinkItem = B, SinkError = E>,
+    B: Batch + Send + 'static,
+    S: Sink<SinkItem = B, SinkError = E> + Send + 'static,
+    E: Send + 'static,
 {
     type SinkItem = B::Input;
-    type SinkError = E;
+    type SinkError = ();
 
     // When used with Stream::forward, a successful call to start_send will always be followed
     // immediately by another call to start_send or a call to poll_complete. This means that
@@ -170,18 +156,18 @@ where
             if self.batch.is_empty() {
                 // We have no data to send, so forward to inner
                 if self.closing {
-                    return self.inner.close();
+                    return self.inner.close().map_err(|e| panic!(e));
                 } else {
-                    return self.inner.poll_complete();
+                    return self.inner.poll_complete().map_err(|e| panic!(e));
                 }
             } else {
                 // We have data to send, so check if we should send it and either attempt the send
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
                 if self.should_send() {
-                    try_ready!(self.poll_send());
+                    try_ready!(self.poll_send().map_err(|e| panic!(e)));
                 } else {
-                    self.inner.poll_complete()?;
+                    self.inner.poll_complete().map_err(|e| panic!(e))?;
                     return Ok(Async::NotReady);
                 }
             }
@@ -191,6 +177,35 @@ where
     fn close(&mut self) -> Poll<(), Self::SinkError> {
         self.closing = true;
         self.poll_complete()
+    }
+}
+
+impl<T> Batch for Vec<T> {
+    type Input = T;
+    type Output = Self;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn push(&mut self, item: Self::Input) {
+        self.push(item)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self::new()
+    }
+
+    fn finish(self) -> Self::Output {
+        self
+    }
+
+    fn num_items(&self) -> usize {
+        self.len()
     }
 }
 

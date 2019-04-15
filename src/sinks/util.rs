@@ -16,7 +16,7 @@ pub use buffer::{Buffer, Compression};
 
 pub trait SinkExt<T>
 where
-    Self: Sink<SinkItem = T> + Sized,
+    Self: Sink<SinkItem = T> + Send + Sized + 'static,
 {
     fn stream_ack(self, acker: Acker) -> StreamAck<Self> {
         StreamAck::new(self, acker)
@@ -24,20 +24,25 @@ where
 
     fn batched(self, batch: T, limit: usize) -> BatchSink<T, Self>
     where
-        T: Batch,
+        T: Batch + Send + 'static,
     {
         BatchSink::new(self, batch, limit)
     }
 
     fn batched_with_min(self, batch: T, min: usize, delay: Duration) -> BatchSink<T, Self>
     where
-        T: Batch,
+        T: Batch + Send + 'static,
     {
         BatchSink::new_min(self, batch, min, Some(delay))
     }
 }
 
-impl<T, S> SinkExt<T> for S where S: Sink<SinkItem = T> + Sized {}
+impl<T, S> SinkExt<T> for S
+where
+    S: Sink<SinkItem = T> + Send + Sized + 'static,
+    T: Send + 'static,
+{
+}
 
 pub struct StreamAck<T> {
     inner: T,
