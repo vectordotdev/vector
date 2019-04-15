@@ -8,10 +8,9 @@ use crate::buffers;
 use futures::{
     future,
     sync::{mpsc, oneshot},
-    Async, Future, Stream,
+    Future, Stream,
 };
 use indexmap::IndexMap;
-use matches::matches;
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
@@ -194,7 +193,9 @@ impl Topology {
 
         let timeout = timer::Delay::new(deadline)
             .map(move |_| {
-                check_handles.retain(|_name, handle| matches!(handle.poll(), Ok(Async::NotReady)));
+                check_handles.retain(|_name, handle| {
+                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
                 error!(
@@ -206,7 +207,9 @@ impl Topology {
 
         let reporter = timer::Interval::new_interval(Duration::from_secs(5))
             .inspect(move |_| {
-                check_handles2.retain(|_name, handle| matches!(handle.poll(), Ok(Async::NotReady)));
+                check_handles2.retain(|_name, handle| {
+                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
+                });
                 let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
                 // TODO: replace with checked_duration_since once it's stable
