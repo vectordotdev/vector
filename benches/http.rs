@@ -16,6 +16,8 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
+    serve(out_addr);
+
     let bench = Benchmark::new("http_no_compression", move |b| {
         b.iter_with_setup(
             || {
@@ -33,8 +35,6 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                 let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-                rt.spawn(serve(out_addr));
 
                 topology.start(&mut rt);
                 wait_for_tcp(in_addr);
@@ -65,6 +65,8 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
+    serve(out_addr);
+
     let bench = Benchmark::new("http_gzip", move |b| {
         b.iter_with_setup(
             || {
@@ -81,8 +83,6 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                 let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-                rt.spawn(serve(out_addr));
 
                 topology.start(&mut rt);
                 wait_for_tcp(in_addr);
@@ -106,12 +106,16 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     c.bench("http", bench);
 }
 
-fn serve(addr: SocketAddr) -> impl Future<Item = (), Error = ()> {
-    let make_service = || service_fn_ok(|_req| Response::new(Body::empty()));
+fn serve(addr: SocketAddr) {
+    std::thread::spawn(move || {
+        let make_service = || service_fn_ok(|_req| Response::new(Body::empty()));
 
-    Server::bind(&addr)
-        .serve(make_service)
-        .map_err(|e| panic!(e))
+        let fut = Server::bind(&addr)
+            .serve(make_service)
+            .map_err(|e| panic!(e));
+
+        tokio::runtime::current_thread::run(fut);
+    });
 }
 
 criterion_group!(http, benchmark_http_no_compression, benchmark_http_gzip);
