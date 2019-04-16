@@ -113,7 +113,7 @@ fn serve(addr: SocketAddr) -> impl Future<Item = (), Error = ()> {
 
     Server::bind(&addr)
         .serve(make_service)
-        .map_err(|e| panic!(e))
+        .map_err(|e| panic!("{:?}", e))
 }
 
 criterion_group!(http, benchmark_http_no_compression, benchmark_http_gzip);
