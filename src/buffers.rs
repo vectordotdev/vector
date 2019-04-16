@@ -11,8 +11,22 @@ use std::sync::{
 mod disk;
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct BufferConfig {
+    #[serde(flatten)]
+    inner: BufferInnerConfig,
+}
+
+impl Default for BufferConfig {
+    fn default() -> Self {
+        BufferConfig {
+            inner: Default::default(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type")]
-pub enum BufferConfig {
+pub enum BufferInnerConfig {
     Memory {
         num_items: usize,
     },
@@ -22,9 +36,18 @@ pub enum BufferConfig {
     },
 }
 
-impl Default for BufferConfig {
+impl From<BufferInnerConfig> for BufferConfig {
+    fn from(inner: BufferInnerConfig) -> Self {
+        Self {
+            inner,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for BufferInnerConfig {
     fn default() -> Self {
-        BufferConfig::Memory { num_items: 100 }
+        BufferInnerConfig::Memory { num_items: 100 }
     }
 }
 
@@ -60,15 +83,15 @@ impl BufferConfig {
         ),
         String,
     > {
-        match self {
-            BufferConfig::Memory { num_items } => {
+        match &self.inner {
+            BufferInnerConfig::Memory { num_items } => {
                 let (tx, rx) = mpsc::channel(*num_items);
                 let tx = BufferInputCloner::Memory(tx);
                 let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))
             }
             #[cfg(feature = "leveldb")]
-            BufferConfig::Disk { max_size } => {
+            BufferInnerConfig::Disk { max_size } => {
                 let path = data_dir
                     .as_ref()
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
