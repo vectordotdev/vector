@@ -67,7 +67,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         };
 
         let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
-        let input_tx = buffers::BufferInputCloner::Memory(input_tx);
+        let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
