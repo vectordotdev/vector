@@ -69,10 +69,6 @@ where
         }
     }
 
-    // pub fn into_inner(self) -> S {
-    //     self.inner
-    // }
-
     fn should_send(&mut self) -> bool {
         self.closing || self.batch.len() >= self.min_size || self.linger_elapsed()
     }
@@ -213,18 +209,19 @@ impl<T> Batch for Vec<T> {
 mod test {
     use super::{Batch, BatchSink};
     use crate::sinks::util::Buffer;
-    use futures::{Future, Sink};
+    use futures::{sync::mpsc, Future, Sink, Stream};
 
     #[test]
     fn batch_sink_buffers_messages_until_limit() {
-        let buffered = BatchSink::new(vec![], Vec::new(), 10);
+        let (tx, rx) = mpsc::unbounded();
+        let buffered = BatchSink::new(tx, Vec::new(), 10);
 
         let (buffered, _) = buffered
             .send_all(futures::stream::iter_ok(0..22))
             .wait()
             .unwrap();
 
-        let output = buffered.into_inner();
+        let output = rx.collect().wait().unwrap();
         assert_eq!(
             output,
             vec![
@@ -237,18 +234,20 @@ mod test {
 
     #[test]
     fn batch_sink_doesnt_buffer_if_its_flushed() {
-        let buffered = BatchSink::new(vec![], Vec::new(), 10);
+        let (tx, rx) = mpsc::unbounded();
+        let buffered = BatchSink::new(tx, Vec::new(), 10);
 
         let buffered = buffered.send(0).wait().unwrap();
         let buffered = buffered.send(1).wait().unwrap();
 
-        let output = buffered.into_inner();
+        let output = rx.collect().wait().unwrap();
         assert_eq!(output, vec![vec![0], vec![1],]);
     }
 
     #[test]
     fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
-        let buffered = BatchSink::new(vec![], Buffer::new(false), 10);
+        let (tx, rx) = mpsc::unbounded();
+        let buffered = BatchSink::new(tx, Buffer::new(false), 10);
 
         let input = vec![
             vec![0, 1, 2],
@@ -263,8 +262,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let output = buffered
-            .into_inner()
+        let output = rx
+            .collect()
+            .wait()
+            .unwrap()
             .into_iter()
             .map(|buf| buf.finish())
             .collect::<Vec<Vec<u8>>>();

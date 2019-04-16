@@ -33,9 +33,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -69,9 +70,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                         max_size: 1_000_000,
                     };
                     config.data_dir = Some(data_dir.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
-
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -103,9 +104,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
                     config.data_dir = Some(data_dir2.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 

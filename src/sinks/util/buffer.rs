@@ -108,14 +108,15 @@ impl super::batch::Batch for Buffer {
 mod test {
     use super::Buffer;
     use crate::sinks::util::batch::{Batch, BatchSink};
-    use futures::{Future, Sink};
+    use futures::{sync::mpsc, Future, Sink, Stream};
     use std::io::Read;
 
     #[test]
     fn gzip() {
         use flate2::read::GzDecoder;
 
-        let buffered = BatchSink::new(vec![], Buffer::new(true), 1000);
+        let (tx, rx) = mpsc::unbounded();
+        let buffered = BatchSink::new(tx, Buffer::new(true), 1000);
 
         let input = std::iter::repeat(
             b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
@@ -127,8 +128,10 @@ mod test {
             .wait()
             .unwrap();
 
-        let output = buffered
-            .into_inner()
+        let output = rx
+            .collect()
+            .wait()
+            .unwrap()
             .into_iter()
             .map(|buf| buf.finish())
             .collect::<Vec<Vec<u8>>>();

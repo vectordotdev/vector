@@ -30,9 +30,10 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let (mut topology, _warnings) =
+                    Topology::build(config, &mut rt.executor()).unwrap();
 
                 rt.spawn(serve(out_addr));
 
@@ -78,9 +79,10 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
+                let (mut topology, _warnings) =
+                    Topology::build(config, &mut rt.executor()).unwrap();
 
                 rt.spawn(serve(out_addr));
 

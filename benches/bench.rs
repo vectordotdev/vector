@@ -31,9 +31,10 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -78,9 +79,10 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -125,9 +127,10 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -173,9 +176,9 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
-
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -238,9 +241,10 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         &["in1", "in2"],
                         sinks::tcp::TcpSinkConfig { address: out_addr2 },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines1 = count_lines(&out_addr1, &rt.executor());
                     let output_lines2 = count_lines(&out_addr2, &rt.executor());
@@ -305,8 +309,10 @@ fn benchmark_transforms(c: &mut Criterion) {
                         &["filter"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
+
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
@@ -432,8 +438,10 @@ fn benchmark_complex(c: &mut Criterion) {
                             address: out_addr_500,
                         },
                     );
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
+
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
+                    let (mut topology, _warnings) =
+                        Topology::build(config, &mut rt.executor()).unwrap();
 
                     let output_lines_all = count_lines(&out_addr_all, &rt.executor());
                     let output_lines_sampled = count_lines(&out_addr_sampled, &rt.executor());

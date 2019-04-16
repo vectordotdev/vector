@@ -644,7 +644,7 @@ mod tests {
         old_config.add_source("in", TcpConfig::new(in_addr));
         old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -697,7 +697,7 @@ mod tests {
         old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
         old_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -751,7 +751,7 @@ mod tests {
         old_config.add_source("in", TcpConfig::new(in_addr));
         old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -804,7 +804,8 @@ mod tests {
             old_config.add_source("in", TcpConfig::new(in_addr));
             old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
             let mut new_config = old_config.clone();
-            let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+            let (mut topology, _warnings) =
+                Topology::build(old_config, &mut rt.executor()).unwrap();
 
             topology.start(&mut rt);
 
@@ -865,7 +866,7 @@ mod tests {
         let mut old_config = Config::empty();
         old_config.add_sink("out", &[], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -909,7 +910,7 @@ mod tests {
         old_config.add_source("in", TcpConfig::new(in_addr));
         old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -950,7 +951,7 @@ mod tests {
         old_config.add_source("in1", TcpConfig::new(in_addr));
         old_config.add_sink("out", &["in1"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1008,7 +1009,7 @@ mod tests {
         );
         old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1091,7 +1092,7 @@ mod tests {
         old_config.add_source("in", TcpConfig::new(in_addr));
         old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1159,7 +1160,7 @@ mod tests {
         );
         old_config.add_sink("out", &["sampler"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1221,7 +1222,7 @@ mod tests {
         );
         old_config.add_sink("out", &["sampler"], TcpSinkConfig { address: out_addr });
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1287,7 +1288,7 @@ mod tests {
         let mut old_config = Config::empty();
         old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (mut topology, _warnings) = Topology::build(old_config, &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
@@ -1355,7 +1356,8 @@ mod tests {
         let mut config = Config::empty();
         config.add_source("in", TcpConfig::new(in_addr));
         config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
-        let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
+        let (mut topology, _warnings) =
+            Topology::build(config.clone(), &mut rt.executor()).unwrap();
 
         topology.start(&mut rt);
 
