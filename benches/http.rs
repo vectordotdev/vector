@@ -114,7 +114,7 @@ fn serve(addr: SocketAddr) {
 
         let fut = Server::bind(&addr)
             .serve(make_service)
-            .map_err(|e| panic!("{:?}", e));
+            .map_err(|e| panic!(e));
 
         tokio::runtime::current_thread::run(fut);
     });

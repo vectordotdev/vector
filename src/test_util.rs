@@ -149,7 +149,7 @@ pub fn shutdown_on_idle(runtime: Runtime) {
     block_on(
         runtime
             .shutdown_on_idle()
-            .timeout(std::time::Duration::from_secs(5)),
+            .timeout(std::time::Duration::from_secs(10)),
     )
     .unwrap()
 }
