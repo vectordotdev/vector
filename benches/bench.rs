@@ -10,6 +10,7 @@ use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
 
 mod buffering;
+mod http;
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -518,7 +519,7 @@ criterion_group!(
     benchmark_transforms,
     benchmark_complex,
 );
-criterion_main!(benches, buffering::buffers);
+criterion_main!(benches, buffering::buffers, http::http);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;
