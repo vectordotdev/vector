@@ -32,6 +32,13 @@ fn main() {
                 .long("metrics-addr")
                 .help("The address that metrics will be served from")
                 .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .help("Number of threads vector's core processing should use. Defaults to number of cores available")
+                .takes_value(true)
         );
     let matches = app.get_matches();
 
@@ -62,6 +69,20 @@ fn main() {
     };
 
     tokio_trace::dispatcher::with_default(&dispatch, || {
+        let threads = matches.value_of("threads").map(|string| {
+            match string
+                .parse::<usize>()
+                .ok()
+                .filter(|&t| t >= 1 && t <= 32768)
+            {
+                Some(t) => t,
+                None => {
+                    error!("threads must be a number between 1 and 32768 (inclusive)");
+                    std::process::exit(1);
+                }
+            }
+        });
+
         let metrics_addr = metrics_addr.map(|addr| {
             if let Ok(addr) = addr.parse() {
                 addr
@@ -121,7 +142,15 @@ fn main() {
             }
         };
 
-        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
+        let mut rt = {
+            let mut builder = tokio::runtime::Builder::new();
+
+            if let Some(threads) = threads {
+                builder.core_threads(threads);
+            }
+
+            builder.build().expect("Unable to create async runtime")
+        };
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
