@@ -32,6 +32,13 @@ fn main() {
                 .long("metrics-addr")
                 .help("The address that metrics will be served from")
                 .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .help("Number of threads vector's core processing should use. Defaults to number of cores available")
+                .takes_value(true)
         );
     let matches = app.get_matches();
 
@@ -62,6 +69,20 @@ fn main() {
     };
 
     tokio_trace::dispatcher::with_default(&dispatch, || {
+        let threads = matches.value_of("threads").map(|string| {
+            match string
+                .parse::<usize>()
+                .ok()
+                .filter(|&t| t >= 1 && t <= 32768)
+            {
+                Some(t) => t,
+                None => {
+                    error!("threads must be a number between 1 and 32768 (inclusive)");
+                    std::process::exit(1);
+                }
+            }
+        });
+
         let metrics_addr = metrics_addr.map(|addr| {
             if let Ok(addr) = addr.parse() {
                 addr
@@ -121,7 +142,15 @@ fn main() {
             }
         };
 
-        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
+        let mut rt = {
+            let mut builder = tokio::runtime::Builder::new();
+
+            if let Some(threads) = threads {
+                builder.core_threads(threads);
+            }
+
+            builder.build().expect("Unable to create async runtime")
+        };
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
@@ -154,7 +183,14 @@ fn main() {
             rt.spawn(topology.healthchecks());
         }
 
-        info!("Vector is starting.");
+        info!(
+            message = "Vector is starting.",
+            version = built_info::PKG_VERSION,
+            git_version = built_info::GIT_VERSION.unwrap_or(""),
+            released = built_info::BUILT_TIME_UTC,
+            arch = built_info::CFG_TARGET_ARCH
+        );
+
         let mut graceful_crash = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
@@ -221,12 +257,10 @@ fn main() {
             use futures::future::Either;
 
             info!("Shutting down.");
-            topology.stop();
+            let shutdown = topology.stop();
             metrics_trigger.cancel();
 
-            let shutdown = rt.shutdown_on_idle();
-
-            match shutdown.select2(signals.into_future()).wait() {
+            match rt.block_on(shutdown.select2(signals.into_future())) {
                 Ok(Either::A(_)) => { /* Graceful shutdown finished */ }
                 Ok(Either::B(_)) => {
                     info!("Shutting down immediately.");
@@ -236,9 +270,16 @@ fn main() {
             }
         } else if signal == SIGQUIT {
             info!("Shutting down immediately");
-            rt.shutdown_now().wait().unwrap();
+            drop(topology);
         } else {
             unreachable!();
         }
+
+        rt.shutdown_now().wait().unwrap();
     });
+}
+
+#[allow(unused)]
+mod built_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

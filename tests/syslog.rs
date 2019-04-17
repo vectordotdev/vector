@@ -45,7 +45,7 @@ fn test_tcp_syslog() {
     block_on(send_lines(in_addr, input_lines.clone().into_iter())).unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -93,7 +93,7 @@ fn test_udp_syslog() {
     thread::sleep(Duration::from_millis(10));
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();
@@ -163,7 +163,7 @@ fn test_unix_stream_syslog() {
         .unwrap();
 
     // Shut down server
-    topology.stop();
+    block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait().unwrap();

@@ -64,19 +64,16 @@ then
   build_release
   build_tar
 
-  S3_PATH="tags/$TAG/$TAR_NAME"
+  S3_PATH="$TAR_NAME"
   upload_s3
 elif [ -n "$BRANCH" ]
 then
-  SHORT_COMMIT_SHA=$(echo $COMMIT_SHA | cut -c1-7)
-  TAR_NAME="$APP_NAME-$BRANCH-$COMMIT_TIMESTAMP-$SHORT_COMMIT_SHA-$TARGET.tar.gz"
+  TAG_DESCRIBE=$(git describe --tags)
+  TAR_NAME="$APP_NAME-$TAG_DESCRIBE-$TARGET.tar.gz"
   build_release
   build_tar
 
-  S3_PATH="branches/$BRANCH/$TAR_NAME"
-  upload_s3
-
-  S3_PATH="branches/$BRANCH/$APP_NAME-$BRANCH-latest-$TARGET.tar.gz"
+  S3_PATH="$TAR_NAME"
   upload_s3
 else
   echo "error: neither TAG nor BRANCH was set"

@@ -2,7 +2,7 @@ use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::buffers::Acker;
 use vector::test_util::{
-    next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::Record;
@@ -66,7 +66,7 @@ fn test_sink_panic() {
 
     std::panic::take_hook();
     assert!(crash.wait().next().is_some());
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -131,7 +131,7 @@ fn test_sink_error() {
     rt2.block_on(send).unwrap();
 
     assert!(crash.wait().next().is_some());
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -180,7 +180,7 @@ fn test_source_error() {
     rt2.block_on(send).unwrap();
 
     assert!(crash.wait().next().is_some());
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();
@@ -233,7 +233,7 @@ fn test_source_panic() {
     std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
-    topology.stop();
+    block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
 
     let output_lines = output_lines.wait();

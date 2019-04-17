@@ -17,6 +17,8 @@ This will create a `100MB` sample log file in the `sample.log` file.
 
 ### Building
 
+Vector compiles with Rust 1.34.0 (stable) or newer. In general, Vector tracks the latest stable release of the Rust compiler.
+
 Building is very easy, all you need to do is use `cargo`:
 
 ``` bash

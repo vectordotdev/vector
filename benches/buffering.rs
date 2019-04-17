@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use tempfile::tempdir;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
-use vector::test_util::{next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
+use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
 use vector::topology::{config, Topology};
 use vector::{buffers::BufferConfig, sinks, sources};
 
@@ -26,19 +26,16 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
+                    config.sinks["out"].buffer = BufferConfig::Memory {
+                        num_items: 100,
+                        when_full: Default::default(),
+                    };
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -54,7 +51,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -65,13 +62,7 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
@@ -79,7 +70,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
-                    };
+                        when_full: Default::default(),
+                    }
+                    .into();
                     config.data_dir = Some(data_dir.clone());
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -96,7 +89,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
@@ -107,19 +100,16 @@ fn benchmark_buffers(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut config = config::Config::empty();
-                    config.add_source(
-                        "in",
-                        sources::tcp::TcpConfig {
-                            address: in_addr,
-                            max_length: 102400,
-                        },
-                    );
+                    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
                     config.add_sink(
                         "out",
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+                    config.sinks["out"].buffer = BufferConfig::Disk {
+                        max_size: 10_000,
+                        when_full: Default::default(),
+                    };
                     config.data_dir = Some(data_dir2.clone());
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -136,7 +126,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
-                    topology.stop();
+                    block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
                     assert_eq!(num_lines, output_lines.wait().unwrap());
