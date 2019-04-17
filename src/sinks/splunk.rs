@@ -141,7 +141,7 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
 
     if let None = uri.scheme_part() {
-        Err("A Uri Scheme must be supplied, host must include a scheme (https or http)".into())
+        Err("Host must include a scheme (https or http)".into())
     } else {
         Ok(())
     }
