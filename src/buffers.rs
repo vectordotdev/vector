@@ -73,7 +73,7 @@ impl BufferInputCloner {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx.clone().sink_map_err(|e| error!("sender error: {:?}", e));
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull(inner))
+                    Box::new(DropWhenFull { inner })
                 } else {
                     Box::new(inner)
                 }
@@ -81,7 +81,9 @@ impl BufferInputCloner {
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull(writer.clone()))
+                    Box::new(DropWhenFull {
+                        inner: writer.clone(),
+                    })
                 } else {
                     Box::new(writer.clone())
                 }
@@ -158,21 +160,23 @@ impl Acker {
     }
 }
 
-pub struct DropWhenFull<S>(S);
+pub struct DropWhenFull<S> {
+    inner: S,
+}
 
 impl<S: Sink> Sink for DropWhenFull<S> {
     type SinkItem = S::SinkItem;
     type SinkError = S::SinkError;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.0.start_send(item) {
+        match self.inner.start_send(item) {
             Ok(AsyncSink::NotReady(_)) => Ok(AsyncSink::Ready),
             other => other,
         }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.0.poll_complete()
+        self.inner.poll_complete()
     }
 }
 
@@ -187,7 +191,7 @@ mod test {
         block_on::<_, _, ()>(future::lazy(|| {
             let (tx, mut rx) = mpsc::channel(2);
 
-            let mut tx = DropWhenFull(tx);
+            let mut tx = DropWhenFull { inner: tx };
 
             assert_eq!(tx.start_send(1), Ok(AsyncSink::Ready));
             assert_eq!(tx.start_send(2), Ok(AsyncSink::Ready));
