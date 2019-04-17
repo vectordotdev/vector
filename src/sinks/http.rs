@@ -154,7 +154,7 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
             }
         }
 
-        let mut request = builder.body(body.into()).unwrap();
+        let mut request = builder.body(body).unwrap();
 
         if let Some(auth) = &config.basic_auth {
             auth.apply(request.headers_mut());

@@ -58,7 +58,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         builder.header("Content-Type", "application/x-ndjson");
         builder.header("Content-Encoding", "gzip");
 
-        builder.body(body.into()).unwrap()
+        builder.body(body).unwrap()
     });
 
     let service = ServiceBuilder::new()

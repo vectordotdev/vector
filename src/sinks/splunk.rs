@@ -68,7 +68,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
         builder.header("Content-Encoding", "gzip");
         builder.header("Authorization", format!("Splunk {}", token));
 
-        builder.body(body.into()).unwrap()
+        builder.body(body).unwrap()
     });
     let service = ServiceBuilder::new()
         .retry(policy)

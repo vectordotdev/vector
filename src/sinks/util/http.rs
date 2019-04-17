@@ -1,45 +1,44 @@
 use super::retries::RetryLogic;
-use futures::Poll;
+use futures::{Future, Poll};
 // use http::{
 //     header::{HeaderName, HeaderValue},
 //     HeaderMap, Method, Uri,
 // };
-use hyper::{
-    client::{HttpConnector, ResponseFuture},
-    Body, Client,
-};
+use hyper::{client::HttpConnector, Body};
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
+use tower_hyper::{body::LiftBody, client::Client};
 
-type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send>;
+type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 
 #[derive(Clone)]
 pub struct HttpService {
-    client: Client<HttpsConnector<HttpConnector>, Body>,
+    inner: Client<HttpsConnector<HttpConnector>, Vec<u8>>,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
     pub fn new(
-        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send + 'static,
+        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     ) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client: Client<_, Body> = Client::builder()
+        let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
+        let inner = Client::with_client(client);
         Self {
-            client,
+            inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
     }
 }
 
 impl Service<Vec<u8>> for HttpService {
-    type Response = hyper::Response<Body>;
+    type Response = hyper::Response<LiftBody<Body>>;
     type Error = hyper::Error;
-    type Future = ResponseFuture;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -47,7 +46,7 @@ impl Service<Vec<u8>> for HttpService {
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         let request = (self.request_builder)(body);
-        self.client.request(request.into())
+        Box::new(self.inner.call(request))
     }
 }
 
@@ -56,7 +55,7 @@ pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
-    type Response = hyper::Response<Body>;
+    type Response = hyper::Response<LiftBody<Body>>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
