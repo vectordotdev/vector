@@ -11,46 +11,26 @@ use std::sync::{
 mod disk;
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct BufferConfig {
-    #[serde(flatten)]
-    inner: BufferInnerConfig,
-    when_full: WhenFull,
-}
-
-impl Default for BufferConfig {
-    fn default() -> Self {
-        BufferConfig {
-            inner: Default::default(),
-            when_full: WhenFull::Block,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-pub enum BufferInnerConfig {
+pub enum BufferConfig {
     Memory {
         num_items: usize,
+        when_full: WhenFull,
     },
     #[cfg(feature = "leveldb")]
     Disk {
         max_size: usize,
+        when_full: WhenFull,
     },
 }
 
-impl From<BufferInnerConfig> for BufferConfig {
-    fn from(inner: BufferInnerConfig) -> Self {
-        Self {
-            inner,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for BufferInnerConfig {
+impl Default for BufferConfig {
     fn default() -> Self {
-        BufferInnerConfig::Memory { num_items: 100 }
+        BufferConfig::Memory {
+            num_items: 100,
+            when_full: Default::default(),
+        }
     }
 }
 
@@ -59,6 +39,12 @@ impl Default for BufferInnerConfig {
 pub enum WhenFull {
     Block,
     DropNewest,
+}
+
+impl Default for WhenFull {
+    fn default() -> Self {
+        WhenFull::Block
+    }
 }
 
 pub enum BufferInputCloner {
@@ -106,22 +92,28 @@ impl BufferConfig {
         ),
         String,
     > {
-        match &self.inner {
-            BufferInnerConfig::Memory { num_items } => {
+        match &self {
+            BufferConfig::Memory {
+                num_items,
+                when_full,
+            } => {
                 let (tx, rx) = mpsc::channel(*num_items);
-                let tx = BufferInputCloner::Memory(tx, self.when_full);
+                let tx = BufferInputCloner::Memory(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))
             }
             #[cfg(feature = "leveldb")]
-            BufferInnerConfig::Disk { max_size } => {
+            BufferConfig::Disk {
+                max_size,
+                when_full,
+            } => {
                 let path = data_dir
                     .as_ref()
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .join(format!("{}_buffer", sink_name));
 
                 let (tx, rx, acker) = disk::open(&path, *max_size);
-                let tx = BufferInputCloner::Disk(tx, self.when_full);
+                let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
             }

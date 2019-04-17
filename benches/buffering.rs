@@ -7,7 +7,7 @@ use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
 use vector::topology::{config, Topology};
-use vector::{buffers::BufferInnerConfig, sinks, sources};
+use vector::{buffers::BufferConfig, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -32,8 +32,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer =
-                        BufferInnerConfig::Memory { num_items: 100 }.into();
+                    config.sinks["out"].buffer = BufferConfig::Memory {
+                        num_items: 100,
+                        when_full: Default::default(),
+                    };
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -66,8 +68,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer = BufferInnerConfig::Disk {
+                    config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
+                        when_full: Default::default(),
                     }
                     .into();
                     config.data_dir = Some(data_dir.clone());
@@ -103,8 +106,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer =
-                        BufferInnerConfig::Disk { max_size: 10_000 }.into();
+                    config.sinks["out"].buffer = BufferConfig::Disk {
+                        max_size: 10_000,
+                        when_full: Default::default(),
+                    };
                     config.data_dir = Some(data_dir2.clone());
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
