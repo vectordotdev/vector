@@ -46,6 +46,11 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Config {
+        inner: Inner,
+    }
+
+    #[derive(Deserialize)]
+    struct Inner {
         #[serde(flatten)]
         region: RegionOrEndpoint,
     }
@@ -54,12 +59,13 @@ mod tests {
     fn region_es_east_1() {
         let config: Config = toml::from_str(
             r#"
+        [inner]
         region = "us-east-1"
         "#,
         )
         .unwrap();
 
-        let region: Region = config.region.try_into().unwrap();
+        let region: Region = config.inner.region.try_into().unwrap();
         assert_eq!(region, Region::UsEast1);
     }
 
@@ -67,6 +73,7 @@ mod tests {
     fn region_custom_name_endpoint() {
         let config: Config = toml::from_str(
             r#"
+        [inner]
         endpoint = "http://localhost:9000"
         "#,
         )
@@ -77,7 +84,7 @@ mod tests {
             endpoint: "http://localhost:9000".into(),
         };
 
-        let region: Region = config.region.try_into().unwrap();
+        let region: Region = config.inner.region.try_into().unwrap();
         assert_eq!(region, expected_region);
     }
 }

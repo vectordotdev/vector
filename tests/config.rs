@@ -213,7 +213,15 @@ fn bad_s3_region() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["unknown field `region` for key `sinks.out1`"])
+    assert_eq!(
+        err,
+        vec![
+            "Sink \"out1\": Must set 'region' or 'endpoint'",
+            "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
+            "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
+        ]
+    )
+    // assert_eq!(err, vec!["unknown field `region` for key `sinks.out1`"])
 }
 
 #[test]
