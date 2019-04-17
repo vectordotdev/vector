@@ -1,6 +1,7 @@
+use super::util::StreamExt as _;
 use crate::record::Record;
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
+use codec::{self, BytesDelimitedCodec};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -117,7 +118,14 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                         );
                         record
                     })
-                    .map_err(|e| error!("error reading line: {:?}", e));
+                    .filter_map_err(|err| match err {
+                        codec::Error::MaxLimitExceeded => {
+                            warn!("Received line longer than max_length. Discarding.");
+                            None
+                        }
+                        codec::Error::Io(io) => Some(io),
+                    })
+                    .map_err(|e| warn!("connection error: {:?}", e));
 
                     let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
 
@@ -132,7 +140,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
 #[cfg(test)]
 mod test {
     use super::TcpConfig;
-    use crate::test_util::{next_addr, send_lines, wait_for_tcp};
+    use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
     use bytes::Bytes;
     use futures::sync::mpsc;
     use futures::Stream;
@@ -174,5 +182,34 @@ mod test {
 
         assert_eq!(with.max_length, 19);
         assert_eq!(without.max_length, super::default_max_length());
+    }
+
+    #[test]
+    fn tcp_continue_after_long_line() {
+        let (tx, rx) = mpsc::channel(10);
+
+        let addr = next_addr();
+
+        let mut config = TcpConfig::new(addr);
+        config.max_length = 10;
+
+        let server = super::tcp(config, tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+        wait_for_tcp(addr);
+
+        let lines = vec![
+            "short".to_owned(),
+            "this is too long".to_owned(),
+            "more short".to_owned(),
+        ];
+
+        rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
+
+        let (record, rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(record.unwrap().raw, "short");
+
+        let (record, _rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(record.unwrap().raw, "more short");
     }
 }
