@@ -44,8 +44,7 @@ rusoto_credential = "0.16.0"
 
 # Tower
 tower = { git = "https://github.com/tower-rs/tower" }
-# tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
-tower-hyper = { path = "../tower-hyper" }
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
