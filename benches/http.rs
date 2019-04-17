@@ -1,8 +1,10 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::Future;
-use hyper::service::service_fn_ok;
+use hyper::service::service_fn;
 use hyper::{Body, Response, Server};
 use std::net::SocketAddr;
+use std::time::{Duration, Instant};
+use tokio::timer::Delay;
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
     sinks, sources,
@@ -110,7 +112,12 @@ fn benchmark_http_gzip(c: &mut Criterion) {
 
 fn serve(addr: SocketAddr) {
     std::thread::spawn(move || {
-        let make_service = || service_fn_ok(|_req| Response::new(Body::empty()));
+        let make_service = || {
+            service_fn(|_req| {
+                let deadline = Instant::now() + Duration::from_millis(500);
+                Delay::new(deadline).and_then(|_| Ok(Response::new(Body::empty())))
+            })
+        };
 
         let fut = Server::bind(&addr)
             .serve(make_service)
