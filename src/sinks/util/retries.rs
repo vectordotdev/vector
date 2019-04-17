@@ -90,7 +90,7 @@ where
                     }
                 } else if error.is::<timeout::error::Elapsed>() {
                     warn!(
-                        message = "request timed out retrying.",
+                        message = "request timed out, retrying.",
                         total_retries = &field::display(self.remaining_attempts)
                     );
                     Some(self.build_retry())
