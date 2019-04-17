@@ -37,9 +37,18 @@ fn batching(
 fn benchmark_batching(c: &mut Criterion) {
     c.bench(
         "batch",
-        batching("no_compression 10mb", false, 2_00_000, 100_000, 100),
+        batching(
+            "no compression 10mb with 2mb batches",
+            false,
+            2_000_000,
+            100_000,
+            100,
+        ),
     );
-    c.bench("batch", batching("gzip 10mb", true, 2_00_000, 100_000, 100));
+    c.bench(
+        "batch",
+        batching("gzip 10mb with 2mb batches", true, 2_000_000, 100_000, 100),
+    );
 }
 
 criterion_group!(batch, benchmark_batching);
