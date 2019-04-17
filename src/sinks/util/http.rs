@@ -1,13 +1,11 @@
 use super::retries::RetryLogic;
 use futures::{Future, Poll};
-// use http::{
-//     header::{HeaderName, HeaderValue},
-//     HeaderMap, Method, Uri,
-// };
 use hyper::{client::HttpConnector, Body};
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
+use tokio_trace::field;
+use tokio_trace_tower_http::InstrumentedHttpService;
 use tower::Service;
 use tower_hyper::{body::LiftBody, client::Client};
 
@@ -15,19 +13,20 @@ type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Se
 
 #[derive(Clone)]
 pub struct HttpService {
-    inner: Client<HttpsConnector<HttpConnector>, Vec<u8>>,
+    inner: InstrumentedHttpService<Client<HttpsConnector<HttpConnector>, Vec<u8>>>,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
-    pub fn new(
-        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-    ) -> Self {
+    pub fn new<F>(request_builder: F) -> Self
+    where
+        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
-        let inner = Client::with_client(client);
+        let inner = InstrumentedHttpService::new(Client::with_client(client));
         Self {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
@@ -46,7 +45,18 @@ impl Service<Vec<u8>> for HttpService {
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         let request = (self.request_builder)(body);
-        Box::new(self.inner.call(request))
+
+        debug!(message = "sending request.");
+
+        let fut = self.inner.call(request).inspect(|res| {
+            debug!(
+                message = "response.",
+                status = &field::display(res.status()),
+                version = &field::debug(res.version()),
+            )
+        });
+
+        Box::new(fut)
     }
 }
 

@@ -31,6 +31,7 @@ tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-tower-http = { git = "https://github.com/LucioFranco/tokio-trace-nursery", branch = "improve-http" }
 
 # Metrics
 hotmic = "0.8"

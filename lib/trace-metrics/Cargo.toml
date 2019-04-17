@@ -5,7 +5,7 @@ authors = ["Lucio Franco <luciofranco14@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio-trace-core = "0.1"
+tokio-trace-core = "0.2"
 hotmic = "0.8"
 
 [dev-dependencies]
