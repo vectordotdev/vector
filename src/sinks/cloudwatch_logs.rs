@@ -283,13 +283,15 @@ mod tests {
             name: "localstack".into(),
             endpoint: "http://localhost:6000".into(),
         };
-
         ensure_stream(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::Region(region.clone()),
+            region: RegionOrEndpoint::Endpoint {
+                endpoint: "http://localhost:6000".into(),
+                endpoint_name: None,
+            },
             buffer_size: 1,
         };
 

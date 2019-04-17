@@ -201,13 +201,16 @@ mod tests {
 
         let config = KinesisSinkConfig {
             stream_name: STREAM_NAME.into(),
-            region: RegionOrEndpoint::Region(region.clone()),
+            region: RegionOrEndpoint::Endpoint {
+                endpoint: "http://localhost:4568".into(),
+                endpoint_name: None,
+            },
             batch_size: 2,
         };
 
         let mut rt = Runtime::new().unwrap();
 
-        let sink = KinesisService::new(config, Acker::Null);
+        let sink = KinesisService::new(config, Acker::Null).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
