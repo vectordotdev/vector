@@ -8,6 +8,7 @@ use futures::{Future, Poll, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::time::Duration;
 use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
@@ -96,8 +97,9 @@ pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
 
 impl S3SinkConfig {
     fn config(&self) -> Result<S3SinkInnerConfig, String> {
+        let region = self.region.clone().try_into()?;
         Ok(S3SinkInnerConfig {
-            client: rusoto_s3::S3Client::new(self.region.clone().into()),
+            client: rusoto_s3::S3Client::new(region),
             gzip: self.gzip,
             buffer_size: self.buffer_size,
             key_prefix: self.key_prefix.clone(),

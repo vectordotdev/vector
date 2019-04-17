@@ -15,7 +15,7 @@ use rusoto_kinesis::{
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
-use std::{fmt, sync::Arc, time::Duration};
+use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use tower::{Service, ServiceBuilder};
 
 #[derive(Clone)]
@@ -37,8 +37,9 @@ pub struct KinesisSinkConfig {
 impl crate::topology::config::SinkConfig for KinesisSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let config = self.clone();
-        let sink = KinesisService::new(config, acker);
-        Ok((Box::new(sink), healthcheck(self.clone())))
+        let sink = KinesisService::new(config, acker)?;
+        let healthcheck = healthcheck(self.clone())?;
+        Ok((Box::new(sink), healthcheck))
     }
 }
 
@@ -46,8 +47,8 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> impl Sink<SinkItem = Record, SinkError = ()> {
-        let client = Arc::new(KinesisClient::new(config.region.clone().into()));
+    ) -> Result<impl Sink<SinkItem = Record, SinkError = ()>, String> {
+        let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size;
         let kinesis = KinesisService { client, config };
@@ -61,9 +62,11 @@ impl KinesisService {
             .service(kinesis)
             .expect("This is a bug, no spawning done");
 
-        BatchServiceSink::new(svc, acker)
+        let sink = BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
-            .with(|record: Record| Ok(record.into()))
+            .with(|record: Record| Ok(record.into()));
+
+        Ok(sink)
     }
 
     fn gen_partition_key(&mut self) -> String {
@@ -128,8 +131,8 @@ impl RetryLogic for KinesisRetryLogic {
     }
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> super::Healthcheck {
-    let client = KinesisClient::new(config.region.into());
+fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> {
+    let client = KinesisClient::new(config.region.try_into()?);
     let stream_name = config.stream_name;
 
     let fut = client
@@ -157,7 +160,7 @@ fn healthcheck(config: KinesisSinkConfig) -> super::Healthcheck {
             }
         });
 
-    Box::new(fut)
+    Ok(Box::new(fut))
 }
 
 #[cfg(test)]

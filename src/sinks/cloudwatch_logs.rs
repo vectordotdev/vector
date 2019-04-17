@@ -5,14 +5,14 @@ use crate::{
     sinks::util::{BatchServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
-use rusoto_core::{region::ParseRegionError, RusotoFuture};
+use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
     DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError, PutLogEventsRequest,
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error as _;
+use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
@@ -50,8 +50,7 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let cloudwatch =
-            CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
+        let cloudwatch = CloudwatchLogsSvc::new(self.clone())?;
 
         let svc = ServiceBuilder::new()
             .timeout(Duration::from_secs(10))
@@ -70,8 +69,9 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
-        let client = CloudWatchLogsClient::new(config.region.clone().into());
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+        let region = config.region.clone().try_into()?;
+        let client = CloudWatchLogsClient::new(region);
 
         Ok(CloudwatchLogsSvc {
             client,
@@ -174,7 +174,7 @@ impl Service<Vec<Record>> for CloudwatchLogsSvc {
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
     let region = config.region.clone();
 
-    let client = CloudWatchLogsClient::new(region.into());
+    let client = CloudWatchLogsClient::new(region.try_into().unwrap());
 
     let request = DescribeLogStreamsRequest {
         limit: Some(1),
