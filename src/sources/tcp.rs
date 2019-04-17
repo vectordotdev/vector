@@ -1,3 +1,4 @@
+use super::util::StreamExt as _;
 use crate::record::Record;
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
@@ -117,15 +118,13 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                         );
                         record
                     })
-                    .map(|x| Some(x))
-                    .or_else(|err| match err {
+                    .filter_map_err(|err| match err {
                         codec::Error::MaxLimitExceeded => {
                             warn!("Received line longer than max_length. Discarding.");
-                            Ok(None)
+                            None
                         }
-                        codec::Error::Io(io) => Err(io),
+                        codec::Error::Io(io) => Some(io),
                     })
-                    .filter_map(|x| x)
                     .map_err(|e| warn!("connection error: {:?}", e));
 
                     let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
