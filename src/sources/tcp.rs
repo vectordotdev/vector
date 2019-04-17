@@ -119,11 +119,14 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                     })
                     .map(|x| Some(x))
                     .or_else(|err| match err {
-                        codec::Error::MaxLimitExceeded => Ok(None),
+                        codec::Error::MaxLimitExceeded => {
+                            warn!("Received line longer than max_length. Discarding.");
+                            Ok(None)
+                        }
                         codec::Error::Io(io) => Err(io),
                     })
                     .filter_map(|x| x)
-                    .map_err(|e| error!("connection error: {:?}", e));
+                    .map_err(|e| warn!("connection error: {:?}", e));
 
                     let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
 
