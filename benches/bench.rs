@@ -9,6 +9,7 @@ use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_
 use vector::topology::{config, Topology};
 use vector::{sinks, sources, transforms};
 
+mod batch;
 mod buffering;
 mod http;
 
@@ -519,7 +520,7 @@ criterion_group!(
     benchmark_transforms,
     benchmark_complex,
 );
-criterion_main!(benches, buffering::buffers, http::http);
+criterion_main!(benches, buffering::buffers, http::http, batch::batch);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;

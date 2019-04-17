@@ -9,11 +9,13 @@ pub enum Compression {
     Gzip,
 }
 
+#[derive(Debug)]
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
 }
 
+#[derive(Debug)]
 pub enum InnerBuffer {
     Plain(Vec<u8>),
     Gzip(GzEncoder<Vec<u8>>),
