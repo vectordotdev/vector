@@ -32,7 +32,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer = BufferConfig::Memory { num_items: 100 };
+                    config.sinks["out"].buffer = BufferConfig::Memory {
+                        num_items: 100,
+                        when_full: Default::default(),
+                    };
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -67,7 +70,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
-                    };
+                        when_full: Default::default(),
+                    }
+                    .into();
                     config.data_dir = Some(data_dir.clone());
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -101,7 +106,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                         &["in"],
                         sinks::tcp::TcpSinkConfig { address: out_addr },
                     );
-                    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+                    config.sinks["out"].buffer = BufferConfig::Disk {
+                        max_size: 10_000,
+                        when_full: Default::default(),
+                    };
                     config.data_dir = Some(data_dir2.clone());
                     let (mut topology, _warnings) = Topology::build(config).unwrap();
 

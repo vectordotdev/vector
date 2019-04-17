@@ -24,7 +24,10 @@ fn test_buffering() {
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 10_000,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -50,7 +53,10 @@ fn test_buffering() {
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 10_000,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir);
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -98,7 +104,10 @@ fn test_max_size() {
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -124,7 +133,10 @@ fn test_max_size() {
         &["in"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir);
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -166,7 +178,10 @@ fn test_max_size_resume() {
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig { address: out_addr },
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -219,7 +234,9 @@ fn test_reclaim_disk_space() {
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
-    };
+        when_full: Default::default(),
+    }
+    .into();
     config.data_dir = Some(data_dir.clone());
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -255,6 +272,7 @@ fn test_reclaim_disk_space() {
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
+        when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
     let (mut topology, _warnings) = Topology::build(config).unwrap();
