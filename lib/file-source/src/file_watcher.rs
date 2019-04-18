@@ -164,7 +164,6 @@ impl FileWatcher {
                     Ok(0)
                 }
                 Ok(sz) => {
-                    buffer.pop();
                     Ok(sz)
                 }
                 Err(e) => {
@@ -204,7 +203,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
             match available.iter().position(|&b| b == delim) {
                 Some(i) => {
                     if !discarding {
-                        buf.extend_from_slice(&available[..=i]);
+                        buf.extend_from_slice(&available[..i]);
                     }
                     (true, i + 1)
                 }
@@ -219,7 +218,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
         r.consume(used);
         total_read += used;
 
-        if !discarding && buf.len() > max_size + 1 {
+        if !discarding && buf.len() > max_size {
             warn!("Found line that exceeds max_line_bytes; discarding.");
             discarding = true;
         }
