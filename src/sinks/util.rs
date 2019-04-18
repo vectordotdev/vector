@@ -4,7 +4,6 @@ pub mod http;
 pub mod retries;
 
 use crate::buffers::Acker;
-use batch::{Batch, BatchSink};
 use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
@@ -12,6 +11,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tower::Service;
 
+pub use batch::{Batch, BatchSink};
 pub use buffer::{Buffer, Compression};
 
 pub trait SinkExt<T>
