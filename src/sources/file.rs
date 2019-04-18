@@ -58,7 +58,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
 
     let out = out
         .sink_map_err(|_| ())
-        .with(move |(line, file): (String, String)| {
+        .with(move |(line, file): (Bytes, String)| {
             trace!(message = "Recieved one record.", file = file.as_str());
             let mut record = Record::from(line);
             if let Some(ref context_key) = context_key {

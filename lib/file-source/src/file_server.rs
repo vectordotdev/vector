@@ -1,4 +1,5 @@
 use crate::file_watcher::FileWatcher;
+use bytes::Bytes;
 use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
 use std::collections::HashMap;
@@ -41,10 +42,10 @@ pub struct FileServer {
 impl FileServer {
     pub fn run(
         self,
-        mut chans: impl Sink<SinkItem = (String, String), SinkError = ()>,
+        mut chans: impl Sink<SinkItem = (Bytes, String), SinkError = ()>,
         shutdown: std::sync::mpsc::Receiver<()>,
     ) {
-        let mut buffer = String::new();
+        let mut buffer = Vec::new();
 
         let mut fp_map: HashMap<PathBuf, FileWatcher> = Default::default();
         let mut fp_map_alt: HashMap<PathBuf, FileWatcher> = Default::default();
@@ -106,7 +107,7 @@ impl FileServer {
 
                         bytes_read += sz;
                         lines.push((
-                            buffer.clone(),
+                            buffer.clone().into(),
                             path.to_str().expect("not a valid path").to_owned(),
                         ));
                         buffer.clear();

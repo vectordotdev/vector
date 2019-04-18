@@ -121,7 +121,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler at need, transparently to the caller.
-    pub fn read_line(&mut self, mut buffer: &mut String) -> io::Result<usize> {
+    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>) -> io::Result<usize> {
         if self.reopen {
             self.open_at_start();
         }
@@ -156,7 +156,7 @@ impl FileWatcher {
             self.previous_size = current_size;
             // match here on error, if metadata doesn't match up open_at_start
             // new reader and let it catch on the next looparound
-            match reader.read_line(&mut buffer) {
+            match reader.read_until(b'\n', &mut buffer) {
                 Ok(0) => {
                     if file_id(&self.path) != self.file_id {
                         self.reopen = true;
