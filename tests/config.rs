@@ -190,7 +190,6 @@ fn bad_s3_region() {
         gzip = true
         bucket = "asdf"
         key_prefix = "logs/"
-        region = "us-east-1"
 
         [sinks.out2]
         type = "s3"
