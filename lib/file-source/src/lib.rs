@@ -258,10 +258,10 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = String::new();
+                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf) {
+                        match fw.read_line(&mut buf, 100_000) {
                             Err(_) => {
                                 unreachable!();
                             }
@@ -340,10 +340,10 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = String::new();
+                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf) {
+                        match fw.read_line(&mut buf, 100_000) {
                             Err(_) => {
                                 unreachable!();
                             }
@@ -365,8 +365,8 @@ mod test {
                                         break;
                                     }
                                 }
-                                assert_eq!(exp, buf);
-                                assert_eq!(sz, buf.len());
+                                assert_eq!(exp.into_bytes(), buf);
+                                assert_eq!(sz, buf.len() + 1);
                                 buf.clear();
                                 break;
                             }
