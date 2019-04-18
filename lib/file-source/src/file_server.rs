@@ -24,6 +24,7 @@ pub struct FileServer {
     pub max_read_bytes: usize,
     pub start_at_beginning: bool,
     pub ignore_before: Option<time::SystemTime>,
+    pub max_line_bytes: usize,
 }
 
 /// `FileServer` as Source
@@ -97,7 +98,7 @@ impl FileServer {
             // line polling
             for (path, mut watcher) in fp_map.drain() {
                 let mut bytes_read: usize = 0;
-                while let Ok(sz) = watcher.read_line(&mut buffer) {
+                while let Ok(sz) = watcher.read_line(&mut buffer, self.max_line_bytes) {
                     if sz > 0 {
                         trace!(
                             message = "Read bytes.",
@@ -106,11 +107,14 @@ impl FileServer {
                         );
 
                         bytes_read += sz;
-                        lines.push((
-                            buffer.clone().into(),
-                            path.to_str().expect("not a valid path").to_owned(),
-                        ));
-                        buffer.clear();
+
+                        if !buffer.is_empty() {
+                            lines.push((
+                                buffer.clone().into(),
+                                path.to_str().expect("not a valid path").to_owned(),
+                            ));
+                            buffer.clear();
+                        }
                     } else {
                         break;
                     }
