@@ -163,9 +163,7 @@ impl FileWatcher {
                     }
                     Ok(0)
                 }
-                Ok(sz) => {
-                    Ok(sz)
-                }
+                Ok(sz) => Ok(sz),
                 Err(e) => {
                     if let io::ErrorKind::NotFound = e.kind() {
                         self.reopen = true;
