@@ -493,6 +493,54 @@ fn start_position() {
     }
 }
 
+#[test]
+fn file_max_line_bytes() {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (trigger, tripwire) = Tripwire::new();
+
+    let dir = tempdir().unwrap();
+    let config = file::FileConfig {
+        include: vec![dir.path().join("*")],
+        max_line_bytes: 10,
+        ..Default::default()
+    };
+
+    let source = file::file_source(&config, tx);
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+    let path = dir.path().join("file");
+    let mut file = File::create(&path).unwrap();
+
+    sleep(); // The files must be observed at their original lengths before writing to them
+
+    writeln!(&mut file, "short").unwrap();
+    writeln!(&mut file, "this is too long").unwrap();
+    writeln!(&mut file, "11 eleven11").unwrap();
+    let super_long = std::iter::repeat("This line is super long and will take up more space that BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+    writeln!(&mut file, "{}", super_long).unwrap();
+    writeln!(&mut file, "exactly 10").unwrap();
+    writeln!(&mut file, "it can end on a line that's too long").unwrap();
+
+    sleep();
+    sleep();
+
+    writeln!(&mut file, "and then continue").unwrap();
+    writeln!(&mut file, "last short").unwrap();
+
+    sleep();
+    sleep();
+
+    drop(trigger);
+    shutdown_on_idle(rt);
+
+    let received = rx.map(|r| r.raw).collect().wait().unwrap();
+
+    assert_eq!(received, vec!["short", "exactly 10", "last short"]);
+}
+
 fn sleep() {
     std::thread::sleep(std::time::Duration::from_millis(50));
 }

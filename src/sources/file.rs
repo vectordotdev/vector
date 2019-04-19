@@ -17,6 +17,12 @@ pub struct FileConfig {
     pub context_key: Option<String>,
     pub start_at_beginning: bool,
     pub ignore_older: Option<u64>,
+    #[serde(default = "default_max_line_bytes")]
+    pub max_line_bytes: usize,
+}
+
+fn default_max_line_bytes() -> usize {
+    100 * 1024
 }
 
 impl Default for FileConfig {
@@ -27,6 +33,7 @@ impl Default for FileConfig {
             context_key: Some("file".to_string()),
             start_at_beginning: false,
             ignore_older: None,
+            max_line_bytes: default_max_line_bytes(),
         }
     }
 }
@@ -52,13 +59,14 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         max_read_bytes: 2048,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
+        max_line_bytes: config.max_line_bytes,
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
 
     let out = out
         .sink_map_err(|_| ())
-        .with(move |(line, file): (String, String)| {
+        .with(move |(line, file): (Bytes, String)| {
             trace!(message = "Recieved one record.", file = file.as_str());
             let mut record = Record::from(line);
             if let Some(ref context_key) = context_key {
