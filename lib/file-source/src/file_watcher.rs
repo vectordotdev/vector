@@ -229,3 +229,41 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::Cursor;
+    use super::read_until_with_max_size;
+
+    #[test]
+    fn test_read_until_with_max_size() {
+        let mut buf = Cursor::new(&b"12"[..]);
+        let mut v = Vec::new();
+        assert_eq!(read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(), 2);
+        assert_eq!(v, b"12");
+
+        let mut buf = Cursor::new(&b"1233"[..]);
+        let mut v = Vec::new();
+        assert_eq!(read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(), 3);
+        assert_eq!(v, b"12");
+        v.truncate(0);
+        assert_eq!(read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(), 1);
+        assert_eq!(v, b"");
+        v.truncate(0);
+        assert_eq!(read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(), 0);
+        assert_eq!(v, []);
+
+
+        let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
+        let mut v = Vec::new();
+        assert_eq!(read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(), 6);
+        assert_eq!(v, b"short");
+        v.truncate(0);
+        assert_eq!(read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(), 28);
+        assert_eq!(v, b"exact size");
+        v.truncate(0);
+        assert_eq!(read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(), 12);
+        assert_eq!(v, []);
+
+    }
+}
