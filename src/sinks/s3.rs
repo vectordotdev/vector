@@ -25,7 +25,7 @@ pub struct S3Sink {
     gzip: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     pub bucket: String,
@@ -75,7 +75,7 @@ impl S3Sink {
         let buffer_size = config.buffer_size;
 
         let s3 = S3Sink {
-            client: S3Client::new(config.region.clone()),
+            client: Self::create_client(config.region.clone()),
             key_prefix: config.key_prefix.clone(),
             bucket: config.bucket.clone(),
             gzip,
@@ -105,7 +105,7 @@ impl S3Sink {
     }
 
     pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
-        let client = S3Client::new(config.region.clone());
+        let client = Self::create_client(config.region.clone());
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -123,6 +123,27 @@ impl S3Sink {
         });
 
         Ok(Box::new(healthcheck))
+    }
+
+    pub fn create_client(region: Region) -> S3Client {
+        // Hack around the fact that rusoto will not pick up runtime
+        // env vars. This is designed to only for test purposes use
+        // static credentials.
+        #[cfg(not(test))]
+        {
+            S3Client::new(region)
+        }
+
+        #[cfg(test)]
+        {
+            use rusoto_core::HttpClient;
+            use rusoto_credential::StaticProvider;
+
+            let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
+            let d = HttpClient::new().unwrap();
+
+            S3Client::new_with(d, p, region)
+        }
     }
 }
 
@@ -187,7 +208,7 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
-        sinks::{self, s3::S3SinkInnerConfig},
+        sinks::s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
         Record,
     };
@@ -203,7 +224,7 @@ mod tests {
     fn s3_insert_message_into() {
         let config = config();
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config, Acker::Null);
+        let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
         let (lines, records) = random_lines_with_stream(100, 10);
 
@@ -227,12 +248,12 @@ mod tests {
     fn s3_rotate_files_after_the_buffer_size_is_reached() {
         ensure_bucket(&client());
 
-        let config = S3SinkInnerConfig {
+        let config = S3SinkConfig {
             buffer_size: 1000,
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config, Acker::Null);
+        let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
         let (lines, records) = random_lines_with_stream(100, 30);
 
@@ -256,12 +277,12 @@ mod tests {
     fn s3_waits_for_full_batch_or_timeout_before_sending() {
         ensure_bucket(&client());
 
-        let config = S3SinkInnerConfig {
+        let config = S3SinkConfig {
             buffer_size: 1000,
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config, Acker::Null);
+        let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
         let (lines, _) = random_lines_with_stream(100, 30);
 
@@ -302,13 +323,13 @@ mod tests {
     fn s3_gzip() {
         ensure_bucket(&client());
 
-        let config = S3SinkInnerConfig {
+        let config = S3SinkConfig {
             buffer_size: 1000,
             gzip: true,
             ..config()
         };
         let prefix = config.key_prefix.clone();
-        let sink = sinks::s3::new(config, Acker::Null);
+        let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
         let (lines, records) = random_lines_with_stream(100, 500);
 
@@ -338,72 +359,47 @@ mod tests {
     fn s3_healthchecks() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        // OK
-        {
-            let healthcheck = sinks::s3::healthcheck(config());
-            rt.block_on(healthcheck).unwrap();
-        }
+        let healthcheck = S3Sink::healthcheck(&config()).unwrap();
+        rt.block_on(healthcheck).unwrap();
+    }
 
-        // Bad credentials
-        {
-            let credentials = rusoto_credential::StaticProvider::new_minimal(
-                "asdf".to_string(),
-                "1234".to_string(),
-            );
+    #[test]
+    fn s3_healthchecks_invalid_bucket() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-            let dispatcher = rusoto_core::request::HttpClient::new().unwrap();
-
-            let region = Region::Custom {
-                name: "minio".to_owned(),
-                endpoint: "http://localhost:9000".to_owned(),
-            };
-
-            let client = S3Client::new_with(dispatcher, credentials, region);
-
-            let config = S3SinkInnerConfig { client, ..config() };
-            let healthcheck = sinks::s3::healthcheck(config);
-            assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid credentials")
-        }
-
-        // Inaccessible bucket
-        {
-            let config = S3SinkInnerConfig {
-                bucket: "asdflkjadskdaadsfadf".to_string(),
-                ..config()
-            };
-            let healthcheck = sinks::s3::healthcheck(config);
-            assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
-        }
+        let config = S3SinkConfig {
+            bucket: "asdflkjadskdaadsfadf".to_string(),
+            ..config()
+        };
+        let healthcheck = S3Sink::healthcheck(&config).unwrap();
+        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
     }
 
     fn client() -> S3Client {
         let region = Region::Custom {
-            name: "localstack".to_owned(),
+            name: "minio".to_owned(),
             endpoint: "http://localhost:9000".to_owned(),
         };
 
-        let static_creds = rusoto_core::credential::StaticProvider::new(
-            "test-access-key".into(),
-            "test-secret-key".into(),
-            None,
-            None,
-        );
-
-        let client = rusoto_core::HttpClient::new().unwrap();
-
-        S3Client::new_with(client, static_creds, region)
+        S3Sink::create_client(region)
     }
 
-    fn config() -> S3SinkInnerConfig {
+    fn config() -> S3SinkConfig {
+        let region = Region::Custom {
+            name: "minio".to_owned(),
+            endpoint: "http://localhost:9000".to_owned(),
+        };
+
         ensure_bucket(&client());
 
-        S3SinkInnerConfig {
-            client: client(),
+        S3SinkConfig {
             key_prefix: random_string(10) + "/",
             buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
             gzip: false,
-            max_linger_secs: 5,
+            max_linger_secs: Some(5),
+            region,
+            ..Default::default()
         }
     }
 
@@ -419,9 +415,13 @@ mod tests {
 
         match res.sync() {
             Ok(_) | Err(CreateBucketError::BucketAlreadyOwnedByYou(_)) => {}
-            e => {
-                panic!("Couldn't create bucket: {:?}", e);
-            }
+            Err(e) => match e {
+                CreateBucketError::Unknown(b) => {
+                    let body = String::from_utf8(b.body.clone()).unwrap();
+                    panic!("Couldn't create bucket: {:?}; Body {}", b, body);
+                }
+                _ => panic!("Couldn't create bucket: {}", e),
+            },
         }
     }
 
