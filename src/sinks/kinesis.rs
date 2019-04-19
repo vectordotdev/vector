@@ -201,10 +201,7 @@ mod tests {
 
         let config = KinesisSinkConfig {
             stream_name: STREAM_NAME.into(),
-            region: RegionOrEndpoint::Endpoint {
-                endpoint: "http://localhost:4568".into(),
-                endpoint_name: None,
-            },
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             batch_size: 2,
         };
 

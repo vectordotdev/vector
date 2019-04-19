@@ -23,7 +23,7 @@ pub struct CloudwatchLogsSvc {
     config: CloudwatchLogsSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
@@ -62,7 +62,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone());
+        let healthcheck = healthcheck(self.clone())?;
 
         Ok((sink, healthcheck))
     }
@@ -171,10 +171,10 @@ impl Service<Vec<Record>> for CloudwatchLogsSvc {
     }
 }
 
-fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
     let region = config.region.clone();
 
-    let client = CloudWatchLogsClient::new(region.try_into().unwrap());
+    let client = CloudWatchLogsClient::new(region.try_into()?);
 
     let request = DescribeLogStreamsRequest {
         limit: Some(1),
@@ -215,7 +215,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
             }
         });
 
-    Box::new(fut)
+    Ok(Box::new(fut))
 }
 
 impl From<Record> for InputLogEvent {
@@ -288,11 +288,9 @@ mod tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::Endpoint {
-                endpoint: "http://localhost:6000".into(),
-                endpoint_name: None,
-            },
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             buffer_size: 1,
+            ..Default::default()
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();

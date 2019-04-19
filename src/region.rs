@@ -10,28 +10,37 @@ pub struct RegionOrEndpoint {
     endpoint: Option<String>,
 }
 
+impl RegionOrEndpoint {
+    pub fn with_region(region: String) -> Self {
+        Self {
+            region: Some(region),
+            endpoint: None,
+        }
+    }
+
+    pub fn with_endpoint(endpoint: String) -> Self {
+        Self {
+            region: None,
+            endpoint: Some(endpoint),
+        }
+    }
+}
+
 impl TryFrom<RegionOrEndpoint> for Region {
     type Error = String;
 
     fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
-        if let Some(region) = r.region {
-            let region = region.parse().map_err(|e| format!("{}", e))?;
-
-            if !r.endpoint.is_some() {
-                Ok(region)
-            } else {
-                Err("Only one of 'region' or 'endpoint' can be specified".into())
-            }
-        } else if let Some(endpoint) = r.endpoint {
-            endpoint
+        match (r.region, r.endpoint) {
+            (Some(region), None) => region.parse().map_err(|e| format!("{}", e)),
+            (None, Some(endpoint)) => endpoint
                 .parse::<Uri>()
                 .map(|_| Region::Custom {
                     name: "custom".into(),
                     endpoint,
                 })
-                .map_err(|e| format!("Custom Endpoint Parse Error: {}", e))
-        } else {
-            Err(format!("Must set 'region' or 'endpoint'"))
+                .map_err(|e| format!("Failed to parse custom endpoint as URI: {}", e)),
+            (Some(_), Some(_)) => Err("Only one of 'region' or 'endpoint' can be specified".into()),
+            (None, None) => Err("Must set 'region' or 'endpoint'".into()),
         }
     }
 }
