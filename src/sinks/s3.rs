@@ -1,27 +1,28 @@
 use crate::buffers::Acker;
 use crate::record::Record;
-use crate::sinks::util::{BatchServiceSink, Buffer, SinkExt};
+use crate::sinks::util::{
+    retries::{FixedRetryPolicy, RetryLogic},
+    BatchServiceSink, Buffer, SinkExt,
+};
 use futures::{Future, Poll, Sink};
 use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
-use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
+use rusoto_s3::{
+    HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
+    S3Client, S3,
+};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_trace::field;
 use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
 
+#[derive(Clone)]
 pub struct S3Sink {
-    config: S3SinkInnerConfig,
-}
-
-pub struct S3SinkInnerConfig {
-    pub buffer_size: usize,
-    pub key_prefix: String,
-    pub bucket: String,
-    pub client: S3Client,
-    pub gzip: bool,
-    pub max_linger_secs: u64,
+    client: S3Client,
+    key_prefix: String,
+    bucket: String,
+    gzip: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -29,97 +30,99 @@ pub struct S3SinkInnerConfig {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
-    pub region: Option<String>,
-    pub endpoint: Option<String>,
+    // TODO(lucio): this will be replaced with RegionOrEndpoint
+    pub region: Region,
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,
-    // TODO: access key and secret token (if the rusoto provider chain stuff isn't good enough)
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
 }
 
 #[typetag::serde(name = "s3")]
 impl crate::topology::config::SinkConfig for S3SinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((new(self.config()?, acker), healthcheck(self.config()?)))
+        let sink = S3Sink::new(self, acker)?;
+        let healthcheck = S3Sink::healthcheck(self)?;
+
+        Ok((sink, healthcheck))
     }
 }
 
-pub fn new(config: S3SinkInnerConfig, acker: Acker) -> super::RouterSink {
-    let gzip = config.gzip;
-    let buffer_size = config.buffer_size;
-    let max_linger_secs = config.max_linger_secs;
+impl S3Sink {
+    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+        let timeout = config.request_timeout_secs.unwrap_or(10);
+        let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(5);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
-    let s3 = S3Sink { config };
+        let policy = FixedRetryPolicy::new(
+            retry_attempts,
+            Duration::from_secs(retry_backoff_secs),
+            S3RetryLogic,
+        );
 
-    let svc = ServiceBuilder::new()
-        .in_flight_limit(1)
-        .timeout(Duration::from_secs(10))
-        .service(s3)
-        .expect("This is a bug, no spawnning");
+        let max_linger_secs = config.max_linger_secs.unwrap_or(300);
+        let gzip = config.gzip;
+        let buffer_size = config.buffer_size;
 
-    let sink = BatchServiceSink::new(svc, acker)
-        .batched_with_min(
-            Buffer::new(gzip),
-            buffer_size,
-            Duration::from_secs(max_linger_secs),
-        )
-        .with(|record: Record| {
-            let mut bytes: Vec<u8> = record.into();
-            bytes.push(b'\n');
-            Ok(bytes)
+        let s3 = S3Sink {
+            client: S3Client::new(config.region.clone()),
+            key_prefix: config.key_prefix.clone(),
+            bucket: config.bucket.clone(),
+            gzip,
+        };
+
+        let svc = ServiceBuilder::new()
+            .in_flight_limit(in_flight_limit)
+            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+            .retry(policy)
+            .timeout(Duration::from_secs(timeout))
+            .service(s3)
+            .expect("This is a bug, no spawnning");
+
+        let sink = BatchServiceSink::new(svc, acker)
+            .batched_with_min(
+                Buffer::new(gzip),
+                buffer_size,
+                Duration::from_secs(max_linger_secs),
+            )
+            .with(|record: Record| {
+                let mut bytes: Vec<u8> = record.into();
+                bytes.push(b'\n');
+                Ok(bytes)
+            });
+
+        Ok(Box::new(sink))
+    }
+
+    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
+        let client = S3Client::new(config.region.clone());
+
+        let request = HeadBucketRequest {
+            bucket: config.bucket.clone(),
+        };
+
+        let response = client.head_bucket(request);
+
+        let healthcheck = response.map_err(|err| match err {
+            HeadBucketError::Unknown(response) => match response.status {
+                http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
+                http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
+                status => format!("Unknown error: Status code: {}", status),
+            },
+            err => err.to_string(),
         });
 
-    Box::new(sink)
-}
-
-pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
-    use rusoto_s3::{HeadBucketError, HeadBucketRequest};
-
-    let request = HeadBucketRequest {
-        bucket: config.bucket,
-    };
-
-    let response = config.client.head_bucket(request);
-
-    let healthcheck = response.map_err(|err| match err {
-        HeadBucketError::Unknown(response) => match response.status {
-            http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
-            http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
-            status => format!("Unknown error: Status code: {}", status),
-        },
-        err => err.to_string(),
-    });
-
-    Box::new(healthcheck)
-}
-
-impl S3SinkConfig {
-    fn region(&self) -> Result<Region, String> {
-        if self.region.is_some() && self.endpoint.is_some() {
-            Err("Only one of 'region' or 'endpoint' can be specified".to_string())
-        } else if let Some(region) = &self.region {
-            region.parse::<Region>().map_err(|e| e.to_string())
-        } else if let Some(endpoint) = &self.endpoint {
-            Ok(Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint.clone(),
-            })
-        } else {
-            Err("Must set 'region' or 'endpoint'".to_string())
-        }
-    }
-
-    fn config(&self) -> Result<S3SinkInnerConfig, String> {
-        let region = self.region()?;
-
-        Ok(S3SinkInnerConfig {
-            client: rusoto_s3::S3Client::new(region),
-            gzip: self.gzip,
-            buffer_size: self.buffer_size,
-            key_prefix: self.key_prefix.clone(),
-            bucket: self.bucket.clone(),
-            max_linger_secs: self.max_linger_secs.unwrap_or(300),
-        })
+        Ok(Box::new(healthcheck))
     }
 }
 
@@ -135,21 +138,21 @@ impl Service<Vec<u8>> for S3Sink {
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         // TODO: make this based on the last record in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-        let extension = if self.config.gzip { ".log.gz" } else { ".log" };
-        let key = format!("{}{}{}", self.config.key_prefix, filename, extension);
+        let extension = if self.gzip { ".log.gz" } else { ".log" };
+        let key = format!("{}{}{}", self.key_prefix, filename, extension);
 
         debug!(
             message = "sending records.",
             bytes = &field::debug(body.len()),
-            bucket = &field::debug(&self.config.bucket),
+            bucket = &field::debug(&self.bucket),
             key = &field::debug(&key)
         );
 
         let request = PutObjectRequest {
             body: Some(body.into()),
-            bucket: self.config.bucket.clone(),
+            bucket: self.bucket.clone(),
             key,
-            content_encoding: if self.config.gzip {
+            content_encoding: if self.gzip {
                 Some("gzip".to_string())
             } else {
                 None
@@ -157,10 +160,24 @@ impl Service<Vec<u8>> for S3Sink {
             ..Default::default()
         };
 
-        self.config
-            .client
+        self.client
             .put_object(request)
             .instrument(info_span!("request"))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct S3RetryLogic;
+
+impl RetryLogic for S3RetryLogic {
+    type Error = PutObjectError;
+    type Response = PutObjectOutput;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            PutObjectError::Unknown(res) if res.status.is_server_error() => true,
+            _ => false,
+        }
     }
 }
 
