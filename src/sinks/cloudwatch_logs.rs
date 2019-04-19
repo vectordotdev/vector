@@ -22,12 +22,18 @@ pub struct CloudwatchLogsSvc {
     config: CloudwatchLogsSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
     pub region: Region,
     pub buffer_size: usize,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
 }
 
 enum State {
@@ -51,8 +57,15 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let cloudwatch =
             CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
 
+        let timeout = self.request_timeout_secs.unwrap_or(10);
+        let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
+        let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(5);
+        let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
+
         let svc = ServiceBuilder::new()
-            .timeout(Duration::from_secs(10))
+            .in_flight_limit(in_flight_limit)
+            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+            .timeout(Duration::from_secs(timeout))
             .service(cloudwatch)
             .expect("This is a bug, no service spawning");
 
@@ -288,6 +301,7 @@ mod tests {
             group_name: GROUP_NAME.into(),
             region: region.clone(),
             buffer_size: 1,
+            ..Default::default()
         };
 
         let (sink, _) = config.build(Acker::Null).unwrap();
