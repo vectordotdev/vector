@@ -3,36 +3,35 @@ use rusoto_core::Region;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum RegionOrEndpoint {
-    Region {
-        region: String,
-    },
-    Endpoint {
-        endpoint: String,
-        endpoint_name: Option<String>,
-    },
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct RegionOrEndpoint {
+    region: Option<String>,
+    endpoint: Option<String>,
 }
 
 impl TryFrom<RegionOrEndpoint> for Region {
     type Error = String;
 
     fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
-        match r {
-            RegionOrEndpoint::Region { region } => region
-                .parse()
-                .map_err(|e| format!("Region Parse Error: {}", e)),
-            RegionOrEndpoint::Endpoint {
-                endpoint,
-                endpoint_name,
-            } => match endpoint.parse::<Uri>() {
-                Ok(_) => Ok(Region::Custom {
-                    name: endpoint_name.unwrap_or_else(|| "custom".into()),
-                    endpoint: endpoint,
-                }),
-                Err(e) => Err(format!("Custom Endpoint Parse Error: {}", e)),
-            },
+        if let Some(region) = r.region {
+            let region = region.parse().map_err(|e| format!("{}", e))?;
+
+            if !r.endpoint.is_some() {
+                Ok(region)
+            } else {
+                Err("Only one of 'region' or 'endpoint' can be specified".into())
+            }
+        } else if let Some(endpoint) = r.endpoint {
+            endpoint
+                .parse::<Uri>()
+                .map(|_| Region::Custom {
+                    name: "custom".into(),
+                    endpoint,
+                })
+                .map_err(|e| format!("Custom Endpoint Parse Error: {}", e))
+        } else {
+            Err(format!("Must set 'region' or 'endpoint'"))
         }
     }
 }
@@ -86,5 +85,19 @@ mod tests {
 
         let region: Region = config.inner.region.try_into().unwrap();
         assert_eq!(region, expected_region);
+    }
+
+    #[test]
+    fn region_not_provided() {
+        let config: Config = toml::from_str(
+            r#"
+        [inner]
+        endpoint_is_spelled_wrong = "http://localhost:9000"
+        "#,
+        )
+        .unwrap();
+
+        let region: Result<Region, String> = config.inner.region.try_into();
+        assert!(region.is_err());
     }
 }
