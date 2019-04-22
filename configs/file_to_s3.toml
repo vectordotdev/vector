@@ -10,7 +10,7 @@ bucket = "test-bucket"
 key_prefix = ""
 buffer_size = 5000000
 gzip = false
-# endpoint = "http://localhost:9000"
+endpoint = "http://localhost:9000"
 
 # [sinks.other_out]
 # inputs = ["in"]
