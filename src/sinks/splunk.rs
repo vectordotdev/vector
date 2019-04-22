@@ -9,8 +9,8 @@ use crate::{
     },
 };
 use futures::{Future, Sink};
-use http::{Method, StatusCode, Uri};
-use hyper::{Body, Client, Request};
+use http::{Method, Request, StatusCode, Uri};
+use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -79,13 +79,18 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
         .map_err(|e| format!("{}", e))?;
+
     let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
+        let mut builder = Request::builder();
         builder.method(Method::POST);
         builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/json");
-        builder.header("Content-Encoding", "gzip");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
+
         builder.header("Authorization", format!("Splunk {}", token));
 
         builder.body(body.into()).unwrap()
@@ -124,7 +129,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 }
 
 pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, String> {
-    let uri = format!("{}/services/collector/event", host)
+    let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
         .map_err(|e| format!("{}", e))?;
 
