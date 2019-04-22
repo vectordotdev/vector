@@ -1,22 +1,22 @@
-use super::util::SinkExt;
-use crate::buffers::Acker;
-use crate::record::Record;
+use crate::{buffers::Acker, record::Record, sinks::util::SinkExt};
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
-use tokio::codec::FramedWrite;
-use tokio::net::TcpStream;
-use tokio::timer::Delay;
+use tokio::{
+    codec::FramedWrite,
+    net::tcp::{ConnectFuture, TcpStream},
+    timer::Delay,
+};
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
-    pub address: std::net::SocketAddr,
+    pub address: SocketAddr,
 }
 
 #[typetag::serde(name = "tcp")]
@@ -34,9 +34,9 @@ struct TcpSink {
 
 enum TcpSinkState {
     Disconnected,
-    Connecting(tokio::net::tcp::ConnectFuture),
+    Connecting(ConnectFuture),
     Connected(FramedWrite<TcpStream, BytesDelimitedCodec>),
-    Backoff(tokio::timer::Delay),
+    Backoff(Delay),
 }
 
 impl TcpSink {
