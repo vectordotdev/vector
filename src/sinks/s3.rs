@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use futures::{Future, Poll, Sink};
-use rusoto_core::RusotoFuture;
+use rusoto_core::{Region, RusotoFuture};
 use rusoto_s3::{
     HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
     S3Client, S3,
@@ -77,8 +77,9 @@ impl S3Sink {
         let gzip = config.gzip;
         let buffer_size = config.buffer_size;
 
+        let region = config.region.clone();
         let s3 = S3Sink {
-            client: Self::create_client(config.region.clone()),
+            client: Self::create_client(region.try_into()?),
             key_prefix: config.key_prefix.clone(),
             bucket: config.bucket.clone(),
             gzip,
@@ -108,7 +109,8 @@ impl S3Sink {
     }
 
     pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
-        let client = Self::create_client(config.region.clone());
+        let region = config.region.clone();
+        let client = Self::create_client(region.try_into()?);
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
