@@ -60,7 +60,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 
         let timeout = self.request_timeout_secs.unwrap_or(10);
         let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(5);
+        let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
 
         let svc = ServiceBuilder::new()
