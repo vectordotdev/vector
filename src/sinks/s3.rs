@@ -62,8 +62,8 @@ impl S3Sink {
     pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
         let timeout = config.request_timeout_secs.unwrap_or(10);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
-        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(5);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(15);
         let retry_attempts = config.request_retry_attempts.unwrap_or(5);
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
