@@ -213,9 +213,10 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
+        record::Record,
+        region::RegionOrEndpoint,
         sinks::s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
-        Record,
     };
     use flate2::read::GzDecoder;
     use futures::{Future, Sink};
@@ -390,11 +391,6 @@ mod tests {
     }
 
     fn config() -> S3SinkConfig {
-        let region = Region::Custom {
-            name: "minio".to_owned(),
-            endpoint: "http://localhost:9000".to_owned(),
-        };
-
         ensure_bucket(&client());
 
         S3SinkConfig {
@@ -403,7 +399,7 @@ mod tests {
             bucket: BUCKET.to_string(),
             gzip: false,
             max_linger_secs: Some(5),
-            region,
+            region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }
     }
