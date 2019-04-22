@@ -1,13 +1,21 @@
-use super::util::{
-    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+use crate::{
+    buffers::Acker,
+    record::Record,
+    sinks::util::{
+        http::{HttpRetryLogic, HttpService},
+        retries::FixedRetryPolicy,
+        BatchServiceSink, Buffer, Compression, SinkExt,
+    },
 };
-use crate::buffers::Acker;
-use crate::record::Record;
 use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
-use http::header::{HeaderName, HeaderValue};
-use http::{Method, Uri};
+use http::{
+    header::{HeaderName, HeaderValue},
+    Method, Uri,
+};
+use hyper::{Body, Client, Request};
+use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -25,9 +33,14 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
     pub request_timeout_secs: Option<u64>,
-    pub retries: Option<usize>,
-    pub in_flight_request_limit: Option<usize>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -37,52 +50,125 @@ pub struct BasicAuth {
     password: String,
 }
 
+#[typetag::serde(name = "http")]
+impl crate::topology::config::SinkConfig for HttpSinkConfig {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        validate_headers(&self.headers)?;
+        let sink = http(self.clone(), acker)?;
+
+        if let Some(healthcheck_uri) = self.healthcheck_uri.clone() {
+            let healtcheck = healthcheck(healthcheck_uri, self.basic_auth.clone())?;
+            Ok((sink, healtcheck))
+        } else {
+            Ok((sink, Box::new(future::ok(()))))
+        }
+    }
+}
+
+fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+    let uri = build_uri(&config.uri)?;
+
+    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+        Compression::None => false,
+        Compression::Gzip => true,
+    };
+
+    let timeout = config.request_timeout_secs.unwrap_or(10);
+    let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
+    let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+
+    let policy = FixedRetryPolicy::new(
+        retry_attempts,
+        Duration::from_secs(retry_backoff_secs),
+        HttpRetryLogic,
+    );
+
+    let http_service = HttpService::new(move |body: Vec<u8>| {
+        let mut builder = hyper::Request::builder();
+        builder.method(Method::POST);
+        builder.uri(uri.clone());
+
+        builder.header("Content-Type", "application/x-ndjson");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
+
+        if let Some(headers) = &config.headers {
+            for (header, value) in headers.iter() {
+                builder.header(header.as_str(), value.as_str());
+            }
+        }
+
+        let mut request = builder.body(body.into()).unwrap();
+
+        if let Some(auth) = &config.basic_auth {
+            auth.apply(request.headers_mut());
+        }
+
+        request
+    });
+    let service = ServiceBuilder::new()
+        .in_flight_limit(in_flight_limit)
+        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+        .retry(policy)
+        .timeout(Duration::from_secs(timeout))
+        .service(http_service)
+        .expect("This is a bug, there is no spawning");
+
+    let sink = BatchServiceSink::new(service, acker)
+        .batched(Buffer::new(gzip), 2 * 1024 * 1024)
+        .with(move |record: Record| {
+            let mut body = json!({
+                "msg": String::from_utf8_lossy(&record.raw[..]),
+                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+                "fields": record.structured,
+            });
+
+            if let Some(host) = record.structured.get(&Atom::from("host")) {
+                body["host"] = json!(host);
+            }
+            let mut body = serde_json::to_vec(&body).unwrap();
+            body.push(b'\n');
+            Ok(body)
+        });
+
+    Ok(Box::new(sink))
+}
+
+fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, String> {
+    let uri = build_uri(&uri)?;
+    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
+
+    if let Some(auth) = auth {
+        auth.apply(request.headers_mut());
+    }
+
+    let https = HttpsConnector::new(4).expect("TLS initialization failed");
+    let client = Client::builder().build(https);
+
+    let healthcheck = client
+        .request(request)
+        .map_err(|err| err.to_string())
+        .and_then(|response| {
+            use hyper::StatusCode;
+
+            match response.status() {
+                StatusCode::OK => Ok(()),
+                other => Err(format!("Unexpected status: {}", other)),
+            }
+        });
+
+    Ok(Box::new(healthcheck))
+}
+
 impl BasicAuth {
     fn apply(&self, header_map: &mut http::header::HeaderMap) {
         let auth = headers::Authorization::basic(&self.user, &self.password);
         header_map.typed_insert(auth)
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ValidatedConfig {
-    uri: Uri,
-    healthcheck_uri: Option<Uri>,
-    basic_auth: Option<BasicAuth>,
-    headers: Option<IndexMap<String, String>>,
-    buffer_size: usize,
-    compression: Compression,
-    request_timeout_secs: u64,
-    retries: usize,
-    in_flight_request_limit: usize,
-}
-
-impl HttpSinkConfig {
-    fn validated(&self) -> Result<ValidatedConfig, String> {
-        validate_headers(&self.headers)?;
-        Ok(ValidatedConfig {
-            uri: self.uri()?,
-            healthcheck_uri: self.healthcheck_uri()?,
-            basic_auth: self.basic_auth.clone(),
-            headers: self.headers.clone(),
-            buffer_size: self.buffer_size.unwrap_or(2 * 1024 * 1024),
-            compression: self.compression.unwrap_or(Compression::Gzip),
-            request_timeout_secs: self.request_timeout_secs.unwrap_or(10),
-            retries: self.retries.unwrap_or(5),
-            in_flight_request_limit: self.in_flight_request_limit.unwrap_or(1),
-        })
-    }
-
-    fn uri(&self) -> Result<Uri, String> {
-        build_uri(&self.uri)
-    }
-
-    fn healthcheck_uri(&self) -> Result<Option<Uri>, String> {
-        if let Some(uri) = &self.healthcheck_uri {
-            build_uri(uri).map(Some)
-        } else {
-            Ok(None)
-        }
     }
 }
 
@@ -110,111 +196,6 @@ fn build_uri(raw: &str) -> Result<Uri, String> {
         .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
         .build()
         .expect("bug building uri"))
-}
-
-#[typetag::serde(name = "http")]
-impl crate::topology::config::SinkConfig for HttpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let config = self.validated()?;
-        let sink = http(config.clone(), acker);
-
-        if let Some(healthcheck_uri) = config.healthcheck_uri {
-            Ok((sink, healthcheck(healthcheck_uri, config.basic_auth)))
-        } else {
-            Ok((sink, Box::new(future::ok(()))))
-        }
-    }
-}
-
-fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
-    let gzip = match config.compression {
-        Compression::None => false,
-        Compression::Gzip => true,
-    };
-
-    let policy = FixedRetryPolicy::new(
-        config.retries,
-        Duration::from_secs(1),
-        util::http::HttpRetryLogic,
-    );
-
-    let in_flight_request_limit = config.in_flight_request_limit;
-    let request_timeout_secs = config.request_timeout_secs;
-    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(config.uri.clone());
-
-        builder.header("Content-Type", "application/x-ndjson");
-        builder.header("Content-Encoding", "gzip");
-
-        if let Some(headers) = &config.headers {
-            for (header, value) in headers.iter() {
-                builder.header(header.as_str(), value.as_str());
-            }
-        }
-
-        let mut request = builder.body(body.into()).unwrap();
-
-        if let Some(auth) = &config.basic_auth {
-            auth.apply(request.headers_mut());
-        }
-
-        request
-    });
-    let service = ServiceBuilder::new()
-        .retry(policy)
-        .in_flight_limit(in_flight_request_limit)
-        .timeout(Duration::from_secs(request_timeout_secs))
-        .service(http_service)
-        .expect("This is a bug, there is no spawning");
-
-    let sink = BatchServiceSink::new(service, acker)
-        .batched(Buffer::new(gzip), 2 * 1024 * 1024)
-        .with(move |record: Record| {
-            let mut body = json!({
-                "msg": String::from_utf8_lossy(&record.raw[..]),
-                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
-                "fields": record.structured,
-            });
-
-            if let Some(host) = record.structured.get(&Atom::from("host")) {
-                body["host"] = json!(host);
-            }
-            let mut body = serde_json::to_vec(&body).unwrap();
-            body.push(b'\n');
-            Ok(body)
-        });
-
-    Box::new(sink)
-}
-
-fn healthcheck(uri: Uri, auth: Option<BasicAuth>) -> super::Healthcheck {
-    use hyper::{Body, Client, Request};
-    use hyper_tls::HttpsConnector;
-
-    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
-
-    if let Some(auth) = auth {
-        auth.apply(request.headers_mut());
-    }
-
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
-
-    let healthcheck = client
-        .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            use hyper::StatusCode;
-
-            match response.status() {
-                StatusCode::OK => Ok(()),
-                other => Err(format!("Unexpected status: {}", other)),
-            }
-        });
-
-    Box::new(healthcheck)
 }
 
 #[cfg(test)]

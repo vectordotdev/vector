@@ -1,8 +1,13 @@
-use super::util::{
-    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+use crate::{
+    buffers::Acker,
+    bytes::BytesExt,
+    record::Record,
+    sinks::util::{
+        http::{HttpRetryLogic, HttpService},
+        retries::FixedRetryPolicy,
+        BatchServiceSink, Buffer, Compression, SinkExt,
+    },
 };
-use crate::buffers::Acker;
-use crate::{bytes::BytesExt, record::Record};
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -12,7 +17,7 @@ use serde_json::json;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
     pub host: String,
@@ -21,15 +26,23 @@ pub struct ElasticSearchConfig {
     pub id_key: Option<String>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
     pub request_timeout_secs: Option<u64>,
-    pub retries: Option<usize>,
-    pub in_flight_request_limit: Option<usize>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
 impl crate::topology::config::SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((es(self.clone(), acker), healthcheck(self.host.clone())))
+        let sink = es(self.clone(), acker);
+        let healtcheck = healthcheck(self.host.clone());
+
+        Ok((sink, healtcheck))
     }
 }
 
@@ -41,13 +54,21 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
-    let retries = config.retries.unwrap_or(5);
-    let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
 
-    let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
+    let timeout = config.request_timeout_secs.unwrap_or(10);
+    let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
+    let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
-    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
+    let policy = FixedRetryPolicy::new(
+        retry_attempts,
+        Duration::from_secs(retry_backoff_secs),
+        HttpRetryLogic,
+    );
+
+    let http_service = HttpService::new(move |body: Vec<u8>| {
         let uri = format!("{}/_bulk", host);
         let uri: Uri = uri.parse().unwrap();
 
@@ -56,15 +77,19 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         builder.uri(uri);
 
         builder.header("Content-Type", "application/x-ndjson");
-        builder.header("Content-Encoding", "gzip");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
 
         builder.body(body.into()).unwrap()
     });
 
     let service = ServiceBuilder::new()
         .in_flight_limit(in_flight_limit)
+        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
         .retry(policy)
-        .timeout(Duration::from_secs(timeout_secs))
+        .timeout(Duration::from_secs(timeout))
         .service(http_service)
         .expect("This is a bug, there is no spawning");
 
@@ -94,16 +119,6 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     Box::new(sink)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
-    if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
-        let val = val.as_utf8_lossy();
-
-        doc.as_object_mut()
-            .unwrap()
-            .insert("_id".into(), json!(val));
-    }
-}
-
 fn healthcheck(host: String) -> super::Healthcheck {
     let uri = format!("{}/_cluster/health", host);
     let request = Request::get(uri).body(Body::empty()).unwrap();
@@ -122,6 +137,16 @@ fn healthcheck(host: String) -> super::Healthcheck {
         });
 
     Box::new(healthcheck)
+}
+
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
+    if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
+        let val = val.as_utf8_lossy();
+
+        doc.as_object_mut()
+            .unwrap()
+            .insert("_id".into(), json!(val));
+    }
 }
 
 #[cfg(test)]
@@ -191,11 +216,7 @@ mod integration_tests {
             index: index.clone(),
             doc_type: "log_lines".into(),
             id_key: Some("my_id".into()),
-            buffer_size: None,
-            compression: None,
-            request_timeout_secs: None,
-            retries: None,
-            in_flight_request_limit: None,
+            ..Default::default()
         };
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
@@ -242,12 +263,7 @@ mod integration_tests {
             host: "http://localhost:9200/".into(),
             index: index.clone(),
             doc_type: "log_lines".into(),
-            id_key: None,
-            buffer_size: None,
-            compression: None,
-            request_timeout_secs: None,
-            retries: None,
-            in_flight_request_limit: None,
+            ..Default::default()
         };
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();

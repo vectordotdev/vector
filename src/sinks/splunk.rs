@@ -1,11 +1,17 @@
-use super::util::{
-    self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
+use crate::{
+    buffers::Acker,
+    bytes::BytesExt,
+    record::Record,
+    sinks::util::{
+        http::{HttpRetryLogic, HttpService},
+        retries::FixedRetryPolicy,
+        BatchServiceSink, Buffer, Compression, SinkExt,
+    },
 };
-use crate::buffers::Acker;
-use crate::bytes::BytesExt;
-use crate::record::Record;
 use futures::{Future, Sink};
-use http::{Method, Uri};
+use http::{Method, Request, StatusCode, Uri};
+use hyper::{Body, Client};
+use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -13,18 +19,23 @@ use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct HecSinkConfig {
     pub token: String,
     pub host: String,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
-    pub request_timeout_secs: Option<u64>,
-    pub retries: Option<usize>,
-    pub in_flight_request_limit: Option<usize>,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
 }
 
 fn default_host_field() -> Atom {
@@ -34,46 +45,62 @@ fn default_host_field() -> Atom {
 #[typetag::serde(name = "splunk_hec")]
 impl crate::topology::config::SinkConfig for HecSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((
-            hec(self.clone(), acker),
-            hec_healthcheck(self.token.clone(), self.host.clone()),
-        ))
+        let sink = hec(self.clone(), acker)?;
+        let healtcheck = healthcheck(self.token.clone(), self.host.clone())?;
+
+        Ok((sink, healtcheck))
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
     let host = config.host.clone();
     let token = config.token.clone();
+    let host_field = config.host_field;
+
     let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let timeout_secs = config.request_timeout_secs.unwrap_or(10);
-    let retries = config.retries.unwrap_or(5);
-    let in_flight_limit = config.in_flight_request_limit.unwrap_or(1);
-    let host_field = config.host_field;
 
-    let policy = FixedRetryPolicy::new(retries, Duration::from_secs(1), util::http::HttpRetryLogic);
+    let timeout = config.request_timeout_secs.unwrap_or(10);
+    let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+    let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
+    let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+    let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
-    let http_service = util::http::HttpService::new(move |body: Vec<u8>| {
-        let uri = format!("{}/services/collector/event", host);
-        let uri: Uri = uri.parse().unwrap();
+    let policy = FixedRetryPolicy::new(
+        retry_attempts,
+        Duration::from_secs(retry_backoff_secs),
+        HttpRetryLogic,
+    );
 
-        let mut builder = hyper::Request::builder();
+    let uri = format!("{}/services/collector/event", host)
+        .parse::<Uri>()
+        .map_err(|e| format!("{}", e))?;
+
+    let http_service = HttpService::new(move |body: Vec<u8>| {
+        let mut builder = Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri);
+        builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/json");
-        builder.header("Content-Encoding", "gzip");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
+
         builder.header("Authorization", format!("Splunk {}", token));
 
         builder.body(body.into()).unwrap()
     });
+
     let service = ServiceBuilder::new()
-        .retry(policy)
         .in_flight_limit(in_flight_limit)
-        .timeout(Duration::from_secs(timeout_secs))
+        .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+        .retry(policy)
+        .timeout(Duration::from_secs(timeout))
         .service(http_service)
         .expect("This is a bug, no spawning");
 
@@ -98,15 +125,13 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
             Ok(body)
         });
 
-    Box::new(sink)
+    Ok(Box::new(sink))
 }
 
-pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
-    use hyper::{Body, Client, Request};
-    use hyper_tls::HttpsConnector;
-
-    let uri = format!("{}/services/collector/health/1.0", host);
-    let uri: Uri = uri.parse().unwrap();
+pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, String> {
+    let uri = format!("{}/services/collector/health/1.0", host)
+        .parse::<Uri>()
+        .map_err(|e| format!("{}", e))?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
@@ -119,20 +144,14 @@ pub fn hec_healthcheck(token: String, host: String) -> super::Healthcheck {
     let healthcheck = client
         .request(request)
         .map_err(|err| err.to_string())
-        .and_then(|response| {
-            use hyper::StatusCode;
-
-            match response.status() {
-                StatusCode::OK => Ok(()),
-                StatusCode::BAD_REQUEST => Err("Invalid HEC token".to_string()),
-                StatusCode::SERVICE_UNAVAILABLE => {
-                    Err("HEC is unhealthy, queues are full".to_string())
-                }
-                other => Err(format!("Unexpected status: {}", other)),
-            }
+        .and_then(|response| match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::BAD_REQUEST => Err("Invalid HEC token".to_string()),
+            StatusCode::SERVICE_UNAVAILABLE => Err("HEC is unhealthy, queues are full".to_string()),
+            other => Err(format!("Unexpected status: {}", other)),
         });
 
-    Box::new(healthcheck)
+    Ok(Box::new(healthcheck))
 }
 
 #[cfg(test)]
@@ -155,7 +174,7 @@ mod tests {
     fn splunk_insert_message() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null);
+        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let record = Record::from(message.clone());
@@ -185,7 +204,7 @@ mod tests {
     fn splunk_insert_many() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null);
+        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let (messages, records) = random_lines_with_stream(100, 10);
 
@@ -217,7 +236,7 @@ mod tests {
     fn splunk_custom_fields() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null);
+        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -247,7 +266,7 @@ mod tests {
     fn splunk_hostname() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null);
+        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -286,7 +305,7 @@ mod tests {
             ..config()
         };
 
-        let sink = sinks::splunk::hec(config, Acker::Null);
+        let sink = sinks::splunk::hec(config, Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
@@ -326,14 +345,16 @@ mod tests {
         // OK
         {
             let healthcheck =
-                sinks::splunk::hec_healthcheck(get_token(), "http://localhost:8088".to_string());
+                sinks::splunk::healthcheck(get_token(), "http://localhost:8088".to_string())
+                    .unwrap();
             rt.block_on(healthcheck).unwrap();
         }
 
         // Server not listening at address
         {
             let healthcheck =
-                sinks::splunk::hec_healthcheck(get_token(), "http://localhost:1111".to_string());
+                sinks::splunk::healthcheck(get_token(), "http://localhost:1111".to_string())
+                    .unwrap();
 
             let err = rt.block_on(healthcheck).unwrap_err();
             assert!(err.starts_with("an error occurred trying to connect"));
@@ -350,7 +371,8 @@ mod tests {
         // Unhealthy server
         {
             let healthcheck =
-                sinks::splunk::hec_healthcheck(get_token(), "http://503.returnco.de".to_string());
+                sinks::splunk::healthcheck(get_token(), "http://503.returnco.de".to_string())
+                    .unwrap();
             assert_eq!(
                 rt.block_on(healthcheck).unwrap_err(),
                 "HEC is unhealthy, queues are full"
@@ -388,10 +410,8 @@ mod tests {
             token: get_token(),
             buffer_size: None,
             compression: None,
-            request_timeout_secs: None,
-            retries: None,
-            in_flight_request_limit: None,
             host_field: "host".into(),
+            ..Default::default()
         }
     }
 

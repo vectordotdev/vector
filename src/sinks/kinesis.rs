@@ -26,13 +26,21 @@ pub struct KinesisService {
     config: KinesisSinkConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: usize,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
 }
 
 #[typetag::serde(name = "kinesis")]
@@ -53,14 +61,27 @@ impl KinesisService {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size;
+
+        let timeout = config.request_timeout_secs.unwrap_or(10);
+        let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
+        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+
+        let policy = FixedRetryPolicy::new(
+            retry_attempts,
+            Duration::from_secs(retry_backoff_secs),
+            KinesisRetryLogic,
+        );
+
         let kinesis = KinesisService { client, config };
 
-        let policy = FixedRetryPolicy::new(5, Duration::from_secs(1), KinesisRetryLogic);
-
         let svc = ServiceBuilder::new()
-            .in_flight_limit(1)
+            .in_flight_limit(in_flight_limit)
+            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
             .retry(policy)
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(timeout))
             .service(kinesis)
             .expect("This is a bug, no spawning done");
 
@@ -203,6 +224,7 @@ mod tests {
             stream_name: STREAM_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             batch_size: 2,
+            ..Default::default()
         };
 
         let mut rt = Runtime::new().unwrap();
