@@ -1,11 +1,14 @@
-use crate::buffers::Acker;
-use crate::record::Record;
-use crate::sinks::util::{BatchServiceSink, Buffer, SinkExt};
+use crate::{
+    buffers::Acker,
+    record::Record,
+    region::RegionOrEndpoint,
+    sinks::util::{BatchServiceSink, Buffer, SinkExt},
+};
 use futures::{Future, Poll, Sink};
-use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::time::Duration;
 use tokio_trace::field;
 use tokio_trace_futures::{Instrument, Instrumented};
@@ -29,8 +32,8 @@ pub struct S3SinkInnerConfig {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
-    pub region: Option<String>,
-    pub endpoint: Option<String>,
+    #[serde(flatten)]
+    pub region: RegionOrEndpoint,
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,
@@ -94,24 +97,8 @@ pub fn healthcheck(config: S3SinkInnerConfig) -> super::Healthcheck {
 }
 
 impl S3SinkConfig {
-    fn region(&self) -> Result<Region, String> {
-        if self.region.is_some() && self.endpoint.is_some() {
-            Err("Only one of 'region' or 'endpoint' can be specified".to_string())
-        } else if let Some(region) = &self.region {
-            region.parse::<Region>().map_err(|e| e.to_string())
-        } else if let Some(endpoint) = &self.endpoint {
-            Ok(Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint.clone(),
-            })
-        } else {
-            Err("Must set 'region' or 'endpoint'".to_string())
-        }
-    }
-
     fn config(&self) -> Result<S3SinkInnerConfig, String> {
-        let region = self.region()?;
-
+        let region = self.region.clone().try_into()?;
         Ok(S3SinkInnerConfig {
             client: rusoto_s3::S3Client::new(region),
             gzip: self.gzip,
