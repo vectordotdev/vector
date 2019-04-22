@@ -4,16 +4,17 @@ use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
 use stream_cancel::{StreamExt, Tripwire};
-use tokio::{self, codec::FramedRead, net::TcpListener, timer};
+use tokio::{codec::FramedRead, net::TcpListener, timer};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
-    pub address: std::net::SocketAddr,
+    pub address: String,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -29,9 +30,9 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(addr: std::net::SocketAddr) -> Self {
+    pub fn new(addr: SocketAddr) -> Self {
         Self {
-            address: addr,
+            address: addr.to_string(),
             max_length: default_max_length(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
@@ -41,20 +42,27 @@ impl TcpConfig {
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
-        Ok(tcp(self.clone(), out))
+        let tcp = tcp(self.clone(), out)?;
+        Ok(tcp)
     }
 }
 
-pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     let TcpConfig {
-        address: addr,
+        address,
         max_length,
         shutdown_timeout_secs,
     } = config;
 
-    Box::new(future::lazy(move || {
+    let addr = address
+        .to_socket_addrs()
+        .map_err(|e| format!("IO Error: {}", e))?
+        .next()
+        .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+
+    let source = future::lazy(move || {
         let listener = match TcpListener::bind(&addr) {
             Ok(listener) => listener,
             Err(err) => {
@@ -134,7 +142,9 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
             })
             .inspect(|_| trigger.cancel());
         future::Either::A(future)
-    }))
+    });
+
+    Ok(Box::new(source))
 }
 
 #[cfg(test)]
@@ -151,7 +161,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::tcp(TcpConfig::new(addr), tx);
+        let server = super::tcp(TcpConfig::new(addr), tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
@@ -193,7 +203,7 @@ mod test {
         let mut config = TcpConfig::new(addr);
         config.max_length = 10;
 
-        let server = super::tcp(config, tx);
+        let server = super::tcp(config, tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
