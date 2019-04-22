@@ -1,6 +1,7 @@
 use self::proto::{record::Event, Log};
 use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{offset::TimeZone, DateTime, Utc};
+use lazy_static::lazy_static;
 use prost_types::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,10 +11,12 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
+lazy_static! {
+    pub static ref MESSAGE: Atom = Atom::from("message");
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
-    #[serde(rename = "message", serialize_with = "crate::bytes::serialize")]
-    pub raw: Bytes,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<Bytes>,
     pub timestamp: DateTime<Utc>,
@@ -23,14 +26,13 @@ pub struct Record {
 
 impl Record {
     pub fn to_string_lossy(&self) -> String {
-        String::from_utf8_lossy(&self.raw[..]).into_owned()
+        String::from_utf8_lossy(&self.structured[&MESSAGE]).into_owned()
     }
 }
 
 impl Default for Record {
     fn default() -> Self {
         Record {
-            raw: Bytes::new(),
             host: None,
             timestamp: Utc::now(),
             structured: HashMap::new(),
@@ -44,8 +46,6 @@ impl From<proto::Record> for Record {
 
         match event {
             Event::Log(proto) => {
-                let raw = Bytes::from(proto.raw);
-
                 let host = if proto.host.len() > 0 {
                     Some(Bytes::from(proto.host))
                 } else {
@@ -64,7 +64,6 @@ impl From<proto::Record> for Record {
                     .collect::<HashMap<_, _>>();
 
                 Record {
-                    raw,
                     host,
                     timestamp,
                     structured,
@@ -76,8 +75,6 @@ impl From<proto::Record> for Record {
 
 impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
-        let raw = record.raw.into_iter().collect::<Vec<u8>>();
-
         let host = record
             .host
             .map(|b| b.into_iter().collect::<Vec<u8>>())
@@ -95,7 +92,6 @@ impl From<Record> for proto::Record {
             .collect::<HashMap<_, _>>();
 
         let event = Event::Log(Log {
-            raw,
             host,
             timestamp,
             structured,
@@ -106,16 +102,23 @@ impl From<Record> for proto::Record {
 }
 
 impl From<Record> for Vec<u8> {
-    fn from(record: Record) -> Vec<u8> {
-        record.raw.into_iter().collect()
+    fn from(mut record: Record) -> Vec<u8> {
+        record
+            .structured
+            .remove(&MESSAGE)
+            .unwrap()
+            .into_iter()
+            .collect()
     }
 }
 
 impl From<Bytes> for Record {
-    fn from(raw: Bytes) -> Self {
+    fn from(message: Bytes) -> Self {
+        let mut structured = HashMap::new();
+        structured.insert(MESSAGE.clone(), message);
+
         Record {
-            raw,
-            timestamp: Utc::now(),
+            structured,
             ..Default::default()
         }
     }
@@ -129,12 +132,7 @@ impl From<&str> for Record {
 
 impl From<String> for Record {
     fn from(line: String) -> Self {
-        let raw = Bytes::from(line);
-
-        Record {
-            raw,
-            ..Default::default()
-        }
+        Bytes::from(line).into()
     }
 }
 

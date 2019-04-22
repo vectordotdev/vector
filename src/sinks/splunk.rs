@@ -3,7 +3,7 @@ use super::util::{
 };
 use crate::buffers::Acker;
 use crate::bytes::BytesExt;
-use crate::record::Record;
+use crate::record::{self, Record};
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
@@ -83,7 +83,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
             let host = record.structured.get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": String::from_utf8_lossy(&record.raw[..]),
+                "event": String::from_utf8_lossy(&record.structured[&record::MESSAGE]),
                 "fields": record.structured
                     .into_iter()
                     .map(|(k, v)| (k, v.as_utf8_lossy().into_owned()))

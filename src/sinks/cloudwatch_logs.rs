@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    record::Record,
+    record::{self, Record},
     sinks::util::{BatchServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
@@ -218,7 +218,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
 
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
-        let message = String::from_utf8_lossy(&record.raw[..]).into_owned();
+        let message = String::from_utf8_lossy(&record.structured[&record::MESSAGE]).into_owned();
 
         let timestamp = record.timestamp.timestamp_millis();
 

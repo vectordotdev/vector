@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,14 +9,14 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct JsonParserConfig {
-    pub field: Option<Atom>,
+    pub field: Atom,
     pub drop_invalid: bool,
 }
 
 impl Default for JsonParserConfig {
     fn default() -> Self {
         Self {
-            field: None,
+            field: record::MESSAGE.clone(),
             drop_invalid: false,
         }
     }
@@ -41,13 +41,7 @@ impl From<JsonParserConfig> for JsonParser {
 
 impl Transform for JsonParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        let to_parse = self
-            .config
-            .field
-            .as_ref()
-            .map_or(Some(record.raw.as_ref()), |field| {
-                record.structured.get(field).map(|s| &s[..])
-            });
+        let to_parse = record.structured.get(&self.config.field).map(|s| &s[..]);
 
         let parsed = to_parse
             .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse).ok())
@@ -105,7 +99,7 @@ fn insert(structured: &mut HashMap<Atom, Bytes>, name: String, value: Value) {
 #[cfg(test)]
 mod test {
     use super::{JsonParser, JsonParserConfig};
-    use crate::record::Record;
+    use crate::record::{self, Record};
     use crate::transforms::Transform;
     use bytes::Bytes;
     use string_cache::DefaultAtom as Atom;
@@ -122,13 +116,16 @@ mod test {
 
         assert_eq!(record.structured[&Atom::from("greeting")], "hello");
         assert_eq!(record.structured[&Atom::from("name")], "bob");
-        assert_eq!(record.raw, r#"{"greeting": "hello", "name": "bob"}"#);
+        assert_eq!(
+            record.structured[&record::MESSAGE],
+            r#"{"greeting": "hello", "name": "bob"}"#
+        );
     }
 
     #[test]
     fn json_parser_parse_field() {
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             ..Default::default()
         });
 
@@ -157,7 +154,10 @@ mod test {
 
         let record = parser.transform(record).unwrap();
 
-        assert!(record.structured.is_empty());
+        assert_eq!(
+            record.structured.keys().cloned().collect::<Vec<Atom>>(),
+            vec![record::MESSAGE.clone()]
+        );
     }
 
     #[test]
@@ -166,7 +166,6 @@ mod test {
 
         // Raw
         let parser = JsonParser::from(JsonParserConfig {
-            field: None,
             ..Default::default()
         });
 
@@ -174,12 +173,15 @@ mod test {
 
         let record = parser.transform(record).unwrap();
 
-        assert!(record.structured.is_empty());
-        assert_eq!(record.raw, invalid);
+        assert_eq!(
+            record.structured.keys().cloned().collect::<Vec<Atom>>(),
+            vec![record::MESSAGE.clone()]
+        );
+        assert_eq!(record.structured[&record::MESSAGE], invalid);
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             ..Default::default()
         });
 
@@ -200,7 +202,6 @@ mod test {
 
         // Raw
         let parser = JsonParser::from(JsonParserConfig {
-            field: None,
             drop_invalid: true,
             ..Default::default()
         });
@@ -216,7 +217,7 @@ mod test {
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             drop_invalid: true,
             ..Default::default()
         });
@@ -244,7 +245,7 @@ mod test {
             ..Default::default()
         });
         let parser2 = JsonParser::from(JsonParserConfig {
-            field: Some("nested".into()),
+            field: "nested".into(),
             ..Default::default()
         });
 

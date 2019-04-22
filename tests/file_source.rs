@@ -4,6 +4,7 @@ use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
 use vector::bytes::BytesExt;
+use vector::record;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -45,7 +46,7 @@ fn happy_path() {
     let mut goodbye_i = 0;
 
     for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = std::str::from_utf8(&record.structured[&record::MESSAGE][..]).unwrap();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
@@ -113,7 +114,7 @@ fn truncate() {
     for record in received {
         assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = std::str::from_utf8(&record.structured[&record::MESSAGE][..]).unwrap();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -177,7 +178,7 @@ fn rotate() {
     for record in received {
         assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = std::str::from_utf8(&record.structured[&record::MESSAGE][..]).unwrap();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -237,7 +238,7 @@ fn multiple_paths() {
     let mut is = [0; 3];
 
     for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = std::str::from_utf8(&record.structured[&record::MESSAGE][..]).unwrap();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
@@ -330,7 +331,10 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert!(received.structured.is_empty());
+        assert_eq!(
+            received.structured.keys().cloned().collect::<Vec<_>>(),
+            vec![record::MESSAGE.clone()]
+        );
     }
 
     drop(trigger);
@@ -366,7 +370,11 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| {
+                std::str::from_utf8(&r.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .to_string()
+            })
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -400,7 +408,11 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| {
+                std::str::from_utf8(&r.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .to_string()
+            })
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -477,7 +489,11 @@ fn start_position() {
                     .as_utf8_lossy()
                     .ends_with("before")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| {
+                std::str::from_utf8(&r.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .to_string()
+            })
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -486,7 +502,11 @@ fn start_position() {
                     .as_utf8_lossy()
                     .ends_with("after")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| {
+                std::str::from_utf8(&r.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .to_string()
+            })
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);
@@ -536,7 +556,11 @@ fn file_max_line_bytes() {
     drop(trigger);
     shutdown_on_idle(rt);
 
-    let received = rx.map(|r| r.raw).collect().wait().unwrap();
+    let received = rx
+        .map(|mut r| r.structured.remove(&record::MESSAGE).unwrap())
+        .collect()
+        .wait()
+        .unwrap();
 
     assert_eq!(received, vec!["short", "exactly 10", "last short"]);
 }

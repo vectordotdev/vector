@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::record::{self, Record};
 use futures::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
@@ -72,7 +72,9 @@ impl Sink for KafkaSink {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
-        let record = FutureRecord::to(&topic).key(&()).payload(&item.raw[..]);
+        let record = FutureRecord::to(&topic)
+            .key(&())
+            .payload(&item.structured[&record::MESSAGE][..]);
 
         debug!(message = "sending record.", count = 1);
         let future = match self.producer.send_result(record) {

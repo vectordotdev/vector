@@ -140,6 +140,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
 #[cfg(test)]
 mod test {
     use super::TcpConfig;
+    use crate::record;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
     use bytes::Bytes;
     use futures::sync::mpsc;
@@ -207,9 +208,9 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().raw, "short");
+        assert_eq!(record.unwrap().structured[&record::MESSAGE], "short");
 
         let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().raw, "more short");
+        assert_eq!(record.unwrap().structured[&record::MESSAGE], "more short");
     }
 }

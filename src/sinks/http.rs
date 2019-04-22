@@ -2,7 +2,7 @@ use super::util::{
     self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
 };
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::record::{self, Record};
 use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
@@ -173,7 +173,7 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
-                "msg": String::from_utf8_lossy(&record.raw[..]),
+                "msg": String::from_utf8_lossy(&record.structured[&record::MESSAGE]),
                 "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
                 "fields": record.structured,
             });

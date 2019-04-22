@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
@@ -34,13 +34,15 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Ok(raw_line) = std::str::from_utf8(&record.raw[..]) {
+        let message = &record.structured[&record::MESSAGE][..];
+
+        if let Ok(raw_line) = std::str::from_utf8(message) {
             if self.pass_list.is_match(&raw_line) {
                 return Some(record);
             }
         }
 
-        if seahash::hash(&record.raw[..]) % self.rate == 0 {
+        if seahash::hash(message) % self.rate == 0 {
             record.structured.insert(
                 Atom::from("sample_rate"),
                 Bytes::from(self.rate.to_string()),
@@ -56,7 +58,7 @@ impl Transform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::Sampler;
-    use crate::record::Record;
+    use crate::record::{self, Record};
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
@@ -122,7 +124,11 @@ mod tests {
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
+            .filter(|s| {
+                !std::str::from_utf8(&s.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .contains("na")
+            })
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing.structured[&Atom::from("sample_rate")], "10");
@@ -131,7 +137,11 @@ mod tests {
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
+            .filter(|s| {
+                !std::str::from_utf8(&s.structured[&record::MESSAGE][..])
+                    .unwrap()
+                    .contains("na")
+            })
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing.structured[&Atom::from("sample_rate")], "25");

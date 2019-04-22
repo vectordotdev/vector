@@ -1,6 +1,6 @@
 use super::util::SinkExt;
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -158,7 +158,7 @@ pub fn raw_tcp(addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(|record: Record| Ok(record.raw)),
+            .with(|mut record: Record| Ok(record.structured.remove(&record::MESSAGE).unwrap())),
     )
 }
 

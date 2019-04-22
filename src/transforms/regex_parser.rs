@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,10 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Some(captures) = self.regex.captures(&record.raw[..]) {
+        if let Some(captures) = self
+            .regex
+            .captures(&record.structured[&record::MESSAGE].clone())
+        {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
                     record
