@@ -28,7 +28,7 @@ pub struct HecSinkConfig {
 }
 
 fn default_host_field() -> Atom {
-    "host".into()
+    record::HOST.clone()
 }
 
 #[typetag::serde(name = "splunk_hec")]

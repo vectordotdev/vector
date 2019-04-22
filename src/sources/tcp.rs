@@ -1,5 +1,5 @@
 use super::util::StreamExt as _;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -110,7 +110,9 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                     .take_until(tripwire)
                     .map(Record::from)
                     .map(move |mut record| {
-                        record.host = host.clone();
+                        if let Some(host) = &host {
+                            record.structured.insert(record::HOST.clone(), host.clone());
+                        }
 
                         trace!(
                             message = "Received one line.",
@@ -161,7 +163,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record.host, Some(Bytes::from("127.0.0.1")));
+        assert_eq!(record.structured[&record::HOST], Bytes::from("127.0.0.1"));
     }
 
     #[test]

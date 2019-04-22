@@ -13,12 +13,11 @@ pub mod proto {
 
 lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
+    pub static ref HOST: Atom = Atom::from("host");
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Record {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub host: Option<Bytes>,
     pub timestamp: DateTime<Utc>,
     #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
     pub structured: HashMap<Atom, Bytes>,
@@ -33,7 +32,6 @@ impl Record {
 impl Default for Record {
     fn default() -> Self {
         Record {
-            host: None,
             timestamp: Utc::now(),
             structured: HashMap::new(),
         }
@@ -46,12 +44,6 @@ impl From<proto::Record> for Record {
 
         match event {
             Event::Log(proto) => {
-                let host = if proto.host.len() > 0 {
-                    Some(Bytes::from(proto.host))
-                } else {
-                    None
-                };
-
                 let timestamp = proto
                     .timestamp
                     .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
@@ -64,7 +56,6 @@ impl From<proto::Record> for Record {
                     .collect::<HashMap<_, _>>();
 
                 Record {
-                    host,
                     timestamp,
                     structured,
                 }
@@ -75,11 +66,6 @@ impl From<proto::Record> for Record {
 
 impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
-        let host = record
-            .host
-            .map(|b| b.into_iter().collect::<Vec<u8>>())
-            .unwrap_or_else(|| Vec::new());
-
         let timestamp = Some(Timestamp {
             seconds: record.timestamp.timestamp(),
             nanos: record.timestamp.timestamp_subsec_nanos() as _,
@@ -92,7 +78,6 @@ impl From<Record> for proto::Record {
             .collect::<HashMap<_, _>>();
 
         let event = Event::Log(Log {
-            host,
             timestamp,
             structured,
         });
