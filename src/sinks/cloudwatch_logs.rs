@@ -1,17 +1,18 @@
 use crate::buffers::Acker;
 use crate::{
     record::Record,
+    region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
-use rusoto_core::{region::ParseRegionError, Region, RusotoFuture};
+use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
     DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError, PutLogEventsRequest,
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error as _;
+use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
@@ -26,7 +27,8 @@ pub struct CloudwatchLogsSvc {
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
     pub group_name: String,
-    pub region: Region,
+    #[serde(flatten)]
+    pub region: RegionOrEndpoint,
     pub buffer_size: usize,
 
     // Tower Request based configuration
@@ -54,8 +56,7 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let cloudwatch =
-            CloudwatchLogsSvc::new(self.clone()).map_err(|e| e.description().to_string())?;
+        let cloudwatch = CloudwatchLogsSvc::new(self.clone())?;
 
         let timeout = self.request_timeout_secs.unwrap_or(10);
         let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
@@ -74,15 +75,16 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone());
+        let healthcheck = healthcheck(self.clone())?;
 
         Ok((sink, healthcheck))
     }
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, ParseRegionError> {
-        let client = CloudWatchLogsClient::new(config.region.clone());
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+        let region = config.region.clone().try_into()?;
+        let client = CloudWatchLogsClient::new(region);
 
         Ok(CloudwatchLogsSvc {
             client,
@@ -182,10 +184,10 @@ impl Service<Vec<Record>> for CloudwatchLogsSvc {
     }
 }
 
-fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
     let region = config.region.clone();
 
-    let client = CloudWatchLogsClient::new(region);
+    let client = CloudWatchLogsClient::new(region.try_into()?);
 
     let request = DescribeLogStreamsRequest {
         limit: Some(1),
@@ -226,7 +228,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
             }
         });
 
-    Box::new(fut)
+    Ok(Box::new(fut))
 }
 
 impl From<Record> for InputLogEvent {
@@ -273,6 +275,7 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
+        region::RegionOrEndpoint,
         sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
@@ -293,13 +296,12 @@ mod tests {
             name: "localstack".into(),
             endpoint: "http://localhost:6000".into(),
         };
-
         ensure_stream(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
             group_name: GROUP_NAME.into(),
-            region: region.clone(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             buffer_size: 1,
             ..Default::default()
         };

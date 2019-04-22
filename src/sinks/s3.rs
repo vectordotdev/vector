@@ -1,17 +1,20 @@
-use crate::buffers::Acker;
-use crate::record::Record;
-use crate::sinks::util::{
-    retries::{FixedRetryPolicy, RetryLogic},
-    BatchServiceSink, Buffer, SinkExt,
+use crate::{
+    buffers::Acker,
+    record::Record,
+    region::RegionOrEndpoint,
+    sinks::util::{
+        retries::{FixedRetryPolicy, RetryLogic},
+        BatchServiceSink, Buffer, SinkExt,
+    },
 };
 use futures::{Future, Poll, Sink};
-use rusoto_core::region::Region;
 use rusoto_core::RusotoFuture;
 use rusoto_s3::{
     HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
     S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::time::Duration;
 use tokio_trace::field;
 use tokio_trace_futures::{Instrument, Instrumented};
@@ -30,8 +33,8 @@ pub struct S3Sink {
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: String,
-    // TODO(lucio): this will be replaced with RegionOrEndpoint
-    pub region: Region,
+    #[serde(flatten)]
+    pub region: RegionOrEndpoint,
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,

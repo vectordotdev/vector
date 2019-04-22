@@ -208,7 +208,16 @@ fn bad_s3_region() {
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
-        endpoint = "https://example.com"
+        endpoint = "https://localhost"
+
+        [sinks.out4]
+        type = "s3"
+        inputs = ["in"]
+        buffer_size = 100000
+        gzip = true
+        bucket = "asdf"
+        key_prefix = "logs/"
+        endpoint = "this shoudlnt work"
       "#,
     )
     .unwrap_err();
@@ -219,6 +228,7 @@ fn bad_s3_region() {
             "Sink \"out1\": Must set 'region' or 'endpoint'",
             "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
+            "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
         ]
     )
 }
