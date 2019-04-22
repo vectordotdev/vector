@@ -76,7 +76,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let timeout = config.request_timeout_secs.unwrap_or(10);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
     let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(5);
-    let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+    let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
@@ -92,7 +92,10 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/x-ndjson");
-        builder.header("Content-Encoding", "gzip");
+
+        if gzip {
+            builder.header("Content-Encoding", "gzip");
+        }
 
         if let Some(headers) = &config.headers {
             for (header, value) in headers.iter() {
