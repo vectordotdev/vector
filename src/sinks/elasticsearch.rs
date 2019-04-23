@@ -176,6 +176,7 @@ mod integration_tests {
         test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
         Record,
+        record,
     };
     use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
@@ -230,7 +231,7 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_record.timestamp,
+            "timestamp": std::str::from_utf8(&input_record.structured[&record::TIMESTAMP][..]).unwrap(),
         });
         assert_eq!(expected, value);
     }
