@@ -11,7 +11,7 @@ use vector::metrics;
 use vector::topology::Topology;
 
 fn main() {
-    let app = App::new("Vector").version("1.0").author("timber.io")
+    let app = App::new("Vector").version("0.1.0").author("timber.io")
         .arg(
             Arg::with_name("config")
                 .short("c")
@@ -39,16 +39,48 @@ fn main() {
                 .long("threads")
                 .help("Number of threads vector's core processing should use. Defaults to number of cores available")
                 .takes_value(true)
-        );
+        )
+        .arg(Arg::with_name("verbose")
+             .short("v")
+             .help("Specify the verboseness of logs produced. If -q is supplied this will do nothing. Eg -v -vv")
+             .multiple(true)
+             .takes_value(false))
+        .arg(Arg::with_name("quiet")
+             .short("q")
+             .help("Specify the quietness of logs produced. If -v is supplied this will override that level. Eg -q -qq")
+             .conflicts_with("verbose")
+             .multiple(true)
+             .takes_value(false));
+
     let matches = app.get_matches();
 
     let config_path = matches.value_of("config").unwrap();
-
     let metrics_addr = matches.value_of("metrics-addr");
 
-    let mut levels = ["vector=info", "codec=info", "file_source=info"]
-        .join(",")
-        .to_string();
+    let verboseness = matches.occurrences_of("verbose");
+    let quietness = matches.occurrences_of("quiet");
+
+    let level = if quietness > 0 {
+        match quietness {
+            0 => "info",
+            1 => "warn",
+            2 | _ => "error",
+        }
+    } else {
+        match verboseness {
+            0 => "info",
+            1 => "debug",
+            2 | _ => "trace",
+        }
+    };
+
+    let mut levels = [
+        format!("vector={}", level),
+        format!("codec={}", level),
+        format!("file_source={}", level),
+    ]
+    .join(",")
+    .to_string();
 
     if let Ok(level) = std::env::var("LOG") {
         let additional_level = ",".to_owned() + level.as_str();
