@@ -9,5 +9,5 @@ message Record {
 }
 
 message Log {
-  map<string, bytes> structured = 4;
+  map<string, bytes> structured = 1;
 }
