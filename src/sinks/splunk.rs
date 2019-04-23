@@ -8,8 +8,9 @@ use crate::{
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
 };
+use bytes::Bytes;
 use futures::{Future, Sink};
-use http::{Method, Request, StatusCode, Uri};
+use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -45,6 +46,7 @@ fn default_host_field() -> Atom {
 #[typetag::serde(name = "splunk_hec")]
 impl crate::topology::config::SinkConfig for HecSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healtcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
@@ -79,6 +81,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
         .map_err(|e| format!("{}", e))?;
+    let token = Bytes::from(format!("Splunk {}", token));
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = Request::builder();
@@ -91,7 +94,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
             builder.header("Content-Encoding", "gzip");
         }
 
-        builder.header("Authorization", format!("Splunk {}", token));
+        builder.header("Authorization", token.clone());
 
         builder.body(body.into()).unwrap()
     });
@@ -154,10 +157,35 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, St
     Ok(Box::new(healthcheck))
 }
 
+pub fn validate_host(host: &String) -> Result<(), String> {
+    let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
+
+    if let None = uri.scheme_part() {
+        Err("Host must include a scheme (https or http)".into())
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    #![cfg(feature = "splunk-integration-tests")]
+    use super::*;
 
+    #[test]
+    fn splunk_validate_host() {
+        let valid = "http://localhost:8888".to_string();
+        let invalid_scheme = "localhost:8888".to_string();
+        let invalid_uri = "iminvalidohnoes".to_string();
+
+        assert_eq!(validate_host(&valid), Ok(()));
+        assert!(validate_host(&invalid_scheme).is_err());
+        assert!(validate_host(&invalid_uri).is_err());
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "splunk-integration-tests")]
+mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         sinks,
