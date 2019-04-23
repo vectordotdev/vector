@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
-
 package record.proto;
 
 message Record {
@@ -11,6 +9,5 @@ message Record {
 }
 
 message Log {
-  google.protobuf.Timestamp timestamp = 3;
   map<string, bytes> structured = 4;
 }

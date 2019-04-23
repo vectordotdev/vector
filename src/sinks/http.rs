@@ -3,7 +3,6 @@ use super::util::{
 };
 use crate::buffers::Acker;
 use crate::record::{self, Record};
-use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::header::{HeaderName, HeaderValue};
@@ -174,7 +173,7 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
         .with(move |record: Record| {
             let mut body = json!({
                 "msg": String::from_utf8_lossy(&record.structured[&record::MESSAGE]),
-                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+                "ts": String::from_utf8_lossy(&record.structured[&record::TIMESTAMP]),
                 "fields": record.structured,
             });
 

@@ -220,7 +220,11 @@ impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
         let message = String::from_utf8_lossy(&record.structured[&record::MESSAGE]).into_owned();
 
-        let timestamp = record.timestamp.timestamp_millis();
+        let timestamp = std::str::from_utf8(&record.structured[&record::TIMESTAMP][..])
+            .ok()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .unwrap()
+            .timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }

@@ -102,6 +102,8 @@ mod test {
     use crate::record::{self, Record};
     use crate::transforms::Transform;
     use bytes::Bytes;
+    use maplit::hashset;
+    use std::collections::HashSet;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -155,8 +157,8 @@ mod test {
         let record = parser.transform(record).unwrap();
 
         assert_eq!(
-            record.structured.keys().cloned().collect::<Vec<Atom>>(),
-            vec![record::MESSAGE.clone()]
+            record.structured.keys().cloned().collect::<HashSet<_>>(),
+            hashset! {record::MESSAGE.clone(), record::TIMESTAMP.clone()}
         );
     }
 
@@ -174,8 +176,8 @@ mod test {
         let record = parser.transform(record).unwrap();
 
         assert_eq!(
-            record.structured.keys().cloned().collect::<Vec<Atom>>(),
-            vec![record::MESSAGE.clone()]
+            record.structured.keys().cloned().collect::<HashSet<_>>(),
+            hashset! {record::MESSAGE.clone(), record::TIMESTAMP.clone()}
         );
         assert_eq!(record.structured[&record::MESSAGE], invalid);
 

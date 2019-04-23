@@ -1,6 +1,6 @@
 use crate::record::{self, Record};
 use bytes::Bytes;
-use chrono::{TimeZone, Utc};
+use chrono::{SecondsFormat, TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -183,11 +183,18 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
                 structured.insert("host".into(), host.clone().into());
             }
 
+            let timestamp = parsed
+                .timestamp
+                .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
+                .unwrap_or(Utc::now());
+            structured.insert(
+                record::TIMESTAMP.clone(),
+                timestamp
+                    .to_rfc3339_opts(SecondsFormat::Millis, true)
+                    .into(),
+            );
+
             let record = Record {
-                timestamp: parsed
-                    .timestamp
-                    .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                    .unwrap_or(Utc::now()),
                 structured,
                 ..Default::default()
             };
@@ -206,7 +213,6 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
 mod test {
     use super::{record_from_str, SyslogConfig};
     use crate::record::{self, Record};
-    use chrono::TimeZone;
     use maplit::hashmap;
 
     #[test]
@@ -246,9 +252,9 @@ mod test {
         let raw = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         let mut expected = Record {
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
+                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
             },
             ..Default::default()
         };
@@ -268,9 +274,9 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         let mut expected = Record {
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             structured: hashmap! {
                 record::MESSAGE.clone() => cleaned.into(),
+                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
             },
             ..Default::default()
         };
@@ -287,9 +293,9 @@ mod test {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
         let mut expected = Record {
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
+                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
             },
             ..Default::default()
         };
@@ -306,9 +312,9 @@ mod test {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Record {
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
+                record::TIMESTAMP.clone() => "2019-02-13T21:31:56.000Z".into(),
             },
             ..Default::default()
         };
@@ -325,9 +331,9 @@ mod test {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
         let mut expected = Record {
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
+                record::TIMESTAMP.clone() => "2019-02-13T21:53:30.000Z".into(),
             },
             ..Default::default()
         };

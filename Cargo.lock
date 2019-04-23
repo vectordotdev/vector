@@ -1744,15 +1744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost-types"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "protobuf"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3246,7 +3237,6 @@ dependencies = [
  "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-build 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-types 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rdkafka 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3597,7 +3587,6 @@ dependencies = [
 "checksum prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9787d1977ea72e8066d58e46ae66100324a2815e677897fe78dfe54958f48252"
 "checksum prost-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5e7dc378b94ac374644181a2247cebf59a6ec1c88b49ac77f3a94b86b79d0e11"
 "checksum prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5644c57d56bc085f9570e113495c1f08d7185beca700dcc296cb4672f380a679"
-"checksum prost-types 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1de482a366941c8d56d19b650fac09ca08508f2a696119ee7513ad590c8bac6f"
 "checksum protobuf 2.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "524d165d95627ddebba768db728216c4429bbb62882f7e6ab1a6c3c54a7ed830"
 "checksum quanta 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "dd25291023477d6f6d60e7ec4bb0883ab20dd628edb95ad7dec25531ed590d23"
 "checksum quick-error 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7ac990ab4e038dd8481a5e3fd00641067fcfc674ad663f3222752ed5284e05d4"
