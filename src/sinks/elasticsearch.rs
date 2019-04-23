@@ -173,10 +173,10 @@ mod integration_tests {
     use super::ElasticSearchConfig;
     use crate::buffers::Acker;
     use crate::{
+        record,
         test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
         Record,
-        record,
     };
     use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
