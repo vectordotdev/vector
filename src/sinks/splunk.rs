@@ -184,9 +184,8 @@ mod tests {
 }
 
 #[cfg(test)]
-mod tests {
-    #![cfg(feature = "splunk-integration-tests")]
-
+#[cfg(feature = "splunk-integration-tests")]
+mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         sinks,
