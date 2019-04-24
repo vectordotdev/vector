@@ -273,8 +273,9 @@ mod integration_tests {
             .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
+        let input = input.into_iter().map(|rec| serde_json::to_value(rec).unwrap()).collect::<Vec<_>>();
         for hit in response.into_hits() {
-            let record: Record = serde_json::from_value(hit.into_document().unwrap()).unwrap();
+            let record = hit.into_document().unwrap();
             assert!(input.contains(&record));
         }
     }

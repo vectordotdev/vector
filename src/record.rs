@@ -2,7 +2,7 @@ use self::proto::{record::Event, Log};
 use bytes::{Buf, Bytes, IntoBuf};
 use chrono::{SecondsFormat, Utc};
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -16,7 +16,7 @@ lazy_static! {
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(Serialize, PartialEq, Debug, Clone)]
 pub struct Record {
     #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
     pub structured: HashMap<Atom, Bytes>,
