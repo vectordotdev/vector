@@ -172,8 +172,8 @@ fn http(config: ValidatedConfig, acker: Acker) -> super::RouterSink {
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
-                "msg": String::from_utf8_lossy(&record.structured[&record::MESSAGE]),
-                "ts": String::from_utf8_lossy(&record.structured[&record::TIMESTAMP]),
+                "msg": record.structured[&record::MESSAGE].to_string_lossy(),
+                "ts": record.structured[&record::TIMESTAMP].to_string_lossy(),
                 "fields": record.structured,
             });
 

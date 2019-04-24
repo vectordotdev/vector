@@ -2,7 +2,6 @@ use super::util::{
     self, retries::FixedRetryPolicy, BatchServiceSink, Buffer, Compression, SinkExt,
 };
 use crate::buffers::Acker;
-use crate::bytes::BytesExt;
 use crate::record::{self, Record};
 use futures::{Future, Sink};
 use http::{Method, Uri};
@@ -83,15 +82,15 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> super::RouterSink {
             let host = record.structured.get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": String::from_utf8_lossy(&record.structured[&record::MESSAGE]),
+                "event": record.structured[&record::MESSAGE].to_string_lossy(),
                 "fields": record.structured
                     .into_iter()
-                    .map(|(k, v)| (k, v.as_utf8_lossy().into_owned()))
+                    .map(|(k, v)| (k, v.to_string_lossy()))
                     .collect::<HashMap<Atom, String>>(),
             });
 
             if let Some(host) = host {
-                let host = host.as_utf8_lossy();
+                let host = host.to_string_lossy();
                 body["host"] = json!(host);
             }
             let body = serde_json::to_vec(&body).unwrap();

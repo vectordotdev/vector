@@ -1,6 +1,5 @@
 use super::Transform;
 use crate::record::{self, Record};
-use bytes::Bytes;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
@@ -34,13 +33,13 @@ impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
         if let Some(captures) = self
             .regex
-            .captures(&record.structured[&record::MESSAGE].clone())
+            .captures(&record.structured[&record::MESSAGE].as_bytes().into_owned())
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
                     record
                         .structured
-                        .insert(name.into(), Bytes::from(capture.as_bytes()));
+                        .insert(name.into(), capture.as_bytes().into());
                 }
             }
         }
@@ -64,8 +63,8 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured[&"status".into()], "1234");
-        assert_eq!(record.structured[&"time".into()], "5678");
+        assert_eq!(record.structured[&"status".into()], "1234".into());
+        assert_eq!(record.structured[&"time".into()], "5678".into());
     }
 
     #[test]

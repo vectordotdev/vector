@@ -218,13 +218,13 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> super::Healthcheck {
 
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
-        let message = String::from_utf8_lossy(&record.structured[&record::MESSAGE]).into_owned();
+        let message = record.structured[&record::MESSAGE].to_string_lossy();
 
-        let timestamp = std::str::from_utf8(&record.structured[&record::TIMESTAMP][..])
-            .ok()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .unwrap()
-            .timestamp_millis();
+        let timestamp = chrono::DateTime::parse_from_rfc3339(
+            &record.structured[&record::TIMESTAMP].to_string_lossy(),
+        )
+        .unwrap()
+        .timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }

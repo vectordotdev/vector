@@ -111,7 +111,9 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> super::Source {
                     .map(Record::from)
                     .map(move |mut record| {
                         if let Some(host) = &host {
-                            record.structured.insert(record::HOST.clone(), host.clone());
+                            record
+                                .structured
+                                .insert(record::HOST.clone(), host.clone().into());
                         }
 
                         trace!(
@@ -144,7 +146,6 @@ mod test {
     use super::TcpConfig;
     use crate::record;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
-    use bytes::Bytes;
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -163,7 +164,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record.structured[&record::HOST], Bytes::from("127.0.0.1"));
+        assert_eq!(record.structured[&record::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -210,9 +211,12 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().structured[&record::MESSAGE], "short");
+        assert_eq!(record.unwrap().structured[&record::MESSAGE], "short".into());
 
         let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().structured[&record::MESSAGE], "more short");
+        assert_eq!(
+            record.unwrap().structured[&record::MESSAGE],
+            "more short".into()
+        );
     }
 }

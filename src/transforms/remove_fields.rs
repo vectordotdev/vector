@@ -40,7 +40,6 @@ impl Transform for RemoveFields {
 mod tests {
     use super::RemoveFields;
     use crate::{record::Record, transforms::Transform};
-    use bytes::Bytes;
 
     #[test]
     fn remove_fields() {
@@ -60,7 +59,7 @@ mod tests {
         assert!(!new_record.structured.contains_key(&"unknown".into()));
         assert_eq!(
             new_record.structured[&"to_keep".into()],
-            Bytes::from("another value")
+            "another value".into()
         );
     }
 }

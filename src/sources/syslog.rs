@@ -1,6 +1,5 @@
 use crate::record::{self, Record};
-use bytes::Bytes;
-use chrono::{SecondsFormat, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -178,7 +177,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
             let mut structured = HashMap::new();
-            structured.insert(record::MESSAGE.clone(), Bytes::from(line.as_bytes()));
+            structured.insert(record::MESSAGE.clone(), line.into());
             if let Some(host) = &parsed.hostname {
                 structured.insert("host".into(), host.clone().into());
             }
@@ -187,12 +186,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
                 .unwrap_or(Utc::now());
-            structured.insert(
-                record::TIMESTAMP.clone(),
-                timestamp
-                    .to_rfc3339_opts(SecondsFormat::Millis, true)
-                    .into(),
-            );
+            structured.insert(record::TIMESTAMP.clone(), timestamp.into());
 
             let record = Record {
                 structured,
@@ -213,6 +207,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
 mod test {
     use super::{record_from_str, SyslogConfig};
     use crate::record::{self, Record};
+    use chrono::TimeZone;
     use maplit::hashmap;
 
     #[test]
@@ -254,7 +249,7 @@ mod test {
         let mut expected = Record {
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
+                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
             },
             ..Default::default()
         };
@@ -276,7 +271,7 @@ mod test {
         let mut expected = Record {
             structured: hashmap! {
                 record::MESSAGE.clone() => cleaned.into(),
-                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
+                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
             },
             ..Default::default()
         };
@@ -295,7 +290,7 @@ mod test {
         let mut expected = Record {
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => "2019-02-13T19:48:34.000Z".into(),
+                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
             },
             ..Default::default()
         };
@@ -314,7 +309,7 @@ mod test {
         let mut expected = Record {
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => "2019-02-13T21:31:56.000Z".into(),
+                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
             },
             ..Default::default()
         };
@@ -333,7 +328,7 @@ mod test {
         let mut expected = Record {
             structured: hashmap! {
                 record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => "2019-02-13T21:53:30.000Z".into(),
+                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
             },
             ..Default::default()
         };

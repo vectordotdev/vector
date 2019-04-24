@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::record::{self, Record};
-use bytes::Bytes;
-use regex::RegexSet;
+use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -34,19 +33,16 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        let message = &record.structured[&record::MESSAGE][..];
+        let message = record.structured[&record::MESSAGE].to_string_lossy();
 
-        if let Ok(raw_line) = std::str::from_utf8(message) {
-            if self.pass_list.is_match(&raw_line) {
-                return Some(record);
-            }
+        if self.pass_list.is_match(&message) {
+            return Some(record);
         }
 
-        if seahash::hash(message) % self.rate == 0 {
-            record.structured.insert(
-                Atom::from("sample_rate"),
-                Bytes::from(self.rate.to_string()),
-            );
+        if seahash::hash(message.as_bytes()) % self.rate == 0 {
+            record
+                .structured
+                .insert(Atom::from("sample_rate"), self.rate.to_string().into());
 
             Some(record)
         } else {
@@ -125,26 +121,26 @@ mod tests {
         let passing = records
             .into_iter()
             .filter(|s| {
-                !std::str::from_utf8(&s.structured[&record::MESSAGE][..])
-                    .unwrap()
+                !s.structured[&record::MESSAGE]
+                    .to_string_lossy()
                     .contains("na")
             })
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "10");
+        assert_eq!(passing.structured[&Atom::from("sample_rate")], "10".into());
 
         let records = random_records(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
             .filter(|s| {
-                !std::str::from_utf8(&s.structured[&record::MESSAGE][..])
-                    .unwrap()
+                !s.structured[&record::MESSAGE]
+                    .to_string_lossy()
                     .contains("na")
             })
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "25");
+        assert_eq!(passing.structured[&Atom::from("sample_rate")], "25".into());
 
         // If the record passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());

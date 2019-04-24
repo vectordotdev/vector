@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::{bytes::BytesExt, Record};
+use crate::Record;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
@@ -165,7 +165,7 @@ impl Sink for PrometheusSink {
         for (field, counter) in &self.counters {
             if let Some(val) = record.structured.get(&field.key) {
                 if field.parse_value {
-                    let val = val.as_utf8_lossy();
+                    let val = val.to_string_lossy();
 
                     if let Ok(count) = val.parse() {
                         counter.inc_by(count);
@@ -183,7 +183,7 @@ impl Sink for PrometheusSink {
 
         for (field, gauge) in &self.gauges {
             if let Some(val) = record.structured.get(&field.key) {
-                let val = val.as_utf8_lossy();
+                let val = val.to_string_lossy();
 
                 if let Ok(count) = val.parse() {
                     gauge.add(count);
