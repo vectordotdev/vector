@@ -6,6 +6,9 @@ extern crate tokio_trace;
 #[macro_use]
 extern crate prost_derive;
 
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 pub mod buffers;
 pub mod bytes;
 pub mod metrics;
