@@ -1,5 +1,8 @@
-use crate::buffers::Acker;
-use crate::record::{self, Record};
+use crate::{
+    buffers::Acker,
+    record::{self, Record},
+    sinks::util::MetadataFuture,
+};
 use futures::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
@@ -14,15 +17,15 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct KafkaSinkConfig {
+pub struct KafkaSinkConfig {
     bootstrap_servers: Vec<String>,
     topic: String,
 }
 
-struct KafkaSink {
+pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
-    in_flight: FuturesUnordered<super::util::MetadataFuture<DeliveryFuture, usize>>,
+    in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
     seq_head: usize,
