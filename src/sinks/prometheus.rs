@@ -23,17 +23,17 @@ pub struct PrometheusSinkConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Counter {
-    key: Atom,
-    label: String,
-    doc: String,
-    parse_value: bool,
+    pub key: Atom,
+    pub label: String,
+    pub doc: String,
+    pub parse_value: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Gauge {
-    key: Atom,
-    label: String,
-    doc: String,
+    pub key: Atom,
+    pub label: String,
+    pub doc: String,
 }
 
 pub fn default_address() -> SocketAddr {
