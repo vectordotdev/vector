@@ -198,7 +198,7 @@ impl Sink for PrometheusSink {
                 let val = val.to_string_lossy();
 
                 if let Ok(count) = val.parse() {
-                    gauge.add(count);
+                    gauge.set(count);
                 } else {
                     warn!(
                         "Unable to parse value from field {} with value {}",
