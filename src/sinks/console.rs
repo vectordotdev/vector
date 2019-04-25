@@ -1,6 +1,6 @@
 use super::util::SinkExt;
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::record::{self, Record};
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
 use tokio::codec::{FramedWrite, LinesCodec};
@@ -37,7 +37,7 @@ impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
         let sink = FramedWrite::new(output, LinesCodec::new())
             .stream_ack(acker)
             .sink_map_err(|_| ())
-            .with(|record: Record| Ok(String::from_utf8_lossy(&record.raw[..]).into_owned()));
+            .with(|record: Record| Ok(record.structured[&record::MESSAGE].to_string_lossy()));
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }

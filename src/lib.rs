@@ -10,7 +10,6 @@ extern crate prost_derive;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
-pub mod bytes;
 pub mod metrics;
 pub mod record;
 pub mod region;

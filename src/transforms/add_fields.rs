@@ -43,7 +43,6 @@ impl Transform for AddFields {
 mod tests {
     use super::AddFields;
     use crate::{record::Record, transforms::Transform};
-    use bytes::Bytes;
     use indexmap::IndexMap;
     use string_cache::DefaultAtom as Atom;
 
@@ -60,6 +59,6 @@ mod tests {
         let kv = new_record.structured.get(&key);
 
         let val = "some_val".to_string();
-        assert_eq!(kv, Some(&Bytes::from(val)));
+        assert_eq!(kv, Some(&val.into()));
     }
 }

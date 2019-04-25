@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::record::Record;
+use crate::record::{self, Record};
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
@@ -45,10 +45,12 @@ impl Sink for BlackholeSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        self.total_records += 1;
-        self.total_raw_bytes += item.raw.len();
+        let message_len = item.structured[&record::MESSAGE].as_bytes().len();
 
-        trace!(raw_bytes_counter = item.raw.len(), records_counter = 1);
+        self.total_records += 1;
+        self.total_raw_bytes += message_len;
+
+        trace!(raw_bytes_counter = message_len, records_counter = 1);
 
         if self.total_records % self.config.print_amount == 0 {
             info!({

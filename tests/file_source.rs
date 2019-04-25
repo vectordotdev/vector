@@ -1,9 +1,11 @@
 use futures::{Future, Stream};
+use maplit::hashset;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
-use vector::bytes::BytesExt;
+use vector::record;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -45,18 +47,18 @@ fn happy_path() {
     let mut goodbye_i = 0;
 
     for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = record.structured[&record::MESSAGE].to_string_lossy();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
-                record.structured[&"file".into()].as_utf8_lossy(),
+                record.structured[&"file".into()].to_string_lossy(),
                 path1.to_str().unwrap()
             );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
             assert_eq!(
-                record.structured[&"file".into()].as_utf8_lossy(),
+                record.structured[&"file".into()].to_string_lossy(),
                 path2.to_str().unwrap()
             );
             goodbye_i += 1;
@@ -111,9 +113,12 @@ fn truncate() {
     let mut pre_trunc = true;
 
     for record in received {
-        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+        assert_eq!(
+            record.structured[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = record.structured[&record::MESSAGE].to_string_lossy();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -175,9 +180,12 @@ fn rotate() {
     let mut pre_rot = true;
 
     for record in received {
-        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+        assert_eq!(
+            record.structured[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = record.structured[&record::MESSAGE].to_string_lossy();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -237,7 +245,7 @@ fn multiple_paths() {
     let mut is = [0; 3];
 
     for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = record.structured[&record::MESSAGE].to_string_lossy();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
@@ -277,7 +285,10 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert_eq!(received.structured[&"file".into()], path.to_str().unwrap());
+        assert_eq!(
+            received.structured[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
     }
 
     // Custom
@@ -303,7 +314,7 @@ fn context_key() {
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
-            received.structured[&"source".into()],
+            received.structured[&"source".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
     }
@@ -330,7 +341,10 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert!(received.structured.is_empty());
+        assert_eq!(
+            received.structured.keys().cloned().collect::<HashSet<_>>(),
+            hashset![record::MESSAGE.clone(), record::TIMESTAMP.clone()]
+        );
     }
 
     drop(trigger);
@@ -366,7 +380,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| r.structured[&record::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -400,7 +414,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| r.structured[&record::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -474,19 +488,19 @@ fn start_position() {
             .iter()
             .filter(|r| {
                 r.structured[&"file".into()]
-                    .as_utf8_lossy()
+                    .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| r.structured[&record::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
             .filter(|r| {
                 r.structured[&"file".into()]
-                    .as_utf8_lossy()
+                    .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|r| r.structured[&record::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);
@@ -536,9 +550,16 @@ fn file_max_line_bytes() {
     drop(trigger);
     shutdown_on_idle(rt);
 
-    let received = rx.map(|r| r.raw).collect().wait().unwrap();
+    let received = rx
+        .map(|mut r| r.structured.remove(&record::MESSAGE).unwrap())
+        .collect()
+        .wait()
+        .unwrap();
 
-    assert_eq!(received, vec!["short", "exactly 10", "last short"]);
+    assert_eq!(
+        received,
+        vec!["short".into(), "exactly 10".into(), "last short".into()]
+    );
 }
 
 fn sleep() {

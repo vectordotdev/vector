@@ -1,6 +1,5 @@
 use crate::{
     buffers::Acker,
-    bytes::BytesExt,
     record::Record,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
@@ -141,7 +140,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
     if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
-        let val = val.as_utf8_lossy();
+        let val = val.to_string_lossy();
 
         doc.as_object_mut()
             .unwrap()
@@ -198,6 +197,7 @@ mod integration_tests {
     use super::ElasticSearchConfig;
     use crate::buffers::Acker;
     use crate::{
+        record,
         test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
         Record,
@@ -251,7 +251,7 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_record.timestamp,
+            "timestamp": input_record.structured[&record::TIMESTAMP],
         });
         assert_eq!(expected, value);
     }
@@ -288,8 +288,12 @@ mod integration_tests {
             .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
+        let input = input
+            .into_iter()
+            .map(|rec| serde_json::to_value(rec).unwrap())
+            .collect::<Vec<_>>();
         for hit in response.into_hits() {
-            let record: Record = serde_json::from_value(hit.into_document().unwrap()).unwrap();
+            let record = hit.into_document().unwrap();
             assert!(input.contains(&record));
         }
     }

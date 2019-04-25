@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    record::Record,
+    record::{self, Record},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
@@ -233,9 +233,13 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
-        let message = String::from_utf8_lossy(&record.raw[..]).into_owned();
+        let message = record.structured[&record::MESSAGE].to_string_lossy();
 
-        let timestamp = record.timestamp.timestamp_millis();
+        let timestamp = chrono::DateTime::parse_from_rfc3339(
+            &record.structured[&record::TIMESTAMP].to_string_lossy(),
+        )
+        .unwrap()
+        .timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }

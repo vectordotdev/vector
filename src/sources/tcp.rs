@@ -1,5 +1,5 @@
 use super::util::StreamExt as _;
-use crate::record::Record;
+use crate::record::{self, Record};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -118,7 +118,11 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
                     .take_until(tripwire)
                     .map(Record::from)
                     .map(move |mut record| {
-                        record.host = host.clone();
+                        if let Some(host) = &host {
+                            record
+                                .structured
+                                .insert(record::HOST.clone(), host.clone().into());
+                        }
 
                         trace!(
                             message = "Received one line.",
@@ -150,8 +154,8 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
 #[cfg(test)]
 mod test {
     use super::TcpConfig;
+    use crate::record;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
-    use bytes::Bytes;
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -170,7 +174,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record.host, Some(Bytes::from("127.0.0.1")));
+        assert_eq!(record.structured[&record::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -217,9 +221,12 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().raw, "short");
+        assert_eq!(record.unwrap().structured[&record::MESSAGE], "short".into());
 
         let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().raw, "more short");
+        assert_eq!(
+            record.unwrap().structured[&record::MESSAGE],
+            "more short".into()
+        );
     }
 }

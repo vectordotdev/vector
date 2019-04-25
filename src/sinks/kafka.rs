@@ -1,4 +1,8 @@
-use crate::{buffers::Acker, record::Record, sinks::util::MetadataFuture};
+use crate::{
+    buffers::Acker,
+    record::{self, Record},
+    sinks::util::MetadataFuture,
+};
 use futures::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
@@ -69,9 +73,19 @@ impl Sink for KafkaSink {
     type SinkItem = Record;
     type SinkError = ();
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+    fn start_send(
+        &mut self,
+        mut item: Self::SinkItem,
+    ) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
-        let record = FutureRecord::to(&topic).key(&()).payload(&item.raw[..]);
+
+        let bytes = item
+            .structured
+            .remove(&record::MESSAGE)
+            .unwrap()
+            .into_bytes();
+
+        let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 
         debug!(message = "sending record.", count = 1);
         let future = match self.producer.send_result(record) {

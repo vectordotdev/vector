@@ -1,7 +1,11 @@
 use futures::Future;
+use maplit::hashmap;
+use prost::Message;
 use tempfile::tempdir;
+use vector::record::{self, Record};
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, random_string, receive_lines, send_lines, shutdown_on_idle,
+    wait_for_tcp,
 };
 use vector::topology::{config, Topology};
 use vector::{buffers::BufferConfig, sinks, sources};
@@ -95,7 +99,24 @@ fn test_max_size() {
 
     let num_lines: usize = 1000;
     let line_size = 1000;
-    let max_size = num_lines * (line_size + 32/* protobuf encoding takes a few extra bytes */) / 2;
+
+    let proto_size = {
+        let example_record = Record {
+            structured: hashmap! {
+                "message".into() => random_string(line_size).into(),
+                "host".into() => "127.0.0.1".into(),
+                "timestamp".into() => "2019-01-01T00:00:00.000Z".into(),
+            },
+        };
+
+        let mut proto = vec![];
+        record::proto::Record::from(example_record)
+            .encode(&mut proto)
+            .unwrap();
+        proto.len()
+    };
+
+    let max_size = num_lines * proto_size / 2;
 
     let in_addr = next_addr();
     let out_addr = next_addr();

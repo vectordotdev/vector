@@ -1,13 +1,12 @@
 use crate::{
     buffers::Acker,
-    record::Record,
+    record::{self, Record},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
 };
-use chrono::SecondsFormat;
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::{
@@ -123,8 +122,8 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
-                "msg": String::from_utf8_lossy(&record.raw[..]),
-                "ts": record.timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+                "msg": record.structured[&record::MESSAGE].to_string_lossy(),
+                "ts": record.structured[&record::TIMESTAMP].to_string_lossy(),
                 "fields": record.structured,
             });
 

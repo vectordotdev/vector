@@ -1,8 +1,9 @@
 use self::proto::{record::Event, Log};
-use bytes::{Buf, Bytes, IntoBuf};
-use chrono::{offset::TimeZone, DateTime, Utc};
-use prost_types::Timestamp;
-use serde::{Deserialize, Serialize};
+use bytes::Bytes;
+use chrono::{DateTime, SecondsFormat, Utc};
+use lazy_static::lazy_static;
+use serde::{Serialize, Serializer};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -10,29 +11,102 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+lazy_static! {
+    pub static ref MESSAGE: Atom = Atom::from("message");
+    pub static ref HOST: Atom = Atom::from("host");
+    pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
+}
+
+#[derive(Serialize, PartialEq, Debug, Clone)]
+#[repr(transparent)]
+#[serde(transparent)]
 pub struct Record {
-    #[serde(rename = "message", serialize_with = "crate::bytes::serialize")]
-    pub raw: Bytes,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub host: Option<Bytes>,
-    pub timestamp: DateTime<Utc>,
-    #[serde(flatten, serialize_with = "crate::bytes::serialize_map")]
-    pub structured: HashMap<Atom, Bytes>,
+    pub structured: HashMap<Atom, Value>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Value {
+    Bytes(Bytes),
+    Timestamp(DateTime<Utc>),
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string_lossy())
+    }
+}
+
+impl From<Bytes> for Value {
+    fn from(bytes: Bytes) -> Self {
+        Value::Bytes(bytes)
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(bytes: &[u8]) -> Self {
+        Value::Bytes(bytes.into())
+    }
+}
+
+impl From<String> for Value {
+    fn from(string: String) -> Self {
+        Value::Bytes(string.into())
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::Bytes(s.into())
+    }
+}
+
+impl From<DateTime<Utc>> for Value {
+    fn from(timestamp: DateTime<Utc>) -> Self {
+        Value::Timestamp(timestamp)
+    }
+}
+
+impl Value {
+    // TODO: return Cow
+    pub fn to_string_lossy(&self) -> String {
+        match self {
+            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
+        }
+    }
+
+    pub fn as_bytes(&self) -> Cow<'_, [u8]> {
+        match self {
+            Value::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
+            Value::Timestamp(timestamp) => Cow::from(timestamp_to_string(timestamp).into_bytes()),
+        }
+    }
+
+    pub fn into_bytes(self) -> Bytes {
+        match self {
+            Value::Bytes(bytes) => bytes,
+            Value::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
+        }
+    }
+}
+
+fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
 impl Record {
+    // TODO: kill off in favor of serializer with configurable field
     pub fn to_string_lossy(&self) -> String {
-        String::from_utf8_lossy(&self.raw[..]).into_owned()
+        self.structured[&MESSAGE].to_string_lossy()
     }
 }
 
 impl Default for Record {
     fn default() -> Self {
         Record {
-            raw: Bytes::new(),
-            host: None,
-            timestamp: Utc::now(),
             structured: HashMap::new(),
         }
     }
@@ -44,31 +118,13 @@ impl From<proto::Record> for Record {
 
         match event {
             Event::Log(proto) => {
-                let raw = Bytes::from(proto.raw);
-
-                let host = if proto.host.len() > 0 {
-                    Some(Bytes::from(proto.host))
-                } else {
-                    None
-                };
-
-                let timestamp = proto
-                    .timestamp
-                    .map(|timestamp| Utc.timestamp(timestamp.seconds, timestamp.nanos as _))
-                    .unwrap_or_else(|| Utc::now());
-
                 let structured = proto
                     .structured
                     .into_iter()
-                    .map(|(k, v)| (Atom::from(k), Bytes::from(v)))
+                    .map(|(k, v)| (Atom::from(k), Bytes::from(v).into()))
                     .collect::<HashMap<_, _>>();
 
-                Record {
-                    raw,
-                    host,
-                    timestamp,
-                    structured,
-                }
+                Record { structured }
             }
         }
     }
@@ -76,46 +132,40 @@ impl From<proto::Record> for Record {
 
 impl From<Record> for proto::Record {
     fn from(record: Record) -> Self {
-        let raw = record.raw.into_iter().collect::<Vec<u8>>();
-
-        let host = record
-            .host
-            .map(|b| b.into_iter().collect::<Vec<u8>>())
-            .unwrap_or_else(|| Vec::new());
-
-        let timestamp = Some(Timestamp {
-            seconds: record.timestamp.timestamp(),
-            nanos: record.timestamp.timestamp_subsec_nanos() as _,
-        });
-
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v.into_buf().collect()))
+            .map(|(k, v)| (k.to_string(), v.as_bytes().into_owned()))
             .collect::<HashMap<_, _>>();
 
-        let event = Event::Log(Log {
-            raw,
-            host,
-            timestamp,
-            structured,
-        });
+        let event = Event::Log(Log { structured });
 
         proto::Record { event: Some(event) }
     }
 }
 
 impl From<Record> for Vec<u8> {
-    fn from(record: Record) -> Vec<u8> {
-        record.raw.into_iter().collect()
+    fn from(mut record: Record) -> Vec<u8> {
+        record
+            .structured
+            .remove(&MESSAGE)
+            .unwrap()
+            .as_bytes()
+            .into_owned()
     }
 }
 
 impl From<Bytes> for Record {
-    fn from(raw: Bytes) -> Self {
+    fn from(message: Bytes) -> Self {
+        let mut structured = HashMap::new();
+        structured.insert(MESSAGE.clone(), message.into());
+
+        let timestamp = Utc::now();
+
+        structured.insert(TIMESTAMP.clone(), timestamp.into());
+
         Record {
-            raw,
-            timestamp: Utc::now(),
+            structured,
             ..Default::default()
         }
     }
@@ -129,12 +179,7 @@ impl From<&str> for Record {
 
 impl From<String> for Record {
     fn from(line: String) -> Self {
-        let raw = Bytes::from(line);
-
-        Record {
-            raw,
-            ..Default::default()
-        }
+        Bytes::from(line).into()
     }
 }
 
@@ -153,7 +198,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": record.timestamp,
+            "timestamp": record.structured[&super::TIMESTAMP],
         });
         let actual = serde_json::to_value(record).unwrap();
         assert_eq!(expected, actual);
