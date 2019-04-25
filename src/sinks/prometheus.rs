@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -89,6 +90,10 @@ fn handle(
         }
     }
 
+    info!(
+        message = "request complete",
+        response_code = field::debug(response.status())
+    );
     Box::new(future::ok(response))
 }
 
@@ -137,7 +142,14 @@ impl PrometheusSink {
         let new_service = move || {
             let registry = Arc::clone(&registry);
 
-            service_fn(move |req| handle(req, &registry))
+            service_fn(move |req| {
+                info_span!(
+                    "prometheus_server",
+                    method = field::debug(req.method()),
+                    path = field::debug(req.uri().path()),
+                )
+                .enter(|| handle(req, &registry))
+            })
         };
 
         let (trigger, tripwire) = Tripwire::new();
