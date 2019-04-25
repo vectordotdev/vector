@@ -97,14 +97,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl Default for Record {
-    fn default() -> Self {
-        Record {
-            structured: HashMap::new(),
-        }
-    }
-}
-
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
         let event = proto.event.unwrap();
@@ -157,10 +149,7 @@ impl From<Bytes> for Record {
 
         structured.insert(TIMESTAMP.clone(), timestamp.into());
 
-        Record {
-            structured,
-            ..Default::default()
-        }
+        Record { structured }
     }
 }
 

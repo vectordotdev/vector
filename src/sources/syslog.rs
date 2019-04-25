@@ -188,10 +188,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
                 .unwrap_or(Utc::now());
             structured.insert(record::TIMESTAMP.clone(), timestamp.into());
 
-            let record = Record {
-                structured,
-                ..Default::default()
-            };
+            let record = Record { structured };
 
             trace!(
                 message = "processing one record.",
@@ -251,7 +248,6 @@ mod test {
                 record::MESSAGE.clone() => raw.into(),
                 record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
             },
-            ..Default::default()
         };
         expected
             .structured
@@ -273,7 +269,6 @@ mod test {
                 record::MESSAGE.clone() => cleaned.into(),
                 record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
             },
-            ..Default::default()
         };
         expected
             .structured
@@ -292,7 +287,6 @@ mod test {
                 record::MESSAGE.clone() => raw.into(),
                 record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
             },
-            ..Default::default()
         };
         expected
             .structured
@@ -311,7 +305,6 @@ mod test {
                 record::MESSAGE.clone() => raw.into(),
                 record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
             },
-            ..Default::default()
         };
         expected
             .structured
@@ -330,7 +323,6 @@ mod test {
                 record::MESSAGE.clone() => raw.into(),
                 record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
             },
-            ..Default::default()
         };
         expected
             .structured
