@@ -97,13 +97,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl Record {
-    // TODO: kill off in favor of serializer with configurable field
-    pub fn to_string_lossy(&self) -> String {
-        self.structured[&MESSAGE].to_string_lossy()
-    }
-}
-
 impl Default for Record {
     fn default() -> Self {
         Record {
