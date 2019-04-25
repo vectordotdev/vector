@@ -1,5 +1,4 @@
 use futures::Future;
-use maplit::hashmap;
 use prost::Message;
 use tempfile::tempdir;
 use vector::record::{self, Record};
@@ -101,13 +100,9 @@ fn test_max_size() {
     let line_size = 1000;
 
     let proto_size = {
-        let example_record = Record {
-            structured: hashmap! {
-                "message".into() => random_string(line_size).into(),
-                "host".into() => "127.0.0.1".into(),
-                "timestamp".into() => "2019-01-01T00:00:00.000Z".into(),
-            },
-        };
+        let mut example_record = Record::from(random_string(line_size));
+        example_record.insert("host".into(), "127.0.0.1".into());
+        example_record.insert("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
         record::proto::Record::from(example_record)

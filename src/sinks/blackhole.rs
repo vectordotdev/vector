@@ -45,7 +45,7 @@ impl Sink for BlackholeSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message_len = item.structured[&record::MESSAGE].as_bytes().len();
+        let message_len = item[&record::MESSAGE].as_bytes().len();
 
         self.total_records += 1;
         self.total_raw_bytes += message_len;

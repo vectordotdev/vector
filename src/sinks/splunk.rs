@@ -14,7 +14,6 @@ use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
@@ -109,14 +108,11 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Record| {
-            let host = record.structured.get(&host_field).map(|h| h.clone());
+            let host = record.get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": record.structured[&record::MESSAGE].to_string_lossy(),
-                "fields": record.structured
-                    .into_iter()
-                    .map(|(k, v)| (k, v.to_string_lossy()))
-                    .collect::<HashMap<Atom, String>>(),
+                "event": record[&record::MESSAGE].to_string_lossy(),
+                "fields": record,
             });
 
             if let Some(host) = host {
@@ -267,7 +263,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.structured.insert("asdf".into(), "hello".into());
+        record.insert("asdf".into(), "hello".into());
 
         let pump = sink.send(record);
 
@@ -297,10 +293,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.structured.insert("asdf".into(), "hello".into());
-        record
-            .structured
-            .insert("host".into(), "example.com:1234".into());
+        record.insert("asdf".into(), "hello".into());
+        record.insert("host".into(), "example.com:1234".into());
 
         let pump = sink.send(record);
 
@@ -336,13 +330,9 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.structured.insert("asdf".into(), "hello".into());
-        record
-            .structured
-            .insert("host".into(), "example.com:1234".into());
-        record
-            .structured
-            .insert("roast".into(), "beef.example.com:1234".into());
+        record.insert("asdf".into(), "hello".into());
+        record.insert("host".into(), "example.com:1234".into());
+        record.insert("roast".into(), "beef.example.com:1234".into());
 
         let pump = sink.send(record);
 

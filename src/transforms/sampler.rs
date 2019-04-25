@@ -33,16 +33,14 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut record: Record) -> Option<Record> {
-        let message = record.structured[&record::MESSAGE].to_string_lossy();
+        let message = record[&record::MESSAGE].to_string_lossy();
 
         if self.pass_list.is_match(&message) {
             return Some(record);
         }
 
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
-            record
-                .structured
-                .insert(Atom::from("sample_rate"), self.rate.to_string().into());
+            record.insert(Atom::from("sample_rate"), self.rate.to_string().into());
 
             Some(record)
         } else {
@@ -120,33 +118,25 @@ mod tests {
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| {
-                !s.structured[&record::MESSAGE]
-                    .to_string_lossy()
-                    .contains("na")
-            })
+            .filter(|s| !s[&record::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "10".into());
+        assert_eq!(passing[&Atom::from("sample_rate")], "10".into());
 
         let records = random_records(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| {
-                !s.structured[&record::MESSAGE]
-                    .to_string_lossy()
-                    .contains("na")
-            })
+            .filter(|s| !s[&record::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "25".into());
+        assert_eq!(passing[&Atom::from("sample_rate")], "25".into());
 
         // If the record passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let record = Record::from("nananana");
         let passing = sampler.transform(record).unwrap();
-        assert!(!passing.structured.contains_key(&Atom::from("sample_rate")));
+        assert!(passing.get(&Atom::from("sample_rate")).is_none());
     }
 
     fn random_records(n: usize) -> Vec<Record> {

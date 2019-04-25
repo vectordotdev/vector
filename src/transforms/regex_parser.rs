@@ -33,13 +33,11 @@ impl Transform for RegexParser {
     fn transform(&self, mut record: Record) -> Option<Record> {
         if let Some(captures) = self
             .regex
-            .captures(&record.structured[&record::MESSAGE].as_bytes().into_owned())
+            .captures(&record[&record::MESSAGE].as_bytes().into_owned())
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    record
-                        .structured
-                        .insert(name.into(), capture.as_bytes().into());
+                    record.insert(name.into(), capture.as_bytes().into());
                 }
             }
         }
@@ -63,8 +61,8 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured[&"status".into()], "1234".into());
-        assert_eq!(record.structured[&"time".into()], "5678".into());
+        assert_eq!(record[&"status".into()], "1234".into());
+        assert_eq!(record[&"time".into()], "5678".into());
     }
 
     #[test]
@@ -74,6 +72,6 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.structured.get(&"status".into()), None);
+        assert_eq!(record.get(&"status".into()), None);
     }
 }

@@ -122,12 +122,12 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |record: Record| {
             let mut body = json!({
-                "msg": record.structured[&record::MESSAGE].to_string_lossy(),
-                "ts": record.structured[&record::TIMESTAMP].to_string_lossy(),
-                "fields": record.structured,
+                "msg": record[&record::MESSAGE].to_string_lossy(),
+                "ts": record[&record::TIMESTAMP].to_string_lossy(),
+                "fields": record,
             });
 
-            if let Some(host) = record.structured.get(&Atom::from("host")) {
+            if let Some(host) = record.get(&Atom::from("host")) {
                 body["host"] = json!(host);
             }
             let mut body = serde_json::to_vec(&body).unwrap();

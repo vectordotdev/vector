@@ -21,7 +21,37 @@ lazy_static! {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct Record {
-    pub structured: HashMap<Atom, Value>,
+    structured: HashMap<Atom, Value>,
+}
+
+impl std::ops::Index<&Atom> for Record {
+    type Output = Value;
+
+    fn index(&self, key: &Atom) -> &Value {
+        &self.structured[key]
+    }
+}
+
+impl Record {
+    pub fn get(&self, key: &Atom) -> Option<&Value> {
+        self.structured.get(key)
+    }
+
+    pub fn into_value(mut self, key: &Atom) -> Option<Value> {
+        self.structured.remove(key)
+    }
+
+    pub fn insert(&mut self, key: Atom, value: Value) {
+        self.structured.insert(key, value);
+    }
+
+    pub fn remove(&mut self, key: &Atom) {
+        self.structured.remove(key);
+    }
+
+    pub fn keys<'a>(&'a self) -> std::collections::hash_map::Keys<'a, Atom, Value> {
+        self.structured.keys()
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
