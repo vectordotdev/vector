@@ -1,5 +1,4 @@
 use futures::{Future, Stream};
-use maplit::hashset;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Seek, Write};
@@ -343,7 +342,9 @@ fn context_key() {
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
             received.keys().cloned().collect::<HashSet<_>>(),
-            hashset![record::MESSAGE.clone(), record::TIMESTAMP.clone()]
+            vec![record::MESSAGE.clone(), record::TIMESTAMP.clone()]
+                .into_iter()
+                .collect::<HashSet<_>>()
         );
     }
 
