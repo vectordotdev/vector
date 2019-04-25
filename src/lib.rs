@@ -7,7 +7,6 @@ extern crate tokio_trace;
 extern crate prost_derive;
 
 pub mod buffers;
-pub mod bytes;
 pub mod metrics;
 pub mod record;
 pub mod sinks;
