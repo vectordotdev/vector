@@ -263,7 +263,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
+        record.insert_explicit("asdf".into(), "hello".into());
 
         let pump = sink.send(record);
 
@@ -293,8 +293,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
-        record.insert("host".into(), "example.com:1234".into());
+        record.insert_explicit("asdf".into(), "hello".into());
+        record.insert_implicit("host".into(), "example.com:1234".into());
 
         let pump = sink.send(record);
 
@@ -330,9 +330,9 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
-        record.insert("host".into(), "example.com:1234".into());
-        record.insert("roast".into(), "beef.example.com:1234".into());
+        record.insert_explicit("asdf".into(), "hello".into());
+        record.insert_implicit("host".into(), "example.com:1234".into());
+        record.insert_explicit("roast".into(), "beef.example.com:1234".into());
 
         let pump = sink.send(record);
 

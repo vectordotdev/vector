@@ -119,7 +119,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
                     .map(Record::from)
                     .map(move |mut record| {
                         if let Some(host) = &host {
-                            record.insert(record::HOST.clone(), host.clone().into());
+                            record.insert_implicit(record::HOST.clone(), host.clone().into());
                         }
 
                         trace!(

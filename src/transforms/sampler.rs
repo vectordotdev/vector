@@ -40,7 +40,7 @@ impl Transform for Sampler {
         }
 
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
-            record.insert(Atom::from("sample_rate"), self.rate.to_string().into());
+            record.insert_implicit(Atom::from("sample_rate"), self.rate.to_string().into());
 
             Some(record)
         } else {

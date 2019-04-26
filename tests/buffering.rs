@@ -101,8 +101,8 @@ fn test_max_size() {
 
     let proto_size = {
         let mut example_record = Record::from(random_string(line_size));
-        example_record.insert("host".into(), "127.0.0.1".into());
-        example_record.insert("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
+        example_record.insert_implicit("host".into(), "127.0.0.1".into());
+        example_record.insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
         record::proto::Record::from(example_record)

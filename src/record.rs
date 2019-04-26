@@ -21,27 +21,43 @@ lazy_static! {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct Record {
-    structured: HashMap<Atom, Value>,
+    structured: HashMap<Atom, OuterValue>,
 }
 
 impl Record {
     pub fn get(&self, key: &Atom) -> Option<&Value> {
-        self.structured.get(key)
+        self.structured.get(key).map(|v| &v.value)
     }
 
     pub fn into_value(mut self, key: &Atom) -> Option<Value> {
-        self.structured.remove(key)
+        self.structured.remove(key).map(|v| v.value)
     }
 
-    pub fn insert(&mut self, key: Atom, value: Value) {
-        self.structured.insert(key, value);
+    pub fn insert_explicit(&mut self, key: Atom, value: Value) {
+        self.structured.insert(
+            key,
+            OuterValue {
+                value,
+                explicit: true,
+            },
+        );
+    }
+
+    pub fn insert_implicit(&mut self, key: Atom, value: Value) {
+        self.structured.insert(
+            key,
+            OuterValue {
+                value,
+                explicit: false,
+            },
+        );
     }
 
     pub fn remove(&mut self, key: &Atom) {
         self.structured.remove(key);
     }
 
-    pub fn keys<'a>(&'a self) -> std::collections::hash_map::Keys<'a, Atom, Value> {
+    pub fn keys(&self) -> impl Iterator<Item = &Atom> {
         self.structured.keys()
     }
 }
@@ -50,7 +66,22 @@ impl std::ops::Index<&Atom> for Record {
     type Output = Value;
 
     fn index(&self, key: &Atom) -> &Value {
-        &self.structured[key]
+        &self.structured[key].value
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct OuterValue {
+    value: Value,
+    explicit: bool,
+}
+
+impl Serialize for OuterValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
     }
 }
 
@@ -72,6 +103,12 @@ impl Serialize for Value {
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
         Value::Bytes(bytes)
+    }
+}
+
+impl From<Vec<u8>> for Value {
+    fn from(bytes: Vec<u8>) -> Self {
+        Value::Bytes(bytes.into())
     }
 }
 
@@ -136,7 +173,13 @@ impl From<proto::Record> for Record {
                 let structured = proto
                     .structured
                     .into_iter()
-                    .map(|(k, v)| (Atom::from(k), Bytes::from(v).into()))
+                    .map(|(k, v)| {
+                        let value = OuterValue {
+                            value: v.data.into(),
+                            explicit: v.explicit,
+                        };
+                        (Atom::from(k), value)
+                    })
                     .collect::<HashMap<_, _>>();
 
                 Record { structured }
@@ -150,7 +193,13 @@ impl From<Record> for proto::Record {
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v.as_bytes().into_owned()))
+            .map(|(k, v)| {
+                let value = proto::Value {
+                    data: v.value.as_bytes().into_owned(),
+                    explicit: v.explicit,
+                };
+                (k.to_string(), value)
+            })
             .collect::<HashMap<_, _>>();
 
         let event = Event::Log(Log { structured });
@@ -165,6 +214,7 @@ impl From<Record> for Vec<u8> {
             .structured
             .remove(&MESSAGE)
             .unwrap()
+            .value
             .as_bytes()
             .into_owned()
     }
@@ -172,14 +222,14 @@ impl From<Record> for Vec<u8> {
 
 impl From<Bytes> for Record {
     fn from(message: Bytes) -> Self {
-        let mut structured = HashMap::new();
-        structured.insert(MESSAGE.clone(), message.into());
+        let mut record = Record {
+            structured: HashMap::new(),
+        };
 
-        let timestamp = Utc::now();
+        record.insert_implicit(MESSAGE.clone(), message.into());
+        record.insert_implicit(TIMESTAMP.clone(), Utc::now().into());
 
-        structured.insert(TIMESTAMP.clone(), timestamp.into());
-
-        Record { structured }
+        record
     }
 }
 
@@ -203,8 +253,8 @@ mod test {
     #[test]
     fn serialization() {
         let mut record = Record::from("raw log line");
-        record.structured.insert("foo".into(), "bar".into());
-        record.structured.insert("bar".into(), "baz".into());
+        record.insert_explicit("foo".into(), "bar".into());
+        record.insert_explicit("bar".into(), "baz".into());
 
         let expected = serde_json::json!({
             "message": "raw log line",
