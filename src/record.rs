@@ -17,9 +17,8 @@ lazy_static! {
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
 }
 
-#[derive(Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[repr(transparent)]
-#[serde(transparent)]
 pub struct Record {
     structured: HashMap<Atom, OuterValue>,
 }
@@ -311,17 +310,26 @@ mod test {
         record.insert_explicit("foo".into(), "bar".into());
         record.insert_explicit("bar".into(), "baz".into());
 
-        let expected = serde_json::json!({
+        let expected_all = serde_json::json!({
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
             "timestamp": record.structured[&super::TIMESTAMP],
         });
-        let actual = serde_json::to_value(record).unwrap();
-        assert_eq!(expected, actual);
+
+        let expected_explicit = serde_json::json!({
+            "foo": "bar",
+            "bar": "baz",
+        });
+
+        let actual_all = serde_json::to_value(record.all_fields()).unwrap();
+        assert_eq!(expected_all, actual_all);
+
+        let actual_explicit = serde_json::to_value(record.explicit_fields()).unwrap();
+        assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
-        assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
+        assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
     }
 
     #[test]
