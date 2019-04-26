@@ -3,7 +3,9 @@ use crate::buffers;
 use futures::prelude::*;
 use futures::{sync::mpsc, Future};
 use std::collections::HashMap;
+use std::time::Duration;
 use stream_cancel::{Trigger, Tripwire};
+use tokio::util::FutureExt;
 use tokio_trace_futures::Instrument;
 
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
@@ -107,6 +109,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let task: Task = Box::new(task);
 
         let healthcheck_task = healthcheck
+            .timeout(Duration::from_secs(10))
             .map(move |_| info!("Healthcheck: Passed."))
             .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
         let healthcheck_span = info_span!("healthcheck", name = name.as_str());
