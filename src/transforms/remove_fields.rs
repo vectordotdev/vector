@@ -29,7 +29,7 @@ impl RemoveFields {
 impl Transform for RemoveFields {
     fn transform(&self, mut record: Record) -> Option<Record> {
         for field in &self.fields {
-            record.structured.remove(field);
+            record.remove(field);
         }
 
         Some(record)
@@ -44,22 +44,15 @@ mod tests {
     #[test]
     fn remove_fields() {
         let mut record = Record::from("message");
-        record
-            .structured
-            .insert("to_remove".into(), "some value".into());
-        record
-            .structured
-            .insert("to_keep".into(), "another value".into());
+        record.insert("to_remove".into(), "some value".into());
+        record.insert("to_keep".into(), "another value".into());
 
         let transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 
         let new_record = transform.transform(record).unwrap();
 
-        assert!(!new_record.structured.contains_key(&"to_remove".into()));
-        assert!(!new_record.structured.contains_key(&"unknown".into()));
-        assert_eq!(
-            new_record.structured[&"to_keep".into()],
-            "another value".into()
-        );
+        assert!(new_record.get(&"to_remove".into()).is_none());
+        assert!(new_record.get(&"unknown".into()).is_none());
+        assert_eq!(new_record[&"to_keep".into()], "another value".into());
     }
 }

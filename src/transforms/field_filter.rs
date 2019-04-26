@@ -37,7 +37,6 @@ impl FieldFilter {
 impl Transform for FieldFilter {
     fn transform(&self, record: Record) -> Option<Record> {
         if record
-            .structured
             .get(&self.field_name)
             .map(|f| f.as_bytes())
             .map_or(false, |b| b == self.value.as_bytes())

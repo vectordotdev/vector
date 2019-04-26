@@ -37,7 +37,7 @@ impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
         let sink = FramedWrite::new(output, LinesCodec::new())
             .stream_ack(acker)
             .sink_map_err(|_| ())
-            .with(|record: Record| Ok(record.structured[&record::MESSAGE].to_string_lossy()));
+            .with(|record: Record| Ok(record[&record::MESSAGE].to_string_lossy()));
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
     }

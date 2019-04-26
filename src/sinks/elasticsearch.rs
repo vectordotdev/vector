@@ -139,7 +139,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
-    if let Some(val) = key.and_then(|k| record.structured.get(&k.as_ref().into())) {
+    if let Some(val) = key.and_then(|k| record.get(&k.as_ref().into())) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -158,7 +158,7 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.structured.insert("foo".into(), "bar".into());
+        record.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -170,7 +170,7 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.structured.insert("not_foo".into(), "bar".into());
+        record.insert("not_foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -182,7 +182,7 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut record = Record::from("butts");
-        record.structured.insert("foo".into(), "bar".into());
+        record.insert("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -222,8 +222,8 @@ mod integration_tests {
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
         let mut input_record = Record::from("raw log line");
-        input_record.structured.insert("my_id".into(), "42".into());
-        input_record.structured.insert("foo".into(), "bar".into());
+        input_record.insert("my_id".into(), "42".into());
+        input_record.insert("foo".into(), "bar".into());
 
         let pump = sink.send(input_record.clone());
         block_on(pump).unwrap();
@@ -251,7 +251,7 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_record.structured[&record::TIMESTAMP],
+            "timestamp": input_record[&record::TIMESTAMP],
         });
         assert_eq!(expected, value);
     }

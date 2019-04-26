@@ -56,6 +56,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::record;
     use futures::sync::mpsc;
     use futures::Async::*;
     use std::io::Cursor;
@@ -77,14 +78,14 @@ mod tests {
         assert!(record.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            record.map(|r| r.map(|r| r.to_string_lossy()))
+            record.map(|r| r.map(|r| r[&record::MESSAGE].to_string_lossy()))
         );
 
         let record = rx.poll().unwrap();
         assert!(record.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            record.map(|r| r.map(|r| r.to_string_lossy()))
+            record.map(|r| r.map(|r| r[&record::MESSAGE].to_string_lossy()))
         );
 
         let record = rx.poll().unwrap();

@@ -172,13 +172,7 @@ pub fn raw_tcp(addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(|mut record: Record| {
-                Ok(record
-                    .structured
-                    .remove(&record::MESSAGE)
-                    .unwrap()
-                    .into_bytes())
-            }),
+            .with(|record: Record| Ok(record.into_value(&record::MESSAGE).unwrap().into_bytes())),
     )
 }
 

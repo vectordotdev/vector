@@ -119,9 +119,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
                     .map(Record::from)
                     .map(move |mut record| {
                         if let Some(host) = &host {
-                            record
-                                .structured
-                                .insert(record::HOST.clone(), host.clone().into());
+                            record.insert(record::HOST.clone(), host.clone().into());
                         }
 
                         trace!(
@@ -174,7 +172,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record.structured[&record::HOST], "127.0.0.1".into());
+        assert_eq!(record[&record::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -221,12 +219,9 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap().structured[&record::MESSAGE], "short".into());
+        assert_eq!(record.unwrap()[&record::MESSAGE], "short".into());
 
         let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(
-            record.unwrap().structured[&record::MESSAGE],
-            "more short".into()
-        );
+        assert_eq!(record.unwrap()[&record::MESSAGE], "more short".into());
     }
 }

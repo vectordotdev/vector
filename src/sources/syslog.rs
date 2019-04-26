@@ -3,7 +3,6 @@ use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::{
     self,
@@ -176,22 +175,17 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
-            let mut structured = HashMap::new();
-            structured.insert(record::MESSAGE.clone(), line.into());
+            let mut record = Record::from(line);
+
             if let Some(host) = &parsed.hostname {
-                structured.insert("host".into(), host.clone().into());
+                record.insert("host".into(), host.clone().into());
             }
 
             let timestamp = parsed
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
                 .unwrap_or(Utc::now());
-            structured.insert(record::TIMESTAMP.clone(), timestamp.into());
-
-            let record = Record {
-                structured,
-                ..Default::default()
-            };
+            record.insert(record::TIMESTAMP.clone(), timestamp.into());
 
             trace!(
                 message = "processing one record.",
@@ -208,7 +202,6 @@ mod test {
     use super::{record_from_str, SyslogConfig};
     use crate::record::{self, Record};
     use chrono::TimeZone;
-    use maplit::hashmap;
 
     #[test]
     fn config() {
@@ -246,16 +239,12 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let raw = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record {
-            structured: hashmap! {
-                record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
-            },
-            ..Default::default()
-        };
-        expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+        let mut expected = Record::from(raw);
+        expected.insert(
+            record::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+        );
+        expected.insert("host".into(), "74794bfb6795".into());
 
         assert_eq!(expected, record_from_str(raw).unwrap());
     }
@@ -268,16 +257,12 @@ mod test {
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record {
-            structured: hashmap! {
-                record::MESSAGE.clone() => cleaned.into(),
-                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
-            },
-            ..Default::default()
-        };
-        expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+        let mut expected = Record::from(cleaned);
+        expected.insert(
+            record::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+        );
+        expected.insert("host".into(), "74794bfb6795".into());
 
         assert_eq!(expected, record_from_str(raw).unwrap());
     }
@@ -287,16 +272,12 @@ mod test {
     fn syslog_ng_default_network() {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
-        let mut expected = Record {
-            structured: hashmap! {
-                record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
-            },
-            ..Default::default()
-        };
-        expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+        let mut expected = Record::from(raw);
+        expected.insert(
+            record::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
+        );
+        expected.insert("host".into(), "74794bfb6795".into());
 
         assert_eq!(expected, record_from_str(raw).unwrap());
     }
@@ -306,16 +287,12 @@ mod test {
     fn rsyslog_omfwd_tcp_default() {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record {
-            structured: hashmap! {
-                record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
-            },
-            ..Default::default()
-        };
-        expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+        let mut expected = Record::from(raw);
+        expected.insert(
+            record::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
+        );
+        expected.insert("host".into(), "74794bfb6795".into());
 
         assert_eq!(expected, record_from_str(raw).unwrap());
     }
@@ -325,16 +302,12 @@ mod test {
     fn rsyslog_omfwd_tcp_forward_format() {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record {
-            structured: hashmap! {
-                record::MESSAGE.clone() => raw.into(),
-                record::TIMESTAMP.clone() => chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
-            },
-            ..Default::default()
-        };
-        expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+        let mut expected = Record::from(raw);
+        expected.insert(
+            record::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
+        );
+        expected.insert("host".into(), "74794bfb6795".into());
 
         assert_eq!(expected, record_from_str(raw).unwrap());
     }

@@ -21,7 +21,37 @@ lazy_static! {
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct Record {
-    pub structured: HashMap<Atom, Value>,
+    structured: HashMap<Atom, Value>,
+}
+
+impl Record {
+    pub fn get(&self, key: &Atom) -> Option<&Value> {
+        self.structured.get(key)
+    }
+
+    pub fn into_value(mut self, key: &Atom) -> Option<Value> {
+        self.structured.remove(key)
+    }
+
+    pub fn insert(&mut self, key: Atom, value: Value) {
+        self.structured.insert(key, value);
+    }
+
+    pub fn remove(&mut self, key: &Atom) {
+        self.structured.remove(key);
+    }
+
+    pub fn keys<'a>(&'a self) -> std::collections::hash_map::Keys<'a, Atom, Value> {
+        self.structured.keys()
+    }
+}
+
+impl std::ops::Index<&Atom> for Record {
+    type Output = Value;
+
+    fn index(&self, key: &Atom) -> &Value {
+        &self.structured[key]
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -97,21 +127,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl Record {
-    // TODO: kill off in favor of serializer with configurable field
-    pub fn to_string_lossy(&self) -> String {
-        self.structured[&MESSAGE].to_string_lossy()
-    }
-}
-
-impl Default for Record {
-    fn default() -> Self {
-        Record {
-            structured: HashMap::new(),
-        }
-    }
-}
-
 impl From<proto::Record> for Record {
     fn from(proto: proto::Record) -> Self {
         let event = proto.event.unwrap();
@@ -164,10 +179,7 @@ impl From<Bytes> for Record {
 
         structured.insert(TIMESTAMP.clone(), timestamp.into());
 
-        Record {
-            structured,
-            ..Default::default()
-        }
+        Record { structured }
     }
 }
 

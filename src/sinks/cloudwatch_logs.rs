@@ -233,13 +233,12 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 
 impl From<Record> for InputLogEvent {
     fn from(record: Record) -> InputLogEvent {
-        let message = record.structured[&record::MESSAGE].to_string_lossy();
+        let message = record[&record::MESSAGE].to_string_lossy();
 
-        let timestamp = chrono::DateTime::parse_from_rfc3339(
-            &record.structured[&record::TIMESTAMP].to_string_lossy(),
-        )
-        .unwrap()
-        .timestamp_millis();
+        let timestamp =
+            chrono::DateTime::parse_from_rfc3339(&record[&record::TIMESTAMP].to_string_lossy())
+                .unwrap()
+                .timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }
