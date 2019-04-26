@@ -25,6 +25,12 @@ pub struct Record {
 }
 
 impl Record {
+    pub fn new_empty() -> Self {
+        Self {
+            structured: HashMap::new(),
+        }
+    }
+
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         self.structured.get(key).map(|v| &v.value)
     }
@@ -59,6 +65,20 @@ impl Record {
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
         self.structured.keys()
+    }
+
+    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: false,
+        }
+    }
+
+    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: true,
+        }
     }
 }
 
@@ -245,10 +265,45 @@ impl From<String> for Record {
     }
 }
 
+#[derive(Clone)]
+pub struct FieldsIter<'a> {
+    inner: std::collections::hash_map::Iter<'a, Atom, OuterValue>,
+    explicit_only: bool,
+}
+
+impl<'a> Iterator for FieldsIter<'a> {
+    type Item = (&'a Atom, &'a Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (key, value) = match self.inner.next() {
+                Some(next) => next,
+                None => return None,
+            };
+
+            if self.explicit_only && !value.explicit {
+                continue;
+            }
+
+            return Some((key, &value.value));
+        }
+    }
+}
+
+impl<'a> Serialize for FieldsIter<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_map(self.clone())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Record;
     use regex::Regex;
+    use std::collections::HashSet;
 
     #[test]
     fn serialization() {
@@ -267,5 +322,50 @@ mod test {
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
         assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
+    }
+
+    #[test]
+    fn record_iteration() {
+        let mut record = Record::new_empty();
+
+        record.insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
+        record.insert_implicit(
+            "Pitbull".into(),
+            "The bigger they are, the harder they fall".into(),
+        );
+
+        let all = record
+            .all_fields()
+            .map(|(k, v)| (k, v.to_string_lossy()))
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            all,
+            vec![
+                (
+                    &"Ke$ha".into(),
+                    "It's going down, I'm yelling timber".to_string()
+                ),
+                (
+                    &"Pitbull".into(),
+                    "The bigger they are, the harder they fall".to_string()
+                ),
+            ]
+            .into_iter()
+            .collect::<HashSet<_>>()
+        );
+
+        let explicit_only = record
+            .explicit_fields()
+            .map(|(k, v)| (k, v.to_string_lossy()))
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            explicit_only,
+            vec![(
+                &"Ke$ha".into(),
+                "It's going down, I'm yelling timber".to_string()
+            ),]
+            .into_iter()
+            .collect::<HashSet<_>>()
+        );
     }
 }
