@@ -24,14 +24,6 @@ pub struct Record {
     structured: HashMap<Atom, Value>,
 }
 
-impl std::ops::Index<&Atom> for Record {
-    type Output = Value;
-
-    fn index(&self, key: &Atom) -> &Value {
-        &self.structured[key]
-    }
-}
-
 impl Record {
     pub fn get(&self, key: &Atom) -> Option<&Value> {
         self.structured.get(key)
@@ -51,6 +43,14 @@ impl Record {
 
     pub fn keys<'a>(&'a self) -> std::collections::hash_map::Keys<'a, Atom, Value> {
         self.structured.keys()
+    }
+}
+
+impl std::ops::Index<&Atom> for Record {
+    type Output = Value;
+
+    fn index(&self, key: &Atom) -> &Value {
+        &self.structured[key]
     }
 }
 
