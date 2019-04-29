@@ -86,12 +86,11 @@ impl S3Sink {
         };
 
         let svc = ServiceBuilder::new()
-            .in_flight_limit(in_flight_limit)
+            .concurrency_limit(in_flight_limit)
             .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
             .retry(policy)
             .timeout(Duration::from_secs(timeout))
-            .service(s3)
-            .expect("This is a bug, no spawnning");
+            .service(s3);
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(
