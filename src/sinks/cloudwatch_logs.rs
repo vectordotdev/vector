@@ -64,11 +64,10 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
 
         let svc = ServiceBuilder::new()
-            .in_flight_limit(in_flight_limit)
+            .concurrency_limit(in_flight_limit)
             .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
             .timeout(Duration::from_secs(timeout))
-            .service(cloudwatch)
-            .expect("This is a bug, no service spawning");
+            .service(cloudwatch);
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker).batched(Vec::new(), self.buffer_size);

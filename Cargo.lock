@@ -2913,130 +2913,80 @@ dependencies = [
 [[package]]
 name = "tower"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-balance 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-buffer 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-discover 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-filter 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-in-flight-limit 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-load-shed 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-rate-limit 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-reconnect 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-retry 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-buffer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-discover 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-limit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-load-shed 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-retry 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-timeout 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-util 0.1.0 (git+https://github.com/tower-rs/tower)",
-]
-
-[[package]]
-name = "tower-balance"
-version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
-dependencies = [
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-discover 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-util 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-timeout 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-util 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-buffer"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-executor 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-sync 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-discover"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tower-filter"
-version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
-dependencies = [
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tower-in-flight-limit"
-version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
-dependencies = [
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-sync 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-layer"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tower-limit"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-sync 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-load-shed"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tower-rate-limit"
-version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
-dependencies = [
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tower-reconnect"
-version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
-dependencies = [
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-util 0.1.0 (git+https://github.com/tower-rs/tower)",
 ]
 
 [[package]]
 name = "tower-retry"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -3051,22 +3001,22 @@ dependencies = [
 [[package]]
 name = "tower-timeout"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-timer 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tower-util"
 version = "0.1.0"
-source = "git+https://github.com/tower-rs/tower#5ed014fc3769dbfa01e5cb27f9c9b7dc96f232fe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -3282,7 +3232,7 @@ dependencies = [
  "tokio-trace-futures 0.0.1 (git+https://github.com/tokio-rs/tokio-trace-nursery)",
  "tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower 0.1.0 (git+https://github.com/tower-rs/tower)",
+ "tower 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "trace-metrics 0.1.0",
  "typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3725,20 +3675,16 @@ dependencies = [
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
 "checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
-"checksum tower 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-balance 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-buffer 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-discover 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-filter 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-in-flight-limit 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-layer 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-load-shed 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-rate-limit 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-reconnect 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-retry 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
+"checksum tower 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b931b40c84f47fd203101b2ef18cd6523e27bb2902129bc3ca2ed1f07fa17695"
+"checksum tower-buffer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5c98a7784e6c8ba106bc98d44ed1dbb9c018a8e0322e5e894d365f9020967128"
+"checksum tower-discover 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "73a7632286f78164d65d18fd0e570307acde9362489aa5c8c53e6315cc2bde47"
+"checksum tower-layer 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0ddf07e10c07dcc8f41da6de036dc66def1a85b70eb8a385159e3908bb258328"
+"checksum tower-limit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "09d3d0fe82c2373225025d50881794e0792e544df9752dec66288b644b40fbfe"
+"checksum tower-load-shed 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "04fbaf5bfb63d84204db87b9b2aeec61549613f2bbb8706dcc36f5f3ea8cd769"
+"checksum tower-retry 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "09e80588125061f276ed2a7b0939988b411e570a2dbb2965b1382ef4f71036f7"
 "checksum tower-service 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2cc0c98637d23732f8de6dfd16494c9f1559c3b9e20b4a46462c8f9b9e827bfa"
-"checksum tower-timeout 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
-"checksum tower-util 0.1.0 (git+https://github.com/tower-rs/tower)" = "<none>"
+"checksum tower-timeout 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "daa179ec4087589dc67148dc661abce5badc2c3ed4197adc7bd64b39f1f33c31"
+"checksum tower-util 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4792342fac093db5d2558655055a89a04ca909663467a4310c7739d9f8b64698"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum typetag 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "204be70778085341a7d3a0e8bb7330dd237ac5b7ea3eb29d1c201fa713510b43"

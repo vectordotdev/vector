@@ -78,12 +78,11 @@ impl KinesisService {
         let kinesis = KinesisService { client, config };
 
         let svc = ServiceBuilder::new()
-            .in_flight_limit(in_flight_limit)
+            .concurrency_limit(in_flight_limit)
             .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
             .retry(policy)
             .timeout(Duration::from_secs(timeout))
-            .service(kinesis)
-            .expect("This is a bug, no spawning done");
+            .service(kinesis);
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)

@@ -85,12 +85,11 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     });
 
     let service = ServiceBuilder::new()
-        .in_flight_limit(in_flight_limit)
+        .concurrency_limit(in_flight_limit)
         .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
         .retry(policy)
         .timeout(Duration::from_secs(timeout))
-        .service(http_service)
-        .expect("This is a bug, there is no spawning");
+        .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
