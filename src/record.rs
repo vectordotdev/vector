@@ -20,7 +20,7 @@ lazy_static! {
 #[derive(PartialEq, Debug, Clone)]
 #[repr(transparent)]
 pub struct Record {
-    structured: HashMap<Atom, OuterValue>,
+    structured: HashMap<Atom, Value>,
 }
 
 impl Record {
@@ -30,28 +30,28 @@ impl Record {
         }
     }
 
-    pub fn get(&self, key: &Atom) -> Option<&Value> {
+    pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
         self.structured.get(key).map(|v| &v.value)
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<Value> {
+    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
         self.structured.remove(key).map(|v| v.value)
     }
 
-    pub fn insert_explicit(&mut self, key: Atom, value: Value) {
+    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
         self.structured.insert(
             key,
-            OuterValue {
+            Value {
                 value,
                 explicit: true,
             },
         );
     }
 
-    pub fn insert_implicit(&mut self, key: Atom, value: Value) {
+    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
         self.structured.insert(
             key,
-            OuterValue {
+            Value {
                 value,
                 explicit: false,
             },
@@ -82,20 +82,20 @@ impl Record {
 }
 
 impl std::ops::Index<&Atom> for Record {
-    type Output = Value;
+    type Output = ValueKind;
 
-    fn index(&self, key: &Atom) -> &Value {
+    fn index(&self, key: &Atom) -> &ValueKind {
         &self.structured[key].value
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct OuterValue {
-    value: Value,
+pub struct Value {
+    value: ValueKind,
     explicit: bool,
 }
 
-impl Serialize for OuterValue {
+impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -105,12 +105,12 @@ impl Serialize for OuterValue {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Value {
+pub enum ValueKind {
     Bytes(Bytes),
     Timestamp(DateTime<Utc>),
 }
 
-impl Serialize for Value {
+impl Serialize for ValueKind {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -119,62 +119,64 @@ impl Serialize for Value {
     }
 }
 
-impl From<Bytes> for Value {
+impl From<Bytes> for ValueKind {
     fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
+        ValueKind::Bytes(bytes)
     }
 }
 
-impl From<Vec<u8>> for Value {
+impl From<Vec<u8>> for ValueKind {
     fn from(bytes: Vec<u8>) -> Self {
-        Value::Bytes(bytes.into())
+        ValueKind::Bytes(bytes.into())
     }
 }
 
-impl From<&[u8]> for Value {
+impl From<&[u8]> for ValueKind {
     fn from(bytes: &[u8]) -> Self {
-        Value::Bytes(bytes.into())
+        ValueKind::Bytes(bytes.into())
     }
 }
 
-impl From<String> for Value {
+impl From<String> for ValueKind {
     fn from(string: String) -> Self {
-        Value::Bytes(string.into())
+        ValueKind::Bytes(string.into())
     }
 }
 
-impl From<&str> for Value {
+impl From<&str> for ValueKind {
     fn from(s: &str) -> Self {
-        Value::Bytes(s.into())
+        ValueKind::Bytes(s.into())
     }
 }
 
-impl From<DateTime<Utc>> for Value {
+impl From<DateTime<Utc>> for ValueKind {
     fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
+        ValueKind::Timestamp(timestamp)
     }
 }
 
-impl Value {
+impl ValueKind {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
+            ValueKind::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            ValueKind::Timestamp(timestamp) => timestamp_to_string(timestamp),
         }
     }
 
     pub fn as_bytes(&self) -> Cow<'_, [u8]> {
         match self {
-            Value::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
-            Value::Timestamp(timestamp) => Cow::from(timestamp_to_string(timestamp).into_bytes()),
+            ValueKind::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
+            ValueKind::Timestamp(timestamp) => {
+                Cow::from(timestamp_to_string(timestamp).into_bytes())
+            }
         }
     }
 
     pub fn into_bytes(self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes,
-            Value::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
+            ValueKind::Bytes(bytes) => bytes,
+            ValueKind::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
         }
     }
 }
@@ -193,7 +195,7 @@ impl From<proto::Record> for Record {
                     .structured
                     .into_iter()
                     .map(|(k, v)| {
-                        let value = OuterValue {
+                        let value = Value {
                             value: v.data.into(),
                             explicit: v.explicit,
                         };
@@ -266,12 +268,12 @@ impl From<String> for Record {
 
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
-    inner: std::collections::hash_map::Iter<'a, Atom, OuterValue>,
+    inner: std::collections::hash_map::Iter<'a, Atom, Value>,
     explicit_only: bool,
 }
 
 impl<'a> Iterator for FieldsIter<'a> {
-    type Item = (&'a Atom, &'a Value);
+    type Item = (&'a Atom, &'a ValueKind);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
