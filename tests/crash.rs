@@ -6,7 +6,10 @@ use vector::test_util::{
 };
 use vector::topology::{config, Topology};
 use vector::Record;
-use vector::{sinks, sources};
+use vector::{
+    sinks::{self, encoders::StringEncoderConfig},
+    sources,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
@@ -48,6 +51,7 @@ fn test_sink_panic() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.add_sink("panic", &["in"], PanicSink);
@@ -116,6 +120,7 @@ fn test_sink_error() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.add_sink("error", &["in"], ErrorSink);
@@ -168,6 +173,7 @@ fn test_source_error() {
         &["in", "error"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -221,6 +227,7 @@ fn test_source_panic() {
         &["in", "panic"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();

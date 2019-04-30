@@ -9,7 +9,10 @@ use vector::test_util::{
     wait_for_tcp,
 };
 use vector::topology::{config, Topology};
-use vector::{sinks, sources, transforms};
+use vector::{
+    sinks::{self, encoders::StringEncoderConfig},
+    sources, transforms,
+};
 
 #[test]
 fn test_pipe() {
@@ -25,6 +28,7 @@ fn test_pipe() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -72,6 +76,7 @@ fn test_sample() {
         &["sampler"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -136,6 +141,7 @@ fn test_parse() {
         &["filter"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -183,6 +189,7 @@ fn test_merge() {
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -243,6 +250,7 @@ fn test_fork() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr1.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.add_sink(
@@ -250,6 +258,7 @@ fn test_fork() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr2.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -298,6 +307,7 @@ fn test_merge_and_fork() {
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr1.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.add_sink(
@@ -305,6 +315,7 @@ fn test_merge_and_fork() {
         &["in2"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr2.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -455,6 +466,7 @@ fn test_reconnect() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();

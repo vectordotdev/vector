@@ -602,6 +602,7 @@ fn handle_errors(
 
 #[cfg(test)]
 mod tests {
+    use crate::sinks::encoders::StringEncoderConfig;
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{
@@ -640,6 +641,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out1_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -659,6 +661,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out2_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
 
@@ -704,6 +707,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out1_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         old_config.add_sink(
@@ -711,6 +715,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out2_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -771,6 +776,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out1_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -787,6 +793,7 @@ mod tests {
 
         new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig {
             address: out2_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         });
 
         wait_for(|| output_lines1.count() >= 100);
@@ -832,6 +839,7 @@ mod tests {
                 &["in"],
                 TcpSinkConfig {
                     address: out1_addr.to_string(),
+                    encoder: Box::new(StringEncoderConfig::new()),
                 },
             );
             let mut new_config = old_config.clone();
@@ -859,6 +867,7 @@ mod tests {
 
             new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig {
                 address: out2_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             });
 
             wait_for(|| output_lines1.count() > 0);
@@ -900,6 +909,7 @@ mod tests {
             &[],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -950,6 +960,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -997,6 +1008,7 @@ mod tests {
             &["in1"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -1061,6 +1073,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -1150,6 +1163,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -1224,6 +1238,7 @@ mod tests {
             &["sampler"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -1292,6 +1307,7 @@ mod tests {
             &["sampler"],
             TcpSinkConfig {
                 address: out_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let mut new_config = old_config.clone();
@@ -1433,6 +1449,7 @@ mod tests {
             &["in"],
             TcpSinkConfig {
                 address: out1_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             },
         );
         let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
@@ -1443,6 +1460,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig {
                 address: out2_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             });
 
             topology.reload_config(config.clone(), &mut rt, true);
@@ -1461,6 +1479,7 @@ mod tests {
 
             config.sinks["out"].inner = Box::new(TcpSinkConfig {
                 address: out2_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             });
 
             topology.reload_config(config.clone(), &mut rt, true);
@@ -1478,6 +1497,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig {
                 address: out1_addr.to_string(),
+                encoder: Box::new(StringEncoderConfig::new()),
             });
 
             topology.reload_config(config.clone(), &mut rt, false);

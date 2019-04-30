@@ -8,7 +8,7 @@ use vector::test_util::{
 };
 use vector::topology::{config, Topology};
 use vector::{
-    sinks,
+    sinks::{self, encoders::StringEncoderConfig},
     sources::syslog::{Mode, SyslogConfig},
 };
 
@@ -26,6 +26,7 @@ fn test_tcp_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -69,6 +70,7 @@ fn test_udp_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -129,6 +131,7 @@ fn test_unix_stream_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();

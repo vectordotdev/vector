@@ -7,7 +7,11 @@ use vector::test_util::{
     wait_for_tcp,
 };
 use vector::topology::{config, Topology};
-use vector::{buffers::BufferConfig, sinks, sources};
+use vector::{
+    buffers::BufferConfig,
+    sinks::{self, encoders::StringEncoderConfig},
+    sources,
+};
 
 #[test]
 fn test_buffering() {
@@ -27,6 +31,7 @@ fn test_buffering() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -58,6 +63,7 @@ fn test_buffering() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -124,6 +130,7 @@ fn test_max_size() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -155,6 +162,7 @@ fn test_max_size() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -202,6 +210,7 @@ fn test_max_size_resume() {
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -258,6 +267,7 @@ fn test_reclaim_disk_space() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
@@ -298,6 +308,7 @@ fn test_reclaim_disk_space() {
         &["in"],
         sinks::tcp::TcpSinkConfig {
             address: out_addr.to_string(),
+            encoder: Box::new(StringEncoderConfig::new()),
         },
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
