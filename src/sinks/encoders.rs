@@ -17,5 +17,5 @@ pub trait Encoder {
 }
 
 pub fn default_string_encoder() -> Box<dyn EncoderConfig> {
-    Box::new(StringEncoderConfig::new())
+    Box::new(StringEncoderConfig {})
 }

@@ -25,6 +25,15 @@ pub struct TcpSinkConfig {
     pub encoder: Box<dyn EncoderConfig>,
 }
 
+impl TcpSinkConfig {
+    pub fn new(address: String) -> Self {
+        Self {
+            address,
+            encoder: default_string_encoder(),
+        }
+    }
+}
+
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SinkConfig for TcpSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {

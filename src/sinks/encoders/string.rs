@@ -6,12 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StringEncoderConfig {}
 
-impl StringEncoderConfig {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 #[typetag::serde(name = "string")]
 impl EncoderConfig for StringEncoderConfig {
     fn build(&self) -> Box<dyn Encoder + Send> {
