@@ -111,7 +111,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
             let mut body = json!({
                 "event": record[&record::MESSAGE].to_string_lossy(),
-                "fields": record,
+                "fields": record.explicit_fields(),
             });
 
             if let Some(host) = host {
@@ -220,6 +220,7 @@ mod integration_tests {
             .expect("Didn't find event in Splunk");
 
         assert_eq!(message, entry["_raw"].as_str().unwrap());
+        assert!(entry.get("message").is_none());
     }
 
     #[test]
@@ -262,7 +263,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
+        record.insert_explicit("asdf".into(), "hello".into());
 
         let pump = sink.send(record);
 
@@ -292,8 +293,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
-        record.insert("host".into(), "example.com:1234".into());
+        record.insert_explicit("asdf".into(), "hello".into());
+        record.insert_implicit("host".into(), "example.com:1234".into());
 
         let pump = sink.send(record);
 
@@ -329,9 +330,9 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut record = Record::from(message.clone());
-        record.insert("asdf".into(), "hello".into());
-        record.insert("host".into(), "example.com:1234".into());
-        record.insert("roast".into(), "beef.example.com:1234".into());
+        record.insert_explicit("asdf".into(), "hello".into());
+        record.insert_implicit("host".into(), "example.com:1234".into());
+        record.insert_explicit("roast".into(), "beef.example.com:1234".into());
 
         let pump = sink.send(record);
 
@@ -405,13 +406,7 @@ mod integration_tests {
         // http://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
         let mut res = client
             .post("https://localhost:8089/services/search/jobs?output_mode=json")
-            .form(&[
-                ("search", "search *"),
-                ("exec_mode", "oneshot"),
-                ("f", "_raw"),
-                ("f", "asdf"),
-                ("f", "host"),
-            ])
+            .form(&[("search", "search *"), ("exec_mode", "oneshot"), ("f", "*")])
             .basic_auth(USERNAME, Some(PASSWORD))
             .send()
             .unwrap();

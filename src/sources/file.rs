@@ -70,7 +70,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
             trace!(message = "Recieved one record.", file = file.as_str());
             let mut record = Record::from(line);
             if let Some(ref context_key) = context_key {
-                record.insert(context_key.clone(), file.into());
+                record.insert_implicit(context_key.clone(), file.into());
             }
             future::ok(record)
         });

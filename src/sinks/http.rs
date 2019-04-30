@@ -123,7 +123,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
             let mut body = json!({
                 "msg": record[&record::MESSAGE].to_string_lossy(),
                 "ts": record[&record::TIMESTAMP].to_string_lossy(),
-                "fields": record,
+                "fields": record.explicit_fields(),
             });
 
             if let Some(host) = record.get(&Atom::from("host")) {

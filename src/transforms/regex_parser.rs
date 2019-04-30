@@ -37,7 +37,7 @@ impl Transform for RegexParser {
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    record.insert(name.into(), capture.as_bytes().into());
+                    record.insert_explicit(name.into(), capture.as_bytes().into());
                 }
             }
         }

@@ -17,50 +17,100 @@ lazy_static! {
     pub static ref TIMESTAMP: Atom = Atom::from("timestamp");
 }
 
-#[derive(Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[repr(transparent)]
-#[serde(transparent)]
 pub struct Record {
     structured: HashMap<Atom, Value>,
 }
 
 impl Record {
-    pub fn get(&self, key: &Atom) -> Option<&Value> {
-        self.structured.get(key)
+    pub fn new_empty() -> Self {
+        Self {
+            structured: HashMap::new(),
+        }
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<Value> {
-        self.structured.remove(key)
+    pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
+        self.structured.get(key).map(|v| &v.value)
     }
 
-    pub fn insert(&mut self, key: Atom, value: Value) {
-        self.structured.insert(key, value);
+    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
+        self.structured.remove(key).map(|v| v.value)
+    }
+
+    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
+        self.structured.insert(
+            key,
+            Value {
+                value,
+                explicit: true,
+            },
+        );
+    }
+
+    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
+        self.structured.insert(
+            key,
+            Value {
+                value,
+                explicit: false,
+            },
+        );
     }
 
     pub fn remove(&mut self, key: &Atom) {
         self.structured.remove(key);
     }
 
-    pub fn keys<'a>(&'a self) -> std::collections::hash_map::Keys<'a, Atom, Value> {
+    pub fn keys(&self) -> impl Iterator<Item = &Atom> {
         self.structured.keys()
+    }
+
+    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: false,
+        }
+    }
+
+    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: true,
+        }
     }
 }
 
 impl std::ops::Index<&Atom> for Record {
-    type Output = Value;
+    type Output = ValueKind;
 
-    fn index(&self, key: &Atom) -> &Value {
-        &self.structured[key]
+    fn index(&self, key: &Atom) -> &ValueKind {
+        &self.structured[key].value
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Value {
+pub struct Value {
+    value: ValueKind,
+    explicit: bool,
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum ValueKind {
     Bytes(Bytes),
     Timestamp(DateTime<Utc>),
 }
 
-impl Serialize for Value {
+impl Serialize for ValueKind {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -69,56 +119,64 @@ impl Serialize for Value {
     }
 }
 
-impl From<Bytes> for Value {
+impl From<Bytes> for ValueKind {
     fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
+        ValueKind::Bytes(bytes)
     }
 }
 
-impl From<&[u8]> for Value {
+impl From<Vec<u8>> for ValueKind {
+    fn from(bytes: Vec<u8>) -> Self {
+        ValueKind::Bytes(bytes.into())
+    }
+}
+
+impl From<&[u8]> for ValueKind {
     fn from(bytes: &[u8]) -> Self {
-        Value::Bytes(bytes.into())
+        ValueKind::Bytes(bytes.into())
     }
 }
 
-impl From<String> for Value {
+impl From<String> for ValueKind {
     fn from(string: String) -> Self {
-        Value::Bytes(string.into())
+        ValueKind::Bytes(string.into())
     }
 }
 
-impl From<&str> for Value {
+impl From<&str> for ValueKind {
     fn from(s: &str) -> Self {
-        Value::Bytes(s.into())
+        ValueKind::Bytes(s.into())
     }
 }
 
-impl From<DateTime<Utc>> for Value {
+impl From<DateTime<Utc>> for ValueKind {
     fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
+        ValueKind::Timestamp(timestamp)
     }
 }
 
-impl Value {
+impl ValueKind {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
+            ValueKind::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            ValueKind::Timestamp(timestamp) => timestamp_to_string(timestamp),
         }
     }
 
     pub fn as_bytes(&self) -> Cow<'_, [u8]> {
         match self {
-            Value::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
-            Value::Timestamp(timestamp) => Cow::from(timestamp_to_string(timestamp).into_bytes()),
+            ValueKind::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
+            ValueKind::Timestamp(timestamp) => {
+                Cow::from(timestamp_to_string(timestamp).into_bytes())
+            }
         }
     }
 
     pub fn into_bytes(self) -> Bytes {
         match self {
-            Value::Bytes(bytes) => bytes,
-            Value::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
+            ValueKind::Bytes(bytes) => bytes,
+            ValueKind::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
         }
     }
 }
@@ -136,7 +194,13 @@ impl From<proto::Record> for Record {
                 let structured = proto
                     .structured
                     .into_iter()
-                    .map(|(k, v)| (Atom::from(k), Bytes::from(v).into()))
+                    .map(|(k, v)| {
+                        let value = Value {
+                            value: v.data.into(),
+                            explicit: v.explicit,
+                        };
+                        (Atom::from(k), value)
+                    })
                     .collect::<HashMap<_, _>>();
 
                 Record { structured }
@@ -150,7 +214,13 @@ impl From<Record> for proto::Record {
         let structured = record
             .structured
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v.as_bytes().into_owned()))
+            .map(|(k, v)| {
+                let value = proto::Value {
+                    data: v.value.as_bytes().into_owned(),
+                    explicit: v.explicit,
+                };
+                (k.to_string(), value)
+            })
             .collect::<HashMap<_, _>>();
 
         let event = Event::Log(Log { structured });
@@ -165,6 +235,7 @@ impl From<Record> for Vec<u8> {
             .structured
             .remove(&MESSAGE)
             .unwrap()
+            .value
             .as_bytes()
             .into_owned()
     }
@@ -172,14 +243,14 @@ impl From<Record> for Vec<u8> {
 
 impl From<Bytes> for Record {
     fn from(message: Bytes) -> Self {
-        let mut structured = HashMap::new();
-        structured.insert(MESSAGE.clone(), message.into());
+        let mut record = Record {
+            structured: HashMap::new(),
+        };
 
-        let timestamp = Utc::now();
+        record.insert_implicit(MESSAGE.clone(), message.into());
+        record.insert_implicit(TIMESTAMP.clone(), Utc::now().into());
 
-        structured.insert(TIMESTAMP.clone(), timestamp.into());
-
-        Record { structured }
+        record
     }
 }
 
@@ -195,27 +266,116 @@ impl From<String> for Record {
     }
 }
 
+#[derive(Clone)]
+pub struct FieldsIter<'a> {
+    inner: std::collections::hash_map::Iter<'a, Atom, Value>,
+    explicit_only: bool,
+}
+
+impl<'a> Iterator for FieldsIter<'a> {
+    type Item = (&'a Atom, &'a ValueKind);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (key, value) = match self.inner.next() {
+                Some(next) => next,
+                None => return None,
+            };
+
+            if self.explicit_only && !value.explicit {
+                continue;
+            }
+
+            return Some((key, &value.value));
+        }
+    }
+}
+
+impl<'a> Serialize for FieldsIter<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_map(self.clone())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Record;
     use regex::Regex;
+    use std::collections::HashSet;
 
     #[test]
     fn serialization() {
         let mut record = Record::from("raw log line");
-        record.structured.insert("foo".into(), "bar".into());
-        record.structured.insert("bar".into(), "baz".into());
+        record.insert_explicit("foo".into(), "bar".into());
+        record.insert_explicit("bar".into(), "baz".into());
 
-        let expected = serde_json::json!({
+        let expected_all = serde_json::json!({
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
             "timestamp": record.structured[&super::TIMESTAMP],
         });
-        let actual = serde_json::to_value(record).unwrap();
-        assert_eq!(expected, actual);
+
+        let expected_explicit = serde_json::json!({
+            "foo": "bar",
+            "bar": "baz",
+        });
+
+        let actual_all = serde_json::to_value(record.all_fields()).unwrap();
+        assert_eq!(expected_all, actual_all);
+
+        let actual_explicit = serde_json::to_value(record.explicit_fields()).unwrap();
+        assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
-        assert!(rfc3339_re.is_match(actual.pointer("/timestamp").unwrap().as_str().unwrap()));
+        assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
+    }
+
+    #[test]
+    fn record_iteration() {
+        let mut record = Record::new_empty();
+
+        record.insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
+        record.insert_implicit(
+            "Pitbull".into(),
+            "The bigger they are, the harder they fall".into(),
+        );
+
+        let all = record
+            .all_fields()
+            .map(|(k, v)| (k, v.to_string_lossy()))
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            all,
+            vec![
+                (
+                    &"Ke$ha".into(),
+                    "It's going down, I'm yelling timber".to_string()
+                ),
+                (
+                    &"Pitbull".into(),
+                    "The bigger they are, the harder they fall".to_string()
+                ),
+            ]
+            .into_iter()
+            .collect::<HashSet<_>>()
+        );
+
+        let explicit_only = record
+            .explicit_fields()
+            .map(|(k, v)| (k, v.to_string_lossy()))
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            explicit_only,
+            vec![(
+                &"Ke$ha".into(),
+                "It's going down, I'm yelling timber".to_string()
+            ),]
+            .into_iter()
+            .collect::<HashSet<_>>()
+        );
     }
 }

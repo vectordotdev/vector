@@ -44,8 +44,8 @@ mod tests {
     #[test]
     fn remove_fields() {
         let mut record = Record::from("message");
-        record.insert("to_remove".into(), "some value".into());
-        record.insert("to_keep".into(), "another value".into());
+        record.insert_explicit("to_remove".into(), "some value".into());
+        record.insert_explicit("to_keep".into(), "another value".into());
 
         let transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 

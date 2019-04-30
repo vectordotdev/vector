@@ -109,7 +109,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
 
-            serde_json::to_writer(&mut body, &record).unwrap();
+            serde_json::to_writer(&mut body, &record.all_fields()).unwrap();
             body.push(b'\n');
             Ok(body)
         });
@@ -157,7 +157,7 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.insert("foo".into(), "bar".into());
+        record.insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -169,7 +169,7 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut record = Record::from("butts");
-        record.insert("not_foo".into(), "bar".into());
+        record.insert_explicit("not_foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -181,7 +181,7 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut record = Record::from("butts");
-        record.insert("foo".into(), "bar".into());
+        record.insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -221,8 +221,8 @@ mod integration_tests {
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
         let mut input_record = Record::from("raw log line");
-        input_record.insert("my_id".into(), "42".into());
-        input_record.insert("foo".into(), "bar".into());
+        input_record.insert_explicit("my_id".into(), "42".into());
+        input_record.insert_explicit("foo".into(), "bar".into());
 
         let pump = sink.send(input_record.clone());
         block_on(pump).unwrap();
@@ -289,7 +289,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec).unwrap())
+            .map(|rec| serde_json::to_value(rec.all_fields()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let record = hit.into_document().unwrap();

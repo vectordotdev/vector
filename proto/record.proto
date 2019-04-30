@@ -8,6 +8,11 @@ message Record {
   }
 }
 
+message Value {
+  bytes data = 1;
+  bool explicit = 2;
+}
+
 message Log {
-  map<string, bytes> structured = 1;
+  map<string, Value> structured = 1;
 }
