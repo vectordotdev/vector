@@ -265,3 +265,46 @@ fn warnings() {
         ]
     )
 }
+
+#[test]
+fn cycle() {
+    let errors = load(
+        r#"
+        [sources.in]
+        type = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.one]
+        type = "sampler"
+        inputs = ["in"]
+        rate = 10
+        pass_list = []
+
+        [transforms.two]
+        type = "sampler"
+        inputs = ["one", "four"]
+        rate = 10
+        pass_list = []
+
+        [transforms.three]
+        type = "sampler"
+        inputs = ["two"]
+        rate = 10
+        pass_list = []
+
+        [transforms.four]
+        type = "sampler"
+        inputs = ["three"]
+        rate = 10
+        pass_list = []
+
+        [sinks.out]
+        type = "tcp"
+        inputs = ["four"]
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .unwrap_err();
+
+    assert_eq!(errors, vec!["Configured topology contains a cycle"])
+}

@@ -4,6 +4,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
+mod validation;
 mod vars;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -106,6 +107,10 @@ impl Config {
         let with_vars = vars::interpolate(&source_string, &vars);
 
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
+    }
+
+    pub fn contains_cycle(&self) -> bool {
+        validation::contains_cycle(self)
     }
 }
 
