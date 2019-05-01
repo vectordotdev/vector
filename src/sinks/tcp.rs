@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::{self, Record},
+    sinks::encoders::{default_string_encoder, Encoder, EncoderConfig},
     sinks::util::SinkExt,
 };
 use bytes::Bytes;
@@ -21,6 +21,17 @@ use tokio_trace::field;
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
+    #[serde(default = "default_string_encoder")]
+    pub encoder: Box<dyn EncoderConfig>,
+}
+
+impl TcpSinkConfig {
+    pub fn new(address: String) -> Self {
+        Self {
+            address,
+            encoder: default_string_encoder(),
+        }
+    }
 }
 
 #[typetag::serde(name = "tcp")]
@@ -33,7 +44,7 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
             .next()
             .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
 
-        let sink = raw_tcp(addr, acker);
+        let sink = raw_tcp(addr, acker, self.encoder.build());
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
@@ -168,11 +179,15 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr, acker: Acker) -> super::RouterSink {
+pub fn raw_tcp(
+    addr: SocketAddr,
+    acker: Acker,
+    encoder: Box<dyn Encoder + Send>,
+) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(|record: Record| Ok(record.into_value(&record::MESSAGE).unwrap().into_bytes())),
+            .with(move |record| Ok(encoder.encode(record))),
     )
 }
 

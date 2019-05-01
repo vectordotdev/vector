@@ -635,13 +635,7 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out1",
-            &["in"],
-            TcpSinkConfig {
-                address: out1_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out1", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -654,13 +648,7 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        new_config.add_sink(
-            "out2",
-            &["in"],
-            TcpSinkConfig {
-                address: out2_addr.to_string(),
-            },
-        );
+        new_config.add_sink("out2", &["in"], TcpSinkConfig::new(out2_addr.to_string()));
 
         wait_for(|| output_lines1.count() >= 100);
 
@@ -699,20 +687,8 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out1",
-            &["in"],
-            TcpSinkConfig {
-                address: out1_addr.to_string(),
-            },
-        );
-        old_config.add_sink(
-            "out2",
-            &["in"],
-            TcpSinkConfig {
-                address: out2_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out1", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
+        old_config.add_sink("out2", &["in"], TcpSinkConfig::new(out2_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -766,13 +742,7 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out",
-            &["in"],
-            TcpSinkConfig {
-                address: out1_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -785,9 +755,8 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig {
-            address: out2_addr.to_string(),
-        });
+        new_config.sinks[&"out".to_string()].inner =
+            Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
         wait_for(|| output_lines1.count() >= 100);
 
@@ -827,13 +796,7 @@ mod tests {
 
             let mut old_config = Config::empty();
             old_config.add_source("in", TcpConfig::new(in_addr));
-            old_config.add_sink(
-                "out",
-                &["in"],
-                TcpSinkConfig {
-                    address: out1_addr.to_string(),
-                },
-            );
+            old_config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
             let mut new_config = old_config.clone();
             let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -857,9 +820,8 @@ mod tests {
             let send = send_lines(in_addr, input_lines);
             rt.spawn(send);
 
-            new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig {
-                address: out2_addr.to_string(),
-            });
+            new_config.sinks[&"out".to_string()].inner =
+                Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
             wait_for(|| output_lines1.count() > 0);
 
@@ -895,13 +857,7 @@ mod tests {
         let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
-        old_config.add_sink(
-            "out",
-            &[],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &[], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -945,13 +901,7 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out",
-            &["in"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -992,13 +942,7 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out",
-            &["in1"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &["in1"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -1056,13 +1000,7 @@ mod tests {
                 shutdown_timeout_secs: 30,
             },
         );
-        old_config.add_sink(
-            "out",
-            &["in"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -1145,13 +1083,7 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink(
-            "out",
-            &["in"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
-        );
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
@@ -1222,9 +1154,7 @@ mod tests {
         old_config.add_sink(
             "out",
             &["sampler"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
+            TcpSinkConfig::new(out_addr.to_string()),
         );
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
@@ -1290,9 +1220,7 @@ mod tests {
         old_config.add_sink(
             "out",
             &["sampler"],
-            TcpSinkConfig {
-                address: out_addr.to_string(),
-            },
+            TcpSinkConfig::new(out_addr.to_string()),
         );
         let mut new_config = old_config.clone();
         let (mut topology, _warnings) = Topology::build(old_config).unwrap();
@@ -1428,22 +1356,14 @@ mod tests {
 
         let mut config = Config::empty();
         config.add_source("in", TcpConfig::new(in_addr));
-        config.add_sink(
-            "out",
-            &["in"],
-            TcpSinkConfig {
-                address: out1_addr.to_string(),
-            },
-        );
+        config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
         let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
 
         topology.start(&mut rt);
 
         // Require-healthy reload with failing healthcheck
         {
-            config.sinks["out"].inner = Box::new(TcpSinkConfig {
-                address: out2_addr.to_string(),
-            });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
             topology.reload_config(config.clone(), &mut rt, true);
 
@@ -1459,9 +1379,7 @@ mod tests {
         {
             let healthcheck_receiver = receive(&out2_addr);
 
-            config.sinks["out"].inner = Box::new(TcpSinkConfig {
-                address: out2_addr.to_string(),
-            });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
             topology.reload_config(config.clone(), &mut rt, true);
             healthcheck_receiver.wait();
@@ -1476,9 +1394,7 @@ mod tests {
 
         // non-require-healthy reload with failing healthcheck
         {
-            config.sinks["out"].inner = Box::new(TcpSinkConfig {
-                address: out1_addr.to_string(),
-            });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
 
             topology.reload_config(config.clone(), &mut rt, false);
 

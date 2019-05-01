@@ -4,6 +4,7 @@ pub mod blackhole;
 pub mod cloudwatch_logs;
 pub mod console;
 pub mod elasticsearch;
+pub mod encoders;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

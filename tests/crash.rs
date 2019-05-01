@@ -46,9 +46,7 @@ fn test_sink_panic() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.add_sink("panic", &["in"], PanicSink);
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -114,9 +112,7 @@ fn test_sink_error() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.add_sink("error", &["in"], ErrorSink);
     let (mut topology, _warnings) = Topology::build(config).unwrap();
@@ -166,9 +162,7 @@ fn test_source_error() {
     config.add_sink(
         "out",
         &["in", "error"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -219,9 +213,7 @@ fn test_source_panic() {
     config.add_sink(
         "out",
         &["in", "panic"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 

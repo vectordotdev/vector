@@ -24,9 +24,7 @@ fn test_tcp_syslog() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -67,9 +65,7 @@ fn test_udp_syslog() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
@@ -127,9 +123,7 @@ fn test_unix_stream_syslog() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     let (mut topology, _warnings) = Topology::build(config).unwrap();
 
