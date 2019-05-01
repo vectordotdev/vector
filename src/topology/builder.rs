@@ -121,7 +121,6 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     }
 
     // Warnings and errors
-    let mut graph_is_sane = true;
     let sink_inputs = config
         .sinks
         .iter()
@@ -137,7 +136,6 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
                 capitalize(output_type),
                 name
             ));
-            graph_is_sane = false;
         }
 
         for input in inputs {
@@ -146,7 +144,6 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
                     "Input {:?} for {} {:?} doesn't exist.",
                     input, output_type, name
                 ));
-                graph_is_sane = false;
             }
         }
     }
@@ -171,11 +168,10 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
                 capitalize(input_type),
                 name
             ));
-            graph_is_sane = false;
         }
     }
 
-    if graph_is_sane && config.contains_cycle() {
+    if config.contains_cycle() {
         errors.push(format!("Configured topology contains a cycle"));
     }
 
