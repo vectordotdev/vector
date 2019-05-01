@@ -6,7 +6,7 @@ use tempfile::tempdir;
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
@@ -38,18 +38,18 @@ fn benchmark_buffers(c: &mut Criterion) {
                         num_items: 100,
                         when_full: Default::default(),
                     };
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
+                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
@@ -78,18 +78,18 @@ fn benchmark_buffers(c: &mut Criterion) {
                     }
                     .into();
                     config.data_dir = Some(data_dir.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
+                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
@@ -117,18 +117,18 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
                     config.data_dir = Some(data_dir2.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
+                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_lines(&out_addr, &rt.executor());
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 

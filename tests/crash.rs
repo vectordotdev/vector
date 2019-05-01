@@ -4,7 +4,7 @@ use vector::buffers::Acker;
 use vector::test_util::{
     block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::Record;
 use vector::{sinks, sources};
 
@@ -51,13 +51,13 @@ fn test_sink_panic() {
         },
     );
     config.add_sink("panic", &["in"], PanicSink);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let crash = topology.start(&mut rt);
+    let (topology, crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -119,13 +119,13 @@ fn test_sink_error() {
         },
     );
     config.add_sink("error", &["in"], ErrorSink);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let crash = topology.start(&mut rt);
+    let (topology, crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -170,13 +170,13 @@ fn test_source_error() {
             address: out_addr.to_string(),
         },
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let crash = topology.start(&mut rt);
+    let (topology, crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -223,14 +223,14 @@ fn test_source_panic() {
             address: out_addr.to_string(),
         },
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let crash = topology.start(&mut rt);
+    let (topology, crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 

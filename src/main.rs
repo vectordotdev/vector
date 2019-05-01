@@ -8,7 +8,7 @@ use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
-use vector::topology::Topology;
+use vector::topology;
 
 fn main() {
     let app = App::new("Vector").version("0.1.0").author("timber.io")
@@ -155,7 +155,7 @@ fn main() {
 
         let topology = vector::topology::Config::load(file).and_then(|f| {
             debug!(message = "Building config from file.");
-            Topology::build(f)
+            topology::build(f)
         });
 
         let mut topology = match topology {
@@ -223,7 +223,7 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let mut graceful_crash = topology.start(&mut rt);
+        let (mut topology, mut graceful_crash) = topology.start(&mut rt);
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();

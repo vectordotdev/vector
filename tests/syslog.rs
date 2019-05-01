@@ -6,7 +6,7 @@ use tokio_uds::UnixStream;
 use vector::test_util::{
     block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
@@ -28,13 +28,13 @@ fn test_tcp_syslog() {
             address: out_addr.to_string(),
         },
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -71,13 +71,13 @@ fn test_udp_syslog() {
             address: out_addr.to_string(),
         },
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology.start(&mut rt);
 
     let input_lines = random_lines(100)
         .enumerate()
@@ -131,13 +131,13 @@ fn test_unix_stream_syslog() {
             address: out_addr.to_string(),
         },
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
+    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive_lines(&out_addr, &rt.executor());
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
     while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
 

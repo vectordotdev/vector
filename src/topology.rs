@@ -18,18 +18,13 @@ use stream_cancel::Trigger;
 use tokio::timer;
 use tokio_trace_futures::Instrument;
 
-pub struct Topology {
-    state: State,
-}
-
-enum State {
-    Ready(builder::Pieces, Config),
-    Running(RunningTopology),
-    Stopped,
+pub struct BuiltTopology {
+    components: builder::Pieces,
+    config: Config,
 }
 
 #[allow(dead_code)]
-struct RunningTopology {
+pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
@@ -39,38 +34,30 @@ struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-impl Topology {
-    pub fn build(config: Config) -> Result<(Self, Vec<String>), Vec<String>> {
-        let (components, warnings) = builder::build_pieces(&config)?;
+pub fn build(config: Config) -> Result<(BuiltTopology, Vec<String>), Vec<String>> {
+    let (components, warnings) = builder::build_pieces(&config)?;
 
-        let topology = Self {
-            state: State::Ready(components, config),
-        };
+    let topology = BuiltTopology { components, config };
 
-        Ok((topology, warnings))
-    }
+    Ok((topology, warnings))
+}
 
+impl BuiltTopology {
     pub fn healthchecks(&mut self) -> impl Future<Item = (), Error = ()> {
-        if let State::Ready(ref mut components, _) = &mut self.state {
-            let healthchecks = components
-                .healthchecks
-                .drain()
-                .map(|(_, v)| v)
-                .collect::<Vec<_>>();
-            futures::future::join_all(healthchecks).map(|_| ())
-        } else {
-            // TODO: make healthchecks reusable
-            unimplemented!("Can only run healthchecks before calling start");
-        }
+        let healthchecks = self
+            .components
+            .healthchecks
+            .drain()
+            .map(|(_, v)| v)
+            .collect::<Vec<_>>();
+        futures::future::join_all(healthchecks).map(|_| ())
     }
 
-    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) -> mpsc::UnboundedReceiver<()> {
-        let state = std::mem::replace(&mut self.state, State::Stopped);
-        let (components, config) = if let State::Ready(components, config) = state {
-            (components, config)
-        } else {
-            panic!("Can only call start once, immediately after building");
-        };
+    pub fn start(
+        self,
+        rt: &mut tokio::runtime::Runtime,
+    ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
+        let Self { components, config } = self;
 
         let builder::Pieces {
             inputs,
@@ -152,7 +139,7 @@ impl Topology {
             }
         }
 
-        self.state = State::Running(RunningTopology {
+        let running_topology = RunningTopology {
             inputs: new_inputs,
             outputs,
             config,
@@ -160,21 +147,16 @@ impl Topology {
             source_tasks: spawned_source_tasks,
             tasks: spawned_tasks,
             abort_tx,
-        });
-
-        abort_rx
-    }
-
-    #[must_use]
-    pub fn stop(&mut self) -> impl Future<Item = (), Error = ()> {
-        let old_state = std::mem::replace(&mut self.state, State::Stopped);
-        let running = if let State::Running(running) = old_state {
-            running
-        } else {
-            unreachable!()
         };
 
-        let mut running_tasks = running.tasks;
+        (running_topology, abort_rx)
+    }
+}
+
+impl RunningTopology {
+    #[must_use]
+    pub fn stop(self) -> impl Future<Item = (), Error = ()> {
+        let mut running_tasks = self.tasks;
 
         let mut wait_handles = Vec::new();
         let mut check_handles = HashMap::new();
@@ -244,21 +226,6 @@ impl Topology {
     }
 
     pub fn reload_config(
-        &mut self,
-        new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
-        require_healthy: bool,
-    ) {
-        if let State::Running(running) = &mut self.state {
-            running.reload_config(new_config, rt, require_healthy);
-        } else {
-            panic!("Can only reload config on a running Topology");
-        }
-    }
-}
-
-impl RunningTopology {
-    fn reload_config(
         &mut self,
         new_config: Config,
         rt: &mut tokio::runtime::Runtime,
@@ -608,8 +575,8 @@ mod tests {
         block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for,
         wait_for_tcp,
     };
+    use crate::topology;
     use crate::topology::config::Config;
-    use crate::topology::Topology;
     use crate::transforms::sampler::SamplerConfig;
     use futures::{future::Either, stream, Future, Stream};
     use matches::assert_matches;
@@ -643,9 +610,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -714,9 +681,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -774,9 +741,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -835,9 +802,9 @@ mod tests {
                 },
             );
             let mut new_config = old_config.clone();
-            let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+            let (topology, _warnings) = topology::build(old_config).unwrap();
 
-            topology.start(&mut rt);
+            let (mut topology, _crash) = topology.start(&mut rt);
 
             // Wait for server to accept traffic
             wait_for_tcp(in_addr);
@@ -903,9 +870,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert!(std::net::TcpStream::connect(in_addr).is_err());
@@ -953,9 +920,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         wait_for_tcp(in_addr);
 
@@ -1000,9 +967,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         wait_for_tcp(in_addr);
 
@@ -1064,9 +1031,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         wait_for_tcp(in_addr);
 
@@ -1153,9 +1120,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1227,9 +1194,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1295,9 +1262,9 @@ mod tests {
             },
         );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1361,22 +1328,16 @@ mod tests {
         let mut old_config = Config::empty();
         old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
+        let (topology, _warnings) = topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology.reload_config(new_config, &mut rt, false);
 
-        let current_config = if let super::State::Running(running) = topology.state {
-            running.config
-        } else {
-            panic!();
-        };
-
         assert_eq!(
-            current_config.data_dir,
+            topology.config.data_dir,
             Some(Path::new("/asdf").to_path_buf())
         );
     }
@@ -1435,9 +1396,9 @@ mod tests {
                 address: out1_addr.to_string(),
             },
         );
-        let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
+        let (topology, _warnings) = topology::build(config.clone()).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology.start(&mut rt);
 
         // Require-healthy reload with failing healthcheck
         {
