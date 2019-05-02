@@ -171,6 +171,10 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         }
     }
 
+    if config.contains_cycle() {
+        errors.push(format!("Configured topology contains a cycle"));
+    }
+
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
