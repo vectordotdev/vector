@@ -58,96 +58,21 @@ impl BuiltTopology {
         rt: &mut tokio::runtime::Runtime,
     ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
         let Self { components, config } = self;
-
-        let builder::Pieces {
-            inputs,
-            outputs,
-            shutdown_triggers,
-            mut tasks,
-            mut source_tasks,
-            healthchecks: _healthchecks,
-        } = components;
-
-        let mut new_inputs = HashMap::new();
-        for (name, (tx, input_names)) in inputs {
-            for input_name in input_names {
-                outputs[&input_name]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            new_inputs.insert(name, tx);
-        }
+        drop(components);
 
         let (abort_tx, abort_rx) = mpsc::unbounded();
 
-        let mut spawned_tasks = HashMap::new();
-
-        for (name, sink) in &config.sinks {
-            let name = name.as_str();
-            let typetag = sink.inner.typetag_name();
-
-            info!("Starting sink {:?} of type {}", name, typetag);
-            let task = tasks.remove(name).unwrap();
-            let task = handle_errors(task, abort_tx.clone());
-
-            let span = info_span!("sink", name = name, r#type = typetag);
-            let task = task.instrument(span);
-            let spawned = oneshot::spawn(task, &rt.executor());
-            spawned_tasks.insert(name.to_string(), spawned);
-        }
-
-        for (name, transform) in &config.transforms {
-            let name = name.as_str();
-            let typetag = transform.inner.typetag_name();
-
-            info!("Starting transform {:?} of type {}", name, typetag);
-            let task = tasks.remove(name).unwrap();
-            let task = handle_errors(task, abort_tx.clone());
-
-            let span = info_span!("transform", name = name, r#type = typetag);
-            let task = task.instrument(span);
-            let spawned = oneshot::spawn(task, &rt.executor());
-            spawned_tasks.insert(name.to_string(), spawned);
-        }
-
-        let mut spawned_source_tasks = HashMap::new();
-        for (name, source) in &config.sources {
-            let name = name.as_str();
-            let typetag = source.typetag_name();
-
-            info!("Starting source {:?} of type {}", name, typetag);
-
-            {
-                let task = tasks.remove(name).unwrap();
-                let task = handle_errors(task, abort_tx.clone());
-
-                let span = info_span!("source-pump", name = name, r#type = typetag);
-                let task = task.instrument(span);
-                let spawned = oneshot::spawn(task, &rt.executor());
-                spawned_tasks.insert(name.to_string(), spawned);
-            }
-
-            {
-                let task = source_tasks.remove(name).unwrap();
-                let task = handle_errors(task, abort_tx.clone());
-
-                let span = info_span!("source", name = name, r#type = typetag);
-                let task = task.instrument(span);
-                let spawned = oneshot::spawn(task, &rt.executor());
-                spawned_source_tasks.insert(name.to_string(), spawned);
-            }
-        }
-
-        let running_topology = RunningTopology {
-            inputs: new_inputs,
-            outputs,
-            config,
-            shutdown_triggers,
-            source_tasks: spawned_source_tasks,
-            tasks: spawned_tasks,
+        let mut running_topology = RunningTopology {
+            inputs: HashMap::new(),
+            outputs: HashMap::new(),
+            config: Config::empty(),
+            shutdown_triggers: HashMap::new(),
+            source_tasks: HashMap::new(),
+            tasks: HashMap::new(),
             abort_tx,
         };
+
+        running_topology.reload_config(config, rt, false, true);
 
         (running_topology, abort_rx)
     }
@@ -230,10 +155,11 @@ impl RunningTopology {
         new_config: Config,
         rt: &mut tokio::runtime::Runtime,
         require_healthy: bool,
+        initial_load: bool,
     ) {
         info!("Reloading config");
 
-        if self.config.data_dir != new_config.data_dir {
+        if !initial_load && self.config.data_dir != new_config.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
             return;
         }
@@ -346,13 +272,20 @@ impl RunningTopology {
             self.remove_outputs(&name);
         }
 
+        // Make sure all transform outputs are set up before another transform might try use
+        // it as an input
+        for name in &transforms_to_change {
+            self.setup_outputs(&name, &mut new_pieces);
+        }
+        for name in &transforms_to_add {
+            self.setup_outputs(&name, &mut new_pieces);
+        }
+
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
-            self.spawn_transform(&name, &mut new_pieces, rt);
-
-            self.setup_outputs(&name, &mut new_pieces);
             self.replace_inputs(&name, &mut new_pieces);
+            self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
         for name in transforms_to_add {
@@ -360,7 +293,6 @@ impl RunningTopology {
 
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn_transform(&name, &mut new_pieces, rt);
-            self.setup_outputs(&name, &mut new_pieces);
         }
 
         // Sinks
@@ -501,14 +433,14 @@ impl RunningTopology {
 
     fn setup_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
-        // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
-        // so until a test exposes this hole
 
         for input in inputs {
             self.outputs[&input]
                 .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
                 .unwrap();
         }
+
+        self.inputs.insert(name.clone(), tx);
     }
 
     fn replace_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
@@ -631,7 +563,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -696,7 +628,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         // out2 should disconnect after the reload
         let output_lines2 = output_lines2.wait();
@@ -758,7 +690,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -830,7 +762,7 @@ mod tests {
 
             wait_for(|| output_lines1.count() > 0);
 
-            topology.reload_config(new_config, &mut rt, false);
+            topology.reload_config(new_config, &mut rt, false, false);
             wait_for(|| output_lines2.count() > 0);
 
             // Shut down server
@@ -882,7 +814,7 @@ mod tests {
             .inputs
             .push("in".to_string());
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         wait_for_tcp(in_addr);
 
@@ -933,7 +865,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
@@ -983,7 +915,7 @@ mod tests {
         new_config.add_source("in2", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1058,7 +990,7 @@ mod tests {
             shutdown_timeout_secs: 30,
         });
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         wait_for_tcp(in_addr);
@@ -1143,7 +1075,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= num_lines);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1211,7 +1143,7 @@ mod tests {
         wait_for(|| output_lines1.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1284,7 +1216,7 @@ mod tests {
             pass_list: vec![],
         });
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -1326,6 +1258,7 @@ mod tests {
         use std::path::Path;
 
         let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(next_addr()));
         old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
         let (topology, _warnings) = topology::build(old_config).unwrap();
@@ -1334,7 +1267,7 @@ mod tests {
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(new_config, &mut rt, false, false);
 
         assert_eq!(
             topology.config.data_dir,
@@ -1406,7 +1339,7 @@ mod tests {
                 address: out2_addr.to_string(),
             });
 
-            topology.reload_config(config.clone(), &mut rt, true);
+            topology.reload_config(config.clone(), &mut rt, true, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
@@ -1424,7 +1357,7 @@ mod tests {
                 address: out2_addr.to_string(),
             });
 
-            topology.reload_config(config.clone(), &mut rt, true);
+            topology.reload_config(config.clone(), &mut rt, true, false);
             healthcheck_receiver.wait();
 
             let receive = receive_one(&out1_addr, &out2_addr);
@@ -1441,7 +1374,7 @@ mod tests {
                 address: out1_addr.to_string(),
             });
 
-            topology.reload_config(config.clone(), &mut rt, false);
+            topology.reload_config(config.clone(), &mut rt, false, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 

@@ -275,7 +275,7 @@ fn main() {
             match config {
                 Ok(config) => {
                     debug!("Reloading topology.");
-                    topology.reload_config(config, &mut rt, require_healthy);
+                    topology.reload_config(config, &mut rt, require_healthy, false);
                 }
                 Err(errors) => {
                     for error in errors {
