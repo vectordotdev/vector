@@ -173,6 +173,8 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
 
     if config.contains_cycle() {
         errors.push(format!("Configured topology contains a cycle"));
+    } else if let Err(type_errors) = config.typecheck() {
+        errors.extend(type_errors);
     }
 
     if errors.is_empty() {
