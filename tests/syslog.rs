@@ -4,7 +4,7 @@ use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio_uds::UnixStream;
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
 use vector::{
@@ -32,7 +32,7 @@ fn test_tcp_syslog() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
@@ -50,7 +50,7 @@ fn test_tcp_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -75,7 +75,7 @@ fn test_udp_syslog() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
 
@@ -100,7 +100,7 @@ fn test_udp_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
 
     // Account for some dropped packets :(
     let output_lines_ratio = output_lines.len() as f32 / num_lines as f32;
@@ -135,7 +135,7 @@ fn test_unix_stream_syslog() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
     // Wait for server to accept traffic
@@ -172,7 +172,7 @@ fn test_unix_stream_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }

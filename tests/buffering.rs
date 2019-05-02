@@ -3,7 +3,7 @@ use prost::Message;
 use tempfile::tempdir;
 use vector::record::{self, Record};
 use vector::test_util::{
-    block_on, next_addr, random_lines, random_string, receive_lines, send_lines, shutdown_on_idle,
+    block_on, next_addr, random_lines, random_string, receive, send_lines, shutdown_on_idle,
     wait_for_tcp,
 };
 use vector::topology::{self, config};
@@ -69,7 +69,7 @@ fn test_buffering() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
 
@@ -85,7 +85,7 @@ fn test_buffering() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
     assert_eq!(input_lines, &output_lines[..num_lines]);
     assert_eq!(input_lines2, &output_lines[num_lines..]);
@@ -166,7 +166,7 @@ fn test_max_size() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
 
@@ -176,7 +176,7 @@ fn test_max_size() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines / 2, output_lines.len());
     assert_eq!(&input_lines[..num_lines / 2], &output_lines[..]);
 }
@@ -228,13 +228,13 @@ fn test_max_size_resume() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
 }
 
@@ -309,7 +309,7 @@ fn test_reclaim_disk_space() {
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     let (topology, _crash) = topology.start(&mut rt);
 
@@ -325,7 +325,7 @@ fn test_reclaim_disk_space() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2 - 1, output_lines.len());
     assert_eq!(&input_lines[1..], &output_lines[..num_lines - 1]);
     assert_eq!(input_lines2, &output_lines[num_lines - 1..]);

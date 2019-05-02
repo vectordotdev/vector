@@ -74,49 +74,6 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     std::iter::repeat(()).map(move |_| random_string(len))
 }
 
-pub fn receive_lines(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> impl Future<Item = Vec<String>, Error = ()> {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-
-    futures::sync::oneshot::spawn(lines, executor)
-}
-
-pub fn receive_lines_with_count(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> (
-    impl Future<Item = Vec<String>, Error = ()>,
-    Arc<AtomicUsize>,
-) {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let count = Arc::new(AtomicUsize::new(0));
-    let count_clone = Arc::clone(&count);
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .inspect(move |_| {
-            count_clone.fetch_add(1, Ordering::Relaxed);
-        })
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-
-    (futures::sync::oneshot::spawn(lines, executor), count)
-}
-
 pub fn wait_for(f: impl Fn() -> bool) {
     let wait = std::time::Duration::from_millis(5);
     let limit = std::time::Duration::from_secs(5);
