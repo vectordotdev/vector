@@ -23,9 +23,9 @@ Vector is designed with a *keen* focus on [performance][benchmarks] and operator
 
 ---
 
-## Development
+### Development
 
-### Sample Logs
+#### Sample Logs
 
 We use `flog` to build a sample set of log files to test sending logs from a file. This can
 be done with the following commands on mac with homebrew.
@@ -38,7 +38,7 @@ $ flog --bytes $((100 * 1024 * 1024)) > sample.log
 
 This will create a `100MB` sample log file in the `sample.log` file.
 
-### Building
+#### Building
 
 Vector compiles with Rust 1.34.0 (stable) or newer. In general, Vector tracks the latest stable release of the Rust compiler.
 
@@ -49,7 +49,7 @@ cargo build
 ```
 
 
-### Testing
+#### Testing
 
 Testing is a bit more complicated, this because to test all the sinks we need to stand
 up local mock versions of the sources we send logs too. To do this we use `docker` and 
@@ -63,7 +63,7 @@ cargo test
 cargo test --features docker
 ```
 
-### Code Style
+#### Code Style
 
 We use `rustfmt` on `stable` to format our code and CI will verify that your code follows
 this format style. To run the following command make sure `rustfmt` has been installed on
