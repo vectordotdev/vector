@@ -224,7 +224,6 @@ fn main() {
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
-            info!("Reloading config");
             let success = topology.reload_config(config, &mut rt, require_healthy, false);
             if !success {
                 error!("Reload aborted");
