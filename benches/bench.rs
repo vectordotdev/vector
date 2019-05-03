@@ -1,11 +1,10 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::assert_relative_eq;
-use futures::{future, Future, Stream};
-use std::net::SocketAddr;
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::net::TcpListener;
-use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
+use futures::future;
+use vector::test_util::{
+    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
+};
 use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
@@ -38,7 +37,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
@@ -52,7 +51,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -87,7 +86,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
@@ -101,7 +100,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -136,7 +135,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
@@ -150,7 +149,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -186,7 +185,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
@@ -208,7 +207,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines * num_writers, output_lines.wait().unwrap());
+                    assert_eq!(num_lines * num_writers, output_lines.wait());
                 },
             );
         })
@@ -255,8 +254,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines1 = count_lines(&out_addr1, &rt.executor());
-                    let output_lines2 = count_lines(&out_addr2, &rt.executor());
+                    let output_lines1 = count_receive(&out_addr1);
+                    let output_lines2 = count_receive(&out_addr2);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr1);
@@ -273,8 +272,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines * 2, output_lines1.wait().unwrap());
-                    assert_eq!(num_lines * 2, output_lines2.wait().unwrap());
+                    assert_eq!(num_lines * 2, output_lines1.wait());
+                    assert_eq!(num_lines * 2, output_lines2.wait());
                 },
             );
         })
@@ -323,7 +322,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     let (topology, _warnings) = topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr);
@@ -342,7 +341,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -450,10 +449,10 @@ fn benchmark_complex(c: &mut Criterion) {
                     let (topology, _warnings) = topology::build(config).unwrap();
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines_all = count_lines(&out_addr_all, &rt.executor());
-                    let output_lines_sampled = count_lines(&out_addr_sampled, &rt.executor());
-                    let output_lines_200 = count_lines(&out_addr_200, &rt.executor());
-                    let output_lines_404 = count_lines(&out_addr_404, &rt.executor());
+                    let output_lines_all = count_receive(&out_addr_all);
+                    let output_lines_sampled = count_receive(&out_addr_sampled);
+                    let output_lines_200 = count_receive(&out_addr_200);
+                    let output_lines_404 = count_receive(&out_addr_404);
 
                     let (topology, _crash) = topology.start(&mut rt);
                     wait_for_tcp(in_addr1);
@@ -503,10 +502,10 @@ fn benchmark_complex(c: &mut Criterion) {
 
                     shutdown_on_idle(rt);
 
-                    let output_lines_all = output_lines_all.wait().unwrap();
-                    let output_lines_sampled = output_lines_sampled.wait().unwrap();
-                    let output_lines_200 = output_lines_200.wait().unwrap();
-                    let output_lines_404 = output_lines_404.wait().unwrap();
+                    let output_lines_all = output_lines_all.wait();
+                    let output_lines_sampled = output_lines_sampled.wait();
+                    let output_lines_200 = output_lines_200.wait();
+                    let output_lines_404 = output_lines_404.wait();
 
                     assert_eq!(output_lines_all, num_lines * 2);
                     assert_relative_eq!(
@@ -547,21 +546,4 @@ fn random_lines(size: usize) -> impl Iterator<Item = String> {
             .take(size)
             .collect::<String>()
     })
-}
-
-fn count_lines(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> impl Future<Item = usize, Error = ()> {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .fold(0, |n, _| future::ok(n + 1));
-
-    futures::sync::oneshot::spawn(lines, executor)
 }

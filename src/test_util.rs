@@ -1,5 +1,5 @@
 use crate::Record;
-use futures::{stream, Async, Future, Poll, Sink, Stream};
+use futures::{future, stream, Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -196,6 +196,42 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
     Receiver {
         handle,
         count,
+        trigger,
+        _runtime: runtime,
+    }
+}
+
+pub struct CountReceiver {
+    handle: futures::sync::oneshot::SpawnHandle<usize, ()>,
+    trigger: Trigger,
+    _runtime: Runtime,
+}
+
+impl CountReceiver {
+    pub fn wait(self) -> usize {
+        self.trigger.cancel();
+        self.handle.wait().unwrap()
+    }
+}
+
+pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    let count = listener
+        .incoming()
+        .take_until(tripwire)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .flatten()
+        .map_err(|e| panic!("{:?}", e))
+        .fold(0, |n, _| future::ok(n + 1));
+
+    let handle = futures::sync::oneshot::spawn(count, &runtime.executor());
+    CountReceiver {
+        handle,
         trigger,
         _runtime: runtime,
     }
