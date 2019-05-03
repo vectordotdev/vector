@@ -8,18 +8,18 @@
   <a href="https://slack.linkerd.io/badge.svg"><img src="https://slack.linkerd.io/badge.svg"></a>
 </p>
 
-Vector is a high-performance log and metrics router. It's designed to be deployed across your entire infrastructure, serving both as a light-weight agent that collects logs and metrics data and a highly efficient centralized service for aggregation and routing.
+Vector is a high-performance log and metrics router. It's designed to be deployed across your entire infrastructure, serving both as a [light-weight agent][agent] that collects logs and metrics data and a [highly efficient centralized service][centralized_service] for aggregation and routing.
 
-Vector is designed with a keen focus on performance and operator friendliness. Its purpose is to decouple routing from the underlying hardware, giving you complete flexibility to adopt the tools of your choice.
+Vector is designed with a *keen* focus on [performance][benchmarks] and operator friendliness. Its purpose is to decouple routing from the underlying components, giving you complete flexibility to adopt the tools of your choice, among [many other benefits][use_cases].
 
 ---
 
-* [**Installation**]()
-* [**Configuration**]()
-* [**Administration**]()
-* [**Use cases**]()
-* [**Guides**]()
-* [**Benchmark Suite**]()
+* [**Installation**][installation]
+* [**Configuration**][configuration]
+* [**Administration**][administration]
+* [**Use cases**][use_cases]
+* [**Guides**][guides]
+* [**Benchmarks**][benchmarks]
 
 ---
 
@@ -84,3 +84,12 @@ unsure, open a pull request.
 <p align="center">
   Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
 </p>
+
+[administration]: https://docs.vectorproject.io/usage/administration
+[agent]: https://docs.vectorproject.io/setup/deployment/as_an_agent
+[benchmarks]: https://docs.vectorproject.io/benchmarks
+[centralized_service]: https://docs.vectorproject.io/setup/deployment/as_a_centralized_service
+[configuration]: https://docs.vectorproject.io/usage/configuration
+[guides]: https://docs.vectorproject.io/usage/guides
+[installation]: https://docs.vectorproject.io/setup/installation
+[use_cases]: https://docs.vectorproject.io/usage/use_cases
