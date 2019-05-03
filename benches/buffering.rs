@@ -36,13 +36,12 @@ fn benchmark_buffers(c: &mut Criterion) {
                         num_items: 100,
                         when_full: Default::default(),
                     };
-                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -76,13 +75,12 @@ fn benchmark_buffers(c: &mut Criterion) {
                     }
                     .into();
                     config.data_dir = Some(data_dir.clone());
-                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -115,13 +113,12 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
                     config.data_dir = Some(data_dir2.clone());
-                    let (topology, _warnings) = topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)

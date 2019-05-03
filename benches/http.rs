@@ -32,11 +32,10 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (topology, _warnings) = topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                let (topology, _crash) = topology.start(&mut rt);
+                let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
 
                 (rt, topology)
@@ -80,11 +79,10 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (topology, _warnings) = topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                let (topology, _crash) = topology.start(&mut rt);
+                let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
 
                 (rt, topology)

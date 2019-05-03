@@ -26,13 +26,12 @@ fn test_pipe() {
             address: out_addr.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -73,13 +72,12 @@ fn test_sample() {
             address: out_addr.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -137,13 +135,12 @@ fn test_parse() {
             address: out_addr.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -184,13 +181,12 @@ fn test_merge() {
             address: out_addr.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -251,14 +247,13 @@ fn test_fork() {
             address: out_addr2.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -306,14 +301,13 @@ fn test_merge_and_fork() {
             address: out_addr2.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -393,14 +387,12 @@ fn test_merge_and_fork_json() {
 
     let config: config::Config = serde_json::from_str(&config).unwrap();
 
-    let (topology, _warnings) = topology::build(config).unwrap();
-
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -456,7 +448,6 @@ fn test_reconnect() {
             address: out_addr.to_string(),
         },
     );
-    let (topology, _warnings) = topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let output_rt = tokio::runtime::Runtime::new().unwrap();
@@ -472,7 +463,7 @@ fn test_reconnect() {
         .collect();
     let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    let (topology, _crash) = topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
