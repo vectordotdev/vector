@@ -362,6 +362,7 @@ impl RunningTopology {
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone());
+        let source_task = source_task.instrument(info_span!("source", name = name.as_str()));
         self.source_tasks
             .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
     }
