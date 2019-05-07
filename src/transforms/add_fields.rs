@@ -32,7 +32,7 @@ impl AddFields {
 impl Transform for AddFields {
     fn transform(&self, mut record: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
-            record.insert_explicit(key, value.into());
+            record.as_mut_log().insert_explicit(key, value.into());
         }
 
         Some(record)

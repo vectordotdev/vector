@@ -47,11 +47,17 @@ mod tests {
         let output_lines = receive(&out_addr);
 
         let mut record1 = Event::new_empty();
-        record1.insert_explicit("qwerty".into(), "asdf".into());
-        record1.insert_explicit("abcd".into(), "1234".into());
+        record1
+            .as_mut_log()
+            .insert_explicit("qwerty".into(), "asdf".into());
+        record1
+            .as_mut_log()
+            .insert_explicit("abcd".into(), "1234".into());
 
         let mut record2 = Event::new_empty();
-        record2.insert_explicit("hello".into(), "goodbye".into());
+        record2
+            .as_mut_log()
+            .insert_explicit("hello".into(), "goodbye".into());
         record2.insert_implicit("hidden".into(), "secret".into());
 
         block_on(sink.send_all(stream::iter_ok(vec![record1, record2]))).unwrap();

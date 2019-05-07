@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
-        self.as_mut_log().insert_explicit(key, value)
-    }
-
     pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
         self.as_mut_log().insert_implicit(key, value)
     }
@@ -363,8 +359,12 @@ mod test {
     #[test]
     fn serialization() {
         let mut record = Event::from("raw log line");
-        record.insert_explicit("foo".into(), "bar".into());
-        record.insert_explicit("bar".into(), "baz".into());
+        record
+            .as_mut_log()
+            .insert_explicit("foo".into(), "bar".into());
+        record
+            .as_mut_log()
+            .insert_explicit("bar".into(), "baz".into());
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
@@ -392,7 +392,9 @@ mod test {
     fn record_iteration() {
         let mut record = Event::new_empty();
 
-        record.insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
+        record
+            .as_mut_log()
+            .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
         record.insert_implicit(
             "Pitbull".into(),
             "The bigger they are, the harder they fall".into(),

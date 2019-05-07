@@ -157,7 +157,9 @@ mod tests {
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut record = Event::from("butts");
-        record.insert_explicit("foo".into(), "bar".into());
+        record
+            .as_mut_log()
+            .insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -169,7 +171,9 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
         let mut record = Event::from("butts");
-        record.insert_explicit("not_foo".into(), "bar".into());
+        record
+            .as_mut_log()
+            .insert_explicit("not_foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -181,7 +185,9 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
         let mut record = Event::from("butts");
-        record.insert_explicit("foo".into(), "bar".into());
+        record
+            .as_mut_log()
+            .insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &record);
@@ -221,8 +227,12 @@ mod integration_tests {
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
         let mut input_record = Event::from("raw log line");
-        input_record.insert_explicit("my_id".into(), "42".into());
-        input_record.insert_explicit("foo".into(), "bar".into());
+        input_record
+            .as_mut_log()
+            .insert_explicit("my_id".into(), "42".into());
+        input_record
+            .as_mut_log()
+            .insert_explicit("foo".into(), "bar".into());
 
         let pump = sink.send(input_record.clone());
         block_on(pump).unwrap();

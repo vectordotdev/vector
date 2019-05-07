@@ -71,16 +71,22 @@ impl Transform for JsonParser {
 fn insert(record: &mut Event, name: String, value: Value) {
     match value {
         Value::String(string) => {
-            record.insert_explicit(name.into(), string.into());
+            record
+                .as_mut_log()
+                .insert_explicit(name.into(), string.into());
         }
         Value::Number(number) => {
-            record.insert_explicit(name.into(), number.to_string().into());
+            record
+                .as_mut_log()
+                .insert_explicit(name.into(), number.to_string().into());
         }
         Value::Bool(b) => {
-            record.insert_explicit(name.into(), b.to_string().into());
+            record
+                .as_mut_log()
+                .insert_explicit(name.into(), b.to_string().into());
         }
         Value::Null => {
-            record.insert_explicit(name.into(), "".into());
+            record.as_mut_log().insert_explicit(name.into(), "".into());
         }
         Value::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {
@@ -132,7 +138,7 @@ mod test {
         // Field present
 
         let mut record = Event::from("message");
-        record.insert_explicit(
+        record.as_mut_log().insert_explicit(
             "data".into(),
             r#"{"greeting": "hello", "name": "bob"}"#.into(),
         );
@@ -177,7 +183,9 @@ mod test {
         });
 
         let mut record = Event::from("message");
-        record.insert_explicit("data".into(), invalid.into());
+        record
+            .as_mut_log()
+            .insert_explicit("data".into(), invalid.into());
 
         let record = parser.transform(record).unwrap();
 
@@ -214,15 +222,21 @@ mod test {
         });
 
         let mut record = Event::from("message");
-        record.insert_explicit("data".into(), valid.into());
+        record
+            .as_mut_log()
+            .insert_explicit("data".into(), valid.into());
         assert!(parser.transform(record).is_some());
 
         let mut record = Event::from("message");
-        record.insert_explicit("data".into(), invalid.into());
+        record
+            .as_mut_log()
+            .insert_explicit("data".into(), invalid.into());
         assert!(parser.transform(record).is_none());
 
         let mut record = Event::from("message");
-        record.insert_explicit("data".into(), not_object.into());
+        record
+            .as_mut_log()
+            .insert_explicit("data".into(), not_object.into());
         assert!(parser.transform(record).is_none());
 
         // Missing field
