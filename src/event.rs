@@ -35,68 +35,104 @@ impl Event {
     }
 
     pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
-        match self {
-            Event::Log(LogEvent { structured }) => structured.get(key).map(|v| &v.value),
-        }
+        self.as_log().get(key)
     }
 
     pub fn into_value(self, key: &Atom) -> Option<ValueKind> {
-        match self {
-            Event::Log(LogEvent { mut structured }) => structured.remove(key).map(|v| v.value),
-        }
+        self.into_log().into_value(key)
     }
 
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
-        match self {
-            Event::Log(LogEvent { ref mut structured }) => structured.insert(
-                key,
-                Value {
-                    value,
-                    explicit: true,
-                },
-            ),
-        };
+        self.as_mut_log().insert_explicit(key, value)
     }
 
     pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
-        match self {
-            Event::Log(LogEvent { ref mut structured }) => structured.insert(
-                key,
-                Value {
-                    value,
-                    explicit: false,
-                },
-            ),
-        };
+        self.as_mut_log().insert_implicit(key, value)
     }
 
     pub fn remove(&mut self, key: &Atom) {
-        match self {
-            Event::Log(LogEvent { ref mut structured }) => structured.remove(key),
-        };
+        self.as_mut_log().remove(key)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
-        match self {
-            Event::Log(LogEvent { structured }) => structured.keys(),
-        }
+        self.as_log().keys()
     }
 
     pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+        self.as_log().all_fields()
+    }
+
+    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
+        self.as_log().explicit_fields()
+    }
+
+    pub fn as_log(&self) -> &LogEvent {
         match self {
-            Event::Log(LogEvent { structured }) => FieldsIter {
-                inner: structured.iter(),
-                explicit_only: false,
+            Event::Log(log) => log,
+        }
+    }
+
+    pub fn as_mut_log(&mut self) -> &mut LogEvent {
+        match self {
+            Event::Log(log) => log,
+        }
+    }
+
+    pub fn into_log(self) -> LogEvent {
+        match self {
+            Event::Log(log) => log,
+        }
+    }
+}
+
+impl LogEvent {
+    pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
+        self.structured.get(key).map(|v| &v.value)
+    }
+
+    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
+        self.structured.remove(key).map(|v| v.value)
+    }
+
+    pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
+        self.structured.insert(
+            key,
+            Value {
+                value,
+                explicit: true,
             },
+        );
+    }
+
+    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
+        self.structured.insert(
+            key,
+            Value {
+                value,
+                explicit: false,
+            },
+        );
+    }
+
+    pub fn remove(&mut self, key: &Atom) {
+        self.structured.remove(key);
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &Atom> {
+        self.structured.keys()
+    }
+
+    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: false,
         }
     }
 
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
-        match self {
-            Event::Log(LogEvent { structured }) => FieldsIter {
-                inner: structured.iter(),
-                explicit_only: true,
-            },
+        FieldsIter {
+            inner: self.structured.iter(),
+            explicit_only: true,
         }
     }
 }
