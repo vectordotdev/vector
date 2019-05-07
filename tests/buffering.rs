@@ -95,8 +95,12 @@ fn test_max_size() {
 
     let proto_size = {
         let mut example_record = Event::from(random_string(line_size));
-        example_record.insert_implicit("host".into(), "127.0.0.1".into());
-        example_record.insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
+        example_record
+            .as_mut_log()
+            .insert_implicit("host".into(), "127.0.0.1".into());
+        example_record
+            .as_mut_log()
+            .insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
         event::proto::EventWrapper::from(example_record)

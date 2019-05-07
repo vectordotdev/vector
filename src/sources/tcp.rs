@@ -119,7 +119,9 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
                     .map(Event::from)
                     .map(move |mut record| {
                         if let Some(host) = &host {
-                            record.insert_implicit(event::HOST.clone(), host.clone().into());
+                            record
+                                .as_mut_log()
+                                .insert_implicit(event::HOST.clone(), host.clone().into());
                         }
 
                         trace!(

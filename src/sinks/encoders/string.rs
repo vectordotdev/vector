@@ -60,7 +60,9 @@ mod tests {
         record2
             .as_mut_log()
             .insert_explicit("hello".into(), "goodbye".into());
-        record2.insert_implicit(event::MESSAGE.clone(), "pssst".into());
+        record2
+            .as_mut_log()
+            .insert_implicit(event::MESSAGE.clone(), "pssst".into());
 
         block_on(sink.send_all(stream::iter_ok(vec![record1, record2]))).unwrap();
 

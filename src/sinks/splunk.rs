@@ -298,7 +298,9 @@ mod integration_tests {
         record
             .as_mut_log()
             .insert_explicit("asdf".into(), "hello".into());
-        record.insert_implicit("host".into(), "example.com:1234".into());
+        record
+            .as_mut_log()
+            .insert_implicit("host".into(), "example.com:1234".into());
 
         let pump = sink.send(record);
 
@@ -337,7 +339,9 @@ mod integration_tests {
         record
             .as_mut_log()
             .insert_explicit("asdf".into(), "hello".into());
-        record.insert_implicit("host".into(), "example.com:1234".into());
+        record
+            .as_mut_log()
+            .insert_implicit("host".into(), "example.com:1234".into());
         record
             .as_mut_log()
             .insert_explicit("roast".into(), "beef.example.com:1234".into());

@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
-        self.as_mut_log().insert_implicit(key, value)
-    }
-
     pub fn remove(&mut self, key: &Atom) {
         self.as_mut_log().remove(key)
     }
@@ -297,8 +293,12 @@ impl From<Bytes> for Event {
             structured: HashMap::new(),
         });
 
-        record.insert_implicit(MESSAGE.clone(), message.into());
-        record.insert_implicit(TIMESTAMP.clone(), Utc::now().into());
+        record
+            .as_mut_log()
+            .insert_implicit(MESSAGE.clone(), message.into());
+        record
+            .as_mut_log()
+            .insert_implicit(TIMESTAMP.clone(), Utc::now().into());
 
         record
     }
@@ -395,7 +395,7 @@ mod test {
         record
             .as_mut_log()
             .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
-        record.insert_implicit(
+        record.as_mut_log().insert_implicit(
             "Pitbull".into(),
             "The bigger they are, the harder they fall".into(),
         );
