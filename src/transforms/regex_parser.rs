@@ -72,6 +72,6 @@ mod tests {
 
         let record = parser.transform(record).unwrap();
 
-        assert_eq!(record.get(&"status".into()), None);
+        assert_eq!(record.as_log().get(&"status".into()), None);
     }
 }

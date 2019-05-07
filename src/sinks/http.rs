@@ -126,7 +126,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
                 "fields": record.explicit_fields(),
             });
 
-            if let Some(host) = record.get(&Atom::from("host")) {
+            if let Some(host) = record.as_log().get(&Atom::from("host")) {
                 body["host"] = json!(host);
             }
             let mut body = serde_json::to_vec(&body).unwrap();

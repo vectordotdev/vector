@@ -51,8 +51,8 @@ mod tests {
 
         let new_record = transform.transform(record).unwrap();
 
-        assert!(new_record.get(&"to_remove".into()).is_none());
-        assert!(new_record.get(&"unknown".into()).is_none());
+        assert!(new_record.as_log().get(&"to_remove".into()).is_none());
+        assert!(new_record.as_log().get(&"unknown".into()).is_none());
         assert_eq!(new_record[&"to_keep".into()], "another value".into());
     }
 }

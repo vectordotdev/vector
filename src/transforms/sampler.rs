@@ -136,7 +136,7 @@ mod tests {
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let record = Event::from("nananana");
         let passing = sampler.transform(record).unwrap();
-        assert!(passing.get(&Atom::from("sample_rate")).is_none());
+        assert!(passing.as_log().get(&Atom::from("sample_rate")).is_none());
     }
 
     fn random_records(n: usize) -> Vec<Event> {

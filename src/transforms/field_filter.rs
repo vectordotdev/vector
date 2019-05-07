@@ -37,6 +37,7 @@ impl FieldFilter {
 impl Transform for FieldFilter {
     fn transform(&self, record: Event) -> Option<Event> {
         if record
+            .as_log()
             .get(&self.field_name)
             .map(|f| f.as_bytes())
             .map_or(false, |b| b == self.value.as_bytes())

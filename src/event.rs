@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
-        self.as_log().get(key)
-    }
-
     pub fn into_value(self, key: &Atom) -> Option<ValueKind> {
         self.into_log().into_value(key)
     }
@@ -378,7 +374,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": record.get(&super::TIMESTAMP),
+            "timestamp": record.as_log().get(&super::TIMESTAMP),
         });
 
         let expected_explicit = serde_json::json!({

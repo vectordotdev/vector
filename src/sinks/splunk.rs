@@ -107,7 +107,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
         .with(move |record: Event| {
-            let host = record.get(&host_field).map(|h| h.clone());
+            let host = record.as_log().get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
                 "event": record[&event::MESSAGE].to_string_lossy(),

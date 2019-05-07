@@ -138,7 +138,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Event) {
-    if let Some(val) = key.and_then(|k| record.get(&k.as_ref().into())) {
+    if let Some(val) = key.and_then(|k| record.as_log().get(&k.as_ref().into())) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()

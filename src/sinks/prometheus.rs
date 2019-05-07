@@ -175,7 +175,7 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         for (field, counter) in &self.counters {
-            if let Some(val) = record.get(&field.key) {
+            if let Some(val) = record.as_log().get(&field.key) {
                 if field.parse_value {
                     let val = val.to_string_lossy();
 
@@ -194,7 +194,7 @@ impl Sink for PrometheusSink {
         }
 
         for (field, gauge) in &self.gauges {
-            if let Some(val) = record.get(&field.key) {
+            if let Some(val) = record.as_log().get(&field.key) {
                 let val = val.to_string_lossy();
 
                 if let Ok(count) = val.parse() {

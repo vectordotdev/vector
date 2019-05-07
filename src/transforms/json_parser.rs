@@ -39,7 +39,10 @@ impl From<JsonParserConfig> for JsonParser {
 
 impl Transform for JsonParser {
     fn transform(&self, mut record: Event) -> Option<Event> {
-        let to_parse = record.get(&self.config.field).map(|s| s.as_bytes());
+        let to_parse = record
+            .as_log()
+            .get(&self.config.field)
+            .map(|s| s.as_bytes());
 
         let parsed = to_parse
             .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse.as_ref()).ok())
@@ -179,7 +182,7 @@ mod test {
         let record = parser.transform(record).unwrap();
 
         assert_eq!(record[&Atom::from("data")], invalid.into());
-        assert!(record.get(&Atom::from("greeting")).is_none());
+        assert!(record.as_log().get(&Atom::from("greeting")).is_none());
     }
 
     #[test]

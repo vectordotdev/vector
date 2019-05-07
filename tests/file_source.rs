@@ -544,7 +544,7 @@ fn file_max_line_bytes() {
     shutdown_on_idle(rt);
 
     let received = rx
-        .map(|r| r.get(&event::MESSAGE).unwrap().clone())
+        .map(|r| r.as_log().get(&event::MESSAGE).unwrap().clone())
         .collect()
         .wait()
         .unwrap();

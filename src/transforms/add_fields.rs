@@ -56,7 +56,7 @@ mod tests {
         let new_record = augment.transform(record).unwrap();
 
         let key = Atom::from("some_key".to_string());
-        let kv = new_record.get(&key);
+        let kv = new_record.as_log().get(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val.into()));
