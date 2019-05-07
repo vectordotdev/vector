@@ -17,7 +17,11 @@ struct StringEncoder {}
 
 impl Encoder for StringEncoder {
     fn encode(&self, record: Event) -> Bytes {
-        record.into_value(&event::MESSAGE).unwrap().into_bytes()
+        record
+            .into_log()
+            .into_value(&event::MESSAGE)
+            .unwrap()
+            .into_bytes()
     }
 }
 

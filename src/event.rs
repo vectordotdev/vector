@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn into_value(self, key: &Atom) -> Option<ValueKind> {
-        self.into_log().into_value(key)
-    }
-
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
         self.as_mut_log().insert_explicit(key, value)
     }
