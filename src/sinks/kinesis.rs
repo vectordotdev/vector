@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::Record,
+    event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -57,7 +57,7 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> Result<impl Sink<SinkItem = Record, SinkError = ()>, String> {
+    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size;
@@ -86,7 +86,7 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
-            .with(|record: Record| Ok(record.into()));
+            .with(|record: Event| Ok(record.into()));
 
         Ok(sink)
     }

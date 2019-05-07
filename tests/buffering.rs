@@ -1,7 +1,7 @@
 use futures::Future;
 use prost::Message;
 use tempfile::tempdir;
-use vector::record::{self, Record};
+use vector::event::{self, Event};
 use vector::test_util::{
     block_on, next_addr, random_lines, random_string, receive, send_lines, shutdown_on_idle,
     wait_for_tcp,
@@ -94,12 +94,12 @@ fn test_max_size() {
     let line_size = 1000;
 
     let proto_size = {
-        let mut example_record = Record::from(random_string(line_size));
+        let mut example_record = Event::from(random_string(line_size));
         example_record.insert_implicit("host".into(), "127.0.0.1".into());
         example_record.insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
-        record::proto::EventWrapper::from(example_record)
+        event::proto::EventWrapper::from(example_record)
             .encode(&mut proto)
             .unwrap();
         proto.len()

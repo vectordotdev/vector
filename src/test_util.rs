@@ -1,4 +1,4 @@
-use crate::Record;
+use crate::Event;
 use futures::{future, stream, Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -42,19 +42,19 @@ pub fn send_lines(
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream<Item = Record, Error = ()>) {
+) -> (Vec<String>, impl Stream<Item = Event, Error = ()>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter_ok(lines.clone().into_iter().map(Record::from));
+    let stream = stream::iter_ok(lines.clone().into_iter().map(Event::from));
     (lines, stream)
 }
 
 pub fn random_records_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Record>, impl Stream<Item = Record, Error = ()>) {
+) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
     let records = (0..count)
         .map(|_| random_string(len))
-        .map(Record::from)
+        .map(Event::from)
         .collect::<Vec<_>>();
     let stream = stream::iter_ok(records.clone().into_iter());
     (records, stream)

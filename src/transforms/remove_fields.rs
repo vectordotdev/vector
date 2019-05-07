@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::Event;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -27,7 +27,7 @@ impl RemoveFields {
 }
 
 impl Transform for RemoveFields {
-    fn transform(&self, mut record: Record) -> Option<Record> {
+    fn transform(&self, mut record: Event) -> Option<Event> {
         for field in &self.fields {
             record.remove(field);
         }
@@ -39,11 +39,11 @@ impl Transform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::RemoveFields;
-    use crate::{record::Record, transforms::Transform};
+    use crate::{event::Event, transforms::Transform};
 
     #[test]
     fn remove_fields() {
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit("to_remove".into(), "some value".into());
         record.insert_explicit("to_keep".into(), "another value".into());
 

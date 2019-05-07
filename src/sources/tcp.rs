@@ -1,5 +1,5 @@
 use super::util::StreamExt as _;
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -41,13 +41,13 @@ impl TcpConfig {
 
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         let tcp = tcp(self.clone(), out)?;
         Ok(tcp)
     }
 }
 
-pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     let TcpConfig {
@@ -116,10 +116,10 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
                         BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
                     )
                     .take_until(tripwire)
-                    .map(Record::from)
+                    .map(Event::from)
                     .map(move |mut record| {
                         if let Some(host) = &host {
-                            record.insert_implicit(record::HOST.clone(), host.clone().into());
+                            record.insert_implicit(event::HOST.clone(), host.clone().into());
                         }
 
                         trace!(
@@ -152,7 +152,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Record>) -> Result<super::Source
 #[cfg(test)]
 mod test {
     use super::TcpConfig;
-    use crate::record;
+    use crate::event;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
     use futures::sync::mpsc;
     use futures::Stream;
@@ -172,7 +172,7 @@ mod test {
             .unwrap();
 
         let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record[&record::HOST], "127.0.0.1".into());
+        assert_eq!(record[&event::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -219,9 +219,9 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap()[&record::MESSAGE], "short".into());
+        assert_eq!(record.unwrap()[&event::MESSAGE], "short".into());
 
         let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap()[&record::MESSAGE], "more short".into());
+        assert_eq!(record.unwrap()[&event::MESSAGE], "more short".into());
     }
 }

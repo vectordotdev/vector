@@ -4,7 +4,7 @@ mod string;
 pub use json::JsonEncoderConfig;
 pub use string::StringEncoderConfig;
 
-use crate::record::Record;
+use crate::Event;
 use bytes::Bytes;
 
 #[typetag::serde(tag = "type")]
@@ -13,7 +13,7 @@ pub trait EncoderConfig: core::fmt::Debug {
 }
 
 pub trait Encoder {
-    fn encode(&self, record: Record) -> Bytes;
+    fn encode(&self, record: Event) -> Bytes;
 }
 
 pub fn default_string_encoder() -> Box<dyn EncoderConfig> {

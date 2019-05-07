@@ -1,4 +1,4 @@
-use crate::record::Record;
+use crate::Event;
 use bytes::Bytes;
 use file_source::file_server::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
@@ -40,13 +40,13 @@ impl Default for FileConfig {
 
 #[typetag::serde(name = "file")]
 impl crate::topology::config::SourceConfig for FileConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         // TODO: validate paths
         Ok(file_source(self, out))
     }
 }
 
-pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Source {
+pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let ignore_before = config
@@ -68,7 +68,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         .sink_map_err(|_| ())
         .with(move |(line, file): (Bytes, String)| {
             trace!(message = "Recieved one record.", file = file.as_str());
-            let mut record = Record::from(line);
+            let mut record = Event::from(line);
             if let Some(ref context_key) = context_key {
                 record.insert_implicit(context_key.clone(), file.into());
             }

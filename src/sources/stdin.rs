@@ -1,4 +1,4 @@
-use crate::{record::Record, topology::config::SourceConfig};
+use crate::{event::Event, topology::config::SourceConfig};
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -28,12 +28,12 @@ fn default_max_length() -> usize {
 
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         Ok(stdin_source(stdin(), self.clone(), out))
     }
 }
 
-pub fn stdin_source<S>(stream: S, config: StdinConfig, out: mpsc::Sender<Record>) -> super::Source
+pub fn stdin_source<S>(stream: S, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
 where
     S: AsyncRead + Send + 'static,
 {
@@ -44,7 +44,7 @@ where
             stream,
             BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
         )
-        .map(Record::from)
+        .map(Event::from)
         .map_err(|e| error!("error reading line: {:?}", e))
         .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
         .map(|_| info!("finished sending"));
@@ -56,7 +56,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::record;
+    use crate::event;
     use futures::sync::mpsc;
     use futures::Async::*;
     use std::io::Cursor;
@@ -78,14 +78,14 @@ mod tests {
         assert!(record.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            record.map(|r| r.map(|r| r[&record::MESSAGE].to_string_lossy()))
+            record.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
         );
 
         let record = rx.poll().unwrap();
         assert!(record.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            record.map(|r| r.map(|r| r[&record::MESSAGE].to_string_lossy()))
+            record.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
         );
 
         let record = rx.poll().unwrap();

@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::Event;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -30,7 +30,7 @@ impl AddFields {
 }
 
 impl Transform for AddFields {
-    fn transform(&self, mut record: Record) -> Option<Record> {
+    fn transform(&self, mut record: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
             record.insert_explicit(key, value.into());
         }
@@ -42,13 +42,13 @@ impl Transform for AddFields {
 #[cfg(test)]
 mod tests {
     use super::AddFields;
-    use crate::{record::Record, transforms::Transform};
+    use crate::{event::Event, transforms::Transform};
     use indexmap::IndexMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn add_fields_record() {
-        let record = Record::from("augment me");
+        let record = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
         let augment = AddFields::new(fields);

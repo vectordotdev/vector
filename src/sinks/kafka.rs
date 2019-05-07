@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::{self, Record},
+    event::{self, Event},
     sinks::util::MetadataFuture,
 };
 use futures::{
@@ -70,13 +70,13 @@ impl KafkaSink {
 }
 
 impl Sink for KafkaSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let bytes = item[&record::MESSAGE].as_bytes();
+        let bytes = item[&event::MESSAGE].as_bytes();
 
         let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 

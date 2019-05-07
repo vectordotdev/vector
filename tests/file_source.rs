@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
-use vector::record;
+use vector::event;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -46,7 +46,7 @@ fn happy_path() {
     let mut goodbye_i = 0;
 
     for record in received {
-        let line = record[&record::MESSAGE].to_string_lossy();
+        let line = record[&event::MESSAGE].to_string_lossy();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
@@ -117,7 +117,7 @@ fn truncate() {
             path.to_str().unwrap()
         );
 
-        let line = record[&record::MESSAGE].to_string_lossy();
+        let line = record[&event::MESSAGE].to_string_lossy();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -184,7 +184,7 @@ fn rotate() {
             path.to_str().unwrap()
         );
 
-        let line = record[&record::MESSAGE].to_string_lossy();
+        let line = record[&event::MESSAGE].to_string_lossy();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -244,7 +244,7 @@ fn multiple_paths() {
     let mut is = [0; 3];
 
     for record in received {
-        let line = record[&record::MESSAGE].to_string_lossy();
+        let line = record[&event::MESSAGE].to_string_lossy();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
@@ -342,7 +342,7 @@ fn context_key() {
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
             received.keys().cloned().collect::<HashSet<_>>(),
-            vec![record::MESSAGE.clone(), record::TIMESTAMP.clone()]
+            vec![event::MESSAGE.clone(), event::TIMESTAMP.clone()]
                 .into_iter()
                 .collect::<HashSet<_>>()
         );
@@ -381,7 +381,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| r[&record::MESSAGE].to_string_lossy())
+            .map(|r| r[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -415,7 +415,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| r[&record::MESSAGE].to_string_lossy())
+            .map(|r| r[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -488,12 +488,12 @@ fn start_position() {
         let before_lines = received
             .iter()
             .filter(|r| r[&"file".into()].to_string_lossy().ends_with("before"))
-            .map(|r| r[&record::MESSAGE].to_string_lossy())
+            .map(|r| r[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
             .filter(|r| r[&"file".into()].to_string_lossy().ends_with("after"))
-            .map(|r| r[&record::MESSAGE].to_string_lossy())
+            .map(|r| r[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);
@@ -544,7 +544,7 @@ fn file_max_line_bytes() {
     shutdown_on_idle(rt);
 
     let received = rx
-        .map(|r| r.get(&record::MESSAGE).unwrap().clone())
+        .map(|r| r.get(&event::MESSAGE).unwrap().clone())
         .collect()
         .wait()
         .unwrap();

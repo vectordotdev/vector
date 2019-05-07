@@ -1,5 +1,5 @@
 use super::{Encoder, EncoderConfig};
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +16,8 @@ impl EncoderConfig for StringEncoderConfig {
 struct StringEncoder {}
 
 impl Encoder for StringEncoder {
-    fn encode(&self, record: Record) -> Bytes {
-        record.into_value(&record::MESSAGE).unwrap().into_bytes()
+    fn encode(&self, record: Event) -> Bytes {
+        record.into_value(&event::MESSAGE).unwrap().into_bytes()
     }
 }
 
@@ -25,7 +25,7 @@ impl Encoder for StringEncoder {
 mod tests {
     use super::StringEncoderConfig;
     use crate::buffers::Acker;
-    use crate::record::{self, Record};
+    use crate::event::{self, Event};
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::test_util::{block_on, next_addr, receive};
     use crate::topology::config::SinkConfig;
@@ -44,13 +44,13 @@ mod tests {
 
         let output_lines = receive(&out_addr);
 
-        let mut record1 = Record::new_empty();
-        record1.insert_explicit(record::MESSAGE.clone(), "this is the message".into());
+        let mut record1 = Event::new_empty();
+        record1.insert_explicit(event::MESSAGE.clone(), "this is the message".into());
         record1.insert_explicit("abcd".into(), "1234".into());
 
-        let mut record2 = Record::new_empty();
+        let mut record2 = Event::new_empty();
         record2.insert_explicit("hello".into(), "goodbye".into());
-        record2.insert_implicit(record::MESSAGE.clone(), "pssst".into());
+        record2.insert_implicit(event::MESSAGE.clone(), "pssst".into());
 
         block_on(sink.send_all(stream::iter_ok(vec![record1, record2]))).unwrap();
 

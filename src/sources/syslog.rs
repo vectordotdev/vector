@@ -1,4 +1,4 @@
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -46,7 +46,7 @@ impl SyslogConfig {
 
 #[typetag::serde(name = "syslog")]
 impl crate::topology::config::SourceConfig for SyslogConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         match self.mode.clone() {
             Mode::Tcp { address } => Ok(tcp(address, self.max_length, out)),
             Mode::Udp { address } => Ok(udp(address, self.max_length, out)),
@@ -55,7 +55,7 @@ impl crate::topology::config::SourceConfig for SyslogConfig {
     }
 }
 
-pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -91,7 +91,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
     }))
 }
 
-pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(
@@ -116,7 +116,7 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
     )
 }
 
-pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -153,7 +153,7 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
     }))
 }
 
-fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
+fn record_from_bytes(bytes: &[u8]) -> Option<Event> {
     std::str::from_utf8(bytes)
         .ok()
         .and_then(|s| record_from_str(s))
@@ -165,7 +165,7 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 
-fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
+fn record_from_str(raw: impl AsRef<str>) -> Option<Event> {
     let line = raw.as_ref();
     trace!(
         message = "Received line.",
@@ -175,7 +175,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
-            let mut record = Record::from(line);
+            let mut record = Event::from(line);
 
             if let Some(host) = &parsed.hostname {
                 record.insert_implicit("host".into(), host.clone().into());
@@ -185,7 +185,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
                 .unwrap_or(Utc::now());
-            record.insert_implicit(record::TIMESTAMP.clone(), timestamp.into());
+            record.insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
 
             trace!(
                 message = "processing one record.",
@@ -200,7 +200,7 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
 #[cfg(test)]
 mod test {
     use super::{record_from_str, SyslogConfig};
-    use crate::record::{self, Record};
+    use crate::event::{self, Event};
     use chrono::TimeZone;
 
     #[test]
@@ -239,9 +239,9 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let raw = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record::from(raw);
+        let mut expected = Event::from(raw);
         expected.insert_implicit(
-            record::TIMESTAMP.clone(),
+            event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
         );
         expected.insert_implicit("host".into(), "74794bfb6795".into());
@@ -257,9 +257,9 @@ mod test {
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record::from(cleaned);
+        let mut expected = Event::from(cleaned);
         expected.insert_implicit(
-            record::TIMESTAMP.clone(),
+            event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
         );
         expected.insert_implicit("host".into(), "74794bfb6795".into());
@@ -272,9 +272,9 @@ mod test {
     fn syslog_ng_default_network() {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
-        let mut expected = Record::from(raw);
+        let mut expected = Event::from(raw);
         expected.insert_implicit(
-            record::TIMESTAMP.clone(),
+            event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
         );
         expected.insert_implicit("host".into(), "74794bfb6795".into());
@@ -287,9 +287,9 @@ mod test {
     fn rsyslog_omfwd_tcp_default() {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record::from(raw);
+        let mut expected = Event::from(raw);
         expected.insert_implicit(
-            record::TIMESTAMP.clone(),
+            event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
         );
         expected.insert_implicit("host".into(), "74794bfb6795".into());
@@ -302,9 +302,9 @@ mod test {
     fn rsyslog_omfwd_tcp_forward_format() {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record::from(raw);
+        let mut expected = Event::from(raw);
         expected.insert_implicit(
-            record::TIMESTAMP.clone(),
+            event::TIMESTAMP.clone(),
             chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
         );
         expected.insert_implicit("host".into(), "74794bfb6795".into());

@@ -1,4 +1,4 @@
-use crate::record::Record;
+use crate::Event;
 use futures::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -48,13 +48,13 @@ impl Default for WhenFull {
 }
 
 pub enum BufferInputCloner {
-    Memory(mpsc::Sender<Record>, WhenFull),
+    Memory(mpsc::Sender<Event>, WhenFull),
     #[cfg(feature = "leveldb")]
     Disk(disk::Writer, WhenFull),
 }
 
 impl BufferInputCloner {
-    pub fn get(&self) -> Box<dyn Sink<SinkItem = Record, SinkError = ()> + Send> {
+    pub fn get(&self) -> Box<dyn Sink<SinkItem = Event, SinkError = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx.clone().sink_map_err(|e| error!("sender error: {:?}", e));
@@ -87,7 +87,7 @@ impl BufferConfig {
     ) -> Result<
         (
             BufferInputCloner,
-            Box<dyn Stream<Item = Record, Error = ()> + Send>,
+            Box<dyn Stream<Item = Event, Error = ()> + Send>,
             Acker,
         ),
         String,

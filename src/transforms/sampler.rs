@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -32,8 +32,8 @@ impl Sampler {
 }
 
 impl Transform for Sampler {
-    fn transform(&self, mut record: Record) -> Option<Record> {
-        let message = record[&record::MESSAGE].to_string_lossy();
+    fn transform(&self, mut record: Event) -> Option<Event> {
+        let message = record[&event::MESSAGE].to_string_lossy();
 
         if self.pass_list.is_match(&message) {
             return Some(record);
@@ -52,7 +52,7 @@ impl Transform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::Sampler;
-    use crate::record::{self, Record};
+    use crate::event::{self, Event};
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn always_passes_records_matching_pass_list() {
-        let record = Record::from("i am important");
+        let record = Event::from("i am important");
         let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
@@ -118,7 +118,7 @@ mod tests {
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !s[&record::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| !s[&event::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing[&Atom::from("sample_rate")], "10".into());
@@ -127,19 +127,19 @@ mod tests {
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = records
             .into_iter()
-            .filter(|s| !s[&record::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| !s[&event::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|record| sampler.transform(record))
             .unwrap();
         assert_eq!(passing[&Atom::from("sample_rate")], "25".into());
 
         // If the record passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
-        let record = Record::from("nananana");
+        let record = Event::from("nananana");
         let passing = sampler.transform(record).unwrap();
         assert!(passing.get(&Atom::from("sample_rate")).is_none());
     }
 
-    fn random_records(n: usize) -> Vec<Record> {
+    fn random_records(n: usize) -> Vec<Event> {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
 
@@ -150,7 +150,7 @@ mod tests {
                     .take(10)
                     .collect::<String>()
             })
-            .map(Record::from)
+            .map(Event::from)
             .collect()
     }
 }

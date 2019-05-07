@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
@@ -30,10 +30,10 @@ impl RegexParser {
 }
 
 impl Transform for RegexParser {
-    fn transform(&self, mut record: Record) -> Option<Record> {
+    fn transform(&self, mut record: Event) -> Option<Event> {
         if let Some(captures) = self
             .regex
-            .captures(&record[&record::MESSAGE].as_bytes().into_owned())
+            .captures(&record[&event::MESSAGE].as_bytes().into_owned())
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
@@ -49,13 +49,13 @@ impl Transform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParser;
-    use crate::record::Record;
     use crate::transforms::Transform;
+    use crate::Event;
     use regex::bytes::Regex;
 
     #[test]
     fn regex_parser_adds_parsed_field_to_record() {
-        let record = Record::from("status=1234 time=5678");
+        let record = Event::from("status=1234 time=5678");
         let parser =
             RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let record = Record::from("asdf1234");
+        let record = Event::from("asdf1234");
         let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
         let record = parser.transform(record).unwrap();

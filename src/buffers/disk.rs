@@ -1,6 +1,6 @@
 #![cfg(feature = "leveldb")]
 
-use crate::record::{proto, Record};
+use crate::event::{proto, Event};
 use futures::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
@@ -67,7 +67,7 @@ impl Clone for Writer {
 }
 
 impl Sink for Writer {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(
@@ -156,7 +156,7 @@ pub struct Reader {
 unsafe impl Send for Reader {}
 
 impl Stream for Reader {
-    type Item = Record;
+    type Item = Event;
     type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
@@ -181,7 +181,7 @@ impl Stream for Reader {
 
             match proto::EventWrapper::decode(value) {
                 Ok(record) => {
-                    let record = Record::from(record);
+                    let record = Event::from(record);
                     Ok(Async::Ready(Some(record)))
                 }
                 Err(err) => {

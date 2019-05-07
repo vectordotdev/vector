@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::{self, Record},
+    event::{self, Event},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -119,10 +119,10 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
-        .with(move |record: Record| {
+        .with(move |record: Event| {
             let mut body = json!({
-                "msg": record[&record::MESSAGE].to_string_lossy(),
-                "ts": record[&record::TIMESTAMP].to_string_lossy(),
+                "msg": record[&event::MESSAGE].to_string_lossy(),
+                "ts": record[&event::TIMESTAMP].to_string_lossy(),
                 "fields": record.explicit_fields(),
             });
 

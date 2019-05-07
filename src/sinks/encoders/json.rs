@@ -1,5 +1,5 @@
 use super::{Encoder, EncoderConfig};
-use crate::record::Record;
+use crate::Event;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -17,7 +17,7 @@ impl EncoderConfig for JsonEncoderConfig {
 pub struct JsonEncoder {}
 
 impl Encoder for JsonEncoder {
-    fn encode(&self, record: Record) -> Bytes {
+    fn encode(&self, record: Event) -> Bytes {
         serde_json::to_vec(&record.all_fields()).unwrap().into()
     }
 }
@@ -29,7 +29,7 @@ mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::test_util::{block_on, next_addr, receive};
     use crate::topology::config::SinkConfig;
-    use crate::Record;
+    use crate::Event;
     use futures::{stream, Sink};
     use serde_json::{self, json, Value};
 
@@ -46,11 +46,11 @@ mod tests {
 
         let output_lines = receive(&out_addr);
 
-        let mut record1 = Record::new_empty();
+        let mut record1 = Event::new_empty();
         record1.insert_explicit("qwerty".into(), "asdf".into());
         record1.insert_explicit("abcd".into(), "1234".into());
 
-        let mut record2 = Record::new_empty();
+        let mut record2 = Event::new_empty();
         record2.insert_explicit("hello".into(), "goodbye".into());
         record2.insert_implicit("hidden".into(), "secret".into());
 

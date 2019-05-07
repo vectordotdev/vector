@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::Record,
+    event::Event,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -93,7 +93,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |record: Record| {
+        .with(move |record: Event| {
             let mut action = json!({
                 "index": {
                     "_index": config.index,
@@ -137,7 +137,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Record) {
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Event) {
     if let Some(val) = key.and_then(|k| record.get(&k.as_ref().into())) {
         let val = val.to_string_lossy();
 
@@ -150,13 +150,13 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, recor
 #[cfg(test)]
 mod tests {
     use super::maybe_set_id;
-    use crate::Record;
+    use crate::Event;
     use serde_json::json;
 
     #[test]
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
-        let mut record = Record::from("butts");
+        let mut record = Event::from("butts");
         record.insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
-        let mut record = Record::from("butts");
+        let mut record = Event::from("butts");
         record.insert_explicit("not_foo".into(), "bar".into());
         let mut action = json!({});
 
@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
-        let mut record = Record::from("butts");
+        let mut record = Event::from("butts");
         record.insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
@@ -196,10 +196,10 @@ mod integration_tests {
     use super::ElasticSearchConfig;
     use crate::buffers::Acker;
     use crate::{
-        record,
+        event,
         test_util::{block_on, random_records_with_stream, random_string},
         topology::config::SinkConfig,
-        Record,
+        Event,
     };
     use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
@@ -220,7 +220,7 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
-        let mut input_record = Record::from("raw log line");
+        let mut input_record = Event::from("raw log line");
         input_record.insert_explicit("my_id".into(), "42".into());
         input_record.insert_explicit("foo".into(), "bar".into());
 
@@ -250,7 +250,7 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_record[&record::TIMESTAMP],
+            "timestamp": input_record[&event::TIMESTAMP],
         });
         assert_eq!(expected, value);
     }

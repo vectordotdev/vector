@@ -15,8 +15,8 @@ pub mod splunk;
 pub mod tcp;
 pub mod util;
 
-use crate::record::Record;
+use crate::Event;
 
-pub type RouterSink = Box<dyn Sink<SinkItem = Record, SinkError = ()> + 'static + Send>;
+pub type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
 pub type Healthcheck = Box<dyn Future<Item = (), Error = String> + Send>;

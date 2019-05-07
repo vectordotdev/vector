@@ -1,4 +1,4 @@
-use crate::{record::Record, sinks, sources, transforms};
+use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ pub enum DataType {
 
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<sources::Source, String>;
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<sources::Source, String>;
 
     fn output_type(&self) -> DataType {
         DataType::Log

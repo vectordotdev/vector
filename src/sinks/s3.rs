@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::Record,
+    event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -98,7 +98,7 @@ impl S3Sink {
                 buffer_size,
                 Duration::from_secs(max_linger_secs),
             )
-            .with(|record: Record| {
+            .with(|record: Event| {
                 let mut bytes: Vec<u8> = record.into();
                 bytes.push(b'\n');
                 Ok(bytes)
@@ -212,7 +212,7 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
-        record::Record,
+        event::Event,
         region::RegionOrEndpoint,
         sinks::s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
@@ -299,13 +299,13 @@ mod tests {
 
         let mut tx = tx.wait();
         for line in lines.iter().take(15) {
-            tx.send(Record::from(line.as_str())).unwrap();
+            tx.send(Event::from(line.as_str())).unwrap();
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         for line in lines.iter().skip(15) {
-            tx.send(Record::from(line.as_str())).unwrap();
+            tx.send(Event::from(line.as_str())).unwrap();
         }
         drop(tx);
 

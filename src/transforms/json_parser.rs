@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::{self, Record};
+use crate::event::{self, Event};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
@@ -14,7 +14,7 @@ pub struct JsonParserConfig {
 impl Default for JsonParserConfig {
     fn default() -> Self {
         Self {
-            field: record::MESSAGE.clone(),
+            field: event::MESSAGE.clone(),
             drop_invalid: false,
         }
     }
@@ -38,7 +38,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl Transform for JsonParser {
-    fn transform(&self, mut record: Record) -> Option<Record> {
+    fn transform(&self, mut record: Event) -> Option<Event> {
         let to_parse = record.get(&self.config.field).map(|s| s.as_bytes());
 
         let parsed = to_parse
@@ -65,7 +65,7 @@ impl Transform for JsonParser {
     }
 }
 
-fn insert(record: &mut Record, name: String, value: Value) {
+fn insert(record: &mut Event, name: String, value: Value) {
     match value {
         Value::String(string) => {
             record.insert_explicit(name.into(), string.into());
@@ -97,7 +97,7 @@ fn insert(record: &mut Record, name: String, value: Value) {
 #[cfg(test)]
 mod test {
     use super::{JsonParser, JsonParserConfig};
-    use crate::record::{self, Record};
+    use crate::event::{self, Event};
     use crate::transforms::Transform;
     use string_cache::DefaultAtom as Atom;
 
@@ -107,14 +107,14 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let record = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
 
         let record = parser.transform(record).unwrap();
 
         assert_eq!(record[&Atom::from("greeting")], "hello".into());
         assert_eq!(record[&Atom::from("name")], "bob".into());
         assert_eq!(
-            record[&record::MESSAGE],
+            record[&event::MESSAGE],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -128,7 +128,7 @@ mod test {
 
         // Field present
 
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit(
             "data".into(),
             r#"{"greeting": "hello", "name": "bob"}"#.into(),
@@ -144,7 +144,7 @@ mod test {
         );
 
         // Field missing
-        let record = Record::from("message");
+        let record = Event::from("message");
 
         let parsed = parser.transform(record.clone()).unwrap();
 
@@ -160,12 +160,12 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(invalid);
+        let record = Event::from(invalid);
 
         let parsed = parser.transform(record.clone()).unwrap();
 
         assert_eq!(record, parsed);
-        assert_eq!(record[&record::MESSAGE], invalid.into());
+        assert_eq!(record[&event::MESSAGE], invalid.into());
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
@@ -173,7 +173,7 @@ mod test {
             ..Default::default()
         });
 
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit("data".into(), invalid.into());
 
         let record = parser.transform(record).unwrap();
@@ -194,13 +194,13 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(valid);
+        let record = Event::from(valid);
         assert!(parser.transform(record).is_some());
 
-        let record = Record::from(invalid);
+        let record = Event::from(invalid);
         assert!(parser.transform(record).is_none());
 
-        let record = Record::from(not_object);
+        let record = Event::from(not_object);
         assert!(parser.transform(record).is_none());
 
         // Field
@@ -210,20 +210,20 @@ mod test {
             ..Default::default()
         });
 
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit("data".into(), valid.into());
         assert!(parser.transform(record).is_some());
 
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit("data".into(), invalid.into());
         assert!(parser.transform(record).is_none());
 
-        let mut record = Record::from("message");
+        let mut record = Event::from("message");
         record.insert_explicit("data".into(), not_object.into());
         assert!(parser.transform(record).is_none());
 
         // Missing field
-        let record = Record::from("message");
+        let record = Event::from("message");
         assert!(parser.transform(record).is_none());
     }
 
@@ -237,7 +237,7 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#);
+        let record = Event::from(r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#);
         let record = parser1.transform(record).unwrap();
         let record = parser2.transform(record).unwrap();
 
@@ -255,7 +255,7 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(
+        let record = Event::from(
             r#"{
               "string": "this is text",
               "null": null,

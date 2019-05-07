@@ -5,7 +5,7 @@ use vector::test_util::{
     block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
-use vector::Record;
+use vector::Event;
 use vector::{sinks, sources};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ impl config::SinkConfig for PanicSink {
 }
 
 impl Sink for PanicSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(
@@ -84,7 +84,7 @@ impl config::SinkConfig for ErrorSink {
 }
 
 impl Sink for ErrorSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(
@@ -142,7 +142,7 @@ struct ErrorSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl vector::topology::config::SourceConfig for ErrorSourceConfig {
-    fn build(&self, _out: mpsc::Sender<Record>) -> Result<sources::Source, String> {
+    fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
         Ok(Box::new(future::err(())))
     }
 }
@@ -190,7 +190,7 @@ struct PanicSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl vector::topology::config::SourceConfig for PanicSourceConfig {
-    fn build(&self, _out: mpsc::Sender<Record>) -> Result<sources::Source, String> {
+    fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

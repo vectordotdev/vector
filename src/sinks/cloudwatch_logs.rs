@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    record::{self, Record},
+    event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
@@ -95,7 +95,7 @@ impl CloudwatchLogsSvc {
     fn put_logs(
         &mut self,
         sequence_token: Option<String>,
-        records: Vec<Record>,
+        records: Vec<Event>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
         let log_events = records.into_iter().map(Into::into).collect();
 
@@ -123,7 +123,7 @@ impl CloudwatchLogsSvc {
     }
 }
 
-impl Service<Vec<Record>> for CloudwatchLogsSvc {
+impl Service<Vec<Event>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -164,7 +164,7 @@ impl Service<Vec<Record>> for CloudwatchLogsSvc {
         }
     }
 
-    fn call(&mut self, req: Vec<Record>) -> Self::Future {
+    fn call(&mut self, req: Vec<Event>) -> Self::Future {
         match &mut self.state {
             State::Token(token) => {
                 let token = token.take();
@@ -230,12 +230,12 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl From<Record> for InputLogEvent {
-    fn from(record: Record) -> InputLogEvent {
-        let message = record[&record::MESSAGE].to_string_lossy();
+impl From<Event> for InputLogEvent {
+    fn from(record: Event) -> InputLogEvent {
+        let message = record[&event::MESSAGE].to_string_lossy();
 
         let timestamp =
-            chrono::DateTime::parse_from_rfc3339(&record[&record::TIMESTAMP].to_string_lossy())
+            chrono::DateTime::parse_from_rfc3339(&record[&event::TIMESTAMP].to_string_lossy())
                 .unwrap()
                 .timestamp_millis();
 

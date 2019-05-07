@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::Record;
+use crate::Event;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
@@ -165,7 +165,7 @@ impl PrometheusSink {
 }
 
 impl Sink for PrometheusSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(

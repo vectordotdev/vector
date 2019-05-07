@@ -18,74 +18,91 @@ lazy_static! {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-#[repr(transparent)]
-pub struct Record {
-    structured: HashMap<Atom, Value>,
+pub enum Event {
+    Log { structured: HashMap<Atom, Value> },
 }
 
-impl Record {
+impl Event {
     pub fn new_empty() -> Self {
-        Self {
+        Event::Log {
             structured: HashMap::new(),
         }
     }
 
     pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
-        self.structured.get(key).map(|v| &v.value)
+        match self {
+            Event::Log { structured } => structured.get(key).map(|v| &v.value),
+        }
     }
 
-    pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
-        self.structured.remove(key).map(|v| v.value)
+    pub fn into_value(self, key: &Atom) -> Option<ValueKind> {
+        match self {
+            Event::Log { mut structured } => structured.remove(key).map(|v| v.value),
+        }
     }
 
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
-        self.structured.insert(
-            key,
-            Value {
-                value,
-                explicit: true,
-            },
-        );
+        match self {
+            Event::Log { ref mut structured } => structured.insert(
+                key,
+                Value {
+                    value,
+                    explicit: true,
+                },
+            ),
+        };
     }
 
     pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
-        self.structured.insert(
-            key,
-            Value {
-                value,
-                explicit: false,
-            },
-        );
+        match self {
+            Event::Log { ref mut structured } => structured.insert(
+                key,
+                Value {
+                    value,
+                    explicit: false,
+                },
+            ),
+        };
     }
 
     pub fn remove(&mut self, key: &Atom) {
-        self.structured.remove(key);
+        match self {
+            Event::Log { ref mut structured } => structured.remove(key),
+        };
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
-        self.structured.keys()
+        match self {
+            Event::Log { structured } => structured.keys(),
+        }
     }
 
     pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
-        FieldsIter {
-            inner: self.structured.iter(),
-            explicit_only: false,
+        match self {
+            Event::Log { structured } => FieldsIter {
+                inner: structured.iter(),
+                explicit_only: false,
+            },
         }
     }
 
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
-        FieldsIter {
-            inner: self.structured.iter(),
-            explicit_only: true,
+        match self {
+            Event::Log { structured } => FieldsIter {
+                inner: structured.iter(),
+                explicit_only: true,
+            },
         }
     }
 }
 
-impl std::ops::Index<&Atom> for Record {
+impl std::ops::Index<&Atom> for Event {
     type Output = ValueKind;
 
     fn index(&self, key: &Atom) -> &ValueKind {
-        &self.structured[key].value
+        match self {
+            Event::Log { structured } => &structured[key].value,
+        }
     }
 }
 
@@ -185,7 +202,7 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl From<proto::EventWrapper> for Record {
+impl From<proto::EventWrapper> for Event {
     fn from(proto: proto::EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
@@ -203,47 +220,51 @@ impl From<proto::EventWrapper> for Record {
                     })
                     .collect::<HashMap<_, _>>();
 
-                Record { structured }
+                Event::Log { structured }
             }
         }
     }
 }
 
-impl From<Record> for proto::EventWrapper {
-    fn from(record: Record) -> Self {
-        let structured = record
-            .structured
-            .into_iter()
-            .map(|(k, v)| {
-                let value = proto::Value {
-                    data: v.value.as_bytes().into_owned(),
-                    explicit: v.explicit,
-                };
-                (k.to_string(), value)
-            })
-            .collect::<HashMap<_, _>>();
+impl From<Event> for proto::EventWrapper {
+    fn from(record: Event) -> Self {
+        match record {
+            Event::Log { structured } => {
+                let structured = structured
+                    .into_iter()
+                    .map(|(k, v)| {
+                        let value = proto::Value {
+                            data: v.value.as_bytes().into_owned(),
+                            explicit: v.explicit,
+                        };
+                        (k.to_string(), value)
+                    })
+                    .collect::<HashMap<_, _>>();
 
-        let event = EventProto::Log(Log { structured });
+                let event = EventProto::Log(Log { structured });
 
-        proto::EventWrapper { event: Some(event) }
+                proto::EventWrapper { event: Some(event) }
+            }
+        }
     }
 }
 
-impl From<Record> for Vec<u8> {
-    fn from(mut record: Record) -> Vec<u8> {
-        record
-            .structured
-            .remove(&MESSAGE)
-            .unwrap()
-            .value
-            .as_bytes()
-            .into_owned()
+impl From<Event> for Vec<u8> {
+    fn from(record: Event) -> Vec<u8> {
+        match record {
+            Event::Log { mut structured } => structured
+                .remove(&MESSAGE)
+                .unwrap()
+                .value
+                .as_bytes()
+                .into_owned(),
+        }
     }
 }
 
-impl From<Bytes> for Record {
+impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut record = Record {
+        let mut record = Event::Log {
             structured: HashMap::new(),
         };
 
@@ -254,13 +275,13 @@ impl From<Bytes> for Record {
     }
 }
 
-impl From<&str> for Record {
+impl From<&str> for Event {
     fn from(line: &str) -> Self {
         line.to_owned().into()
     }
 }
 
-impl From<String> for Record {
+impl From<String> for Event {
     fn from(line: String) -> Self {
         Bytes::from(line).into()
     }
@@ -302,13 +323,13 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::Record;
+    use super::Event;
     use regex::Regex;
     use std::collections::HashSet;
 
     #[test]
     fn serialization() {
-        let mut record = Record::from("raw log line");
+        let mut record = Event::from("raw log line");
         record.insert_explicit("foo".into(), "bar".into());
         record.insert_explicit("bar".into(), "baz".into());
 
@@ -316,7 +337,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": record.structured[&super::TIMESTAMP],
+            "timestamp": record.get(&super::TIMESTAMP),
         });
 
         let expected_explicit = serde_json::json!({
@@ -336,7 +357,7 @@ mod test {
 
     #[test]
     fn record_iteration() {
-        let mut record = Record::new_empty();
+        let mut record = Event::new_empty();
 
         record.insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
         record.insert_implicit(
