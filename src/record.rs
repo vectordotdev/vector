@@ -1,4 +1,4 @@
-use self::proto::{event_wrapper::Event, Log};
+use self::proto::{event_wrapper::Event as EventProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
@@ -190,7 +190,7 @@ impl From<proto::EventWrapper> for Record {
         let event = proto.event.unwrap();
 
         match event {
-            Event::Log(proto) => {
+            EventProto::Log(proto) => {
                 let structured = proto
                     .structured
                     .into_iter()
@@ -223,7 +223,7 @@ impl From<Record> for proto::EventWrapper {
             })
             .collect::<HashMap<_, _>>();
 
-        let event = Event::Log(Log { structured });
+        let event = EventProto::Log(Log { structured });
 
         proto::EventWrapper { event: Some(event) }
     }
