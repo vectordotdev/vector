@@ -29,9 +29,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -77,9 +75,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -125,9 +121,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -174,9 +168,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -235,16 +227,12 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     config.add_sink(
                         "out1",
                         &["in1", "in2"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr1.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr1.to_string()),
                     );
                     config.add_sink(
                         "out2",
                         &["in1", "in2"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr2.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
                     );
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -310,9 +298,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["filter"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -408,37 +394,27 @@ fn benchmark_complex(c: &mut Criterion) {
                     config.add_sink(
                         "out_all",
                         &["parser"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr_all.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr_all.to_string()),
                     );
                     config.add_sink(
                         "out_sampled",
                         &["sampler"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr_sampled.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr_sampled.to_string()),
                     );
                     config.add_sink(
                         "out_200",
                         &["filter_200"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr_200.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr_200.to_string()),
                     );
                     config.add_sink(
                         "out_404",
                         &["filter_404"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr_404.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr_404.to_string()),
                     );
                     config.add_sink(
                         "out_500",
                         &["filter_500"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr_500.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr_500.to_string()),
                     );
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 

@@ -12,7 +12,7 @@ pub struct BlackholeSink {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BlackholeConfig {
-    print_amount: usize,
+    pub print_amount: usize,
 }
 
 #[typetag::serde(name = "blackhole")]

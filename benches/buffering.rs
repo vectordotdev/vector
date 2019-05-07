@@ -28,9 +28,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
                     config.sinks["out"].buffer = BufferConfig::Memory {
                         num_items: 100,
@@ -65,9 +63,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 1_000_000,
@@ -104,9 +100,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     config.add_sink(
                         "out",
                         &["in"],
-                        sinks::tcp::TcpSinkConfig {
-                            address: out_addr.to_string(),
-                        },
+                        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
                     );
                     config.sinks["out"].buffer = BufferConfig::Disk {
                         max_size: 10_000,

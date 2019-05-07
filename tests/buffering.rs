@@ -25,9 +25,7 @@ fn test_buffering() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 10_000,
@@ -55,9 +53,7 @@ fn test_buffering() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 10_000,
@@ -120,9 +116,7 @@ fn test_max_size() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size,
@@ -150,9 +144,7 @@ fn test_max_size() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size,
@@ -196,9 +188,7 @@ fn test_max_size_resume() {
     config.add_sink(
         "out",
         &["in1", "in2"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size,
@@ -251,9 +241,7 @@ fn test_reclaim_disk_space() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
@@ -290,9 +278,7 @@ fn test_reclaim_disk_space() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig {
-            address: out_addr.to_string(),
-        },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,

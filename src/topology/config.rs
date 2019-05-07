@@ -4,6 +4,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
+mod validation;
 mod vars;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -16,9 +17,19 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DataType {
+    Log,
+    Metric,
+}
+
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug {
     fn build(&self, out: mpsc::Sender<Record>) -> Result<sources::Source, String>;
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -36,6 +47,10 @@ pub trait SinkConfig: core::fmt::Debug {
         &self,
         acker: crate::buffers::Acker,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -48,6 +63,14 @@ pub struct TransformOuter {
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
     fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
+    }
 }
 
 // Helper methods for programming contstruction during tests
@@ -106,6 +129,14 @@ impl Config {
         let with_vars = vars::interpolate(&source_string, &vars);
 
         toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
+    }
+
+    pub fn contains_cycle(&self) -> bool {
+        validation::contains_cycle(self)
+    }
+
+    pub fn typecheck(&self) -> Result<(), Vec<String>> {
+        validation::typecheck(self)
     }
 }
 
