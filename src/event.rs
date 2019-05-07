@@ -19,31 +19,36 @@ lazy_static! {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
-    Log { structured: HashMap<Atom, Value> },
+    Log(LogEvent),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct LogEvent {
+    structured: HashMap<Atom, Value>,
 }
 
 impl Event {
     pub fn new_empty() -> Self {
-        Event::Log {
+        Event::Log(LogEvent {
             structured: HashMap::new(),
-        }
+        })
     }
 
     pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
         match self {
-            Event::Log { structured } => structured.get(key).map(|v| &v.value),
+            Event::Log(LogEvent { structured }) => structured.get(key).map(|v| &v.value),
         }
     }
 
     pub fn into_value(self, key: &Atom) -> Option<ValueKind> {
         match self {
-            Event::Log { mut structured } => structured.remove(key).map(|v| v.value),
+            Event::Log(LogEvent { mut structured }) => structured.remove(key).map(|v| v.value),
         }
     }
 
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
         match self {
-            Event::Log { ref mut structured } => structured.insert(
+            Event::Log(LogEvent { ref mut structured }) => structured.insert(
                 key,
                 Value {
                     value,
@@ -55,7 +60,7 @@ impl Event {
 
     pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
         match self {
-            Event::Log { ref mut structured } => structured.insert(
+            Event::Log(LogEvent { ref mut structured }) => structured.insert(
                 key,
                 Value {
                     value,
@@ -67,19 +72,19 @@ impl Event {
 
     pub fn remove(&mut self, key: &Atom) {
         match self {
-            Event::Log { ref mut structured } => structured.remove(key),
+            Event::Log(LogEvent { ref mut structured }) => structured.remove(key),
         };
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
         match self {
-            Event::Log { structured } => structured.keys(),
+            Event::Log(LogEvent { structured }) => structured.keys(),
         }
     }
 
     pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
         match self {
-            Event::Log { structured } => FieldsIter {
+            Event::Log(LogEvent { structured }) => FieldsIter {
                 inner: structured.iter(),
                 explicit_only: false,
             },
@@ -88,7 +93,7 @@ impl Event {
 
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
         match self {
-            Event::Log { structured } => FieldsIter {
+            Event::Log(LogEvent { structured }) => FieldsIter {
                 inner: structured.iter(),
                 explicit_only: true,
             },
@@ -101,7 +106,7 @@ impl std::ops::Index<&Atom> for Event {
 
     fn index(&self, key: &Atom) -> &ValueKind {
         match self {
-            Event::Log { structured } => &structured[key].value,
+            Event::Log(LogEvent { structured }) => &structured[key].value,
         }
     }
 }
@@ -220,7 +225,7 @@ impl From<proto::EventWrapper> for Event {
                     })
                     .collect::<HashMap<_, _>>();
 
-                Event::Log { structured }
+                Event::Log(LogEvent { structured })
             }
         }
     }
@@ -229,7 +234,7 @@ impl From<proto::EventWrapper> for Event {
 impl From<Event> for proto::EventWrapper {
     fn from(record: Event) -> Self {
         match record {
-            Event::Log { structured } => {
+            Event::Log(LogEvent { structured }) => {
                 let structured = structured
                     .into_iter()
                     .map(|(k, v)| {
@@ -252,7 +257,7 @@ impl From<Event> for proto::EventWrapper {
 impl From<Event> for Vec<u8> {
     fn from(record: Event) -> Vec<u8> {
         match record {
-            Event::Log { mut structured } => structured
+            Event::Log(LogEvent { mut structured }) => structured
                 .remove(&MESSAGE)
                 .unwrap()
                 .value
@@ -264,9 +269,9 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut record = Event::Log {
+        let mut record = Event::Log(LogEvent {
             structured: HashMap::new(),
-        };
+        });
 
         record.insert_implicit(MESSAGE.clone(), message.into());
         record.insert_implicit(TIMESTAMP.clone(), Utc::now().into());
