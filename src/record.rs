@@ -1,4 +1,4 @@
-use self::proto::{record::Event, Log};
+use self::proto::{event_wrapper::Event, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
 lazy_static! {
@@ -185,8 +185,8 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl From<proto::Record> for Record {
-    fn from(proto: proto::Record) -> Self {
+impl From<proto::EventWrapper> for Record {
+    fn from(proto: proto::EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
         match event {
@@ -209,7 +209,7 @@ impl From<proto::Record> for Record {
     }
 }
 
-impl From<Record> for proto::Record {
+impl From<Record> for proto::EventWrapper {
     fn from(record: Record) -> Self {
         let structured = record
             .structured
@@ -225,7 +225,7 @@ impl From<Record> for proto::Record {
 
         let event = Event::Log(Log { structured });
 
-        proto::Record { event: Some(event) }
+        proto::EventWrapper { event: Some(event) }
     }
 }
 

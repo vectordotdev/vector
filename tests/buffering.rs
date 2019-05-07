@@ -99,7 +99,7 @@ fn test_max_size() {
         example_record.insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
-        record::proto::Record::from(example_record)
+        record::proto::EventWrapper::from(example_record)
             .encode(&mut proto)
             .unwrap();
         proto.len()

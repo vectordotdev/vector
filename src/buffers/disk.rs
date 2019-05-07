@@ -75,7 +75,9 @@ impl Sink for Writer {
         record: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         let mut value = vec![];
-        proto::Record::from(record).encode(&mut value).unwrap(); // This will not error when writing to a Vec
+        proto::EventWrapper::from(record)
+            .encode(&mut value)
+            .unwrap(); // This will not error when writing to a Vec
         let record_size = value.len();
 
         if self.current_size.fetch_add(record_size, Ordering::Relaxed) + record_size > self.max_size
@@ -89,7 +91,7 @@ impl Sink for Writer {
 
             self.poll_complete()?;
 
-            let record = proto::Record::decode(value).unwrap().into();
+            let record = proto::EventWrapper::decode(value).unwrap().into();
             return Ok(AsyncSink::NotReady(record));
         }
 
@@ -177,7 +179,7 @@ impl Stream for Reader {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 
-            match proto::Record::decode(value) {
+            match proto::EventWrapper::decode(value) {
                 Ok(record) => {
                     let record = Record::from(record);
                     Ok(Async::Ready(Some(record)))
