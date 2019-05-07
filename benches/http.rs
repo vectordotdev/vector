@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
 use vector::{
     sinks, sources,
-    topology::{config, Topology},
+    topology::{self, config},
 };
 
 fn benchmark_http_no_compression(c: &mut Criterion) {
@@ -32,16 +32,15 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                topology.start(&mut rt);
+                let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
 
                 (rt, topology)
             },
-            |(mut rt, mut topology)| {
+            |(mut rt, topology)| {
                 let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                 rt.block_on(send).unwrap();
 
@@ -80,16 +79,15 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                         ..Default::default()
                     },
                 );
-                let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                 let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                topology.start(&mut rt);
+                let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                 wait_for_tcp(in_addr);
 
                 (rt, topology)
             },
-            |(mut rt, mut topology)| {
+            |(mut rt, topology)| {
                 let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                 rt.block_on(send).unwrap();
 

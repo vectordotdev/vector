@@ -3,10 +3,10 @@ use prost::Message;
 use tempfile::tempdir;
 use vector::record::{self, Record};
 use vector::test_util::{
-    block_on, next_addr, random_lines, random_string, receive_lines, send_lines, shutdown_on_idle,
+    block_on, next_addr, random_lines, random_string, receive, send_lines, shutdown_on_idle,
     wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, sinks, sources};
 
 #[test]
@@ -32,11 +32,10 @@ fn test_buffering() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -61,13 +60,12 @@ fn test_buffering() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -81,7 +79,7 @@ fn test_buffering() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
     assert_eq!(input_lines, &output_lines[..num_lines]);
     assert_eq!(input_lines2, &output_lines[num_lines..]);
@@ -125,11 +123,10 @@ fn test_max_size() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -154,13 +151,12 @@ fn test_max_size() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -168,7 +164,7 @@ fn test_max_size() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines / 2, output_lines.len());
     assert_eq!(&input_lines[..num_lines / 2], &output_lines[..]);
 }
@@ -199,11 +195,10 @@ fn test_max_size_resume() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
 
@@ -218,13 +213,13 @@ fn test_max_size_resume() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
 }
 
@@ -254,11 +249,10 @@ fn test_reclaim_disk_space() {
     }
     .into();
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -291,13 +285,12 @@ fn test_reclaim_disk_space() {
         when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -311,7 +304,7 @@ fn test_reclaim_disk_space() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2 - 1, output_lines.len());
     assert_eq!(&input_lines[1..], &output_lines[..num_lines - 1]);
     assert_eq!(input_lines2, &output_lines[num_lines - 1..]);

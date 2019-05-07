@@ -1,12 +1,10 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 
-use futures::{future, Future, Stream};
-use std::net::SocketAddr;
 use tempfile::tempdir;
-use tokio::codec::{FramedRead, LinesCodec};
-use tokio::net::TcpListener;
-use vector::test_util::{block_on, next_addr, send_lines, shutdown_on_idle, wait_for_tcp};
-use vector::topology::{config, Topology};
+use vector::test_util::{
+    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
+};
+use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
@@ -36,25 +34,24 @@ fn benchmark_buffers(c: &mut Criterion) {
                         num_items: 100,
                         when_full: Default::default(),
                     };
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -74,25 +71,24 @@ fn benchmark_buffers(c: &mut Criterion) {
                     }
                     .into();
                     config.data_dir = Some(data_dir.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -111,25 +107,24 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
                     config.data_dir = Some(data_dir2.clone());
-                    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
                     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_lines(&out_addr, &rt.executor());
+                    let output_lines = count_receive(&out_addr);
 
-                    topology.start(&mut rt);
+                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
                 },
-                |(mut rt, mut topology, output_lines)| {
+                |(mut rt, topology, output_lines)| {
                     let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
                     rt.block_on(send).unwrap();
 
                     block_on(topology.stop()).unwrap();
 
                     shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait().unwrap());
+                    assert_eq!(num_lines, output_lines.wait());
                 },
             );
         })
@@ -152,21 +147,4 @@ fn random_lines(size: usize) -> impl Iterator<Item = String> {
             .take(size)
             .collect::<String>()
     })
-}
-
-fn count_lines(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> impl Future<Item = usize, Error = ()> {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .fold(0, |n, _| future::ok(n + 1));
-
-    futures::sync::oneshot::spawn(lines, executor)
 }

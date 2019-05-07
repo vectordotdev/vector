@@ -107,7 +107,7 @@ mod test {
     use crate::{
         sinks::prometheus::{Counter, Gauge, PrometheusSinkConfig},
         test_util::{block_on, next_addr, shutdown_on_idle},
-        topology::{config, Topology},
+        topology::{self, config},
     };
     use futures::Stream;
     use std::{thread, time::Duration};
@@ -137,11 +137,10 @@ mod test {
                 }],
             },
         );
-        let (mut topology, _warnings) = Topology::build(config).unwrap();
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        topology.start(&mut rt);
+        let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

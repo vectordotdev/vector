@@ -1,5 +1,5 @@
 use crate::Record;
-use futures::{stream, Async, Future, Poll, Sink, Stream};
+use futures::{future, stream, Async, Future, Poll, Sink, Stream};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -72,49 +72,6 @@ pub fn random_string(len: usize) -> String {
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     std::iter::repeat(()).map(move |_| random_string(len))
-}
-
-pub fn receive_lines(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> impl Future<Item = Vec<String>, Error = ()> {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-
-    futures::sync::oneshot::spawn(lines, executor)
-}
-
-pub fn receive_lines_with_count(
-    addr: &SocketAddr,
-    executor: &tokio::runtime::TaskExecutor,
-) -> (
-    impl Future<Item = Vec<String>, Error = ()>,
-    Arc<AtomicUsize>,
-) {
-    let listener = TcpListener::bind(addr).unwrap();
-
-    let count = Arc::new(AtomicUsize::new(0));
-    let count_clone = Arc::clone(&count);
-
-    let lines = listener
-        .incoming()
-        .take(1)
-        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
-        .flatten()
-        .inspect(move |_| {
-            count_clone.fetch_add(1, Ordering::Relaxed);
-        })
-        .map_err(|e| panic!("{:?}", e))
-        .collect();
-
-    (futures::sync::oneshot::spawn(lines, executor), count)
 }
 
 pub fn wait_for(f: impl Fn() -> bool) {
@@ -239,6 +196,42 @@ pub fn receive(addr: &SocketAddr) -> Receiver {
     Receiver {
         handle,
         count,
+        trigger,
+        _runtime: runtime,
+    }
+}
+
+pub struct CountReceiver {
+    handle: futures::sync::oneshot::SpawnHandle<usize, ()>,
+    trigger: Trigger,
+    _runtime: Runtime,
+}
+
+impl CountReceiver {
+    pub fn wait(self) -> usize {
+        self.trigger.cancel();
+        self.handle.wait().unwrap()
+    }
+}
+
+pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let listener = TcpListener::bind(addr).unwrap();
+
+    let (trigger, tripwire) = Tripwire::new();
+
+    let count = listener
+        .incoming()
+        .take_until(tripwire)
+        .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+        .flatten()
+        .map_err(|e| panic!("{:?}", e))
+        .fold(0, |n, _| future::ok(n + 1));
+
+    let handle = futures::sync::oneshot::spawn(count, &runtime.executor());
+    CountReceiver {
+        handle,
         trigger,
         _runtime: runtime,
     }

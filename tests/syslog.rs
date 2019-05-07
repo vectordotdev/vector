@@ -4,9 +4,9 @@ use std::{collections::HashMap, thread, time::Duration};
 use tokio::codec::{FramedWrite, LinesCodec};
 use tokio_uds::UnixStream;
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{
     sinks,
     sources::syslog::{Mode, SyslogConfig},
@@ -26,13 +26,12 @@ fn test_tcp_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -48,7 +47,7 @@ fn test_tcp_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -67,13 +66,12 @@ fn test_udp_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     let input_lines = random_lines(100)
         .enumerate()
@@ -96,7 +94,7 @@ fn test_udp_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
 
     // Account for some dropped packets :(
     let output_lines_ratio = output_lines.len() as f32 / num_lines as f32;
@@ -125,13 +123,12 @@ fn test_unix_stream_syslog() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
 
@@ -166,7 +163,7 @@ fn test_unix_stream_syslog() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }

@@ -5,10 +5,9 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive, receive_lines, send_lines, shutdown_on_idle,
-    wait_for_tcp,
+    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
 #[test]
@@ -25,13 +24,12 @@ fn test_pipe() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
     let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -70,13 +68,12 @@ fn test_sample() {
         &["sampler"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -88,7 +85,7 @@ fn test_sample() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     let num_output_lines = output_lines.len();
 
     let output_lines_ratio = num_output_lines as f32 / num_lines as f32;
@@ -132,13 +129,12 @@ fn test_parse() {
         &["filter"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -157,7 +153,7 @@ fn test_parse() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(output_lines, vec!["missing status=404".to_owned()]);
 }
 
@@ -177,13 +173,12 @@ fn test_merge() {
         &["in1", "in2"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -199,7 +194,7 @@ fn test_merge() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     let num_output_lines = output_lines.len();
 
     assert_eq!(num_output_lines, num_lines * 2);
@@ -240,14 +235,13 @@ fn test_fork() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines1 = receive_lines(&out_addr1, &rt.executor());
-    let output_lines2 = receive_lines(&out_addr2, &rt.executor());
+    let output_lines1 = receive(&out_addr1);
+    let output_lines2 = receive(&out_addr2);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -259,8 +253,8 @@ fn test_fork() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait().unwrap();
-    let output_lines2 = output_lines2.wait().unwrap();
+    let output_lines1 = output_lines1.wait();
+    let output_lines2 = output_lines2.wait();
     assert_eq!(num_lines, output_lines1.len());
     assert_eq!(num_lines, output_lines2.len());
     assert_eq!(input_lines, output_lines1);
@@ -291,14 +285,13 @@ fn test_merge_and_fork() {
         &["in2"],
         sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines1 = receive_lines(&out_addr1, &rt.executor());
-    let output_lines2 = receive_lines(&out_addr2, &rt.executor());
+    let output_lines1 = receive(&out_addr1);
+    let output_lines2 = receive(&out_addr2);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -314,8 +307,8 @@ fn test_merge_and_fork() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait().unwrap();
-    let output_lines2 = output_lines2.wait().unwrap();
+    let output_lines1 = output_lines1.wait();
+    let output_lines2 = output_lines2.wait();
 
     assert_eq!(num_lines, output_lines2.len());
 
@@ -378,14 +371,12 @@ fn test_merge_and_fork_json() {
 
     let config: config::Config = serde_json::from_str(&config).unwrap();
 
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
-
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines1 = receive_lines(&out_addr1, &rt.executor());
-    let output_lines2 = receive_lines(&out_addr2, &rt.executor());
+    let output_lines1 = receive(&out_addr1);
+    let output_lines2 = receive(&out_addr2);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -401,8 +392,8 @@ fn test_merge_and_fork_json() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait().unwrap();
-    let output_lines2 = output_lines2.wait().unwrap();
+    let output_lines1 = output_lines1.wait();
+    let output_lines2 = output_lines2.wait();
 
     assert_eq!(num_lines, output_lines2.len());
 
@@ -439,7 +430,6 @@ fn test_reconnect() {
         &["in"],
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let output_rt = tokio::runtime::Runtime::new().unwrap();
@@ -455,7 +445,7 @@ fn test_reconnect() {
         .collect();
     let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
