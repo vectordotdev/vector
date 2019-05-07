@@ -111,7 +111,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
             let mut body = json!({
                 "event": record[&event::MESSAGE].to_string_lossy(),
-                "fields": record.explicit_fields(),
+                "fields": record.as_log().explicit_fields(),
             });
 
             if let Some(host) = host {

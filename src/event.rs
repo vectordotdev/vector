@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
-        self.as_log().explicit_fields()
-    }
-
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
@@ -369,7 +365,7 @@ mod test {
         let actual_all = serde_json::to_value(record.as_log().all_fields()).unwrap();
         assert_eq!(expected_all, actual_all);
 
-        let actual_explicit = serde_json::to_value(record.explicit_fields()).unwrap();
+        let actual_explicit = serde_json::to_value(record.as_log().explicit_fields()).unwrap();
         assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -410,6 +406,7 @@ mod test {
         );
 
         let explicit_only = record
+            .as_log()
             .explicit_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))
             .collect::<HashSet<_>>();
