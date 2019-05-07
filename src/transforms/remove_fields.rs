@@ -29,7 +29,7 @@ impl RemoveFields {
 impl Transform for RemoveFields {
     fn transform(&self, mut record: Event) -> Option<Event> {
         for field in &self.fields {
-            record.remove(field);
+            record.as_mut_log().remove(field);
         }
 
         Some(record)

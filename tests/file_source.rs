@@ -341,7 +341,7 @@ fn context_key() {
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
-            received.keys().cloned().collect::<HashSet<_>>(),
+            received.as_log().keys().cloned().collect::<HashSet<_>>(),
             vec![event::MESSAGE.clone(), event::TIMESTAMP.clone()]
                 .into_iter()
                 .collect::<HashSet<_>>()

@@ -34,14 +34,6 @@ impl Event {
         })
     }
 
-    pub fn remove(&mut self, key: &Atom) {
-        self.as_mut_log().remove(key)
-    }
-
-    pub fn keys(&self) -> impl Iterator<Item = &Atom> {
-        self.as_log().keys()
-    }
-
     pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
         self.as_log().all_fields()
     }
