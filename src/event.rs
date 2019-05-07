@@ -28,7 +28,7 @@ pub struct LogEvent {
 }
 
 impl Event {
-    pub fn new_empty() -> Self {
+    pub fn new_empty_log() -> Self {
         Event::Log(LogEvent {
             structured: HashMap::new(),
         })
@@ -374,7 +374,7 @@ mod test {
 
     #[test]
     fn record_iteration() {
-        let mut record = Event::new_empty();
+        let mut record = Event::new_empty_log();
 
         record
             .as_mut_log()

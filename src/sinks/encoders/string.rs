@@ -48,7 +48,7 @@ mod tests {
 
         let output_lines = receive(&out_addr);
 
-        let mut record1 = Event::new_empty();
+        let mut record1 = Event::new_empty_log();
         record1
             .as_mut_log()
             .insert_explicit(event::MESSAGE.clone(), "this is the message".into());
@@ -56,7 +56,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("abcd".into(), "1234".into());
 
-        let mut record2 = Event::new_empty();
+        let mut record2 = Event::new_empty_log();
         record2
             .as_mut_log()
             .insert_explicit("hello".into(), "goodbye".into());
