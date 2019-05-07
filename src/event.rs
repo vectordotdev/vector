@@ -34,10 +34,6 @@ impl Event {
         })
     }
 
-    pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
-        self.as_log().all_fields()
-    }
-
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
         self.as_log().explicit_fields()
     }
@@ -370,7 +366,7 @@ mod test {
             "bar": "baz",
         });
 
-        let actual_all = serde_json::to_value(record.all_fields()).unwrap();
+        let actual_all = serde_json::to_value(record.as_log().all_fields()).unwrap();
         assert_eq!(expected_all, actual_all);
 
         let actual_explicit = serde_json::to_value(record.explicit_fields()).unwrap();
@@ -393,6 +389,7 @@ mod test {
         );
 
         let all = record
+            .as_log()
             .all_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))
             .collect::<HashSet<_>>();

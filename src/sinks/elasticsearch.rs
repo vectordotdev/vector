@@ -109,7 +109,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
 
-            serde_json::to_writer(&mut body, &record.all_fields()).unwrap();
+            serde_json::to_writer(&mut body, &record.as_log().all_fields()).unwrap();
             body.push(b'\n');
             Ok(body)
         });
@@ -299,7 +299,7 @@ mod integration_tests {
         assert_eq!(input.len() as u64, response.total());
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(rec.all_fields()).unwrap())
+            .map(|rec| serde_json::to_value(rec.as_log().all_fields()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
             let record = hit.into_document().unwrap();

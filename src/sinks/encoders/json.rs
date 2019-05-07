@@ -18,7 +18,9 @@ pub struct JsonEncoder {}
 
 impl Encoder for JsonEncoder {
     fn encode(&self, record: Event) -> Bytes {
-        serde_json::to_vec(&record.all_fields()).unwrap().into()
+        serde_json::to_vec(&record.as_log().all_fields())
+            .unwrap()
+            .into()
     }
 }
 
