@@ -33,7 +33,7 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let message = event[&event::MESSAGE].to_string_lossy();
+        let message = event.as_log()[&event::MESSAGE].to_string_lossy();
 
         if self.pass_list.is_match(&message) {
             return Some(event);
@@ -120,19 +120,19 @@ mod tests {
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing[&Atom::from("sample_rate")], "10".into());
+        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
 
         let events = random_events(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
-            .filter(|s| !s[&event::MESSAGE].to_string_lossy().contains("na"))
+            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
             .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing[&Atom::from("sample_rate")], "25".into());
+        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());
 
         // If the event passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());

@@ -110,7 +110,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
             let host = event.as_log().get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": event[&event::MESSAGE].to_string_lossy(),
+                "event": event.as_log()[&event::MESSAGE].to_string_lossy(),
                 "fields": event.as_log().explicit_fields(),
             });
 

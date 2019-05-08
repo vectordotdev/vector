@@ -171,7 +171,7 @@ mod test {
             .unwrap();
 
         let event = rx.wait().next().unwrap().unwrap();
-        assert_eq!(event[&event::HOST], "127.0.0.1".into());
+        assert_eq!(event.as_log()[&event::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -218,9 +218,12 @@ mod test {
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
         let (event, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap()[&event::MESSAGE], "short".into());
+        assert_eq!(event.unwrap().as_log()[&event::MESSAGE], "short".into());
 
         let (event, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap()[&event::MESSAGE], "more short".into());
+        assert_eq!(
+            event.unwrap().as_log()[&event::MESSAGE],
+            "more short".into()
+        );
     }
 }
