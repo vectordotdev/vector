@@ -74,7 +74,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let (output, control) = Fanout::new();
 
         let task = input_rx
-            .filter_map(move |r| transform.transform(r))
+            .filter_map(move |event| transform.transform(event))
             .forward(output)
             .map(|_| ());
         let task: Task = Box::new(task);

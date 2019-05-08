@@ -78,14 +78,14 @@ mod tests {
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            event.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
+            event.map(|event| event.map(|event| event[&event::MESSAGE].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            event.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
+            event.map(|event| event.map(|event| event[&event::MESSAGE].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();

@@ -381,7 +381,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| r[&event::MESSAGE].to_string_lossy())
+            .map(|event| event[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -415,7 +415,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| r[&event::MESSAGE].to_string_lossy())
+            .map(|event| event[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -487,13 +487,13 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let before_lines = received
             .iter()
-            .filter(|r| r[&"file".into()].to_string_lossy().ends_with("before"))
-            .map(|r| r[&event::MESSAGE].to_string_lossy())
+            .filter(|event| event[&"file".into()].to_string_lossy().ends_with("before"))
+            .map(|event| event[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|r| r[&"file".into()].to_string_lossy().ends_with("after"))
-            .map(|r| r[&event::MESSAGE].to_string_lossy())
+            .filter(|event| event[&"file".into()].to_string_lossy().ends_with("after"))
+            .map(|event| event[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);
@@ -544,7 +544,7 @@ fn file_max_line_bytes() {
     shutdown_on_idle(rt);
 
     let received = rx
-        .map(|r| r.as_log().get(&event::MESSAGE).unwrap().clone())
+        .map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
         .collect()
         .wait()
         .unwrap();
