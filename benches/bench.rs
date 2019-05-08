@@ -12,6 +12,7 @@ use vector::{sinks, sources, transforms};
 mod batch;
 mod buffering;
 mod http;
+mod lua;
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -510,7 +511,13 @@ criterion_group!(
     benchmark_transforms,
     benchmark_complex,
 );
-criterion_main!(benches, buffering::buffers, http::http, batch::batch);
+criterion_main!(
+    benches,
+    buffering::buffers,
+    http::http,
+    batch::batch,
+    lua::lua
+);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     use rand::distributions::Alphanumeric;
