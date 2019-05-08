@@ -27,12 +27,12 @@ impl RemoveFields {
 }
 
 impl Transform for RemoveFields {
-    fn transform(&self, mut record: Event) -> Option<Event> {
+    fn transform(&self, mut event: Event) -> Option<Event> {
         for field in &self.fields {
-            record.as_mut_log().remove(field);
+            event.as_mut_log().remove(field);
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
@@ -43,20 +43,20 @@ mod tests {
 
     #[test]
     fn remove_fields() {
-        let mut record = Event::from("message");
-        record
+        let mut event = Event::from("message");
+        event
             .as_mut_log()
             .insert_explicit("to_remove".into(), "some value".into());
-        record
+        event
             .as_mut_log()
             .insert_explicit("to_keep".into(), "another value".into());
 
         let transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 
-        let new_record = transform.transform(record).unwrap();
+        let new_event = transform.transform(event).unwrap();
 
-        assert!(new_record.as_log().get(&"to_remove".into()).is_none());
-        assert!(new_record.as_log().get(&"unknown".into()).is_none());
-        assert_eq!(new_record[&"to_keep".into()], "another value".into());
+        assert!(new_event.as_log().get(&"to_remove".into()).is_none());
+        assert!(new_event.as_log().get(&"unknown".into()).is_none());
+        assert_eq!(new_event[&"to_keep".into()], "another value".into());
     }
 }

@@ -13,7 +13,7 @@ pub trait EncoderConfig: core::fmt::Debug {
 }
 
 pub trait Encoder {
-    fn encode(&self, record: Event) -> Bytes;
+    fn encode(&self, event: Event) -> Bytes;
 }
 
 pub fn default_string_encoder() -> Box<dyn EncoderConfig> {

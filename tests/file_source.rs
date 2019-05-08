@@ -45,19 +45,19 @@ fn happy_path() {
     let mut hello_i = 0;
     let mut goodbye_i = 0;
 
-    for record in received {
-        let line = record[&event::MESSAGE].to_string_lossy();
+    for event in received {
+        let line = event[&event::MESSAGE].to_string_lossy();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
-                record[&"file".into()].to_string_lossy(),
+                event[&"file".into()].to_string_lossy(),
                 path1.to_str().unwrap()
             );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
             assert_eq!(
-                record[&"file".into()].to_string_lossy(),
+                event[&"file".into()].to_string_lossy(),
                 path2.to_str().unwrap()
             );
             goodbye_i += 1;
@@ -111,13 +111,13 @@ fn truncate() {
     let mut i = 0;
     let mut pre_trunc = true;
 
-    for record in received {
+    for event in received {
         assert_eq!(
-            record[&"file".into()].to_string_lossy(),
+            event[&"file".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
 
-        let line = record[&event::MESSAGE].to_string_lossy();
+        let line = event[&event::MESSAGE].to_string_lossy();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -178,13 +178,13 @@ fn rotate() {
     let mut i = 0;
     let mut pre_rot = true;
 
-    for record in received {
+    for event in received {
         assert_eq!(
-            record[&"file".into()].to_string_lossy(),
+            event[&"file".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
 
-        let line = record[&event::MESSAGE].to_string_lossy();
+        let line = event[&event::MESSAGE].to_string_lossy();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -243,8 +243,8 @@ fn multiple_paths() {
 
     let mut is = [0; 3];
 
-    for record in received {
-        let line = record[&event::MESSAGE].to_string_lossy();
+    for event in received {
+        let line = event[&event::MESSAGE].to_string_lossy();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);

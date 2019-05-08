@@ -119,14 +119,14 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
-        .with(move |record: Event| {
+        .with(move |event: Event| {
             let mut body = json!({
-                "msg": record[&event::MESSAGE].to_string_lossy(),
-                "ts": record[&event::TIMESTAMP].to_string_lossy(),
-                "fields": record.as_log().explicit_fields(),
+                "msg": event[&event::MESSAGE].to_string_lossy(),
+                "ts": event[&event::TIMESTAMP].to_string_lossy(),
+                "fields": event.as_log().explicit_fields(),
             });
 
-            if let Some(host) = record.as_log().get(&Atom::from("host")) {
+            if let Some(host) = event.as_log().get(&Atom::from("host")) {
                 body["host"] = json!(host);
             }
             let mut body = serde_json::to_vec(&body).unwrap();
@@ -256,8 +256,8 @@ mod tests {
         let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
-        let (input_lines, records) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(records);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(events);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
@@ -312,8 +312,8 @@ mod tests {
         let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
         let (rx, trigger, server) = build_test_server(&in_addr);
 
-        let (input_lines, records) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(records);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(events);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);

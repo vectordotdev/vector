@@ -236,8 +236,8 @@ impl From<proto::EventWrapper> for Event {
 }
 
 impl From<Event> for proto::EventWrapper {
-    fn from(record: Event) -> Self {
-        match record {
+    fn from(event: Event) -> Self {
+        match event {
             Event::Log(LogEvent { structured }) => {
                 let structured = structured
                     .into_iter()
@@ -259,8 +259,8 @@ impl From<Event> for proto::EventWrapper {
 }
 
 impl From<Event> for Vec<u8> {
-    fn from(record: Event) -> Vec<u8> {
-        match record {
+    fn from(event: Event) -> Vec<u8> {
+        match event {
             Event::Log(LogEvent { mut structured }) => structured
                 .remove(&MESSAGE)
                 .unwrap()
@@ -273,18 +273,18 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut record = Event::Log(LogEvent {
+        let mut event = Event::Log(LogEvent {
             structured: HashMap::new(),
         });
 
-        record
+        event
             .as_mut_log()
             .insert_implicit(MESSAGE.clone(), message.into());
-        record
+        event
             .as_mut_log()
             .insert_implicit(TIMESTAMP.clone(), Utc::now().into());
 
-        record
+        event
     }
 }
 
@@ -342,11 +342,11 @@ mod test {
 
     #[test]
     fn serialization() {
-        let mut record = Event::from("raw log line");
-        record
+        let mut event = Event::from("raw log line");
+        event
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
-        record
+        event
             .as_mut_log()
             .insert_explicit("bar".into(), "baz".into());
 
@@ -354,7 +354,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": record.as_log().get(&super::TIMESTAMP),
+            "timestamp": event.as_log().get(&super::TIMESTAMP),
         });
 
         let expected_explicit = serde_json::json!({
@@ -362,10 +362,10 @@ mod test {
             "bar": "baz",
         });
 
-        let actual_all = serde_json::to_value(record.as_log().all_fields()).unwrap();
+        let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(expected_all, actual_all);
 
-        let actual_explicit = serde_json::to_value(record.as_log().explicit_fields()).unwrap();
+        let actual_explicit = serde_json::to_value(event.as_log().explicit_fields()).unwrap();
         assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -373,18 +373,18 @@ mod test {
     }
 
     #[test]
-    fn record_iteration() {
-        let mut record = Event::new_empty_log();
+    fn event_iteration() {
+        let mut event = Event::new_empty_log();
 
-        record
+        event
             .as_mut_log()
             .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
-        record.as_mut_log().insert_implicit(
+        event.as_mut_log().insert_implicit(
             "Pitbull".into(),
             "The bigger they are, the harder they fall".into(),
         );
 
-        let all = record
+        let all = event
             .as_log()
             .all_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))
@@ -405,7 +405,7 @@ mod test {
             .collect::<HashSet<_>>()
         );
 
-        let explicit_only = record
+        let explicit_only = event
             .as_log()
             .explicit_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))

@@ -93,7 +93,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |record: Event| {
+        .with(move |event: Event| {
             let mut action = json!({
                 "index": {
                     "_index": config.index,
@@ -103,13 +103,13 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             maybe_set_id(
                 id_key.as_ref(),
                 action.pointer_mut("/index").unwrap(),
-                &record,
+                &event,
             );
 
             let mut body = serde_json::to_vec(&action).unwrap();
             body.push(b'\n');
 
-            serde_json::to_writer(&mut body, &record.as_log().all_fields()).unwrap();
+            serde_json::to_writer(&mut body, &event.as_log().all_fields()).unwrap();
             body.push(b'\n');
             Ok(body)
         });
@@ -137,8 +137,8 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, record: &Event) {
-    if let Some(val) = key.and_then(|k| record.as_log().get(&k.as_ref().into())) {
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
+    if let Some(val) = key.and_then(|k| event.as_log().get(&k.as_ref().into())) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -156,13 +156,13 @@ mod tests {
     #[test]
     fn sets_id_from_custom_field() {
         let id_key = Some("foo");
-        let mut record = Event::from("butts");
-        record
+        let mut event = Event::from("butts");
+        event
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &event);
 
         assert_eq!(json!({"_id": "bar"}), action);
     }
@@ -170,13 +170,13 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
-        let mut record = Event::from("butts");
-        record
+        let mut event = Event::from("butts");
+        event
             .as_mut_log()
             .insert_explicit("not_foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &event);
 
         assert_eq!(json!({}), action);
     }
@@ -184,13 +184,13 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
-        let mut record = Event::from("butts");
-        record
+        let mut event = Event::from("butts");
+        event
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &record);
+        maybe_set_id(id_key, &mut action, &event);
 
         assert_eq!(json!({}), action);
     }
@@ -203,7 +203,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         event,
-        test_util::{block_on, random_records_with_stream, random_string},
+        test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
         Event,
     };
@@ -214,7 +214,7 @@ mod integration_tests {
     use serde_json::{json, Value};
 
     #[test]
-    fn structures_records_correctly() {
+    fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
@@ -226,15 +226,15 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
-        let mut input_record = Event::from("raw log line");
-        input_record
+        let mut input_event = Event::from("raw log line");
+        input_event
             .as_mut_log()
             .insert_explicit("my_id".into(), "42".into());
-        input_record
+        input_event
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
 
-        let pump = sink.send(input_record.clone());
+        let pump = sink.send(input_event.clone());
         block_on(pump).unwrap();
 
         // make sure writes all all visible
@@ -260,13 +260,13 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_record[&event::TIMESTAMP],
+            "timestamp": input_event[&event::TIMESTAMP],
         });
         assert_eq!(expected, value);
     }
 
     #[test]
-    fn insert_records() {
+    fn insert_events() {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
@@ -277,9 +277,9 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
-        let (input, records) = random_records_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         // make sure writes all all visible
@@ -302,8 +302,8 @@ mod integration_tests {
             .map(|rec| serde_json::to_value(rec.as_log().all_fields()).unwrap())
             .collect::<Vec<_>>();
         for hit in response.into_hits() {
-            let record = hit.into_document().unwrap();
-            assert!(input.contains(&record));
+            let event = hit.into_document().unwrap();
+            assert!(input.contains(&event));
         }
     }
 

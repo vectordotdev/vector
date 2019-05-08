@@ -666,7 +666,7 @@ mod tests {
 
     // The previous test pauses to make sure the old version of the sink has receieved all messages
     // sent before the reload. This test does not pause, making sure the new sink is atomically
-    // swapped in for the old one and that no records are lost in the changeover.
+    // swapped in for the old one and that no events are lost in the changeover.
     #[test]
     fn topology_change_sink_no_gap() {
         let in_addr = next_addr();

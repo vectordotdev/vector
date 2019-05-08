@@ -48,16 +48,16 @@ pub fn random_lines_with_stream(
     (lines, stream)
 }
 
-pub fn random_records_with_stream(
+pub fn random_events_with_stream(
     len: usize,
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
-    let records = (0..count)
+    let events = (0..count)
         .map(|_| random_string(len))
         .map(Event::from)
         .collect::<Vec<_>>();
-    let stream = stream::iter_ok(records.clone().into_iter());
-    (records, stream)
+    let stream = stream::iter_ok(events.clone().into_iter());
+    (events, stream)
 }
 
 pub fn random_string(len: usize) -> String {

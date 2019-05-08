@@ -81,7 +81,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> sup
                 }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(record_from_str)
+                    .filter_map(event_from_str)
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -108,7 +108,7 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Event>) -> su
         })
         .and_then(|socket| {
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .filter_map(|(bytes, _sock)| record_from_bytes(&bytes))
+                .filter_map(|(bytes, _sock)| event_from_bytes(&bytes))
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
@@ -143,7 +143,7 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Event>) -> super
                 }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(record_from_str)
+                    .filter_map(event_from_str)
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -153,10 +153,10 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Event>) -> super
     }))
 }
 
-fn record_from_bytes(bytes: &[u8]) -> Option<Event> {
+fn event_from_bytes(bytes: &[u8]) -> Option<Event> {
     std::str::from_utf8(bytes)
         .ok()
-        .and_then(|s| record_from_str(s))
+        .and_then(|s| event_from_str(s))
 }
 
 // TODO: many more cases to handle:
@@ -165,7 +165,7 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Event> {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 
-fn record_from_str(raw: impl AsRef<str>) -> Option<Event> {
+fn event_from_str(raw: impl AsRef<str>) -> Option<Event> {
     let line = raw.as_ref();
     trace!(
         message = "Received line.",
@@ -175,10 +175,10 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Event> {
     let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
-            let mut record = Event::from(line);
+            let mut event = Event::from(line);
 
             if let Some(host) = &parsed.hostname {
-                record
+                event
                     .as_mut_log()
                     .insert_implicit("host".into(), host.clone().into());
             }
@@ -187,23 +187,23 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Event> {
                 .timestamp
                 .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
                 .unwrap_or(Utc::now());
-            record
+            event
                 .as_mut_log()
                 .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
 
             trace!(
-                message = "processing one record.",
-                record = &field::debug(&record)
+                message = "processing one event.",
+                event = &field::debug(&event)
             );
 
-            record
+            event
         })
         .ok()
 }
 
 #[cfg(test)]
 mod test {
-    use super::{record_from_str, SyslogConfig};
+    use super::{event_from_str, SyslogConfig};
     use crate::event::{self, Event};
     use chrono::TimeZone;
 
@@ -252,7 +252,7 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -272,7 +272,7 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -289,7 +289,7 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -323,6 +323,6 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 }

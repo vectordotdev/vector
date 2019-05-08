@@ -8,5 +8,5 @@ pub mod remove_fields;
 pub mod sampler;
 
 pub trait Transform: Sync + Send {
-    fn transform(&self, record: Event) -> Option<Event>;
+    fn transform(&self, event: Event) -> Option<Event>;
 }

@@ -98,8 +98,8 @@ impl S3Sink {
                 buffer_size,
                 Duration::from_secs(max_linger_secs),
             )
-            .with(|record: Event| {
-                let mut bytes: Vec<u8> = record.into();
+            .with(|event: Event| {
+                let mut bytes: Vec<u8> = event.into();
                 bytes.push(b'\n');
                 Ok(bytes)
             });
@@ -161,13 +161,13 @@ impl Service<Vec<u8>> for S3Sink {
     }
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
-        // TODO: make this based on the last record in the file
+        // TODO: make this based on the last event in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
         let extension = if self.gzip { ".log.gz" } else { ".log" };
         let key = format!("{}{}{}", self.key_prefix, filename, extension);
 
         debug!(
-            message = "sending records.",
+            message = "sending events.",
             bytes = &field::debug(body.len()),
             bucket = &field::debug(&self.bucket),
             key = &field::debug(&key)
@@ -231,9 +231,9 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
-        let (lines, records) = random_lines_with_stream(100, 10);
+        let (lines, events) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         let keys = get_keys(prefix);
@@ -260,9 +260,9 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
-        let (lines, records) = random_lines_with_stream(100, 30);
+        let (lines, events) = random_lines_with_stream(100, 30);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         let keys = get_keys(prefix);
@@ -336,9 +336,9 @@ mod tests {
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
-        let (lines, records) = random_lines_with_stream(100, 500);
+        let (lines, events) = random_lines_with_stream(100, 500);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         let keys = get_keys(prefix);

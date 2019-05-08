@@ -95,9 +95,9 @@ impl CloudwatchLogsSvc {
     fn put_logs(
         &mut self,
         sequence_token: Option<String>,
-        records: Vec<Event>,
+        events: Vec<Event>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        let log_events = records.into_iter().map(Into::into).collect();
+        let log_events = events.into_iter().map(Into::into).collect();
 
         let request = PutLogEventsRequest {
             log_events,
@@ -231,11 +231,11 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 }
 
 impl From<Event> for InputLogEvent {
-    fn from(record: Event) -> InputLogEvent {
-        let message = record[&event::MESSAGE].to_string_lossy();
+    fn from(event: Event) -> InputLogEvent {
+        let message = event[&event::MESSAGE].to_string_lossy();
 
         let timestamp =
-            chrono::DateTime::parse_from_rfc3339(&record[&event::TIMESTAMP].to_string_lossy())
+            chrono::DateTime::parse_from_rfc3339(&event[&event::TIMESTAMP].to_string_lossy())
                 .unwrap()
                 .timestamp_millis();
 
@@ -312,9 +312,9 @@ mod tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, records) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         let mut request = GetLogEventsRequest::default();

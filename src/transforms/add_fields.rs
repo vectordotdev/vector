@@ -30,12 +30,12 @@ impl AddFields {
 }
 
 impl Transform for AddFields {
-    fn transform(&self, mut record: Event) -> Option<Event> {
+    fn transform(&self, mut event: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
-            record.as_mut_log().insert_explicit(key, value.into());
+            event.as_mut_log().insert_explicit(key, value.into());
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
@@ -47,16 +47,16 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
 
     #[test]
-    fn add_fields_record() {
-        let record = Event::from("augment me");
+    fn add_fields_event() {
+        let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
         let augment = AddFields::new(fields);
 
-        let new_record = augment.transform(record).unwrap();
+        let new_event = augment.transform(event).unwrap();
 
         let key = Atom::from("some_key".to_string());
-        let kv = new_record.as_log().get(&key);
+        let kv = new_event.as_log().get(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val.into()));

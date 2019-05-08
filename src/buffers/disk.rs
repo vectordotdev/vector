@@ -72,27 +72,24 @@ impl Sink for Writer {
 
     fn start_send(
         &mut self,
-        record: Self::SinkItem,
+        event: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         let mut value = vec![];
-        proto::EventWrapper::from(record)
-            .encode(&mut value)
-            .unwrap(); // This will not error when writing to a Vec
-        let record_size = value.len();
+        proto::EventWrapper::from(event).encode(&mut value).unwrap(); // This will not error when writing to a Vec
+        let event_size = value.len();
 
-        if self.current_size.fetch_add(record_size, Ordering::Relaxed) + record_size > self.max_size
-        {
+        if self.current_size.fetch_add(event_size, Ordering::Relaxed) + event_size > self.max_size {
             self.blocked_write_tasks
                 .lock()
                 .unwrap()
                 .push(task::current());
 
-            self.current_size.fetch_sub(record_size, Ordering::Relaxed);
+            self.current_size.fetch_sub(event_size, Ordering::Relaxed);
 
             self.poll_complete()?;
 
-            let record = proto::EventWrapper::decode(value).unwrap().into();
-            return Ok(AsyncSink::NotReady(record));
+            let event = proto::EventWrapper::decode(value).unwrap().into();
+            return Ok(AsyncSink::NotReady(event));
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
@@ -180,9 +177,9 @@ impl Stream for Reader {
             self.read_offset += 1;
 
             match proto::EventWrapper::decode(value) {
-                Ok(record) => {
-                    let record = Event::from(record);
-                    Ok(Async::Ready(Some(record)))
+                Ok(event) => {
+                    let event = Event::from(event);
+                    Ok(Async::Ready(Some(event)))
                 }
                 Err(err) => {
                     error!("Error deserializing proto: {:?}", err);

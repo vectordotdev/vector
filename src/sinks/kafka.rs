@@ -80,7 +80,7 @@ impl Sink for KafkaSink {
 
         let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 
-        debug!(message = "sending record.", count = 1);
+        debug!(message = "sending event.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
             Err((e, record)) => {
@@ -185,10 +185,10 @@ mod test {
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
 
-        let num_records = 1000;
-        let (input, records) = random_lines_with_stream(100, num_records);
+        let num_events = 1000;
+        let (input, events) = random_lines_with_stream(100, num_events);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         // read back everything from the beginning
@@ -216,7 +216,7 @@ mod test {
         let (low, high) = consumer
             .fetch_watermarks(&topic, 0, Duration::from_secs(3))
             .unwrap();
-        assert_eq!((0, num_records as i64), (low, high));
+        assert_eq!((0, num_events as i64), (low, high));
 
         // loop instead of iter so we can set a timeout
         let mut failures = 0;
@@ -240,7 +240,7 @@ mod test {
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_records
+            num_events
         );
     }
 }

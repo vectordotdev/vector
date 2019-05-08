@@ -117,18 +117,15 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
                     )
                     .take_until(tripwire)
                     .map(Event::from)
-                    .map(move |mut record| {
+                    .map(move |mut event| {
                         if let Some(host) = &host {
-                            record
+                            event
                                 .as_mut_log()
                                 .insert_implicit(event::HOST.clone(), host.clone().into());
                         }
 
-                        trace!(
-                            message = "Received one line.",
-                            record = field::debug(&record)
-                        );
-                        record
+                        trace!(message = "Received one line.", event = field::debug(&event));
+                        event
                     })
                     .filter_map_err(|err| match err {
                         codec::Error::MaxLimitExceeded => {
@@ -173,8 +170,8 @@ mod test {
         rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
 
-        let record = rx.wait().next().unwrap().unwrap();
-        assert_eq!(record[&event::HOST], "127.0.0.1".into());
+        let event = rx.wait().next().unwrap().unwrap();
+        assert_eq!(event[&event::HOST], "127.0.0.1".into());
     }
 
     #[test]
@@ -220,10 +217,10 @@ mod test {
 
         rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
 
-        let (record, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap()[&event::MESSAGE], "short".into());
+        let (event, rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(event.unwrap()[&event::MESSAGE], "short".into());
 
-        let (record, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(record.unwrap()[&event::MESSAGE], "more short".into());
+        let (event, _rx) = block_on(rx.into_future()).unwrap();
+        assert_eq!(event.unwrap()[&event::MESSAGE], "more short".into());
     }
 }

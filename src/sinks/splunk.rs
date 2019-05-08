@@ -106,12 +106,12 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |record: Event| {
-            let host = record.as_log().get(&host_field).map(|h| h.clone());
+        .with(move |event: Event| {
+            let host = event.as_log().get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": record[&event::MESSAGE].to_string_lossy(),
-                "fields": record.as_log().explicit_fields(),
+                "event": event[&event::MESSAGE].to_string_lossy(),
+                "fields": event.as_log().explicit_fields(),
             });
 
             if let Some(host) = host {
@@ -199,9 +199,9 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let record = Event::from(message.clone());
+        let event = Event::from(message.clone());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -229,9 +229,9 @@ mod integration_tests {
 
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
-        let (messages, records) = random_lines_with_stream(100, 10);
+        let (messages, events) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
 
         rt.block_on(pump).unwrap();
 
@@ -262,12 +262,12 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Event::from(message.clone());
-        record
+        let mut event = Event::from(message.clone());
+        event
             .as_mut_log()
             .insert_explicit("asdf".into(), "hello".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -294,15 +294,15 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Event::from(message.clone());
-        record
+        let mut event = Event::from(message.clone());
+        event
             .as_mut_log()
             .insert_explicit("asdf".into(), "hello".into());
-        record
+        event
             .as_mut_log()
             .insert_implicit("host".into(), "example.com:1234".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -335,18 +335,18 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config, Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Event::from(message.clone());
-        record
+        let mut event = Event::from(message.clone());
+        event
             .as_mut_log()
             .insert_explicit("asdf".into(), "hello".into());
-        record
+        event
             .as_mut_log()
             .insert_implicit("host".into(), "example.com:1234".into());
-        record
+        event
             .as_mut_log()
             .insert_explicit("roast".into(), "beef.example.com:1234".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 

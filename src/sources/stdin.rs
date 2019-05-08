@@ -73,23 +73,23 @@ mod tests {
 
         rt.block_on(source).unwrap();
 
-        let record = rx.poll().unwrap();
+        let event = rx.poll().unwrap();
 
-        assert!(record.is_ready());
+        assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            record.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
+            event.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
         );
 
-        let record = rx.poll().unwrap();
-        assert!(record.is_ready());
+        let event = rx.poll().unwrap();
+        assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            record.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
+            event.map(|r| r.map(|r| r[&event::MESSAGE].to_string_lossy()))
         );
 
-        let record = rx.poll().unwrap();
-        assert!(record.is_ready());
-        assert_eq!(Ready(None), record);
+        let event = rx.poll().unwrap();
+        assert!(event.is_ready());
+        assert_eq!(Ready(None), event);
     }
 }

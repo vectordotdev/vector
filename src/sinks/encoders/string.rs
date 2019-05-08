@@ -16,8 +16,8 @@ impl EncoderConfig for StringEncoderConfig {
 struct StringEncoder {}
 
 impl Encoder for StringEncoder {
-    fn encode(&self, record: Event) -> Bytes {
-        record
+    fn encode(&self, event: Event) -> Bytes {
+        event
             .into_log()
             .into_value(&event::MESSAGE)
             .unwrap()
@@ -48,23 +48,23 @@ mod tests {
 
         let output_lines = receive(&out_addr);
 
-        let mut record1 = Event::new_empty_log();
-        record1
+        let mut event1 = Event::new_empty_log();
+        event1
             .as_mut_log()
             .insert_explicit(event::MESSAGE.clone(), "this is the message".into());
-        record1
+        event1
             .as_mut_log()
             .insert_explicit("abcd".into(), "1234".into());
 
-        let mut record2 = Event::new_empty_log();
-        record2
+        let mut event2 = Event::new_empty_log();
+        event2
             .as_mut_log()
             .insert_explicit("hello".into(), "goodbye".into());
-        record2
+        event2
             .as_mut_log()
             .insert_implicit(event::MESSAGE.clone(), "pssst".into());
 
-        block_on(sink.send_all(stream::iter_ok(vec![record1, record2]))).unwrap();
+        block_on(sink.send_all(stream::iter_ok(vec![event1, event2]))).unwrap();
 
         let output_lines = output_lines.wait();
         assert_eq!(2, output_lines.len());

@@ -92,11 +92,11 @@ impl From<Metric> for Event {
     fn from(metric: Metric) -> Event {
         match metric {
             Metric::Counter { name, val, .. } | Metric::Gauge { name, val, .. } => {
-                let mut record = Event::new_empty_log();
-                record
+                let mut event = Event::new_empty_log();
+                event
                     .as_mut_log()
                     .insert_explicit(name.into(), val.to_string().into());
-                record
+                event
             }
             _ => Event::from(format!("{:?}", metric)),
         }

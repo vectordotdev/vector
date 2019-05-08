@@ -17,8 +17,8 @@ impl EncoderConfig for JsonEncoderConfig {
 pub struct JsonEncoder {}
 
 impl Encoder for JsonEncoder {
-    fn encode(&self, record: Event) -> Bytes {
-        serde_json::to_vec(&record.as_log().all_fields())
+    fn encode(&self, event: Event) -> Bytes {
+        serde_json::to_vec(&event.as_log().all_fields())
             .unwrap()
             .into()
     }
@@ -48,23 +48,23 @@ mod tests {
 
         let output_lines = receive(&out_addr);
 
-        let mut record1 = Event::new_empty_log();
-        record1
+        let mut event1 = Event::new_empty_log();
+        event1
             .as_mut_log()
             .insert_explicit("qwerty".into(), "asdf".into());
-        record1
+        event1
             .as_mut_log()
             .insert_explicit("abcd".into(), "1234".into());
 
-        let mut record2 = Event::new_empty_log();
-        record2
+        let mut event2 = Event::new_empty_log();
+        event2
             .as_mut_log()
             .insert_explicit("hello".into(), "goodbye".into());
-        record2
+        event2
             .as_mut_log()
             .insert_implicit("hidden".into(), "secret".into());
 
-        block_on(sink.send_all(stream::iter_ok(vec![record1, record2]))).unwrap();
+        block_on(sink.send_all(stream::iter_ok(vec![event1, event2]))).unwrap();
 
         let output_lines = output_lines.wait();
         assert_eq!(2, output_lines.len());

@@ -86,7 +86,7 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
-            .with(|record: Event| Ok(record.into()));
+            .with(|event: Event| Ok(event.into()));
 
         Ok(sink)
     }
@@ -112,8 +112,8 @@ impl Service<Vec<Vec<u8>>> for KinesisService {
 
     fn call(&mut self, items: Vec<Vec<u8>>) -> Self::Future {
         debug!(
-            message = "sending records.",
-            records = &field::debug(items.len())
+            message = "sending events.",
+            events = &field::debug(items.len())
         );
 
         let records = items
@@ -232,9 +232,9 @@ mod tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (input_lines, records) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         rt.block_on(pump).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(1));

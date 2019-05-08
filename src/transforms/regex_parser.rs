@@ -30,21 +30,21 @@ impl RegexParser {
 }
 
 impl Transform for RegexParser {
-    fn transform(&self, mut record: Event) -> Option<Event> {
+    fn transform(&self, mut event: Event) -> Option<Event> {
         if let Some(captures) = self
             .regex
-            .captures(&record[&event::MESSAGE].as_bytes().into_owned())
+            .captures(&event[&event::MESSAGE].as_bytes().into_owned())
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    record
+                    event
                         .as_mut_log()
                         .insert_explicit(name.into(), capture.as_bytes().into());
                 }
             }
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
@@ -56,24 +56,24 @@ mod tests {
     use regex::bytes::Regex;
 
     #[test]
-    fn regex_parser_adds_parsed_field_to_record() {
-        let record = Event::from("status=1234 time=5678");
+    fn regex_parser_adds_parsed_field_to_event() {
+        let event = Event::from("status=1234 time=5678");
         let parser =
             RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record[&"status".into()], "1234".into());
-        assert_eq!(record[&"time".into()], "5678".into());
+        assert_eq!(event[&"status".into()], "1234".into());
+        assert_eq!(event[&"time".into()], "5678".into());
     }
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let record = Event::from("asdf1234");
+        let event = Event::from("asdf1234");
         let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record.as_log().get(&"status".into()), None);
+        assert_eq!(event.as_log().get(&"status".into()), None);
     }
 }
