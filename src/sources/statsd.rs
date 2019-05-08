@@ -12,35 +12,6 @@ use tokio_trace::field;
 
 mod parser;
 
-#[derive(Debug, PartialEq)]
-pub enum Metric {
-    Counter {
-        name: String,
-        val: usize,
-        sampling: Option<f32>,
-    },
-    Timer {
-        name: String,
-        val: usize,
-        sampling: Option<f32>,
-    },
-    Gauge {
-        name: String,
-        val: usize,
-        direction: Option<Direction>,
-    },
-    Set {
-        name: String,
-        val: String,
-    },
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Direction {
-    Plus,
-    Minus,
-}
-
 #[derive(Deserialize, Serialize, Debug)]
 struct StatsdConfig {
     address: SocketAddr,
@@ -86,21 +57,6 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
             metrics_in.forward(out).map(|_| info!("finished sending"))
         }),
     )
-}
-
-impl From<Metric> for Event {
-    fn from(metric: Metric) -> Event {
-        match metric {
-            Metric::Counter { name, val, .. } | Metric::Gauge { name, val, .. } => {
-                let mut event = Event::new_empty_log();
-                event
-                    .as_mut_log()
-                    .insert_explicit(name.into(), val.to_string().into());
-                event
-            }
-            _ => Event::from(format!("{:?}", metric)),
-        }
-    }
 }
 
 #[cfg(test)]

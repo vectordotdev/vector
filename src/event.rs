@@ -7,6 +7,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
+pub mod metric;
+
+pub use metric::Metric;
+
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
