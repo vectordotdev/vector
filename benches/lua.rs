@@ -3,11 +3,11 @@ use indexmap::IndexMap;
 use vector::{
     topology::config::TransformConfig,
     transforms::{self, Transform},
-    Record,
+    Event,
 };
 
 fn add_fields(c: &mut Criterion) {
-    let num_records: usize = 100_000;
+    let num_events: usize = 100_000;
 
     let key = "the key";
     let value = "this is the value";
@@ -27,10 +27,10 @@ fn add_fields(c: &mut Criterion) {
                     transforms::add_fields::AddFields::new(map)
                 },
                 |transform| {
-                    for _ in 0..num_records {
-                        let record = Record::new_empty();
-                        let record = transform.transform(record).unwrap();
-                        assert_eq!(record[&key_atom], value_bytes);
+                    for _ in 0..num_events {
+                        let event = Event::new_empty_log();
+                        let event = transform.transform(event).unwrap();
+                        assert_eq!(event[&key_atom], value_bytes);
                     }
                 },
             )
@@ -38,14 +38,14 @@ fn add_fields(c: &mut Criterion) {
         .with_function("lua", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = format!("record['{}'] = '{}'", key, value);
+                    let source = format!("event['{}'] = '{}'", key, value);
                     transforms::lua::Lua::new(&source).unwrap()
                 },
                 |transform| {
-                    for _ in 0..num_records {
-                        let record = Record::new_empty();
-                        let record = transform.transform(record).unwrap();
-                        assert_eq!(record[&key_atom2], value_bytes2);
+                    for _ in 0..num_events {
+                        let event = Event::new_empty_log();
+                        let event = transform.transform(event).unwrap();
+                        assert_eq!(event[&key_atom2], value_bytes2);
                     }
                 },
             )
@@ -55,7 +55,7 @@ fn add_fields(c: &mut Criterion) {
 }
 
 fn field_filter(c: &mut Criterion) {
-    let num_records: usize = 100_000;
+    let num_events: usize = 100_000;
 
     c.bench(
         "lua_field_filter",
@@ -70,15 +70,17 @@ fn field_filter(c: &mut Criterion) {
                     .unwrap()
                 },
                 |transform| {
-                    let num = (0..num_records)
+                    let num = (0..num_events)
                         .map(|i| {
-                            let mut record = Record::new_empty();
-                            record.insert_explicit("the_field".into(), (i % 10).to_string().into());
-                            record
+                            let mut event = Event::new_empty_log();
+                            event
+                                .as_mut_log()
+                                .insert_explicit("the_field".into(), (i % 10).to_string().into());
+                            event
                         })
                         .filter_map(|r| transform.transform(r))
                         .count();
-                    assert_eq!(num, num_records / 10);
+                    assert_eq!(num, num_events / 10);
                 },
             )
         })
@@ -86,22 +88,24 @@ fn field_filter(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = r#"
-                      if record["the_field"] ~= "0" then
-                        record = nil
+                      if event["the_field"] ~= "0" then
+                        event = nil
                       end
                     "#;
                     transforms::lua::Lua::new(&source).unwrap()
                 },
                 |transform| {
-                    let num = (0..num_records)
+                    let num = (0..num_events)
                         .map(|i| {
-                            let mut record = Record::new_empty();
-                            record.insert_explicit("the_field".into(), (i % 10).to_string().into());
-                            record
+                            let mut event = Event::new_empty_log();
+                            event
+                                .as_mut_log()
+                                .insert_explicit("the_field".into(), (i % 10).to_string().into());
+                            event
                         })
                         .filter_map(|r| transform.transform(r))
                         .count();
-                    assert_eq!(num, num_records / 10);
+                    assert_eq!(num, num_events / 10);
                 },
             )
         })

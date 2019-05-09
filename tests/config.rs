@@ -1,8 +1,8 @@
-use vector::topology::{Config, Topology};
+use vector::topology::{self, Config};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     Config::load(config.as_bytes())
-        .and_then(|c| Topology::build(c))
+        .and_then(|c| topology::builder::build_pieces(&c))
         .map(|(_topology, warnings)| warnings)
 }
 

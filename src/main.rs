@@ -3,12 +3,13 @@ extern crate tokio_trace;
 
 use clap::{App, Arg};
 use futures::{future, Future, Stream};
+use std::fs::File;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
-use vector::topology::Topology;
+use vector::topology;
 
 fn main() {
     let app = App::new("Vector").version("0.1.0").author("timber.io")
@@ -132,20 +133,10 @@ fn main() {
             path = field::debug(&config_path)
         );
 
-        let file = match std::fs::File::open(config_path) {
-            Ok(f) => f,
-            Err(e) => {
-                if let std::io::ErrorKind::NotFound = e.kind() {
-                    error!(
-                        message = "Config file not found.",
-                        path = field::debug(&config_path)
-                    );
-                    std::process::exit(1);
-                } else {
-                    error!("Error opening config file: {}", e);
-                    std::process::exit(1);
-                }
-            }
+        let file = if let Some(file) = open_config(config_path) {
+            file
+        } else {
+            std::process::exit(1);
         };
 
         trace!(
@@ -153,26 +144,7 @@ fn main() {
             path = field::debug(&config_path)
         );
 
-        let topology = vector::topology::Config::load(file).and_then(|f| {
-            debug!(message = "Building config from file.");
-            Topology::build(f)
-        });
-
-        let mut topology = match topology {
-            Ok((topology, warnings)) => {
-                for warning in warnings {
-                    error!("Configuration warning: {}", warning);
-                }
-
-                topology
-            }
-            Err(errors) => {
-                for error in errors {
-                    error!("Configuration error: {}", error);
-                }
-                return;
-            }
-        };
+        let config = vector::topology::Config::load(file);
 
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
@@ -200,21 +172,6 @@ fn main() {
 
         let require_healthy = matches.is_present("require-healthy");
 
-        if require_healthy {
-            info!("Running healthchecks and waiting to start sinks.");
-            let success = rt.block_on(topology.healthchecks());
-
-            if success.is_ok() {
-                info!("All healthchecks passed.");
-            } else {
-                error!("Sinks unhealthy; shutting down.");
-                std::process::exit(1);
-            }
-        } else {
-            info!("Running healthchecks.");
-            rt.spawn(topology.healthchecks());
-        }
-
         info!(
             message = "Vector is starting.",
             version = built_info::PKG_VERSION,
@@ -223,7 +180,8 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let mut graceful_crash = topology.start(&mut rt);
+        let (mut topology, mut graceful_crash) = topology::start(config, &mut rt, require_healthy)
+            .unwrap_or_else(|| std::process::exit(1));
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -256,32 +214,19 @@ fn main() {
                 message = "Reloading config.",
                 path = field::debug(&config_path)
             );
-            let file = match std::fs::File::open(config_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    if let std::io::ErrorKind::NotFound = e.kind() {
-                        error!("Config file not found in: {}", config_path);
-                        continue;
-                    } else {
-                        error!("Error opening config file: {}", e);
-                        continue;
-                    }
-                }
+
+            let file = if let Some(file) = open_config(config_path) {
+                file
+            } else {
+                continue;
             };
 
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
-            match config {
-                Ok(config) => {
-                    debug!("Reloading topology.");
-                    topology.reload_config(config, &mut rt, require_healthy);
-                }
-                Err(errors) => {
-                    for error in errors {
-                        error!("Configuration error: {}", error);
-                    }
-                }
+            let success = topology.reload_config(config, &mut rt, require_healthy, false);
+            if !success {
+                error!("Reload aborted");
             }
         };
 
@@ -309,6 +254,21 @@ fn main() {
 
         rt.shutdown_now().wait().unwrap();
     });
+}
+
+fn open_config(path: &str) -> Option<File> {
+    match File::open(path) {
+        Ok(f) => Some(f),
+        Err(e) => {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                error!("Config file not found in: {}", path);
+                None
+            } else {
+                error!("Error opening config file: {}", e);
+                None
+            }
+        }
+    }
 }
 
 #[allow(unused)]

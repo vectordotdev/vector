@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -36,27 +36,27 @@ impl Lua {
         Ok(Self { lua })
     }
 
-    fn process(&self, record: Record) -> Result<Option<Record>, rlua::Error> {
+    fn process(&self, event: Event) -> Result<Option<Event>, rlua::Error> {
         self.lua.context(|ctx| {
             let globals = ctx.globals();
 
-            globals.set("record", record)?;
+            globals.set("event", event)?;
 
             let func = ctx.named_registry_value::<_, rlua::Function>("vector_func")?;
             func.call(())?;
 
-            globals.get::<_, Option<Record>>("record")
+            globals.get::<_, Option<Event>>("event")
         })
     }
 }
 
 impl Transform for Lua {
-    fn transform(&self, record: Record) -> Option<Record> {
-        match self.process(record) {
-            Ok(record) => record,
+    fn transform(&self, event: Event) -> Option<Event> {
+        match self.process(event) {
+            Ok(event) => event,
             Err(err) => {
                 error!(
-                    "Error in lua script; discarding record.\n{}",
+                    "Error in lua script; discarding event.\n{}",
                     format_error(&err)
                 );
                 None
@@ -65,15 +65,16 @@ impl Transform for Lua {
     }
 }
 
-impl rlua::UserData for Record {
+impl rlua::UserData for Event {
     fn add_methods<'lua, M: rlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_meta_method_mut(
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::String<'lua>>)| {
                 if let Some(string) = value {
-                    this.insert_explicit(key.into(), string.as_bytes().into());
+                    this.as_mut_log()
+                        .insert_explicit(key.into(), string.as_bytes().into());
                 } else {
-                    this.remove(&key.into());
+                    this.as_mut_log().remove(&key.into());
                 }
 
                 Ok(())
@@ -81,7 +82,7 @@ impl rlua::UserData for Record {
         );
 
         methods.add_meta_method(rlua::MetaMethod::Index, |ctx, this, key: String| {
-            if let Some(value) = this.get(&key.into()) {
+            if let Some(value) = this.as_log().get(&key.into()) {
                 let string = ctx.create_string(&value.as_bytes())?;
                 Ok(Some(string))
             } else {
@@ -101,115 +102,119 @@ fn format_error(error: &rlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::{format_error, Lua};
-    use crate::{record::Record, transforms::Transform};
+    use crate::{event::Event, transforms::Transform};
 
     #[test]
     fn lua_add_field() {
         let transform = Lua::new(
             r#"
-              record["hello"] = "goodbye"
+              event["hello"] = "goodbye"
             "#,
         )
         .unwrap();
 
-        let record = Record::from("program me");
+        let event = Event::from("program me");
 
-        let record = transform.transform(record).unwrap();
+        let event = transform.transform(event).unwrap();
 
-        assert_eq!(record[&"hello".into()], "goodbye".into());
+        assert_eq!(event[&"hello".into()], "goodbye".into());
     }
 
     #[test]
     fn lua_read_field() {
         let transform = Lua::new(
             r#"
-              _, _, name = string.find(record["message"], "Hello, my name is (%a+).")
-              record["name"] = name
+              _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
+              event["name"] = name
             "#,
         )
         .unwrap();
 
-        let record = Record::from("Hello, my name is Bob.");
+        let event = Event::from("Hello, my name is Bob.");
 
-        let record = transform.transform(record).unwrap();
+        let event = transform.transform(event).unwrap();
 
-        assert_eq!(record[&"name".into()], "Bob".into());
+        assert_eq!(event[&"name".into()], "Bob".into());
     }
 
     #[test]
     fn lua_remove_field() {
         let transform = Lua::new(
             r#"
-              record["name"] = nil
+              event["name"] = nil
             "#,
         )
         .unwrap();
 
-        let mut record = Record::new_empty();
-        record.insert_explicit("name".into(), "Bob".into());
-        let record = transform.transform(record).unwrap();
+        let mut event = Event::new_empty_log();
+        event
+            .as_mut_log()
+            .insert_explicit("name".into(), "Bob".into());
+        let event = transform.transform(event).unwrap();
 
-        assert!(record.get(&"name".into()).is_none());
+        assert!(event.as_log().get(&"name".into()).is_none());
     }
 
     #[test]
-    fn lua_drop_record() {
+    fn lua_drop_event() {
         let transform = Lua::new(
             r#"
-              record = nil
+              event = nil
             "#,
         )
         .unwrap();
 
-        let mut record = Record::new_empty();
-        record.insert_explicit("name".into(), "Bob".into());
-        let record = transform.transform(record);
+        let mut event = Event::new_empty_log();
+        event
+            .as_mut_log()
+            .insert_explicit("name".into(), "Bob".into());
+        let event = transform.transform(event);
 
-        assert!(record.is_none());
+        assert!(event.is_none());
     }
 
     #[test]
     fn lua_read_empty_field() {
         let transform = Lua::new(
             r#"
-              if record["non-existant"] == nil then
-                record["result"] = "empty"
+              if event["non-existant"] == nil then
+                event["result"] = "empty"
               else
-                record["result"] = "found"
+                event["result"] = "found"
               end
             "#,
         )
         .unwrap();
 
-        let record = Record::new_empty();
-        let record = transform.transform(record).unwrap();
+        let event = Event::new_empty_log();
+        let event = transform.transform(event).unwrap();
 
-        assert_eq!(record[&"result".into()], "empty".into());
+        assert_eq!(event[&"result".into()], "empty".into());
     }
 
     #[test]
     fn lua_numeric_value() {
         let transform = Lua::new(
             r#"
-              record["number"] = 3
+              event["number"] = 3
             "#,
         )
         .unwrap();
 
-        let record = transform.transform(Record::new_empty()).unwrap();
-        assert_eq!(record[&"number".into()], "3".into());
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event[&"number".into()], "3".into());
     }
 
     #[test]
     fn lua_non_coercible_value() {
         let transform = Lua::new(
             r#"
-              record["junk"] = {"asdf"}
+              event["junk"] = {"asdf"}
             "#,
         )
         .unwrap();
 
-        let err = transform.process(Record::new_empty()).unwrap_err();
+        let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("error converting Lua table to String"), err);
     }
@@ -218,12 +223,12 @@ mod tests {
     fn lua_non_string_key_write() {
         let transform = Lua::new(
             r#"
-              record[false] = "hello"
+              event[false] = "hello"
             "#,
         )
         .unwrap();
 
-        let err = transform.process(Record::new_empty()).unwrap_err();
+        let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("error converting Lua boolean to String"), err);
     }
@@ -232,12 +237,12 @@ mod tests {
     fn lua_non_string_key_read() {
         let transform = Lua::new(
             r#"
-              print(record[false])
+              print(event[false])
             "#,
         )
         .unwrap();
 
-        let err = transform.process(Record::new_empty()).unwrap_err();
+        let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("error converting Lua boolean to String"), err);
     }
@@ -251,7 +256,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = transform.process(Record::new_empty()).unwrap_err();
+        let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), err);
     }

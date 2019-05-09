@@ -1,4 +1,4 @@
-use crate::Record;
+use crate::Event;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -48,12 +48,12 @@ struct StatsdConfig {
 
 #[typetag::serde(name = "statsd")]
 impl crate::topology::config::SourceConfig for StatsdConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         Ok(statsd(self.address.clone(), out))
     }
 }
 
-fn statsd(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
+fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
 
     Box::new(
@@ -76,7 +76,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
                         .lines()
                         .map(parse)
                         .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                        .map(Record::from)
+                        .map(Event::from)
                         .collect::<Vec<_>>();
                     futures::stream::iter_ok::<_, std::io::Error>(metrics)
                 })
@@ -88,15 +88,17 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Record>) -> super::Source {
     )
 }
 
-impl From<Metric> for Record {
-    fn from(metric: Metric) -> Record {
+impl From<Metric> for Event {
+    fn from(metric: Metric) -> Event {
         match metric {
             Metric::Counter { name, val, .. } | Metric::Gauge { name, val, .. } => {
-                let mut record = Record::new_empty();
-                record.insert_explicit(name.into(), val.to_string().into());
-                record
+                let mut event = Event::new_empty_log();
+                event
+                    .as_mut_log()
+                    .insert_explicit(name.into(), val.to_string().into());
+                event
             }
-            _ => Record::from(format!("{:?}", metric)),
+            _ => Event::from(format!("{:?}", metric)),
         }
     }
 }
@@ -107,7 +109,7 @@ mod test {
     use crate::{
         sinks::prometheus::{Counter, Gauge, PrometheusSinkConfig},
         test_util::{block_on, next_addr, shutdown_on_idle},
-        topology::{config, Topology},
+        topology::{self, config},
     };
     use futures::Stream;
     use std::{thread, time::Duration};
@@ -137,11 +139,10 @@ mod test {
                 }],
             },
         );
-        let (mut topology, _warnings) = Topology::build(config).unwrap();
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        topology.start(&mut rt);
+        let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

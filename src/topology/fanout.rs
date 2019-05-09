@@ -1,5 +1,5 @@
 use crate::sinks::RouterSink;
-use crate::Record;
+use crate::Event;
 use futures::sync::mpsc;
 use futures::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
@@ -85,7 +85,7 @@ impl Fanout {
 }
 
 impl Sink for Fanout {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
@@ -144,7 +144,7 @@ impl Sink for Fanout {
 mod tests {
     use super::{ControlMessage, Fanout};
     use crate::test_util::{self, CollectCurrent};
-    use crate::Record;
+    use crate::Event;
     use futures::sync::mpsc;
     use futures::{stream, Future, Sink, Stream};
 
@@ -160,8 +160,8 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let _fanout = fanout.send(rec2.clone()).wait().unwrap();
@@ -191,9 +191,9 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
-        let rec3 = Record::from("line 3".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
+        let rec3 = Event::from("line 3".to_string());
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -225,8 +225,8 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
@@ -235,7 +235,7 @@ mod tests {
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
         fanout.add("c".to_string(), tx_c);
 
-        let rec3 = Record::from("line 3".to_string());
+        let rec3 = Event::from("line 3".to_string());
         let _fanout = fanout.send(rec3.clone()).wait().unwrap();
 
         assert_eq!(
@@ -264,8 +264,8 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let fanout = fanout.send(rec2.clone()).wait().unwrap();
@@ -274,7 +274,7 @@ mod tests {
             .unbounded_send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
-        let rec3 = Record::from("line 3".to_string());
+        let rec3 = Event::from("line 3".to_string());
         let _fanout = test_util::block_on(fanout.send(rec3.clone())).unwrap();
 
         assert_eq!(
@@ -302,9 +302,9 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
-        let rec3 = Record::from("line 3".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
+        let rec3 = Event::from("line 3".to_string());
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -342,9 +342,9 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
-        let rec3 = Record::from("line 3".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
+        let rec3 = Event::from("line 3".to_string());
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -382,9 +382,9 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
-        let rec3 = Record::from("line 3".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
+        let rec3 = Event::from("line 3".to_string());
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -412,8 +412,8 @@ mod tests {
     fn fanout_no_sinks() {
         let fanout = Fanout::new().0;
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let _fanout = fanout.send(rec2.clone()).wait().unwrap();
@@ -431,8 +431,8 @@ mod tests {
         fanout.add("a".to_string(), tx_a1);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Record::from("line 1".to_string());
-        let rec2 = Record::from("line 2".to_string());
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
 
         let fanout = fanout.send(rec1.clone()).wait().unwrap();
         let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
@@ -441,7 +441,7 @@ mod tests {
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), tx_a2);
 
-        let rec3 = Record::from("line 3".to_string());
+        let rec3 = Event::from("line 3".to_string());
         let _fanout = fanout.send(rec3.clone()).wait().unwrap();
 
         assert_eq!(

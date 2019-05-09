@@ -8,14 +8,14 @@ fn batching(
     bench_name: &'static str,
     gzip: bool,
     max_size: usize,
-    num_records: usize,
-    record_len: usize,
+    num_events: usize,
+    event_len: usize,
 ) -> Benchmark {
     Benchmark::new(bench_name, move |b| {
         b.iter_with_setup(
             move || {
-                let input = random_lines(record_len)
-                    .take(num_records)
+                let input = random_lines(event_len)
+                    .take(num_events)
                     .map(|s| s.into_bytes())
                     .collect::<Vec<_>>();
                 futures::stream::iter_ok::<_, ()>(input.into_iter())
@@ -31,7 +31,7 @@ fn batching(
     })
     .sample_size(10)
     .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_records * record_len) as u32))
+    .throughput(Throughput::Bytes((num_events * event_len) as u32))
 }
 
 fn benchmark_batching(c: &mut Criterion) {

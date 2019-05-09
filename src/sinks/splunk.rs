@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    record::{self, Record},
+    event::{self, Event},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -38,7 +38,7 @@ pub struct HecSinkConfig {
 }
 
 fn default_host_field() -> Atom {
-    record::HOST.clone()
+    event::HOST.clone()
 }
 
 #[typetag::serde(name = "splunk_hec")]
@@ -106,12 +106,12 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |record: Record| {
-            let host = record.get(&host_field).map(|h| h.clone());
+        .with(move |event: Event| {
+            let host = event.as_log().get(&host_field).map(|h| h.clone());
 
             let mut body = json!({
-                "event": record[&record::MESSAGE].to_string_lossy(),
-                "fields": record.explicit_fields(),
+                "event": event[&event::MESSAGE].to_string_lossy(),
+                "fields": event.as_log().explicit_fields(),
             });
 
             if let Some(host) = host {
@@ -184,7 +184,7 @@ mod integration_tests {
     use crate::{
         sinks,
         test_util::{random_lines_with_stream, random_string},
-        Record,
+        Event,
     };
     use futures::Sink;
     use serde_json::Value as JsonValue;
@@ -199,9 +199,9 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let record = Record::from(message.clone());
+        let event = Event::from(message.clone());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -229,9 +229,9 @@ mod integration_tests {
 
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
-        let (messages, records) = random_lines_with_stream(100, 10);
+        let (messages, events) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
 
         rt.block_on(pump).unwrap();
 
@@ -262,10 +262,12 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Record::from(message.clone());
-        record.insert_explicit("asdf".into(), "hello".into());
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("asdf".into(), "hello".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -292,11 +294,15 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Record::from(message.clone());
-        record.insert_explicit("asdf".into(), "hello".into());
-        record.insert_implicit("host".into(), "example.com:1234".into());
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("asdf".into(), "hello".into());
+        event
+            .as_mut_log()
+            .insert_implicit("host".into(), "example.com:1234".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 
@@ -329,12 +335,18 @@ mod integration_tests {
         let sink = sinks::splunk::hec(config, Acker::Null).unwrap();
 
         let message = random_string(100);
-        let mut record = Record::from(message.clone());
-        record.insert_explicit("asdf".into(), "hello".into());
-        record.insert_implicit("host".into(), "example.com:1234".into());
-        record.insert_explicit("roast".into(), "beef.example.com:1234".into());
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("asdf".into(), "hello".into());
+        event
+            .as_mut_log()
+            .insert_implicit("host".into(), "example.com:1234".into());
+        event
+            .as_mut_log()
+            .insert_explicit("roast".into(), "beef.example.com:1234".into());
 
-        let pump = sink.send(record);
+        let pump = sink.send(event);
 
         rt.block_on(pump).unwrap();
 

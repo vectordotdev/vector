@@ -134,7 +134,7 @@ impl Sink for TcpSink {
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
                 debug!(
-                    message = "sending record.",
+                    message = "sending event.",
                     bytes = &field::display(line.len())
                 );
                 match connection.start_send(line) {
@@ -157,7 +157,7 @@ impl Sink for TcpSink {
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
         // Stream::forward will immediately poll_complete the sink it's forwarding to,
-        // but we don't want to connect before the first record actually comes through.
+        // but we don't want to connect before the first event actually comes through.
         if let TcpSinkState::Disconnected = self.state {
             return Ok(Async::Ready(()));
         }
@@ -187,7 +187,7 @@ pub fn raw_tcp(
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(move |record| Ok(encoder.encode(record))),
+            .with(move |event| Ok(encoder.encode(event))),
     )
 }
 

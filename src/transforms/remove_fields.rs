@@ -1,5 +1,5 @@
 use super::Transform;
-use crate::record::Record;
+use crate::Event;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -27,32 +27,36 @@ impl RemoveFields {
 }
 
 impl Transform for RemoveFields {
-    fn transform(&self, mut record: Record) -> Option<Record> {
+    fn transform(&self, mut event: Event) -> Option<Event> {
         for field in &self.fields {
-            record.remove(field);
+            event.as_mut_log().remove(field);
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::RemoveFields;
-    use crate::{record::Record, transforms::Transform};
+    use crate::{event::Event, transforms::Transform};
 
     #[test]
     fn remove_fields() {
-        let mut record = Record::from("message");
-        record.insert_explicit("to_remove".into(), "some value".into());
-        record.insert_explicit("to_keep".into(), "another value".into());
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert_explicit("to_remove".into(), "some value".into());
+        event
+            .as_mut_log()
+            .insert_explicit("to_keep".into(), "another value".into());
 
         let transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()]);
 
-        let new_record = transform.transform(record).unwrap();
+        let new_event = transform.transform(event).unwrap();
 
-        assert!(new_record.get(&"to_remove".into()).is_none());
-        assert!(new_record.get(&"unknown".into()).is_none());
-        assert_eq!(new_record[&"to_keep".into()], "another value".into());
+        assert!(new_event.as_log().get(&"to_remove".into()).is_none());
+        assert!(new_event.as_log().get(&"unknown".into()).is_none());
+        assert_eq!(new_event[&"to_keep".into()], "another value".into());
     }
 }

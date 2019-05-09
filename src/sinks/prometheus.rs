@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::Record;
+use crate::Event;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
@@ -165,17 +165,17 @@ impl PrometheusSink {
 }
 
 impl Sink for PrometheusSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(
         &mut self,
-        record: Self::SinkItem,
+        event: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
         for (field, counter) in &self.counters {
-            if let Some(val) = record.get(&field.key) {
+            if let Some(val) = event.as_log().get(&field.key) {
                 if field.parse_value {
                     let val = val.to_string_lossy();
 
@@ -194,7 +194,7 @@ impl Sink for PrometheusSink {
         }
 
         for (field, gauge) in &self.gauges {
-            if let Some(val) = record.get(&field.key) {
+            if let Some(val) = event.as_log().get(&field.key) {
                 let val = val.to_string_lossy();
 
                 if let Ok(count) = val.parse() {

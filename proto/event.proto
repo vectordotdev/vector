@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package record.proto;
+package event.proto;
 
-message Record {
+message EventWrapper {
   oneof event {
     Log log = 1;
   }

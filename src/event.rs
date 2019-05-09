@@ -1,4 +1,4 @@
-use self::proto::{record::Event, Log};
+use self::proto::{event_wrapper::Event as EventProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/record.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
 lazy_static! {
@@ -18,18 +18,42 @@ lazy_static! {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-#[repr(transparent)]
-pub struct Record {
+pub enum Event {
+    Log(LogEvent),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct LogEvent {
     structured: HashMap<Atom, Value>,
 }
 
-impl Record {
-    pub fn new_empty() -> Self {
-        Self {
+impl Event {
+    pub fn new_empty_log() -> Self {
+        Event::Log(LogEvent {
             structured: HashMap::new(),
+        })
+    }
+
+    pub fn as_log(&self) -> &LogEvent {
+        match self {
+            Event::Log(log) => log,
         }
     }
 
+    pub fn as_mut_log(&mut self) -> &mut LogEvent {
+        match self {
+            Event::Log(log) => log,
+        }
+    }
+
+    pub fn into_log(self) -> LogEvent {
+        match self {
+            Event::Log(log) => log,
+        }
+    }
+}
+
+impl LogEvent {
     pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
         self.structured.get(key).map(|v| &v.value)
     }
@@ -81,11 +105,13 @@ impl Record {
     }
 }
 
-impl std::ops::Index<&Atom> for Record {
+impl std::ops::Index<&Atom> for Event {
     type Output = ValueKind;
 
     fn index(&self, key: &Atom) -> &ValueKind {
-        &self.structured[key].value
+        match self {
+            Event::Log(LogEvent { structured }) => &structured[key].value,
+        }
     }
 }
 
@@ -185,12 +211,12 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-impl From<proto::Record> for Record {
-    fn from(proto: proto::Record) -> Self {
+impl From<proto::EventWrapper> for Event {
+    fn from(proto: proto::EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
         match event {
-            Event::Log(proto) => {
+            EventProto::Log(proto) => {
                 let structured = proto
                     .structured
                     .into_iter()
@@ -203,64 +229,72 @@ impl From<proto::Record> for Record {
                     })
                     .collect::<HashMap<_, _>>();
 
-                Record { structured }
+                Event::Log(LogEvent { structured })
             }
         }
     }
 }
 
-impl From<Record> for proto::Record {
-    fn from(record: Record) -> Self {
-        let structured = record
-            .structured
-            .into_iter()
-            .map(|(k, v)| {
-                let value = proto::Value {
-                    data: v.value.as_bytes().into_owned(),
-                    explicit: v.explicit,
-                };
-                (k.to_string(), value)
-            })
-            .collect::<HashMap<_, _>>();
+impl From<Event> for proto::EventWrapper {
+    fn from(event: Event) -> Self {
+        match event {
+            Event::Log(LogEvent { structured }) => {
+                let structured = structured
+                    .into_iter()
+                    .map(|(k, v)| {
+                        let value = proto::Value {
+                            data: v.value.as_bytes().into_owned(),
+                            explicit: v.explicit,
+                        };
+                        (k.to_string(), value)
+                    })
+                    .collect::<HashMap<_, _>>();
 
-        let event = Event::Log(Log { structured });
+                let event = EventProto::Log(Log { structured });
 
-        proto::Record { event: Some(event) }
+                proto::EventWrapper { event: Some(event) }
+            }
+        }
     }
 }
 
-impl From<Record> for Vec<u8> {
-    fn from(mut record: Record) -> Vec<u8> {
-        record
-            .structured
-            .remove(&MESSAGE)
-            .unwrap()
-            .value
-            .as_bytes()
-            .into_owned()
+impl From<Event> for Vec<u8> {
+    fn from(event: Event) -> Vec<u8> {
+        match event {
+            Event::Log(LogEvent { mut structured }) => structured
+                .remove(&MESSAGE)
+                .unwrap()
+                .value
+                .as_bytes()
+                .into_owned(),
+        }
     }
 }
 
-impl From<Bytes> for Record {
+impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut record = Record {
+        let mut event = Event::Log(LogEvent {
             structured: HashMap::new(),
-        };
+        });
 
-        record.insert_implicit(MESSAGE.clone(), message.into());
-        record.insert_implicit(TIMESTAMP.clone(), Utc::now().into());
+        event
+            .as_mut_log()
+            .insert_implicit(MESSAGE.clone(), message.into());
+        event
+            .as_mut_log()
+            .insert_implicit(TIMESTAMP.clone(), Utc::now().into());
 
-        record
+        event
     }
 }
 
-impl From<&str> for Record {
+impl From<&str> for Event {
     fn from(line: &str) -> Self {
         line.to_owned().into()
     }
 }
 
-impl From<String> for Record {
+impl From<String> for Event {
     fn from(line: String) -> Self {
         Bytes::from(line).into()
     }
@@ -302,21 +336,25 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::Record;
+    use super::Event;
     use regex::Regex;
     use std::collections::HashSet;
 
     #[test]
     fn serialization() {
-        let mut record = Record::from("raw log line");
-        record.insert_explicit("foo".into(), "bar".into());
-        record.insert_explicit("bar".into(), "baz".into());
+        let mut event = Event::from("raw log line");
+        event
+            .as_mut_log()
+            .insert_explicit("foo".into(), "bar".into());
+        event
+            .as_mut_log()
+            .insert_explicit("bar".into(), "baz".into());
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": record.structured[&super::TIMESTAMP],
+            "timestamp": event.as_log().get(&super::TIMESTAMP),
         });
 
         let expected_explicit = serde_json::json!({
@@ -324,10 +362,10 @@ mod test {
             "bar": "baz",
         });
 
-        let actual_all = serde_json::to_value(record.all_fields()).unwrap();
+        let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(expected_all, actual_all);
 
-        let actual_explicit = serde_json::to_value(record.explicit_fields()).unwrap();
+        let actual_explicit = serde_json::to_value(event.as_log().explicit_fields()).unwrap();
         assert_eq!(expected_explicit, actual_explicit);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -335,16 +373,19 @@ mod test {
     }
 
     #[test]
-    fn record_iteration() {
-        let mut record = Record::new_empty();
+    fn event_iteration() {
+        let mut event = Event::new_empty_log();
 
-        record.insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
-        record.insert_implicit(
+        event
+            .as_mut_log()
+            .insert_explicit("Ke$ha".into(), "It's going down, I'm yelling timber".into());
+        event.as_mut_log().insert_implicit(
             "Pitbull".into(),
             "The bigger they are, the harder they fall".into(),
         );
 
-        let all = record
+        let all = event
+            .as_log()
             .all_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))
             .collect::<HashSet<_>>();
@@ -364,7 +405,8 @@ mod test {
             .collect::<HashSet<_>>()
         );
 
-        let explicit_only = record
+        let explicit_only = event
+            .as_log()
             .explicit_fields()
             .map(|(k, v)| (k, v.to_string_lossy()))
             .collect::<HashSet<_>>();
