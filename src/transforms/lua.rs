@@ -11,7 +11,10 @@ pub struct LuaConfig {
 #[typetag::serde(name = "lua")]
 impl crate::topology::config::TransformConfig for LuaConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Ok(Box::new(Lua::new(&self.source)))
+        Lua::new(&self.source).map(|l| {
+            let b: Box<dyn Transform> = Box::new(l);
+            b
+        })
     }
 }
 
@@ -20,15 +23,17 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str) -> Self {
+    pub fn new(source: &str) -> Result<Self, String> {
         let lua = rlua::Lua::new();
 
         lua.context(|ctx| {
-            let func = ctx.load(&source).into_function().unwrap();
-            ctx.set_named_registry_value("vector_func", func).unwrap();
-        });
+            let func = ctx.load(&source).into_function()?;
+            ctx.set_named_registry_value("vector_func", func)?;
+            Ok(())
+        })
+        .map_err(|err| format_error(&err))?;
 
-        Self { lua }
+        Ok(Self { lua })
     }
 
     fn process(&self, record: Record) -> Result<Option<Record>, rlua::Error> {
@@ -104,7 +109,8 @@ mod tests {
             r#"
               record["hello"] = "goodbye"
             "#,
-        );
+        )
+        .unwrap();
 
         let record = Record::from("program me");
 
@@ -120,7 +126,8 @@ mod tests {
               _, _, name = string.find(record["message"], "Hello, my name is (%a+).")
               record["name"] = name
             "#,
-        );
+        )
+        .unwrap();
 
         let record = Record::from("Hello, my name is Bob.");
 
@@ -135,7 +142,8 @@ mod tests {
             r#"
               record["name"] = nil
             "#,
-        );
+        )
+        .unwrap();
 
         let mut record = Record::new_empty();
         record.insert_explicit("name".into(), "Bob".into());
@@ -150,7 +158,8 @@ mod tests {
             r#"
               record = nil
             "#,
-        );
+        )
+        .unwrap();
 
         let mut record = Record::new_empty();
         record.insert_explicit("name".into(), "Bob".into());
@@ -169,7 +178,8 @@ mod tests {
                 record["result"] = "found"
               end
             "#,
-        );
+        )
+        .unwrap();
 
         let record = Record::new_empty();
         let record = transform.transform(record).unwrap();
@@ -183,7 +193,8 @@ mod tests {
             r#"
               record["number"] = 3
             "#,
-        );
+        )
+        .unwrap();
 
         let record = transform.transform(Record::new_empty()).unwrap();
         assert_eq!(record[&"number".into()], "3".into());
@@ -195,7 +206,8 @@ mod tests {
             r#"
               record["junk"] = {"asdf"}
             "#,
-        );
+        )
+        .unwrap();
 
         let err = transform.process(Record::new_empty()).unwrap_err();
         let err = format_error(&err);
@@ -208,7 +220,8 @@ mod tests {
             r#"
               record[false] = "hello"
             "#,
-        );
+        )
+        .unwrap();
 
         let err = transform.process(Record::new_empty()).unwrap_err();
         let err = format_error(&err);
@@ -221,7 +234,8 @@ mod tests {
             r#"
               print(record[false])
             "#,
-        );
+        )
+        .unwrap();
 
         let err = transform.process(Record::new_empty()).unwrap_err();
         let err = format_error(&err);
@@ -234,10 +248,24 @@ mod tests {
             r#"
               error("this is an error")
             "#,
-        );
+        )
+        .unwrap();
 
         let err = transform.process(Record::new_empty()).unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), err);
+    }
+
+    #[test]
+    fn lua_syntax_error() {
+        let err = Lua::new(
+            r#"
+              1234 = sadf <>&*!#@
+            "#,
+        )
+        .map(|_| ())
+        .unwrap_err();
+
+        assert!(err.contains("syntax error:"), err);
     }
 }
