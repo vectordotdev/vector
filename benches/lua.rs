@@ -1,9 +1,9 @@
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use vector::{
+    topology::config::TransformConfig,
     transforms::{self, Transform},
     Record,
-    topology::config::TransformConfig,
 };
 
 fn add_fields(c: &mut Criterion) {
@@ -62,7 +62,12 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig { field: "the_field".to_string(), value: "0".to_string() }.build().unwrap()
+                    transforms::field_filter::FieldFilterConfig {
+                        field: "the_field".to_string(),
+                        value: "0".to_string(),
+                    }
+                    .build()
+                    .unwrap()
                 },
                 |transform| {
                     let num = (0..num_records)
