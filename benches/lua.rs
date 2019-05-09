@@ -38,7 +38,7 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = format!("record['{}'] = '{}'", key, value);
-                    transforms::lua::Lua::new(source)
+                    transforms::lua::Lua::new(&source).unwrap()
                 },
                 |transform| {
                     for _ in 0..num_records {
