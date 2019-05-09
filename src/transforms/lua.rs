@@ -11,7 +11,7 @@ pub struct LuaConfig {
 #[typetag::serde(name = "lua")]
 impl crate::topology::config::TransformConfig for LuaConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Ok(Box::new(Lua::new(self.source.clone())))
+        Ok(Box::new(Lua::new(&self.source)))
     }
 }
 
@@ -20,7 +20,7 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: String) -> Self {
+    pub fn new(source: &str) -> Self {
         let lua = rlua::Lua::new();
 
         lua.context(|ctx| {
@@ -102,9 +102,8 @@ mod tests {
     fn lua_add_field() {
         let transform = Lua::new(
             r#"
-          record["hello"] = "goodbye"
-        "#
-            .to_owned(),
+              record["hello"] = "goodbye"
+            "#,
         );
 
         let record = Record::from("program me");
@@ -118,10 +117,9 @@ mod tests {
     fn lua_read_field() {
         let transform = Lua::new(
             r#"
-          _, _, name = string.find(record["message"], "Hello, my name is (%a+).")
-          record["name"] = name
-        "#
-            .to_owned(),
+              _, _, name = string.find(record["message"], "Hello, my name is (%a+).")
+              record["name"] = name
+            "#,
         );
 
         let record = Record::from("Hello, my name is Bob.");
@@ -135,9 +133,8 @@ mod tests {
     fn lua_remove_field() {
         let transform = Lua::new(
             r#"
-          record["name"] = nil
-        "#
-            .to_owned(),
+              record["name"] = nil
+            "#,
         );
 
         let mut record = Record::new_empty();
@@ -151,9 +148,8 @@ mod tests {
     fn lua_drop_record() {
         let transform = Lua::new(
             r#"
-          record = nil
-        "#
-            .to_owned(),
+              record = nil
+            "#,
         );
 
         let mut record = Record::new_empty();
@@ -167,13 +163,12 @@ mod tests {
     fn lua_read_empty_field() {
         let transform = Lua::new(
             r#"
-          if record["non-existant"] == nil then
-            record["result"] = "empty"
-          else
-            record["result"] = "found"
-          end
-        "#
-            .to_owned(),
+              if record["non-existant"] == nil then
+                record["result"] = "empty"
+              else
+                record["result"] = "found"
+              end
+            "#,
         );
 
         let record = Record::new_empty();
@@ -186,9 +181,8 @@ mod tests {
     fn lua_numeric_value() {
         let transform = Lua::new(
             r#"
-          record["number"] = 3
-        "#
-            .to_owned(),
+              record["number"] = 3
+            "#,
         );
 
         let record = transform.transform(Record::new_empty()).unwrap();
@@ -199,9 +193,8 @@ mod tests {
     fn lua_non_coercible_value() {
         let transform = Lua::new(
             r#"
-          record["junk"] = {"asdf"}
-        "#
-            .to_owned(),
+              record["junk"] = {"asdf"}
+            "#,
         );
 
         let err = transform.process(Record::new_empty()).unwrap_err();
@@ -213,9 +206,8 @@ mod tests {
     fn lua_non_string_key_write() {
         let transform = Lua::new(
             r#"
-          record[false] = "hello"
-        "#
-            .to_owned(),
+              record[false] = "hello"
+            "#,
         );
 
         let err = transform.process(Record::new_empty()).unwrap_err();
@@ -227,9 +219,8 @@ mod tests {
     fn lua_non_string_key_read() {
         let transform = Lua::new(
             r#"
-          print(record[false])
-        "#
-            .to_owned(),
+              print(record[false])
+            "#,
         );
 
         let err = transform.process(Record::new_empty()).unwrap_err();
@@ -241,9 +232,8 @@ mod tests {
     fn lua_script_error() {
         let transform = Lua::new(
             r#"
-          error("this is an error")
-        "#
-            .to_owned(),
+              error("this is an error")
+            "#,
         );
 
         let err = transform.process(Record::new_empty()).unwrap_err();
