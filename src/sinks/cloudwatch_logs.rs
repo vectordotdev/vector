@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    event::{self, Event},
+    event::{self, Event, LogEvent},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
@@ -12,9 +12,11 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
@@ -97,7 +99,11 @@ impl CloudwatchLogsSvc {
         sequence_token: Option<String>,
         events: Vec<Event>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        let log_events = events.into_iter().map(Into::into).collect();
+        let log_events = events
+            .into_iter()
+            .map(Event::into_log)
+            .map(Into::into)
+            .collect();
 
         let request = PutLogEventsRequest {
             log_events,
@@ -172,7 +178,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 self.state = State::Put(rx);
 
                 let fut = self
-                    .put_logs(token, req.into())
+                    .put_logs(token, req)
                     .map_err(CloudwatchError::Put)
                     .and_then(move |res| tx.send(res).map_err(|_| CloudwatchError::ServiceDropped));
 
@@ -230,16 +236,34 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl From<Event> for InputLogEvent {
-    fn from(event: Event) -> InputLogEvent {
-        let message = event[&event::MESSAGE].to_string_lossy();
+impl From<LogEvent> for InputLogEvent {
+    fn from(log: LogEvent) -> InputLogEvent {
+        if log.is_structured() {
+            let timestamp =
+                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
+                    .unwrap()
+                    .timestamp_millis();
 
-        let timestamp =
-            chrono::DateTime::parse_from_rfc3339(&event[&event::TIMESTAMP].to_string_lossy())
-                .unwrap()
-                .timestamp_millis();
+            let map = log
+                .into_structured()
+                .into_iter()
+                .map(|(k, v)| (k, v.into_value().to_string_lossy()))
+                .collect::<HashMap<Atom, String>>();
 
-        InputLogEvent { message, timestamp }
+            let bytes = serde_json::to_vec(&map).unwrap();
+            let message = String::from_utf8(bytes).unwrap();
+
+            InputLogEvent { message, timestamp }
+        } else {
+            let message = log[&event::MESSAGE].to_string_lossy();
+
+            let timestamp =
+                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
+                    .unwrap()
+                    .timestamp_millis();
+
+            InputLogEvent { message, timestamp }
+        }
     }
 }
 

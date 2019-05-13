@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::Index;
 use string_cache::DefaultAtom as Atom;
 
 pub mod proto {
@@ -46,6 +47,11 @@ impl Event {
         }
     }
 
+    pub fn is_log(&self) -> bool {
+        // TODO: when we add more variants this will be backwards compat
+        true
+    }
+
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
@@ -60,6 +66,10 @@ impl LogEvent {
 
     pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
         self.structured.remove(key).map(|v| v.value)
+    }
+
+    pub fn into_structured(self) -> HashMap<Atom, Value> {
+        self.structured
     }
 
     pub fn is_structured(&self) -> bool {
@@ -109,7 +119,7 @@ impl LogEvent {
     }
 }
 
-impl std::ops::Index<&Atom> for Event {
+impl Index<&Atom> for Event {
     type Output = ValueKind;
 
     fn index(&self, key: &Atom) -> &ValueKind {
@@ -119,10 +129,28 @@ impl std::ops::Index<&Atom> for Event {
     }
 }
 
+impl Index<&Atom> for LogEvent {
+    type Output = ValueKind;
+
+    fn index(&self, key: &Atom) -> &ValueKind {
+        &self.structured[&key].value
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Value {
     value: ValueKind,
     explicit: bool,
+}
+
+impl Value {
+    pub fn into_value(self) -> ValueKind {
+        self.value
+    }
+
+    pub fn is_explicit(&self) -> bool {
+        self.explicit
+    }
 }
 
 impl Serialize for Value {
