@@ -105,13 +105,11 @@ impl LogEvent {
     }
 }
 
-impl std::ops::Index<&Atom> for Event {
+impl std::ops::Index<&Atom> for LogEvent {
     type Output = ValueKind;
 
     fn index(&self, key: &Atom) -> &ValueKind {
-        match self {
-            Event::Log(LogEvent { structured }) => &structured[key].value,
-        }
+        &self.structured[key].value
     }
 }
 

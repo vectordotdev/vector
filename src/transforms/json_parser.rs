@@ -117,10 +117,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event[&Atom::from("greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event[&event::MESSAGE],
+            event.as_log()[&event::MESSAGE],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -142,10 +142,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event[&Atom::from("greeting")], "hello".into(),);
-        assert_eq!(event[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into(),);
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event[&Atom::from("data")],
+            event.as_log()[&Atom::from("data")],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
 
@@ -171,7 +171,7 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(event[&event::MESSAGE], invalid.into());
+        assert_eq!(event.as_log()[&event::MESSAGE], invalid.into());
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
@@ -186,7 +186,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event[&Atom::from("data")], invalid.into());
+        assert_eq!(event.as_log()[&Atom::from("data")], invalid.into());
         assert!(event.as_log().get(&Atom::from("greeting")).is_none());
     }
 
@@ -255,10 +255,10 @@ mod test {
         let event = parser1.transform(event).unwrap();
         let event = parser2.transform(event).unwrap();
 
-        assert_eq!(event[&Atom::from("greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event[&Atom::from("message")],
+            event.as_log()[&Atom::from("message")],
             "help i'm trapped under many layers of json".into()
         );
     }
@@ -284,18 +284,18 @@ mod test {
         );
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event[&Atom::from("string")], "this is text".into());
-        assert_eq!(event[&Atom::from("null")], "".into());
-        assert_eq!(event[&Atom::from("float")], "12.34".into());
-        assert_eq!(event[&Atom::from("int")], "56".into());
-        assert_eq!(event[&Atom::from("bool true")], "true".into());
-        assert_eq!(event[&Atom::from("bool false")], "false".into());
-        assert_eq!(event[&Atom::from("array[0]")], "z".into());
-        assert_eq!(event[&Atom::from("array[1]")], "7".into());
-        assert_eq!(event[&Atom::from("object.nested")], "data".into());
-        assert_eq!(event[&Atom::from("object.more")], "values".into());
+        assert_eq!(event.as_log()[&Atom::from("string")], "this is text".into());
+        assert_eq!(event.as_log()[&Atom::from("null")], "".into());
+        assert_eq!(event.as_log()[&Atom::from("float")], "12.34".into());
+        assert_eq!(event.as_log()[&Atom::from("int")], "56".into());
+        assert_eq!(event.as_log()[&Atom::from("bool true")], "true".into());
+        assert_eq!(event.as_log()[&Atom::from("bool false")], "false".into());
+        assert_eq!(event.as_log()[&Atom::from("array[0]")], "z".into());
+        assert_eq!(event.as_log()[&Atom::from("array[1]")], "7".into());
+        assert_eq!(event.as_log()[&Atom::from("object.nested")], "data".into());
+        assert_eq!(event.as_log()[&Atom::from("object.more")], "values".into());
         assert_eq!(
-            event[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
+            event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
             "1234".into()
         );
     }

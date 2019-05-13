@@ -260,7 +260,7 @@ mod integration_tests {
             "message": "raw log line",
             "my_id": "42",
             "foo": "bar",
-            "timestamp": input_event[&event::TIMESTAMP],
+            "timestamp": input_event.as_log()[&event::TIMESTAMP],
         });
         assert_eq!(expected, value);
     }

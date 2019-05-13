@@ -46,18 +46,18 @@ fn happy_path() {
     let mut goodbye_i = 0;
 
     for event in received {
-        let line = event[&event::MESSAGE].to_string_lossy();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
-                event[&"file".into()].to_string_lossy(),
+                event.as_log()[&"file".into()].to_string_lossy(),
                 path1.to_str().unwrap()
             );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
             assert_eq!(
-                event[&"file".into()].to_string_lossy(),
+                event.as_log()[&"file".into()].to_string_lossy(),
                 path2.to_str().unwrap()
             );
             goodbye_i += 1;
@@ -113,11 +113,11 @@ fn truncate() {
 
     for event in received {
         assert_eq!(
-            event[&"file".into()].to_string_lossy(),
+            event.as_log()[&"file".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
 
-        let line = event[&event::MESSAGE].to_string_lossy();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -180,11 +180,11 @@ fn rotate() {
 
     for event in received {
         assert_eq!(
-            event[&"file".into()].to_string_lossy(),
+            event.as_log()[&"file".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
 
-        let line = event[&event::MESSAGE].to_string_lossy();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -244,7 +244,7 @@ fn multiple_paths() {
     let mut is = [0; 3];
 
     for event in received {
-        let line = event[&event::MESSAGE].to_string_lossy();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
@@ -285,7 +285,7 @@ fn context_key() {
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
-            received[&"file".into()].to_string_lossy(),
+            received.as_log()[&"file".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
     }
@@ -313,7 +313,7 @@ fn context_key() {
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
-            received[&"source".into()].to_string_lossy(),
+            received.as_log()[&"source".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
     }
@@ -381,7 +381,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|event| event[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -415,7 +415,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|event| event[&event::MESSAGE].to_string_lossy())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -487,13 +487,21 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let before_lines = received
             .iter()
-            .filter(|event| event[&"file".into()].to_string_lossy().ends_with("before"))
-            .map(|event| event[&event::MESSAGE].to_string_lossy())
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
+                    .ends_with("before")
+            })
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|event| event[&"file".into()].to_string_lossy().ends_with("after"))
-            .map(|event| event[&event::MESSAGE].to_string_lossy())
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
+                    .ends_with("after")
+            })
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);

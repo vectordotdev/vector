@@ -121,8 +121,8 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |event: Event| {
             let mut body = json!({
-                "msg": event[&event::MESSAGE].to_string_lossy(),
-                "ts": event[&event::TIMESTAMP].to_string_lossy(),
+                "msg": event.as_log()[&event::MESSAGE].to_string_lossy(),
+                "ts": event.as_log()[&event::TIMESTAMP].to_string_lossy(),
                 "fields": event.as_log().explicit_fields(),
             });
 
