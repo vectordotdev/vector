@@ -33,7 +33,7 @@ impl Transform for RegexParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
         if let Some(captures) = self
             .regex
-            .captures(&event[&event::MESSAGE].as_bytes().into_owned())
+            .captures(&event.as_log()[&event::MESSAGE].as_bytes().into_owned())
         {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
@@ -63,8 +63,8 @@ mod tests {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event[&"status".into()], "1234".into());
-        assert_eq!(event[&"time".into()], "5678".into());
+        assert_eq!(event.as_log()[&"status".into()], "1234".into());
+        assert_eq!(event.as_log()[&"time".into()], "5678".into());
     }
 
     #[test]

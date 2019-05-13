@@ -119,16 +119,6 @@ impl LogEvent {
     }
 }
 
-impl Index<&Atom> for Event {
-    type Output = ValueKind;
-
-    fn index(&self, key: &Atom) -> &ValueKind {
-        match self {
-            Event::Log(LogEvent { structured }) => &structured[key].value,
-        }
-    }
-}
-
 impl Index<&Atom> for LogEvent {
     type Output = ValueKind;
 

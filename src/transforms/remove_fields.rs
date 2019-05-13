@@ -57,6 +57,9 @@ mod tests {
 
         assert!(new_event.as_log().get(&"to_remove".into()).is_none());
         assert!(new_event.as_log().get(&"unknown".into()).is_none());
-        assert_eq!(new_event[&"to_keep".into()], "another value".into());
+        assert_eq!(
+            new_event.as_log()[&"to_keep".into()],
+            "another value".into()
+        );
     }
 }

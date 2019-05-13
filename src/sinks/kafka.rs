@@ -76,7 +76,7 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let bytes = item[&event::MESSAGE].as_bytes();
+        let bytes = item.as_log()[&event::MESSAGE].as_bytes();
 
         let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 
