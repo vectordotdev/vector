@@ -32,12 +32,21 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
+    pub encoding: Encoding,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
     pub request_timeout_secs: Option<u64>,
     pub request_rate_limit_duration_secs: Option<u64>,
     pub request_rate_limit_num: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+pub enum Encoding {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "json")]
+    Json,
 }
 
 enum State {
@@ -102,7 +111,7 @@ impl CloudwatchLogsSvc {
         let log_events = events
             .into_iter()
             .map(Event::into_log)
-            .map(Into::into)
+            .map(|e| self.encode_log(e))
             .collect();
 
         let request = PutLogEventsRequest {
@@ -126,6 +135,35 @@ impl CloudwatchLogsSvc {
         };
 
         self.client.describe_log_streams(request)
+    }
+
+    pub fn encode_log(&self, log: LogEvent) -> InputLogEvent {
+        if log.is_structured() || self.config.encoding == Encoding::Json {
+            let timestamp =
+                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
+                    .unwrap()
+                    .timestamp_millis();
+
+            let map = log
+                .into_structured()
+                .into_iter()
+                .map(|(k, v)| (k, v.into_value().to_string_lossy()))
+                .collect::<HashMap<Atom, String>>();
+
+            let bytes = serde_json::to_vec(&map).unwrap();
+            let message = String::from_utf8(bytes).unwrap();
+
+            InputLogEvent { message, timestamp }
+        } else {
+            let message = log[&event::MESSAGE].to_string_lossy();
+
+            let timestamp =
+                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
+                    .unwrap()
+                    .timestamp_millis();
+
+            InputLogEvent { message, timestamp }
+        }
     }
 }
 
@@ -236,34 +274,9 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl From<LogEvent> for InputLogEvent {
-    fn from(log: LogEvent) -> InputLogEvent {
-        if log.is_structured() {
-            let timestamp =
-                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
-                    .unwrap()
-                    .timestamp_millis();
-
-            let map = log
-                .into_structured()
-                .into_iter()
-                .map(|(k, v)| (k, v.into_value().to_string_lossy()))
-                .collect::<HashMap<Atom, String>>();
-
-            let bytes = serde_json::to_vec(&map).unwrap();
-            let message = String::from_utf8(bytes).unwrap();
-
-            InputLogEvent { message, timestamp }
-        } else {
-            let message = log[&event::MESSAGE].to_string_lossy();
-
-            let timestamp =
-                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
-                    .unwrap()
-                    .timestamp_millis();
-
-            InputLogEvent { message, timestamp }
-        }
+impl Default for Encoding {
+    fn default() -> Encoding {
+        Encoding::Text
     }
 }
 
