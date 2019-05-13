@@ -115,7 +115,7 @@ mod tests {
 
         let event = Event::from("program me");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform(event).unwrap().into_log();
 
         assert_eq!(event[&"hello".into()], "goodbye".into());
     }
@@ -132,7 +132,7 @@ mod tests {
 
         let event = Event::from("Hello, my name is Bob.");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform(event).unwrap().into_log();
 
         assert_eq!(event[&"name".into()], "Bob".into());
     }
@@ -187,7 +187,7 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform(event).unwrap().into_log();
 
         assert_eq!(event[&"result".into()], "empty".into());
     }
@@ -201,7 +201,10 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform
+            .transform(Event::new_empty_log())
+            .unwrap()
+            .into_log();
         assert_eq!(event[&"number".into()], "3".into());
     }
 

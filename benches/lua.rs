@@ -29,7 +29,7 @@ fn add_fields(c: &mut Criterion) {
                 |transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
+                        let event = transform.transform(event).unwrap().into_log();
                         assert_eq!(event[&key_atom], value_bytes);
                     }
                 },
@@ -44,7 +44,7 @@ fn add_fields(c: &mut Criterion) {
                 |transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
+                        let event = transform.transform(event).unwrap().into_log();
                         assert_eq!(event[&key_atom2], value_bytes2);
                     }
                 },
