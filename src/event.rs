@@ -62,6 +62,10 @@ impl LogEvent {
         self.structured.remove(key).map(|v| v.value)
     }
 
+    pub fn is_structured(&self) -> bool {
+        self.structured.iter().any(|(_, v)| v.explicit)
+    }
+
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
         self.structured.insert(
             key,
