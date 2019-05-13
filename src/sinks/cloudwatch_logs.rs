@@ -234,10 +234,11 @@ impl From<Event> for InputLogEvent {
     fn from(event: Event) -> InputLogEvent {
         let message = event.as_log()[&event::MESSAGE].to_string_lossy();
 
-        let timestamp =
-            chrono::DateTime::parse_from_rfc3339(&event.as_log()[&event::TIMESTAMP].to_string_lossy())
-                .unwrap()
-                .timestamp_millis();
+        let timestamp = chrono::DateTime::parse_from_rfc3339(
+            &event.as_log()[&event::TIMESTAMP].to_string_lossy(),
+        )
+        .unwrap()
+        .timestamp_millis();
 
         InputLogEvent { message, timestamp }
     }
