@@ -117,7 +117,7 @@ mod tests {
 
         let event = transform.transform(event).unwrap().into_log();
 
-        assert_eq!(event[&"hello".into()], "goodbye".into());
+        assert_eq!(event.as_log()[&"hello".into()], "goodbye".into());
     }
 
     #[test]
@@ -134,7 +134,7 @@ mod tests {
 
         let event = transform.transform(event).unwrap().into_log();
 
-        assert_eq!(event[&"name".into()], "Bob".into());
+        assert_eq!(event.as_log()[&"name".into()], "Bob".into());
     }
 
     #[test]
@@ -189,7 +189,7 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap().into_log();
 
-        assert_eq!(event[&"result".into()], "empty".into());
+        assert_eq!(event.as_log()[&"result".into()], "empty".into());
     }
 
     #[test]
@@ -201,11 +201,8 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform
-            .transform(Event::new_empty_log())
-            .unwrap()
-            .into_log();
-        assert_eq!(event[&"number".into()], "3".into());
+        let event = transform.transform(Event::new_empty_log()).unwrap();
+        assert_eq!(event.as_log()[&"number".into()], "3".into());
     }
 
     #[test]
