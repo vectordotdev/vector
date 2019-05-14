@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    event::{self, Event},
+    event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
@@ -30,12 +30,20 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
+    pub encoding: Encoding,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
     pub request_timeout_secs: Option<u64>,
     pub request_rate_limit_duration_secs: Option<u64>,
     pub request_rate_limit_num: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 enum State {
@@ -97,7 +105,11 @@ impl CloudwatchLogsSvc {
         sequence_token: Option<String>,
         events: Vec<Event>,
     ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        let log_events = events.into_iter().map(Into::into).collect();
+        let log_events = events
+            .into_iter()
+            .map(Event::into_log)
+            .map(|e| self.encode_log(e))
+            .collect();
 
         let request = PutLogEventsRequest {
             log_events,
@@ -120,6 +132,31 @@ impl CloudwatchLogsSvc {
         };
 
         self.client.describe_log_streams(request)
+    }
+
+    pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
+        if log.is_structured() || self.config.encoding == Encoding::Json {
+            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
+
+            let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
+            let message = String::from_utf8(bytes).unwrap();
+
+            InputLogEvent { message, timestamp }
+        } else {
+            let message = log[&event::MESSAGE].to_string_lossy();
+
+            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
+
+            InputLogEvent { message, timestamp }
+        }
     }
 }
 
@@ -172,7 +209,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 self.state = State::Put(rx);
 
                 let fut = self
-                    .put_logs(token, req.into())
+                    .put_logs(token, req)
                     .map_err(CloudwatchError::Put)
                     .and_then(move |res| tx.send(res).map_err(|_| CloudwatchError::ServiceDropped));
 
@@ -230,17 +267,9 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl From<Event> for InputLogEvent {
-    fn from(event: Event) -> InputLogEvent {
-        let message = event.as_log()[&event::MESSAGE].to_string_lossy();
-
-        let timestamp = chrono::DateTime::parse_from_rfc3339(
-            &event.as_log()[&event::TIMESTAMP].to_string_lossy(),
-        )
-        .unwrap()
-        .timestamp_millis();
-
-        InputLogEvent { message, timestamp }
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Text
     }
 }
 
@@ -278,8 +307,9 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
+        event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
-        sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
+        sinks::cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };
@@ -289,9 +319,40 @@ mod tests {
         CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
         GetLogEventsRequest,
     };
+    use std::collections::HashMap;
+    use string_cache::DefaultAtom as Atom;
 
     const STREAM_NAME: &'static str = "test-1";
     const GROUP_NAME: &'static str = "router";
+
+    #[test]
+    fn cloudwatch_encode_log() {
+        let config = CloudwatchLogsSinkConfig {
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+        let svc = CloudwatchLogsSvc::new(config).unwrap();
+
+        let mut event = Event::from("hello world").into_log();
+
+        event.insert_explicit("key".into(), "value".into());
+
+        let input_event = svc.encode_log(event.clone());
+
+        let ts = if let ValueKind::Timestamp(ts) = event[&event::TIMESTAMP] {
+            ts.timestamp_millis()
+        } else {
+            panic!()
+        };
+
+        assert_eq!(input_event.timestamp, ts);
+
+        let bytes = input_event.message;
+
+        let map: HashMap<Atom, String> = serde_json::from_str(&bytes[..]).unwrap();
+
+        assert!(map.get(&event::TIMESTAMP).is_none());
+    }
 
     #[test]
     fn cloudwatch_insert_log_event() {

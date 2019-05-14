@@ -86,8 +86,8 @@ impl LogEvent {
         );
     }
 
-    pub fn remove(&mut self, key: &Atom) {
-        self.structured.remove(key);
+    pub fn remove(&mut self, key: &Atom) -> Option<ValueKind> {
+        self.structured.remove(key).map(|v| v.value)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
