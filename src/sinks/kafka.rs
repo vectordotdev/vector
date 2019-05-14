@@ -76,7 +76,13 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let bytes = item.as_log()[&event::MESSAGE].as_bytes();
+        let log = item.as_log();
+
+        let bytes = if log.is_structured() {
+            serde_json::to_vec(&log.all_fields()).unwrap()
+        } else {
+            log[&event::MESSAGE].as_bytes().into_owned()
+        };
 
         let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 
