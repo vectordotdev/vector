@@ -62,6 +62,10 @@ impl LogEvent {
         self.structured.remove(key).map(|v| v.value)
     }
 
+    pub fn into_structured(self) -> HashMap<Atom, Value> {
+        self.structured
+    }
+
     pub fn is_structured(&self) -> bool {
         self.structured.iter().any(|(_, v)| v.explicit)
     }
@@ -121,6 +125,12 @@ impl std::ops::Index<&Atom> for LogEvent {
 pub struct Value {
     value: ValueKind,
     explicit: bool,
+}
+
+impl Value {
+    pub fn into_value(self) -> ValueKind {
+        self.value
+    }
 }
 
 impl Serialize for Value {
