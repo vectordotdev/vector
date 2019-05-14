@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -99,9 +99,16 @@ impl S3Sink {
                 Duration::from_secs(max_linger_secs),
             )
             .with(|event: Event| {
-                let mut bytes: Vec<u8> = event.into();
-                bytes.push(b'\n');
-                Ok(bytes)
+                let log = event.into_log();
+
+                if log.is_structured() {
+                    serde_json::to_vec(&log.all_fields())
+                        .map_err(|e| panic!("Error encoding: {}", e))
+                } else {
+                    let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
+                    bytes.push(b'\n');
+                    Ok(bytes)
+                }
             });
 
         Ok(Box::new(sink))
