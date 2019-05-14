@@ -1,16 +1,15 @@
-use crate::buffers::Acker;
 use crate::{
+    buffers::Acker,
     event::{metric::Direction, Metric},
     Event,
 };
 use futures::{future, Async, AsyncSink, Future, Sink};
-use hyper::service::service_fn;
-use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
+use hyper::{
+    header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
+};
 use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
