@@ -149,10 +149,11 @@ impl CloudwatchLogsSvc {
         } else {
             let message = log[&event::MESSAGE].to_string_lossy();
 
-            let timestamp =
-                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
-                    .unwrap()
-                    .timestamp_millis();
+            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
+                ts.timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
 
             InputLogEvent { message, timestamp }
         }
