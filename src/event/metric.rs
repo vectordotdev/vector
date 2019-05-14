@@ -1,20 +1,20 @@
 use super::Event;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Metric {
     Counter {
         name: String,
-        val: usize,
+        val: u32,
         sampling: Option<f32>,
     },
     Timer {
         name: String,
-        val: usize,
+        val: u32,
         sampling: Option<f32>,
     },
     Gauge {
         name: String,
-        val: usize,
+        val: u32,
         direction: Option<Direction>,
     },
     Set {
@@ -23,7 +23,7 @@ pub enum Metric {
     },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Direction {
     Plus,
     Minus,

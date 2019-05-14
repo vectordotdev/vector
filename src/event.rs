@@ -1,4 +1,4 @@
-use self::proto::{event_wrapper::Event as EventProto, Log};
+use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
@@ -24,6 +24,7 @@ lazy_static! {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
+    Metric(Metric),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -41,18 +42,21 @@ impl Event {
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
+            _ => panic!("failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
+            _ => panic!("failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
+            _ => panic!("failed type coercion, {:?} is not a log event", self),
         }
     }
 }
@@ -237,6 +241,51 @@ impl From<proto::EventWrapper> for Event {
 
                 Event::Log(LogEvent { structured })
             }
+            EventProto::Metric(proto) => {
+                let metric = proto.metric.unwrap();
+                match metric {
+                    MetricProto::Counter(counter) => {
+                        let sampling = if counter.sampling == 0f32 {
+                            None
+                        } else {
+                            Some(counter.sampling)
+                        };
+                        Event::Metric(Metric::Counter {
+                            name: counter.name,
+                            val: counter.val,
+                            sampling,
+                        })
+                    }
+                    MetricProto::Timer(timer) => {
+                        let sampling = if timer.sampling == 0f32 {
+                            None
+                        } else {
+                            Some(timer.sampling)
+                        };
+                        Event::Metric(Metric::Timer {
+                            name: timer.name,
+                            val: timer.val,
+                            sampling,
+                        })
+                    }
+                    MetricProto::Gauge(gauge) => {
+                        let direction = match gauge.direction() {
+                            proto::gauge::Direction::None => None,
+                            proto::gauge::Direction::Plus => Some(metric::Direction::Plus),
+                            proto::gauge::Direction::Minus => Some(metric::Direction::Minus),
+                        };
+                        Event::Metric(Metric::Gauge {
+                            name: gauge.name,
+                            val: gauge.val,
+                            direction,
+                        })
+                    }
+                    MetricProto::Set(set) => Event::Metric(Metric::Set {
+                        name: set.name,
+                        val: set.val,
+                    }),
+                }
+            }
         }
     }
 }
@@ -260,20 +309,77 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
+            Event::Metric(Metric::Counter {
+                name,
+                val,
+                sampling,
+            }) => {
+                let counter = proto::Counter {
+                    name,
+                    val,
+                    sampling: sampling.unwrap_or(0f32),
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::Counter(counter)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::Timer {
+                name,
+                val,
+                sampling,
+            }) => {
+                let timer = proto::Timer {
+                    name,
+                    val,
+                    sampling: sampling.unwrap_or(0f32),
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::Timer(timer)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::Gauge {
+                name,
+                val,
+                direction,
+            }) => {
+                let direction = match direction {
+                    None => proto::gauge::Direction::None,
+                    Some(metric::Direction::Plus) => proto::gauge::Direction::Plus,
+                    Some(metric::Direction::Minus) => proto::gauge::Direction::Minus,
+                }
+                .into();
+                let gauge = proto::Gauge {
+                    name,
+                    val,
+                    direction,
+                };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::Gauge(gauge)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Metric(Metric::Set { name, val }) => {
+                let set = proto::Set { name, val };
+                let event = EventProto::Metric(proto::Metric {
+                    metric: Some(MetricProto::Set(set)),
+                });
+                proto::EventWrapper { event: Some(event) }
+            }
         }
     }
 }
 
+// TODO: should probably get rid of this
 impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
-        match event {
-            Event::Log(LogEvent { mut structured }) => structured
-                .remove(&MESSAGE)
-                .unwrap()
-                .value
-                .as_bytes()
-                .into_owned(),
-        }
+        event
+            .into_log()
+            .into_value(&MESSAGE)
+            .unwrap()
+            .as_bytes()
+            .into_owned()
     }
 }
 
