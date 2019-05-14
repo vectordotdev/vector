@@ -67,7 +67,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
 mod test {
     use super::StatsdConfig;
     use crate::{
-        sinks::prometheus::{Counter, Gauge, PrometheusSinkConfig},
+        sinks::prometheus::PrometheusSinkConfig,
         test_util::{block_on, next_addr, shutdown_on_idle},
         topology::{self, config},
     };
@@ -86,17 +86,8 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                counters: vec![Counter {
-                    key: "foo".into(),
-                    label: "foo".into(),
-                    doc: "foo".into(),
-                    parse_value: true,
-                }],
-                gauges: vec![Gauge {
-                    key: "bar".into(),
-                    label: "bar".into(),
-                    doc: "bar".into(),
-                }],
+                counters: vec!["foo".into()],
+                gauges: vec!["bar".into()],
             },
         );
 

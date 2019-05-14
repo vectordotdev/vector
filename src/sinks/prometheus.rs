@@ -11,7 +11,6 @@ use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
-use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -19,23 +18,8 @@ use tokio_trace::field;
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub counters: Vec<Counter>,
-    pub gauges: Vec<Gauge>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Counter {
-    pub key: Atom,
-    pub label: String,
-    pub doc: String,
-    pub parse_value: bool,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Gauge {
-    pub key: Atom,
-    pub label: String,
-    pub doc: String,
+    pub counters: Vec<String>,
+    pub gauges: Vec<String>,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -67,8 +51,8 @@ struct PrometheusSink {
     registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
     address: SocketAddr,
-    counters: HashMap<Counter, prometheus::Counter>,
-    gauges: HashMap<Gauge, prometheus::Gauge>,
+    counters: HashMap<String, prometheus::Counter>,
+    gauges: HashMap<String, prometheus::Gauge>,
     acker: Acker,
 }
 
@@ -104,28 +88,26 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>, acker: Acker) -> Self {
+    fn new(address: SocketAddr, counters: Vec<String>, gauges: Vec<String>, acker: Acker) -> Self {
         let registry = Registry::new();
 
         let counters = counters
             .into_iter()
-            .map(|config| {
-                let counter =
-                    prometheus::Counter::new(config.label.clone(), config.doc.clone()).unwrap();
+            .map(|name| {
+                let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
                 registry.register(Box::new(counter.clone())).unwrap();
 
-                (config, counter)
+                (name, counter)
             })
             .collect();
 
         let gauges = gauges
             .into_iter()
-            .map(|config| {
-                let gauge =
-                    prometheus::Gauge::new(config.label.clone(), config.doc.clone()).unwrap();
+            .map(|name| {
+                let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
                 registry.register(Box::new(gauge.clone())).unwrap();
 
-                (config, gauge)
+                (name, gauge)
             })
             .collect();
 
@@ -187,14 +169,8 @@ impl Sink for PrometheusSink {
                 // TODO: take sampling into account
                 sampling: _,
             } => {
-                for (config, counter) in &self.counters {
-                    if &config.key == name {
-                        if config.parse_value {
-                            counter.inc_by(*val as f64);
-                        } else {
-                            counter.inc_by(1.0);
-                        }
-                    }
+                if let Some(counter) = self.counters.get_mut(name) {
+                    counter.inc_by(*val as f64);
                 }
             }
             Metric::Gauge {
@@ -202,14 +178,12 @@ impl Sink for PrometheusSink {
                 val,
                 direction,
             } => {
-                for (config, gauge) in &self.gauges {
-                    if &config.key == name {
-                        let val = *val as f64;
-                        match direction {
-                            None => gauge.set(val),
-                            Some(Direction::Plus) => gauge.add(val),
-                            Some(Direction::Minus) => gauge.sub(val),
-                        }
+                if let Some(gauge) = self.gauges.get_mut(name) {
+                    let val = *val as f64;
+                    match direction {
+                        None => gauge.set(val),
+                        Some(Direction::Plus) => gauge.add(val),
+                        Some(Direction::Minus) => gauge.sub(val),
                     }
                 }
             }
