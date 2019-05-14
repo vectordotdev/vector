@@ -19,6 +19,7 @@ pub struct TcpConfig {
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
+    pub host_key: Option<String>,
 }
 
 fn default_max_length() -> usize {
@@ -34,6 +35,7 @@ impl TcpConfig {
         Self {
             address: addr.to_string(),
             max_length: default_max_length(),
+            host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
@@ -53,8 +55,11 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
     let TcpConfig {
         address,
         max_length,
+        host_key,
         shutdown_timeout_secs,
     } = config;
+
+    let host_key = host_key.unwrap_or(event::HOST.to_string());
 
     let addr = address
         .to_socket_addrs()
@@ -86,6 +91,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
             .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
+                let host_key = host_key.clone();
 
                 let span = if let Some(addr) = &peer_addr {
                     info_span!("connection", peer_addr = field::display(addr))
@@ -121,7 +127,7 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
                         if let Some(host) = &host {
                             event
                                 .as_mut_log()
-                                .insert_implicit(event::HOST.clone(), host.clone().into());
+                                .insert_implicit(host_key.clone().into(), host.clone().into());
                         }
 
                         trace!(message = "Received one line.", event = field::debug(&event));
