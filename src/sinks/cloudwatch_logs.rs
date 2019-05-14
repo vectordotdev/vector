@@ -1,6 +1,6 @@
 use crate::buffers::Acker;
 use crate::{
-    event::{self, Event, LogEvent},
+    event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, SinkExt},
 };
@@ -40,10 +40,9 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    #[serde(rename = "text")]
     Text,
-    #[serde(rename = "json")]
     Json,
 }
 
@@ -137,15 +136,13 @@ impl CloudwatchLogsSvc {
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
         if log.is_structured() || self.config.encoding == Encoding::Json {
-            let timestamp = if let Some(ts) = log.remove(&event::TIMESTAMP) {
-                chrono::DateTime::parse_from_rfc3339(&ts.to_string_lossy())
-                    .unwrap()
-                    .timestamp_millis()
+            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+                ts.timestamp_millis()
             } else {
                 chrono::Utc::now().timestamp_millis()
             };
 
-            let bytes = serde_json::to_vec(&log).unwrap();
+            let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
             let message = String::from_utf8(bytes).unwrap();
 
             InputLogEvent { message, timestamp }

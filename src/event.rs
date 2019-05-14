@@ -22,7 +22,7 @@ pub enum Event {
     Log(LogEvent),
 }
 
-#[derive(Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
     structured: HashMap<Atom, Value>,
 }
