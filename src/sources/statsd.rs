@@ -22,6 +22,10 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         Ok(statsd(self.address.clone(), out))
     }
+
+    fn output_type(&self) -> crate::topology::config::DataType {
+        crate::topology::config::DataType::Metric
+    }
 }
 
 fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
@@ -47,7 +51,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
                         .lines()
                         .map(parse)
                         .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                        .map(Event::from)
+                        .map(Event::Metric)
                         .collect::<Vec<_>>();
                     futures::stream::iter_ok::<_, std::io::Error>(metrics)
                 })

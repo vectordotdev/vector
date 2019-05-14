@@ -1,5 +1,8 @@
 use crate::buffers::Acker;
-use crate::Event;
+use crate::{
+    event::{metric::Direction, Metric},
+    Event,
+};
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
@@ -54,6 +57,10 @@ impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> crate::topology::config::DataType {
+        crate::topology::config::DataType::Metric
     }
 }
 
@@ -174,37 +181,41 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        for (field, counter) in &self.counters {
-            if let Some(val) = event.as_log().get(&field.key) {
-                if field.parse_value {
-                    let val = val.to_string_lossy();
-
-                    if let Ok(count) = val.parse() {
-                        counter.inc_by(count);
-                    } else {
-                        warn!(
-                            "Unable to parse value from field {} with value {}",
-                            field.key, val
-                        );
+        match event.as_metric() {
+            Metric::Counter {
+                name,
+                val,
+                // TODO: take sampling into account
+                sampling: _,
+            } => {
+                for (config, counter) in &self.counters {
+                    if &config.key == name {
+                        if config.parse_value {
+                            counter.inc_by(*val as f64);
+                        } else {
+                            counter.inc_by(1.0);
+                        }
                     }
-                } else {
-                    counter.inc_by(1.0);
                 }
             }
-        }
-
-        for (field, gauge) in &self.gauges {
-            if let Some(val) = event.as_log().get(&field.key) {
-                let val = val.to_string_lossy();
-
-                if let Ok(count) = val.parse() {
-                    gauge.set(count);
-                } else {
-                    warn!(
-                        "Unable to parse value from field {} with value {}",
-                        field.key, val
-                    );
+            Metric::Gauge {
+                name,
+                val,
+                direction,
+            } => {
+                for (config, gauge) in &self.gauges {
+                    if &config.key == name {
+                        let val = *val as f64;
+                        match direction {
+                            None => gauge.set(val),
+                            Some(Direction::Plus) => gauge.add(val),
+                            Some(Direction::Minus) => gauge.sub(val),
+                        }
+                    }
                 }
+            }
+            _ => {
+                // TODO: support all the metric types
             }
         }
 

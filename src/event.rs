@@ -59,6 +59,13 @@ impl Event {
             _ => panic!("failed type coercion, {:?} is not a log event", self),
         }
     }
+
+    pub fn as_metric(&self) -> &Metric {
+        match self {
+            Event::Metric(metric) => metric,
+            _ => panic!("failed type coercion, {:?} is not a metric", self),
+        }
+    }
 }
 
 impl LogEvent {
