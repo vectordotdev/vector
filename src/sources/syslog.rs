@@ -49,7 +49,7 @@ impl SyslogConfig {
 #[typetag::serde(name = "syslog")]
 impl crate::topology::config::SourceConfig for SyslogConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        let host_key = self.host_key.clone().unwrap_or("host".into());
+        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address } => Ok(tcp(address, self.max_length, host_key, out)),
