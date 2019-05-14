@@ -139,13 +139,19 @@ impl CloudwatchLogsSvc {
 
     pub fn encode_log(&self, log: LogEvent) -> InputLogEvent {
         if log.is_structured() || self.config.encoding == Encoding::Json {
-            let timestamp =
-                chrono::DateTime::parse_from_rfc3339(&log[&event::TIMESTAMP].to_string_lossy())
-                    .unwrap()
-                    .timestamp_millis();
+            let mut data = log.into_structured();
 
-            let map = log
-                .into_structured()
+            let ts = data.remove(&event::TIMESTAMP);
+
+            let timestamp = if let Some(ts) = ts {
+                chrono::DateTime::parse_from_rfc3339(&ts.into_value().to_string_lossy())
+                    .unwrap()
+                    .timestamp_millis()
+            } else {
+                chrono::Utc::now().timestamp_millis()
+            };
+
+            let map = data
                 .into_iter()
                 .map(|(k, v)| (k, v.into_value().to_string_lossy()))
                 .collect::<HashMap<Atom, String>>();
