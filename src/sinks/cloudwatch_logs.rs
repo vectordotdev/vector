@@ -12,11 +12,9 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
-use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 
 pub struct CloudwatchLogsSvc {
@@ -137,26 +135,17 @@ impl CloudwatchLogsSvc {
         self.client.describe_log_streams(request)
     }
 
-    pub fn encode_log(&self, log: LogEvent) -> InputLogEvent {
+    pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
         if log.is_structured() || self.config.encoding == Encoding::Json {
-            let mut data = log.into_structured();
-
-            let ts = data.remove(&event::TIMESTAMP);
-
-            let timestamp = if let Some(ts) = ts {
-                chrono::DateTime::parse_from_rfc3339(&ts.into_value().to_string_lossy())
+            let timestamp = if let Some(ts) = log.remove(&event::TIMESTAMP) {
+                chrono::DateTime::parse_from_rfc3339(&ts.to_string_lossy())
                     .unwrap()
                     .timestamp_millis()
             } else {
                 chrono::Utc::now().timestamp_millis()
             };
 
-            let map = data
-                .into_iter()
-                .map(|(k, v)| (k, v.into_value().to_string_lossy()))
-                .collect::<HashMap<Atom, String>>();
-
-            let bytes = serde_json::to_vec(&map).unwrap();
+            let bytes = serde_json::to_vec(&log).unwrap();
             let message = String::from_utf8(bytes).unwrap();
 
             InputLogEvent { message, timestamp }

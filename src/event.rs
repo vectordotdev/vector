@@ -22,7 +22,7 @@ pub enum Event {
     Log(LogEvent),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Serialize, PartialEq, Debug, Clone)]
 pub struct LogEvent {
     structured: HashMap<Atom, Value>,
 }
@@ -62,10 +62,6 @@ impl LogEvent {
         self.structured.remove(key).map(|v| v.value)
     }
 
-    pub fn into_structured(self) -> HashMap<Atom, Value> {
-        self.structured
-    }
-
     pub fn is_structured(&self) -> bool {
         self.structured.iter().any(|(_, v)| v.explicit)
     }
@@ -90,8 +86,8 @@ impl LogEvent {
         );
     }
 
-    pub fn remove(&mut self, key: &Atom) {
-        self.structured.remove(key);
+    pub fn remove(&mut self, key: &Atom) -> Option<ValueKind> {
+        self.structured.remove(key).map(|v| v.value)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
@@ -125,12 +121,6 @@ impl std::ops::Index<&Atom> for LogEvent {
 pub struct Value {
     value: ValueKind,
     explicit: bool,
-}
-
-impl Value {
-    pub fn into_value(self) -> ValueKind {
-        self.value
-    }
 }
 
 impl Serialize for Value {
