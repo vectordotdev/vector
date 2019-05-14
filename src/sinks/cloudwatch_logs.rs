@@ -307,8 +307,9 @@ mod tests {
 
     use crate::buffers::Acker;
     use crate::{
+        event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
-        sinks::cloudwatch_logs::CloudwatchLogsSinkConfig,
+        sinks::cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };
@@ -318,9 +319,40 @@ mod tests {
         CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
         GetLogEventsRequest,
     };
+    use std::collections::HashMap;
+    use string_cache::DefaultAtom as Atom;
 
     const STREAM_NAME: &'static str = "test-1";
     const GROUP_NAME: &'static str = "router";
+
+    #[test]
+    fn cloudwatch_encode_log() {
+        let config = CloudwatchLogsSinkConfig {
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+        let svc = CloudwatchLogsSvc::new(config).unwrap();
+
+        let mut event = Event::from("hello world").into_log();
+
+        event.insert_explicit("key".into(), "value".into());
+
+        let input_event = svc.encode_log(event.clone());
+
+        let ts = if let ValueKind::Timestamp(ts) = event[&event::TIMESTAMP] {
+            ts.timestamp_millis()
+        } else {
+            panic!()
+        };
+
+        assert_eq!(input_event.timestamp, ts);
+
+        let bytes = input_event.message;
+
+        let map: HashMap<Atom, String> = serde_json::from_str(&bytes[..]).unwrap();
+
+        assert!(map.get(&event::TIMESTAMP).is_none());
+    }
 
     #[test]
     fn cloudwatch_insert_log_event() {
