@@ -177,9 +177,12 @@ impl RunningTopology {
             let to_change = old_names
                 .intersection(&new_names)
                 .filter(|&n| {
-                    let old_toml = toml::Value::try_from(&old[n]).unwrap();
-                    let new_toml = toml::Value::try_from(&new[n]).unwrap();
-                    old_toml != new_toml
+                    // hack to check if the configs are the same
+                    // the reason we don't use toml is because
+                    // it does not support nested none values
+                    let old_json = serde_json::to_vec(&old[n]).unwrap();
+                    let new_json = serde_json::to_vec(&new[n]).unwrap();
+                    old_json != new_json
                 })
                 .cloned()
                 .collect::<HashSet<_>>();

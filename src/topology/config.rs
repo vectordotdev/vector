@@ -142,7 +142,10 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        let toml = toml::Value::try_from(&self).unwrap();
-        toml.try_into().unwrap()
+        // hack to check if the configs are the same
+        // the reason we don't use toml is because
+        // it does not support nested none values
+        let json = serde_json::to_vec(self).unwrap();
+        serde_json::from_slice(&json[..]).unwrap()
     }
 }
