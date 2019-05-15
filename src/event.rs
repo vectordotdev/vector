@@ -60,7 +60,7 @@ impl Event {
         }
     }
 
-    pub fn as_metric(&self) -> &Metric {
+    pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("failed type coercion, {:?} is not a metric", self),

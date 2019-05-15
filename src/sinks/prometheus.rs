@@ -18,8 +18,6 @@ use tokio_trace::field;
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub counters: Vec<String>,
-    pub gauges: Vec<String>,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -31,12 +29,7 @@ pub fn default_address() -> SocketAddr {
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(PrometheusSink::new(
-            self.address,
-            self.counters.clone(),
-            self.gauges.clone(),
-            acker,
-        ));
+        let sink = Box::new(PrometheusSink::new(self.address, acker));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
@@ -88,36 +81,36 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, counters: Vec<String>, gauges: Vec<String>, acker: Acker) -> Self {
-        let registry = Registry::new();
-
-        let counters = counters
-            .into_iter()
-            .map(|name| {
-                let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
-                registry.register(Box::new(counter.clone())).unwrap();
-
-                (name, counter)
-            })
-            .collect();
-
-        let gauges = gauges
-            .into_iter()
-            .map(|name| {
-                let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
-                registry.register(Box::new(gauge.clone())).unwrap();
-
-                (name, gauge)
-            })
-            .collect();
-
+    fn new(address: SocketAddr, acker: Acker) -> Self {
         Self {
-            registry: Arc::new(registry),
+            registry: Arc::new(Registry::new()),
             server_shutdown_trigger: None,
             address,
-            counters,
-            gauges,
+            counters: HashMap::new(),
+            gauges: HashMap::new(),
             acker,
+        }
+    }
+
+    fn with_counter(&mut self, name: String, f: impl Fn(&prometheus::Counter)) {
+        if let Some(counter) = self.counters.get(&name) {
+            f(counter);
+        } else {
+            let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
+            self.registry.register(Box::new(counter.clone())).unwrap();
+            f(&counter);
+            self.counters.insert(name, counter);
+        }
+    }
+
+    fn with_gauge(&mut self, name: String, f: impl Fn(&prometheus::Gauge)) {
+        if let Some(gauge) = self.gauges.get(&name) {
+            f(gauge);
+        } else {
+            let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
+            self.registry.register(Box::new(gauge.clone())).unwrap();
+            f(&gauge);
+            self.gauges.insert(name.clone(), gauge);
         }
     }
 
@@ -162,31 +155,25 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        match event.as_metric() {
+        match event.into_metric() {
             Metric::Counter {
                 name,
                 val,
                 // TODO: take sampling into account
                 sampling: _,
-            } => {
-                if let Some(counter) = self.counters.get_mut(name) {
-                    counter.inc_by(*val as f64);
-                }
-            }
+            } => self.with_counter(name, |counter| counter.inc_by(val as f64)),
             Metric::Gauge {
                 name,
                 val,
                 direction,
-            } => {
-                if let Some(gauge) = self.gauges.get_mut(name) {
-                    let val = *val as f64;
-                    match direction {
-                        None => gauge.set(val),
-                        Some(Direction::Plus) => gauge.add(val),
-                        Some(Direction::Minus) => gauge.sub(val),
-                    }
+            } => self.with_gauge(name, |gauge| {
+                let val = val as f64;
+                match direction {
+                    None => gauge.set(val),
+                    Some(Direction::Plus) => gauge.add(val),
+                    Some(Direction::Minus) => gauge.sub(val),
                 }
-            }
+            }),
             _ => {
                 // TODO: support all the metric types
             }
