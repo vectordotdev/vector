@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
@@ -98,11 +98,7 @@ impl S3Sink {
                 buffer_size,
                 Duration::from_secs(max_linger_secs),
             )
-            .with(|event: Event| {
-                let mut bytes: Vec<u8> = event.into();
-                bytes.push(b'\n');
-                Ok(bytes)
-            });
+            .with(encode_event);
 
         Ok(Box::new(sink))
     }
@@ -206,9 +202,57 @@ impl RetryLogic for S3RetryLogic {
     }
 }
 
+fn encode_event(event: Event) -> Result<Vec<u8>, ()> {
+    let log = event.into_log();
+
+    if log.is_structured() {
+        serde_json::to_vec(&log.all_fields())
+            .map(|mut b| {
+                b.push(b'\n');
+                b
+            })
+            .map_err(|e| panic!("Error encoding: {}", e))
+    } else {
+        let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
+        bytes.push(b'\n');
+        Ok(bytes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    #![cfg(feature = "s3-integration-tests")]
+    use super::*;
+    use crate::event::{self, Event};
+    use std::collections::HashMap;
+
+    #[test]
+    fn s3_encode_event_non_structured() {
+        let message = "hello world".to_string();
+        let bytes = encode_event(message.clone().into()).unwrap();
+
+        let encoded_message = message + "\n";
+        assert_eq!(&bytes[..], encoded_message.as_bytes());
+    }
+
+    #[test]
+    fn s3_encode_event_structured() {
+        let message = "hello world".to_string();
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("key".into(), "value".into());
+        let bytes = encode_event(event).unwrap();
+
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map["key"], "value".to_string());
+    }
+}
+
+#[cfg(feature = "s3-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
 
     use crate::buffers::Acker;
     use crate::{
