@@ -1,6 +1,8 @@
+mod dynamic;
 mod json;
 mod string;
 
+pub use dynamic::DynamicEncoderConfig;
 pub use json::JsonEncoderConfig;
 pub use string::StringEncoderConfig;
 

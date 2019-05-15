@@ -13,7 +13,7 @@ impl EncoderConfig for StringEncoderConfig {
     }
 }
 
-struct StringEncoder {}
+pub struct StringEncoder {}
 
 impl Encoder for StringEncoder {
     fn encode(&self, event: Event) -> Bytes {

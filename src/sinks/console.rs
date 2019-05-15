@@ -25,13 +25,13 @@ pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
     #[serde(default = "default_string_encoder")]
-    pub encoder: Box<dyn EncoderConfig>,
+    pub encoding: Box<dyn EncoderConfig>,
 }
 
 #[typetag::serde(name = "console")]
 impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let encoder = self.encoder.build();
+        let encoder = self.encoding.build();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
             Target::Stdout => Box::new(io::stdout()),
