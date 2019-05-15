@@ -206,7 +206,12 @@ fn encode_event(event: Event) -> Result<Vec<u8>, ()> {
     let log = event.into_log();
 
     if log.is_structured() {
-        serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
+        serde_json::to_vec(&log.all_fields())
+            .map(|mut b| {
+                b.push(b'\n');
+                b
+            })
+            .map_err(|e| panic!("Error encoding: {}", e))
     } else {
         let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
         bytes.push(b'\n');
