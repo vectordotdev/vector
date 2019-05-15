@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event},
+    event::{self, Event, ValueKind},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -106,21 +106,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |event: Event| {
-            let host = event.as_log().get(&host_field).map(|h| h.clone());
-
-            let mut body = json!({
-                "event": event.as_log()[&event::MESSAGE].to_string_lossy(),
-                "fields": event.as_log().explicit_fields(),
-            });
-
-            if let Some(host) = host {
-                let host = host.to_string_lossy();
-                body["host"] = json!(host);
-            }
-            let body = serde_json::to_vec(&body).unwrap();
-            Ok(body)
-        });
+        .with(move |e| encode_event(&host_field, e));
 
     Ok(Box::new(sink))
 }
@@ -161,9 +147,69 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     }
 }
 
+fn encode_event(host_field: &Atom, mut event: Event) -> Result<Vec<u8>, ()> {
+    let host = event.as_log().get(&host_field).map(|h| h.clone());
+    let timestamp =
+        if let Some(ValueKind::Timestamp(ts)) = event.as_mut_log().remove(&event::TIMESTAMP) {
+            ts.timestamp()
+        } else {
+            chrono::Utc::now().timestamp()
+        };
+
+    let mut body = if event.as_log().is_structured() {
+        json!({
+            "event": event.as_log().all_fields(),
+            "fields": event.as_log().explicit_fields(),
+            "time": timestamp,
+        })
+    } else {
+        json!({
+            "event": event.as_log()[&event::MESSAGE].to_string_lossy(),
+            "fields": event.as_log().explicit_fields(),
+            "time": timestamp,
+        })
+    };
+
+    if let Some(host) = host {
+        let host = host.to_string_lossy();
+        body["host"] = json!(host);
+    }
+
+    serde_json::to_vec(&body).map_err(|e| panic!("Error encoding json body: {}", e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{self, Event};
+    use serde::Deserialize;
+    use std::collections::HashMap;
+
+    #[derive(Deserialize, Debug)]
+    struct HecEvent {
+        time: i64,
+        event: HashMap<String, String>,
+        fields: HashMap<String, String>,
+    }
+
+    #[test]
+    fn splunk_encode_event_structured() {
+        let host = "host".into();
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_explicit("key".into(), "value".into());
+
+        let bytes = encode_event(&host, event).unwrap();
+
+        let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
+
+        let event = &hec_event.event;
+        let kv = event.get("key".into()).unwrap();
+
+        assert_eq!(kv, &"value".to_string());
+        assert!(event.get(&event::TIMESTAMP.to_string()).is_none());
+    }
 
     #[test]
     fn splunk_validate_host() {
