@@ -19,6 +19,7 @@ pub struct FileConfig {
     pub ignore_older: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
+    pub host_key: Option<String>,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -34,6 +35,7 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
+            host_key: None,
         }
     }
 }
@@ -63,17 +65,27 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
+    let host_key = config.host_key.clone().unwrap_or("host".into());
+    let hostname = hostname::get_hostname();
 
     let out = out
         .sink_map_err(|_| ())
         .with(move |(line, file): (Bytes, String)| {
             trace!(message = "Recieved one event.", file = file.as_str());
             let mut event = Event::from(line);
-            if let Some(ref context_key) = context_key {
+
+            if let Some(context_key) = &context_key {
                 event
                     .as_mut_log()
                     .insert_implicit(context_key.clone(), file.into());
             }
+
+            if let Some(hostname) = &hostname {
+                event
+                    .as_mut_log()
+                    .insert_implicit(host_key.clone().into(), hostname.clone().into());
+            }
+
             future::ok(event)
         });
 

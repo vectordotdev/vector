@@ -12,12 +12,14 @@ use tokio::{
 pub struct StdinConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    pub host_key: Option<String>,
 }
 
 impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
             max_length: default_max_length(),
+            host_key: None,
         }
     }
 }
@@ -40,11 +42,24 @@ where
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
+        let host_key = config.host_key.clone().unwrap_or("host".into());
+        let hostname = hostname::get_hostname();
+
         let source = FramedRead::new(
             stream,
             BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
         )
-        .map(Event::from)
+        .map(move |e| {
+            let mut event = Event::from(e);
+
+            if let Some(hostname) = &hostname {
+                event
+                    .as_mut_log()
+                    .insert_implicit(host_key.clone().into(), hostname.clone().into());
+            }
+
+            event
+        })
         .map_err(|e| error!("error reading line: {:?}", e))
         .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
         .map(|_| info!("finished sending"));
