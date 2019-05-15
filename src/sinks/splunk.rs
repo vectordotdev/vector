@@ -321,7 +321,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -329,8 +329,9 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
     }
 
     #[test]
@@ -356,7 +357,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -364,9 +365,11 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
-        assert_eq!("example.com:1234", entry["host"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("example.com:1234", host);
     }
 
     #[test]
@@ -400,7 +403,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -408,9 +411,11 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
-        assert_eq!("beef.example.com:1234", entry["host"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("beef.example.com:1234", host);
     }
 
     #[test]
