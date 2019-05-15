@@ -177,9 +177,9 @@ impl RunningTopology {
             let to_change = old_names
                 .intersection(&new_names)
                 .filter(|&n| {
-                    // hack to check if the configs are the same
-                    // the reason we don't use toml is because
-                    // it does not support nested none values
+                    // This is a hack around the issue of comparing two
+                    // trait objects. Json is used here over toml since
+                    // toml does not support serializing `None`.
                     let old_json = serde_json::to_vec(&old[n]).unwrap();
                     let new_json = serde_json::to_vec(&new[n]).unwrap();
                     old_json != new_json

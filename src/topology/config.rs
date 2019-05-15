@@ -142,9 +142,11 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        // hack to check if the configs are the same
-        // the reason we don't use toml is because
-        // it does not support nested none values
+        // This is a hack around the issue of cloning
+        // trait objects. So instead to clone the config
+        // we first serialize it into json, then back from
+        // json. Originally we used toml here but toml does not
+        // support serializing `None`.
         let json = serde_json::to_vec(self).unwrap();
         serde_json::from_slice(&json[..]).unwrap()
     }
