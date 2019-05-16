@@ -30,7 +30,7 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
-    pub encoding: Encoding,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -84,7 +84,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-    let encoding = config.encoding.clone();
+    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
 
@@ -130,7 +130,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .timeout(Duration::from_secs(timeout))
         .service(http_service);
 
-    let encoding = config.encoding.clone();
+    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |event| encode_event(event, &encoding));
@@ -220,6 +220,7 @@ impl Default for Encoding {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         sinks::http::HttpSinkConfig,
@@ -231,10 +232,40 @@ mod tests {
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
+    use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
     #[test]
-    fn validates_normal_headers() {
+    fn http_encode_event_text() {
+        let encoding = Encoding::Text;
+        let event = Event::from("hello world");
+
+        let bytes = encode_event(event, &encoding).unwrap();
+
+        assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
+    }
+
+    #[test]
+    fn http_encode_event_json() {
+        let encoding = Encoding::Json;
+        let event = Event::from("hello world");
+
+        let bytes = encode_event(event, &encoding).unwrap();
+
+        #[derive(Deserialize, Debug)]
+        #[serde(deny_unknown_fields)]
+        struct ExpectedEvent {
+            message: String,
+            timestamp: chrono::DateTime<chrono::Utc>,
+        }
+
+        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
+
+        assert_eq!(output.message, "hello world".to_string());
+    }
+
+    #[test]
+    fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         [headers]
@@ -247,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn catches_bad_header_names() {
+    fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         [headers]
@@ -262,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_http_happy_path() {
+    fn http_happy_path() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -271,6 +302,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         user = "waldo"
         password = "hunter2"
+        encoding = "json"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -306,7 +338,7 @@ mod tests {
             .map(Result::unwrap)
             .map(|s| {
                 let val: serde_json::Value = serde_json::from_str(&s).unwrap();
-                val.get("msg").unwrap().as_str().unwrap().to_owned()
+                val.get("message").unwrap().as_str().unwrap().to_owned()
             })
             .collect::<Vec<_>>();
 
@@ -317,13 +349,14 @@ mod tests {
     }
 
     #[test]
-    fn passes_custom_headers() {
+    fn http_passes_custom_headers() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "json"
         [headers]
         foo = "bar"
         baz = "quux"
@@ -366,7 +399,7 @@ mod tests {
             .map(Result::unwrap)
             .map(|s| {
                 let val: serde_json::Value = serde_json::from_str(&s).unwrap();
-                val.get("msg").unwrap().as_str().unwrap().to_owned()
+                val.get("message").unwrap().as_str().unwrap().to_owned()
             })
             .collect::<Vec<_>>();
 
