@@ -30,7 +30,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
-    pub encoding: Encoding,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -135,7 +135,11 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        if log.is_structured() || self.config.encoding == Encoding::Json {
+        // if the log is structured and the encoding isn't set to `Text` or the encoding
+        // is set to `Json` then encode the payload as json. Otherwise, text.
+        if (log.is_structured() && self.config.encoding != Some(Encoding::Text))
+            || self.config.encoding == Some(Encoding::Json)
+        {
             let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
                 ts.timestamp_millis()
             } else {
@@ -303,27 +307,13 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
 
 #[cfg(test)]
 mod tests {
-    #![cfg(feature = "cloudwatch-integration-tests")]
-
-    use crate::buffers::Acker;
     use crate::{
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
         sinks::aws_cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
-        test_util::{block_on, random_lines_with_stream},
-        topology::config::SinkConfig,
-    };
-    use futures::Sink;
-    use rusoto_core::Region;
-    use rusoto_logs::{
-        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
-        GetLogEventsRequest,
     };
     use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
-
-    const STREAM_NAME: &'static str = "test-1";
-    const GROUP_NAME: &'static str = "router";
 
     #[test]
     fn cloudwatch_encode_log() {
@@ -353,6 +343,28 @@ mod tests {
 
         assert!(map.get(&event::TIMESTAMP).is_none());
     }
+}
+
+#[cfg(feature = "cloudwatch-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+
+    use crate::buffers::Acker;
+    use crate::{
+        region::RegionOrEndpoint,
+        sinks::aws_cloudwatch_logs::CloudwatchLogsSinkConfig,
+        test_util::{block_on, random_lines_with_stream},
+        topology::config::SinkConfig,
+    };
+    use futures::Sink;
+    use rusoto_core::Region;
+    use rusoto_logs::{
+        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
+        GetLogEventsRequest,
+    };
+
+    const STREAM_NAME: &'static str = "test-1";
+    const GROUP_NAME: &'static str = "router";
 
     #[test]
     fn cloudwatch_insert_log_event() {
