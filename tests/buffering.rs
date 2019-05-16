@@ -1,9 +1,12 @@
 use futures::Future;
+use prost::Message;
 use tempfile::tempdir;
+use vector::event::{self, Event};
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive_lines, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, random_string, receive, send_lines, shutdown_on_idle,
+    wait_for_tcp,
 };
-use vector::topology::{config, Topology};
+use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, sinks, sources};
 
 #[test]
@@ -22,15 +25,17 @@ fn test_buffering() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 10_000,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -48,17 +53,19 @@ fn test_buffering() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size: 10_000 };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size: 10_000,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -72,7 +79,7 @@ fn test_buffering() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
     assert_eq!(input_lines, &output_lines[..num_lines]);
     assert_eq!(input_lines2, &output_lines[num_lines..]);
@@ -85,7 +92,24 @@ fn test_max_size() {
 
     let num_lines: usize = 1000;
     let line_size = 1000;
-    let max_size = num_lines * (line_size + 32/* protobuf encoding takes a few extra bytes */) / 2;
+
+    let proto_size = {
+        let mut example_event = Event::from(random_string(line_size));
+        example_event
+            .as_mut_log()
+            .insert_implicit("host".into(), "127.0.0.1".into());
+        example_event
+            .as_mut_log()
+            .insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
+
+        let mut proto = vec![];
+        event::proto::EventWrapper::from(example_event)
+            .encode(&mut proto)
+            .unwrap();
+        proto.len()
+    };
+
+    let max_size = num_lines * proto_size / 2;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -96,15 +120,17 @@ fn test_max_size() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -122,17 +148,19 @@ fn test_max_size() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir);
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -140,7 +168,7 @@ fn test_max_size() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines / 2, output_lines.len());
     assert_eq!(&input_lines[..num_lines / 2], &output_lines[..]);
 }
@@ -164,15 +192,17 @@ fn test_max_size_resume() {
     config.add_sink(
         "out",
         &["in1", "in2"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
-    config.sinks["out"].buffer = BufferConfig::Disk { max_size };
+    config.sinks["out"].buffer = BufferConfig::Disk {
+        max_size,
+        when_full: Default::default(),
+    };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
 
@@ -187,13 +217,13 @@ fn test_max_size_resume() {
 
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2, output_lines.len());
 }
 
@@ -215,17 +245,18 @@ fn test_reclaim_disk_space() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
-    };
+        when_full: Default::default(),
+    }
+    .into();
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
     let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
@@ -251,19 +282,19 @@ fn test_reclaim_disk_space() {
     config.add_sink(
         "out",
         &["in"],
-        sinks::tcp::TcpSinkConfig { address: out_addr },
+        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
     config.sinks["out"].buffer = BufferConfig::Disk {
         max_size: 1_000_000_000,
+        when_full: Default::default(),
     };
     config.data_dir = Some(data_dir.clone());
-    let (mut topology, _warnings) = Topology::build(config).unwrap();
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive_lines(&out_addr, &rt.executor());
+    let output_lines = receive(&out_addr);
 
-    topology.start(&mut rt);
+    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
 
     wait_for_tcp(in_addr);
 
@@ -277,7 +308,7 @@ fn test_reclaim_disk_space() {
 
     shutdown_on_idle(rt);
 
-    let output_lines = output_lines.wait().unwrap();
+    let output_lines = output_lines.wait();
     assert_eq!(num_lines * 2 - 1, output_lines.len());
     assert_eq!(&input_lines[1..], &output_lines[..num_lines - 1]);
     assert_eq!(input_lines2, &output_lines[num_lines - 1..]);

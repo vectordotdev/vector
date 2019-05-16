@@ -1,28 +1,53 @@
-use super::util::SinkExt;
-use crate::buffers::Acker;
-use crate::record::Record;
+use crate::{
+    buffers::Acker,
+    sinks::encoders::{default_string_encoder, Encoder, EncoderConfig},
+    sinks::util::SinkExt,
+};
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
-use tokio::codec::FramedWrite;
-use tokio::net::TcpStream;
-use tokio::timer::Delay;
+use tokio::{
+    codec::FramedWrite,
+    net::tcp::{ConnectFuture, TcpStream},
+    timer::Delay,
+};
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
-    pub address: std::net::SocketAddr,
+    pub address: String,
+    #[serde(default = "default_string_encoder")]
+    pub encoder: Box<dyn EncoderConfig>,
+}
+
+impl TcpSinkConfig {
+    pub fn new(address: String) -> Self {
+        Self {
+            address,
+            encoder: default_string_encoder(),
+        }
+    }
 }
 
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SinkConfig for TcpSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        Ok((raw_tcp(self.address, acker), tcp_healthcheck(self.address)))
+        let addr = self
+            .address
+            .to_socket_addrs()
+            .map_err(|e| format!("IO Error: {}", e))?
+            .next()
+            .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+
+        let sink = raw_tcp(addr, acker, self.encoder.build());
+        let healthcheck = tcp_healthcheck(addr);
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -34,9 +59,9 @@ struct TcpSink {
 
 enum TcpSinkState {
     Disconnected,
-    Connecting(tokio::net::tcp::ConnectFuture),
+    Connecting(ConnectFuture),
     Connected(FramedWrite<TcpStream, BytesDelimitedCodec>),
-    Backoff(tokio::timer::Delay),
+    Backoff(Delay),
 }
 
 impl TcpSink {
@@ -109,7 +134,7 @@ impl Sink for TcpSink {
         match self.poll_connection() {
             Ok(Async::Ready(connection)) => {
                 debug!(
-                    message = "sending record.",
+                    message = "sending event.",
                     bytes = &field::display(line.len())
                 );
                 match connection.start_send(line) {
@@ -132,7 +157,7 @@ impl Sink for TcpSink {
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
         // Stream::forward will immediately poll_complete the sink it's forwarding to,
-        // but we don't want to connect before the first record actually comes through.
+        // but we don't want to connect before the first event actually comes through.
         if let TcpSinkState::Disconnected = self.state {
             return Ok(Async::Ready(()));
         }
@@ -154,11 +179,15 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr, acker: Acker) -> super::RouterSink {
+pub fn raw_tcp(
+    addr: SocketAddr,
+    acker: Acker,
+    encoder: Box<dyn Encoder + Send>,
+) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(|record: Record| Ok(record.raw)),
+            .with(move |event| Ok(encoder.encode(event))),
     )
 }
 

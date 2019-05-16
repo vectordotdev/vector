@@ -1,5 +1,4 @@
-use crate::record::Record;
-use bytes::Bytes;
+use crate::event::{self, Event};
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -22,6 +21,7 @@ pub struct SyslogConfig {
     pub mode: Mode,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    pub host_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -40,6 +40,7 @@ impl SyslogConfig {
     pub fn new(mode: Mode) -> Self {
         Self {
             mode,
+            host_key: None,
             max_length: default_max_length(),
         }
     }
@@ -47,16 +48,23 @@ impl SyslogConfig {
 
 #[typetag::serde(name = "syslog")]
 impl crate::topology::config::SourceConfig for SyslogConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
+
         match self.mode.clone() {
-            Mode::Tcp { address } => Ok(tcp(address, self.max_length, out)),
-            Mode::Udp { address } => Ok(udp(address, self.max_length, out)),
-            Mode::Unix { path } => Ok(unix(path, self.max_length, out)),
+            Mode::Tcp { address } => Ok(tcp(address, self.max_length, host_key, out)),
+            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
     }
 }
 
-pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn tcp(
+    addr: SocketAddr,
+    max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -73,6 +81,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
             .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let host_key = host_key.clone();
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
 
                 let span = info_span!("connection");
@@ -82,7 +91,14 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
                 }
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(record_from_str)
+                    .filter_map(event_from_str)
+                    .map(move |mut e| {
+                        if let Some(addr) = peer_addr {
+                            e.as_mut_log()
+                                .insert_implicit(host_key.clone().into(), addr.to_string().into());
+                        }
+                        e
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -92,7 +108,12 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Record>) -> su
     }))
 }
 
-pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn udp(
+    addr: SocketAddr,
+    _max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(
@@ -107,9 +128,18 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
 
             future::ok(socket)
         })
-        .and_then(|socket| {
+        .and_then(move |socket| {
+            let host_key = host_key.clone();
+
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .filter_map(|(bytes, _sock)| record_from_bytes(&bytes))
+                .filter_map(move |(bytes, addr)| {
+                    let host_key = host_key.clone();
+                    event_from_bytes(&bytes).map(|mut e| {
+                        e.as_mut_log()
+                            .insert_implicit(host_key.into(), addr.to_string().into());
+                        e
+                    })
+                })
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
@@ -117,7 +147,12 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Record>) -> s
     )
 }
 
-pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> super::Source {
+pub fn unix(
+    path: PathBuf,
+    max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -135,16 +170,31 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
             .for_each(move |socket| {
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
+                let host_key = host_key.clone();
 
                 let span = info_span!("connection");
-                if let Some(addr) = &peer_addr {
-                    if let Some(path) = addr.as_pathname() {
+                let path = if let Some(addr) = peer_addr.clone() {
+                    if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                         span.record("peer_path", &field::debug(&path));
+                        Some(path.clone())
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    None
+                };
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(record_from_str)
+                    .filter_map(event_from_str)
+                    .map(move |mut e| {
+                        if let Some(path) = &path {
+                            e.as_mut_log().insert_implicit(
+                                host_key.clone().into(),
+                                path.to_string_lossy().into_owned().into(),
+                            );
+                        }
+                        e
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -154,10 +204,10 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Record>) -> supe
     }))
 }
 
-fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
+fn event_from_bytes(bytes: &[u8]) -> Option<Event> {
     std::str::from_utf8(bytes)
         .ok()
-        .and_then(|s| record_from_str(s))
+        .and_then(|s| event_from_str(s))
 }
 
 // TODO: many more cases to handle:
@@ -166,7 +216,7 @@ fn record_from_bytes(bytes: &[u8]) -> Option<Record> {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 
-fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
+fn event_from_str(raw: impl AsRef<str>) -> Option<Event> {
     let line = raw.as_ref();
     trace!(
         message = "Received line.",
@@ -176,33 +226,36 @@ fn record_from_str(raw: impl AsRef<str>) -> Option<Record> {
     let line = line.trim();
     syslog_rfc5424::parse_message(line)
         .map(|parsed| {
-            let mut record = Record {
-                raw: Bytes::from(line.as_bytes()),
-                timestamp: parsed
-                    .timestamp
-                    .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
-                    .unwrap_or(Utc::now()),
-                ..Default::default()
-            };
+            let mut event = Event::from(line);
 
-            if let Some(host) = parsed.hostname {
-                record.structured.insert("host".into(), host.into());
+            if let Some(host) = &parsed.hostname {
+                event
+                    .as_mut_log()
+                    .insert_implicit("host".into(), host.clone().into());
             }
 
+            let timestamp = parsed
+                .timestamp
+                .map(|ts| Utc.timestamp(ts, parsed.timestamp_nanos.unwrap_or(0) as u32))
+                .unwrap_or(Utc::now());
+            event
+                .as_mut_log()
+                .insert_implicit(event::TIMESTAMP.clone(), timestamp.into());
+
             trace!(
-                message = "processing one record.",
-                record = &field::debug(&record)
+                message = "processing one event.",
+                event = &field::debug(&event)
             );
 
-            record
+            event
         })
         .ok()
 }
 
 #[cfg(test)]
 mod test {
-    use super::{record_from_str, SyslogConfig};
-    use crate::record::Record;
+    use super::{event_from_str, SyslogConfig};
+    use crate::event::{self, Event};
     use chrono::TimeZone;
 
     #[test]
@@ -241,16 +294,16 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let raw = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record {
-            raw: bytes::Bytes::from(raw),
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
-            ..Default::default()
-        };
+        let mut expected = Event::from(raw);
+        expected.as_mut_log().insert_implicit(
+            event::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+        );
         expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+            .as_mut_log()
+            .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -261,16 +314,16 @@ mod test {
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        let mut expected = Record {
-            raw: bytes::Bytes::from(cleaned),
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
-            ..Default::default()
-        };
+        let mut expected = Event::from(cleaned);
+        expected.as_mut_log().insert_implicit(
+            event::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34).into(),
+        );
         expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+            .as_mut_log()
+            .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -278,16 +331,16 @@ mod test {
     fn syslog_ng_default_network() {
         let raw = r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar"#;
 
-        let mut expected = Record {
-            raw: bytes::Bytes::from(raw),
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26),
-            ..Default::default()
-        };
+        let mut expected = Event::from(raw);
+        expected.as_mut_log().insert_implicit(
+            event::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(20, 7, 26).into(),
+        );
         expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+            .as_mut_log()
+            .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -295,16 +348,16 @@ mod test {
     fn rsyslog_omfwd_tcp_default() {
         let raw = r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record {
-            raw: bytes::Bytes::from(raw),
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56),
-            ..Default::default()
-        };
+        let mut expected = Event::from(raw);
+        expected.as_mut_log().insert_implicit(
+            event::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 31, 56).into(),
+        );
         expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+            .as_mut_log()
+            .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 
     #[test]
@@ -312,15 +365,15 @@ mod test {
     fn rsyslog_omfwd_tcp_forward_format() {
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] start"#;
 
-        let mut expected = Record {
-            raw: bytes::Bytes::from(raw),
-            timestamp: chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30),
-            ..Default::default()
-        };
+        let mut expected = Event::from(raw);
+        expected.as_mut_log().insert_implicit(
+            event::TIMESTAMP.clone(),
+            chrono::Utc.ymd(2019, 2, 13).and_hms(21, 53, 30).into(),
+        );
         expected
-            .structured
-            .insert("host".into(), "74794bfb6795".into());
+            .as_mut_log()
+            .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, record_from_str(raw).unwrap());
+        assert_eq!(expected, event_from_str(raw).unwrap());
     }
 }

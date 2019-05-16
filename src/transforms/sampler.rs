@@ -1,7 +1,6 @@
 use super::Transform;
-use crate::record::Record;
-use bytes::Bytes;
-use regex::RegexSet;
+use crate::event::{self, Event};
+use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -33,20 +32,19 @@ impl Sampler {
 }
 
 impl Transform for Sampler {
-    fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Ok(raw_line) = std::str::from_utf8(&record.raw[..]) {
-            if self.pass_list.is_match(&raw_line) {
-                return Some(record);
-            }
+    fn transform(&self, mut event: Event) -> Option<Event> {
+        let message = event.as_log()[&event::MESSAGE].to_string_lossy();
+
+        if self.pass_list.is_match(&message) {
+            return Some(event);
         }
 
-        if seahash::hash(&record.raw[..]) % self.rate == 0 {
-            record.structured.insert(
-                Atom::from("sample_rate"),
-                Bytes::from(self.rate.to_string()),
-            );
+        if seahash::hash(message.as_bytes()) % self.rate == 0 {
+            event
+                .as_mut_log()
+                .insert_implicit(Atom::from("sample_rate"), self.rate.to_string().into());
 
-            Some(record)
+            Some(event)
         } else {
             None
         }
@@ -56,7 +54,7 @@ impl Transform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::Sampler;
-    use crate::record::Record;
+    use crate::event::{self, Event};
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
@@ -64,86 +62,86 @@ mod tests {
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
-        let num_records = 10000;
+        let num_events = 10000;
 
-        let records = random_records(num_records);
+        let events = random_events(num_events);
         let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
-        let total_passed = records
+        let total_passed = events
             .into_iter()
-            .filter_map(|record| sampler.transform(record))
+            .filter_map(|event| sampler.transform(event))
             .count();
         let ideal = 1.0 as f64 / 2.0 as f64;
-        let actual = total_passed as f64 / num_records as f64;
+        let actual = total_passed as f64 / num_events as f64;
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
-        let records = random_records(num_records);
+        let events = random_events(num_events);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
-        let total_passed = records
+        let total_passed = events
             .into_iter()
-            .filter_map(|record| sampler.transform(record))
+            .filter_map(|event| sampler.transform(event))
             .count();
         let ideal = 1.0 as f64 / 25.0 as f64;
-        let actual = total_passed as f64 / num_records as f64;
+        let actual = total_passed as f64 / num_events as f64;
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
     }
 
     #[test]
-    fn consistely_samples_the_same_records() {
-        let records = random_records(1000);
+    fn consistely_samples_the_same_events() {
+        let events = random_events(1000);
         let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
 
-        let first_run = records
+        let first_run = events
             .clone()
             .into_iter()
-            .filter_map(|record| sampler.transform(record))
+            .filter_map(|event| sampler.transform(event))
             .collect::<Vec<_>>();
-        let second_run = records
+        let second_run = events
             .into_iter()
-            .filter_map(|record| sampler.transform(record))
+            .filter_map(|event| sampler.transform(event))
             .collect::<Vec<_>>();
 
         assert_eq!(first_run, second_run);
     }
 
     #[test]
-    fn always_passes_records_matching_pass_list() {
-        let record = Record::from("i am important");
+    fn always_passes_events_matching_pass_list() {
+        let event = Event::from("i am important");
         let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
-            .filter_map(|_| sampler.transform(record.clone()))
+            .filter_map(|_| sampler.transform(event.clone()))
             .count();
         assert_eq!(total_passed, 1000);
     }
 
     #[test]
-    fn sampler_adds_sampling_rate_to_record() {
-        let records = random_records(10000);
+    fn sampler_adds_sampling_rate_to_event() {
+        let events = random_events(10000);
         let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
-        let passing = records
+        let passing = events
             .into_iter()
-            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
-            .find_map(|record| sampler.transform(record))
+            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "10");
+        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
 
-        let records = random_records(10000);
+        let events = random_events(10000);
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
-        let passing = records
+        let passing = events
             .into_iter()
-            .filter(|s| !std::str::from_utf8(&s.raw[..]).unwrap().contains("na"))
-            .find_map(|record| sampler.transform(record))
+            .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
+            .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing.structured[&Atom::from("sample_rate")], "25");
+        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());
 
-        // If the record passed the regex check, don't include the sampling rate
+        // If the event passed the regex check, don't include the sampling rate
         let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
-        let record = Record::from("nananana");
-        let passing = sampler.transform(record).unwrap();
-        assert!(!passing.structured.contains_key(&Atom::from("sample_rate")));
+        let event = Event::from("nananana");
+        let passing = sampler.transform(event).unwrap();
+        assert!(passing.as_log().get(&Atom::from("sample_rate")).is_none());
     }
 
-    fn random_records(n: usize) -> Vec<Record> {
+    fn random_events(n: usize) -> Vec<Event> {
         use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
 
@@ -154,7 +152,7 @@ mod tests {
                     .take(10)
                     .collect::<String>()
             })
-            .map(Record::from)
+            .map(Event::from)
             .collect()
     }
 }

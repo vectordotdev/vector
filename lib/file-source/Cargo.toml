@@ -9,6 +9,7 @@ publish = false
 glob = "0.2.11"
 futures = "0.1.25"
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+bytes = { version = "0.4.10", features = ["serde"] }
 
 [dev-dependencies]
 tempdir = "0.3"

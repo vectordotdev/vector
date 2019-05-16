@@ -1,22 +1,20 @@
 use super::Transform;
-use crate::record::Record;
-use bytes::Bytes;
+use crate::event::{self, Event};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct JsonParserConfig {
-    pub field: Option<Atom>,
+    pub field: Atom,
     pub drop_invalid: bool,
 }
 
 impl Default for JsonParserConfig {
     fn default() -> Self {
         Self {
-            field: None,
+            field: event::MESSAGE.clone(),
             drop_invalid: false,
         }
     }
@@ -40,17 +38,11 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl Transform for JsonParser {
-    fn transform(&self, mut record: Record) -> Option<Record> {
-        let to_parse = self
-            .config
-            .field
-            .as_ref()
-            .map_or(Some(record.raw.as_ref()), |field| {
-                record.structured.get(field).map(|s| &s[..])
-            });
+    fn transform(&self, mut event: Event) -> Option<Event> {
+        let to_parse = event.as_log().get(&self.config.field).map(|s| s.as_bytes());
 
         let parsed = to_parse
-            .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse).ok())
+            .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse.as_ref()).ok())
             .and_then(|value| {
                 if let Value::Object(object) = value {
                     Some(object)
@@ -61,7 +53,7 @@ impl Transform for JsonParser {
 
         if let Some(object) = parsed {
             for (name, value) in object {
-                insert(&mut record.structured, name, value);
+                insert(&mut event, name, value);
             }
         } else {
             if self.config.drop_invalid {
@@ -69,34 +61,40 @@ impl Transform for JsonParser {
             }
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
-fn insert(structured: &mut HashMap<Atom, Bytes>, name: String, value: Value) {
+fn insert(event: &mut Event, name: String, value: Value) {
     match value {
         Value::String(string) => {
-            structured.insert(name.into(), Bytes::from(string));
+            event
+                .as_mut_log()
+                .insert_explicit(name.into(), string.into());
         }
         Value::Number(number) => {
-            structured.insert(name.into(), Bytes::from(number.to_string()));
+            event
+                .as_mut_log()
+                .insert_explicit(name.into(), number.to_string().into());
         }
         Value::Bool(b) => {
-            structured.insert(name.into(), Bytes::from(b.to_string()));
+            event
+                .as_mut_log()
+                .insert_explicit(name.into(), b.to_string().into());
         }
         Value::Null => {
-            structured.insert(name.into(), Bytes::from(""));
+            event.as_mut_log().insert_explicit(name.into(), "".into());
         }
         Value::Array(array) => {
             for (i, element) in array.into_iter().enumerate() {
                 let element_name = format!("{}[{}]", name, i);
-                insert(structured, element_name, element);
+                insert(event, element_name, element);
             }
         }
         Value::Object(object) => {
             for (key, value) in object.into_iter() {
                 let item_name = format!("{}.{}", name, key);
-                insert(structured, item_name, value);
+                insert(event, item_name, value);
             }
         }
     }
@@ -105,9 +103,8 @@ fn insert(structured: &mut HashMap<Atom, Bytes>, name: String, value: Value) {
 #[cfg(test)]
 mod test {
     use super::{JsonParser, JsonParserConfig};
-    use crate::record::Record;
+    use crate::event::{self, Event};
     use crate::transforms::Transform;
-    use bytes::Bytes;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
@@ -116,48 +113,48 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("greeting")], "hello");
-        assert_eq!(record.structured[&Atom::from("name")], "bob");
-        assert_eq!(record.raw, r#"{"greeting": "hello", "name": "bob"}"#);
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(
+            event.as_log()[&event::MESSAGE],
+            r#"{"greeting": "hello", "name": "bob"}"#.into()
+        );
     }
 
     #[test]
     fn json_parser_parse_field() {
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             ..Default::default()
         });
 
         // Field present
 
-        let mut record = Record::from("message");
-        record.structured.insert(
+        let mut event = Event::from("message");
+        event.as_mut_log().insert_explicit(
             "data".into(),
             r#"{"greeting": "hello", "name": "bob"}"#.into(),
         );
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into(),);
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            record.structured[&Atom::from("greeting")],
-            Bytes::from("hello")
-        );
-        assert_eq!(record.structured[&Atom::from("name")], Bytes::from("bob"));
-        assert_eq!(
-            record.structured[&Atom::from("data")],
-            Bytes::from(r#"{"greeting": "hello", "name": "bob"}"#)
+            event.as_log()[&Atom::from("data")],
+            r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
 
         // Field missing
-        let record = Record::from("message");
+        let event = Event::from("message");
 
-        let record = parser.transform(record).unwrap();
+        let parsed = parser.transform(event.clone()).unwrap();
 
-        assert!(record.structured.is_empty());
+        assert_eq!(event, parsed);
     }
 
     #[test]
@@ -166,30 +163,31 @@ mod test {
 
         // Raw
         let parser = JsonParser::from(JsonParserConfig {
-            field: None,
             ..Default::default()
         });
 
-        let record = Record::from(invalid);
+        let event = Event::from(invalid);
 
-        let record = parser.transform(record).unwrap();
+        let parsed = parser.transform(event.clone()).unwrap();
 
-        assert!(record.structured.is_empty());
-        assert_eq!(record.raw, invalid);
+        assert_eq!(event, parsed);
+        assert_eq!(event.as_log()[&event::MESSAGE], invalid.into());
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             ..Default::default()
         });
 
-        let mut record = Record::from("message");
-        record.structured.insert("data".into(), invalid.into());
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert_explicit("data".into(), invalid.into());
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("data")], Bytes::from(invalid));
-        assert!(!record.structured.contains_key(&Atom::from("greeting")));
+        assert_eq!(event.as_log()[&Atom::from("data")], invalid.into());
+        assert!(event.as_log().get(&Atom::from("greeting")).is_none());
     }
 
     #[test]
@@ -200,42 +198,47 @@ mod test {
 
         // Raw
         let parser = JsonParser::from(JsonParserConfig {
-            field: None,
             drop_invalid: true,
             ..Default::default()
         });
 
-        let record = Record::from(valid);
-        assert!(parser.transform(record).is_some());
+        let event = Event::from(valid);
+        assert!(parser.transform(event).is_some());
 
-        let record = Record::from(invalid);
-        assert!(parser.transform(record).is_none());
+        let event = Event::from(invalid);
+        assert!(parser.transform(event).is_none());
 
-        let record = Record::from(not_object);
-        assert!(parser.transform(record).is_none());
+        let event = Event::from(not_object);
+        assert!(parser.transform(event).is_none());
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: Some("data".into()),
+            field: "data".into(),
             drop_invalid: true,
             ..Default::default()
         });
 
-        let mut record = Record::from("message");
-        record.structured.insert("data".into(), valid.into());
-        assert!(parser.transform(record).is_some());
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert_explicit("data".into(), valid.into());
+        assert!(parser.transform(event).is_some());
 
-        let mut record = Record::from("message");
-        record.structured.insert("data".into(), invalid.into());
-        assert!(parser.transform(record).is_none());
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert_explicit("data".into(), invalid.into());
+        assert!(parser.transform(event).is_none());
 
-        let mut record = Record::from("message");
-        record.structured.insert("data".into(), not_object.into());
-        assert!(parser.transform(record).is_none());
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert_explicit("data".into(), not_object.into());
+        assert!(parser.transform(event).is_none());
 
         // Missing field
-        let record = Record::from("message");
-        assert!(parser.transform(record).is_none());
+        let event = Event::from("message");
+        assert!(parser.transform(event).is_none());
     }
 
     #[test]
@@ -244,19 +247,19 @@ mod test {
             ..Default::default()
         });
         let parser2 = JsonParser::from(JsonParserConfig {
-            field: Some("nested".into()),
+            field: "nested".into(),
             ..Default::default()
         });
 
-        let record = Record::from(r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#);
-        let record = parser1.transform(record).unwrap();
-        let record = parser2.transform(record).unwrap();
+        let event = Event::from(r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#);
+        let event = parser1.transform(event).unwrap();
+        let event = parser2.transform(event).unwrap();
 
-        assert_eq!(record.structured[&Atom::from("greeting")], "hello");
-        assert_eq!(record.structured[&Atom::from("name")], "bob");
+        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            record.structured[&Atom::from("message")],
-            Bytes::from("help i'm trapped under many layers of json")
+            event.as_log()[&Atom::from("message")],
+            "help i'm trapped under many layers of json".into()
         );
     }
 
@@ -266,7 +269,7 @@ mod test {
             ..Default::default()
         });
 
-        let record = Record::from(
+        let event = Event::from(
             r#"{
               "string": "this is text",
               "null": null,
@@ -279,39 +282,21 @@ mod test {
               "deep": [[[{"a": { "b": { "c": [[[1234]]]}}}]]]
             }"#,
         );
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
+        assert_eq!(event.as_log()[&Atom::from("string")], "this is text".into());
+        assert_eq!(event.as_log()[&Atom::from("null")], "".into());
+        assert_eq!(event.as_log()[&Atom::from("float")], "12.34".into());
+        assert_eq!(event.as_log()[&Atom::from("int")], "56".into());
+        assert_eq!(event.as_log()[&Atom::from("bool true")], "true".into());
+        assert_eq!(event.as_log()[&Atom::from("bool false")], "false".into());
+        assert_eq!(event.as_log()[&Atom::from("array[0]")], "z".into());
+        assert_eq!(event.as_log()[&Atom::from("array[1]")], "7".into());
+        assert_eq!(event.as_log()[&Atom::from("object.nested")], "data".into());
+        assert_eq!(event.as_log()[&Atom::from("object.more")], "values".into());
         assert_eq!(
-            record.structured[&Atom::from("string")],
-            Bytes::from("this is text")
-        );
-        assert_eq!(record.structured[&Atom::from("null")], Bytes::from(""));
-        assert_eq!(
-            record.structured[&Atom::from("float")],
-            Bytes::from("12.34")
-        );
-        assert_eq!(record.structured[&Atom::from("int")], Bytes::from("56"));
-        assert_eq!(
-            record.structured[&Atom::from("bool true")],
-            Bytes::from("true")
-        );
-        assert_eq!(
-            record.structured[&Atom::from("bool false")],
-            Bytes::from("false")
-        );
-        assert_eq!(record.structured[&Atom::from("array[0]")], Bytes::from("z"));
-        assert_eq!(record.structured[&Atom::from("array[1]")], Bytes::from("7"));
-        assert_eq!(
-            record.structured[&Atom::from("object.nested")],
-            Bytes::from("data")
-        );
-        assert_eq!(
-            record.structured[&Atom::from("object.more")],
-            Bytes::from("values")
-        );
-        assert_eq!(
-            record.structured[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
-            Bytes::from("1234")
+            event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
+            "1234".into()
         );
     }
 }

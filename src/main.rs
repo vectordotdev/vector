@@ -3,15 +3,16 @@ extern crate tokio_trace;
 
 use clap::{App, Arg};
 use futures::{future, Future, Stream};
+use std::fs::File;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
 use vector::metrics;
-use vector::topology::Topology;
+use vector::topology;
 
 fn main() {
-    let app = App::new("Vector").version("1.0").author("timber.io")
+    let app = App::new("Vector").version("0.1.0").author("timber.io")
         .arg(
             Arg::with_name("config")
                 .short("c")
@@ -32,16 +33,55 @@ fn main() {
                 .long("metrics-addr")
                 .help("The address that metrics will be served from")
                 .takes_value(true)
-        );
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .help("Number of threads vector's core processing should use. Defaults to number of cores available")
+                .takes_value(true)
+        )
+        .arg(Arg::with_name("verbose")
+             .short("v")
+             .help("Specify the verboseness of logs produced. If -q is supplied this will do nothing. Eg -v -vv")
+             .multiple(true)
+             .takes_value(false))
+        .arg(Arg::with_name("quiet")
+             .short("q")
+             .help("Specify the quietness of logs produced. If -v is supplied this will override that level. Eg -q -qq")
+             .conflicts_with("verbose")
+             .multiple(true)
+             .takes_value(false));
+
     let matches = app.get_matches();
 
     let config_path = matches.value_of("config").unwrap();
-
     let metrics_addr = matches.value_of("metrics-addr");
 
-    let mut levels = ["vector=info", "codec=info", "file_source=info"]
-        .join(",")
-        .to_string();
+    let verboseness = matches.occurrences_of("verbose");
+    let quietness = matches.occurrences_of("quiet");
+
+    let level = if quietness > 0 {
+        match quietness {
+            0 => "info",
+            1 => "warn",
+            2 | _ => "error",
+        }
+    } else {
+        match verboseness {
+            0 => "info",
+            1 => "debug",
+            2 | _ => "trace",
+        }
+    };
+
+    let mut levels = [
+        format!("vector={}", level),
+        format!("codec={}", level),
+        format!("file_source={}", level),
+    ]
+    .join(",")
+    .to_string();
 
     if let Ok(level) = std::env::var("LOG") {
         let additional_level = ",".to_owned() + level.as_str();
@@ -62,6 +102,20 @@ fn main() {
     };
 
     tokio_trace::dispatcher::with_default(&dispatch, || {
+        let threads = matches.value_of("threads").map(|string| {
+            match string
+                .parse::<usize>()
+                .ok()
+                .filter(|&t| t >= 1 && t <= 32768)
+            {
+                Some(t) => t,
+                None => {
+                    error!("threads must be a number between 1 and 32768 (inclusive)");
+                    std::process::exit(1);
+                }
+            }
+        });
+
         let metrics_addr = metrics_addr.map(|addr| {
             if let Ok(addr) = addr.parse() {
                 addr
@@ -79,20 +133,10 @@ fn main() {
             path = field::debug(&config_path)
         );
 
-        let file = match std::fs::File::open(config_path) {
-            Ok(f) => f,
-            Err(e) => {
-                if let std::io::ErrorKind::NotFound = e.kind() {
-                    error!(
-                        message = "Config file not found.",
-                        path = field::debug(&config_path)
-                    );
-                    std::process::exit(1);
-                } else {
-                    error!("Error opening config file: {}", e);
-                    std::process::exit(1);
-                }
-            }
+        let file = if let Some(file) = open_config(config_path) {
+            file
+        } else {
+            std::process::exit(1);
         };
 
         trace!(
@@ -100,28 +144,17 @@ fn main() {
             path = field::debug(&config_path)
         );
 
-        let topology = vector::topology::Config::load(file).and_then(|f| {
-            debug!(message = "Building config from file.");
-            Topology::build(f)
-        });
+        let config = vector::topology::Config::load(file);
 
-        let mut topology = match topology {
-            Ok((topology, warnings)) => {
-                for warning in warnings {
-                    error!("Configuration warning: {}", warning);
-                }
+        let mut rt = {
+            let mut builder = tokio::runtime::Builder::new();
 
-                topology
+            if let Some(threads) = threads {
+                builder.core_threads(threads);
             }
-            Err(errors) => {
-                for error in errors {
-                    error!("Configuration error: {}", error);
-                }
-                return;
-            }
+
+            builder.build().expect("Unable to create async runtime")
         };
-
-        let mut rt = tokio::runtime::Runtime::new().expect("Unable to create async runtime");
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
@@ -139,21 +172,6 @@ fn main() {
 
         let require_healthy = matches.is_present("require-healthy");
 
-        if require_healthy {
-            info!("Running healthchecks and waiting to start sinks.");
-            let success = rt.block_on(topology.healthchecks());
-
-            if success.is_ok() {
-                info!("All healthchecks passed.");
-            } else {
-                error!("Sinks unhealthy; shutting down.");
-                std::process::exit(1);
-            }
-        } else {
-            info!("Running healthchecks.");
-            rt.spawn(topology.healthchecks());
-        }
-
         info!(
             message = "Vector is starting.",
             version = built_info::PKG_VERSION,
@@ -162,7 +180,8 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let mut graceful_crash = topology.start(&mut rt);
+        let (mut topology, mut graceful_crash) = topology::start(config, &mut rt, require_healthy)
+            .unwrap_or_else(|| std::process::exit(1));
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -195,32 +214,19 @@ fn main() {
                 message = "Reloading config.",
                 path = field::debug(&config_path)
             );
-            let file = match std::fs::File::open(config_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    if let std::io::ErrorKind::NotFound = e.kind() {
-                        error!("Config file not found in: {}", config_path);
-                        continue;
-                    } else {
-                        error!("Error opening config file: {}", e);
-                        continue;
-                    }
-                }
+
+            let file = if let Some(file) = open_config(config_path) {
+                file
+            } else {
+                continue;
             };
 
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
-            match config {
-                Ok(config) => {
-                    debug!("Reloading topology.");
-                    topology.reload_config(config, &mut rt, require_healthy);
-                }
-                Err(errors) => {
-                    for error in errors {
-                        error!("Configuration error: {}", error);
-                    }
-                }
+            let success = topology.reload_config(config, &mut rt, require_healthy, false);
+            if !success {
+                error!("Reload aborted");
             }
         };
 
@@ -248,6 +254,21 @@ fn main() {
 
         rt.shutdown_now().wait().unwrap();
     });
+}
+
+fn open_config(path: &str) -> Option<File> {
+    match File::open(path) {
+        Ok(f) => Some(f),
+        Err(e) => {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                error!("Config file not found in: {}", path);
+                None
+            } else {
+                error!("Error opening config file: {}", e);
+                None
+            }
+        }
+    }
 }
 
 #[allow(unused)]

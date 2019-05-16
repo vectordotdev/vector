@@ -121,7 +121,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler at need, transparently to the caller.
-    pub fn read_line(&mut self, mut buffer: &mut String) -> io::Result<usize> {
+    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
         if self.reopen {
             self.open_at_start();
         }
@@ -156,18 +156,14 @@ impl FileWatcher {
             self.previous_size = current_size;
             // match here on error, if metadata doesn't match up open_at_start
             // new reader and let it catch on the next looparound
-            match reader.read_line(&mut buffer) {
+            match read_until_with_max_size(reader, b'\n', &mut buffer, max_size) {
                 Ok(0) => {
                     if file_id(&self.path) != self.file_id {
                         self.reopen = true;
                     }
                     Ok(0)
                 }
-                Ok(sz) => {
-                    assert_eq!(sz, buffer.len());
-                    buffer.pop();
-                    Ok(buffer.len())
-                }
+                Ok(sz) => Ok(sz),
                 Err(e) => {
                     if let io::ErrorKind::NotFound = e.kind() {
                         self.reopen = true;
@@ -179,5 +175,114 @@ impl FileWatcher {
             self.open_at_start();
             Ok(0)
         }
+    }
+}
+
+// Tweak of https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471
+// After more than max_size bytes are read as part of a single line, this discard the remaining bytes
+// in that line, and then starts again on the next line.
+fn read_until_with_max_size<R: BufRead + ?Sized>(
+    r: &mut R,
+    delim: u8,
+    buf: &mut Vec<u8>,
+    max_size: usize,
+) -> io::Result<usize> {
+    let mut total_read = 0;
+    let mut discarding = false;
+    loop {
+        let available = match r.fill_buf() {
+            Ok(n) => n,
+            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+
+        let (done, used) = {
+            // TODO: use memchr to make this faster
+            match available.iter().position(|&b| b == delim) {
+                Some(i) => {
+                    if !discarding {
+                        buf.extend_from_slice(&available[..i]);
+                    }
+                    (true, i + 1)
+                }
+                None => {
+                    if !discarding {
+                        buf.extend_from_slice(available);
+                    }
+                    (false, available.len())
+                }
+            }
+        };
+        r.consume(used);
+        total_read += used;
+
+        if !discarding && buf.len() > max_size {
+            warn!("Found line that exceeds max_line_bytes; discarding.");
+            discarding = true;
+        }
+
+        if done && discarding {
+            discarding = false;
+            buf.clear();
+        } else if done || used == 0 {
+            return Ok(total_read);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::read_until_with_max_size;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_read_until_with_max_size() {
+        let mut buf = Cursor::new(&b"12"[..]);
+        let mut v = Vec::new();
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
+            2
+        );
+        assert_eq!(v, b"12");
+
+        let mut buf = Cursor::new(&b"1233"[..]);
+        let mut v = Vec::new();
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
+            3
+        );
+        assert_eq!(v, b"12");
+        v.truncate(0);
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
+            1
+        );
+        assert_eq!(v, b"");
+        v.truncate(0);
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
+            0
+        );
+        assert_eq!(v, []);
+
+        let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
+        let mut v = Vec::new();
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
+            6
+        );
+        assert_eq!(v, b"short");
+        v.truncate(0);
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
+            28
+        );
+        assert_eq!(v, b"exact size");
+        v.truncate(0);
+        assert_eq!(
+            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
+            12
+        );
+        assert_eq!(v, []);
     }
 }

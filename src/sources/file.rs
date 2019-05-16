@@ -1,4 +1,4 @@
-use crate::record::Record;
+use crate::Event;
 use bytes::Bytes;
 use file_source::file_server::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
@@ -17,6 +17,12 @@ pub struct FileConfig {
     pub context_key: Option<String>,
     pub start_at_beginning: bool,
     pub ignore_older: Option<u64>,
+    #[serde(default = "default_max_line_bytes")]
+    pub max_line_bytes: usize,
+}
+
+fn default_max_line_bytes() -> usize {
+    100 * 1024
 }
 
 impl Default for FileConfig {
@@ -27,19 +33,20 @@ impl Default for FileConfig {
             context_key: Some("file".to_string()),
             start_at_beginning: false,
             ignore_older: None,
+            max_line_bytes: default_max_line_bytes(),
         }
     }
 }
 
 #[typetag::serde(name = "file")]
 impl crate::topology::config::SourceConfig for FileConfig {
-    fn build(&self, out: mpsc::Sender<Record>) -> Result<super::Source, String> {
+    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         // TODO: validate paths
         Ok(file_source(self, out))
     }
 }
 
-pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Source {
+pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let ignore_before = config
@@ -52,21 +59,22 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Record>) -> super::Sou
         max_read_bytes: 2048,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
+        max_line_bytes: config.max_line_bytes,
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
 
     let out = out
         .sink_map_err(|_| ())
-        .with(move |(line, file): (String, String)| {
-            trace!(message = "Recieved one record.", file = file.as_str());
-            let mut record = Record::from(line);
+        .with(move |(line, file): (Bytes, String)| {
+            trace!(message = "Recieved one event.", file = file.as_str());
+            let mut event = Event::from(line);
             if let Some(ref context_key) = context_key {
-                record
-                    .structured
-                    .insert(context_key.clone(), Bytes::from(file));
+                event
+                    .as_mut_log()
+                    .insert_implicit(context_key.clone(), file.into());
             }
-            future::ok(record)
+            future::ok(event)
         });
 
     let include = config.include.clone();

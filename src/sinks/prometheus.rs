@@ -1,5 +1,5 @@
 use crate::buffers::Acker;
-use crate::{bytes::BytesExt, Record};
+use crate::Event;
 use futures::{future, Async, AsyncSink, Future, Sink};
 use hyper::service::service_fn;
 use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
@@ -10,6 +10,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -22,17 +23,17 @@ pub struct PrometheusSinkConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Counter {
-    key: Atom,
-    label: String,
-    doc: String,
-    parse_value: bool,
+    pub key: Atom,
+    pub label: String,
+    pub doc: String,
+    pub parse_value: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Gauge {
-    key: Atom,
-    label: String,
-    doc: String,
+    pub key: Atom,
+    pub label: String,
+    pub doc: String,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -89,6 +90,10 @@ fn handle(
         }
     }
 
+    info!(
+        message = "request complete",
+        response_code = field::debug(response.status())
+    );
     Box::new(future::ok(response))
 }
 
@@ -137,7 +142,14 @@ impl PrometheusSink {
         let new_service = move || {
             let registry = Arc::clone(&registry);
 
-            service_fn(move |req| handle(req, &registry))
+            service_fn(move |req| {
+                info_span!(
+                    "prometheus_server",
+                    method = field::debug(req.method()),
+                    path = field::debug(req.uri().path()),
+                )
+                .enter(|| handle(req, &registry))
+            })
         };
 
         let (trigger, tripwire) = Tripwire::new();
@@ -153,19 +165,19 @@ impl PrometheusSink {
 }
 
 impl Sink for PrometheusSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(
         &mut self,
-        record: Self::SinkItem,
+        event: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
         for (field, counter) in &self.counters {
-            if let Some(val) = record.structured.get(&field.key) {
+            if let Some(val) = event.as_log().get(&field.key) {
                 if field.parse_value {
-                    let val = val.as_utf8_lossy();
+                    let val = val.to_string_lossy();
 
                     if let Ok(count) = val.parse() {
                         counter.inc_by(count);
@@ -182,11 +194,11 @@ impl Sink for PrometheusSink {
         }
 
         for (field, gauge) in &self.gauges {
-            if let Some(val) = record.structured.get(&field.key) {
-                let val = val.as_utf8_lossy();
+            if let Some(val) = event.as_log().get(&field.key) {
+                let val = val.to_string_lossy();
 
                 if let Ok(count) = val.parse() {
-                    gauge.add(count);
+                    gauge.set(count);
                 } else {
                     warn!(
                         "Unable to parse value from field {} with value {}",

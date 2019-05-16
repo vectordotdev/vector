@@ -1,5 +1,8 @@
-use crate::buffers::Acker;
-use crate::record::Record;
+use crate::{
+    buffers::Acker,
+    event::{self, Event},
+    sinks::util::MetadataFuture,
+};
 use futures::{
     future::{self, poll_fn, IntoFuture},
     stream::FuturesUnordered,
@@ -14,15 +17,15 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct KafkaSinkConfig {
+pub struct KafkaSinkConfig {
     bootstrap_servers: Vec<String>,
     topic: String,
 }
 
-struct KafkaSink {
+pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
-    in_flight: FuturesUnordered<super::util::MetadataFuture<DeliveryFuture, usize>>,
+    in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
     seq_head: usize,
@@ -67,14 +70,17 @@ impl KafkaSink {
 }
 
 impl Sink for KafkaSink {
-    type SinkItem = Record;
+    type SinkItem = Event;
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
-        let record = FutureRecord::to(&topic).key(&()).payload(&item.raw[..]);
 
-        debug!(message = "sending record.", count = 1);
+        let bytes = encode_event(&item);
+
+        let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
+
+        debug!(message = "sending event.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
             Err((e, record)) => {
@@ -154,9 +160,49 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     Box::new(check)
 }
 
+fn encode_event(event: &Event) -> Vec<u8> {
+    let log = event.as_log();
+
+    if log.is_structured() {
+        serde_json::to_vec(&log.all_fields()).unwrap()
+    } else {
+        log[&event::MESSAGE].as_bytes().into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{self, Event};
+    use std::collections::HashMap;
+
+    #[test]
+    fn kafka_encode_event_non_structured() {
+        let message = "hello world".to_string();
+        let bytes = encode_event(&message.clone().into());
+
+        assert_eq!(&bytes[..], message.as_bytes())
+    }
+
+    #[test]
+    fn kafka_encode_event_structured() {
+        let message = "hello world".to_string();
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("key".into(), "value".into());
+        let bytes = encode_event(&event);
+
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map["key"], "value".to_string())
+    }
+}
+
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
-mod test {
+mod integration_test {
     use super::{KafkaSink, KafkaSinkConfig};
     use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
@@ -179,10 +225,10 @@ mod test {
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
 
-        let num_records = 1000;
-        let (input, records) = random_lines_with_stream(100, num_records);
+        let num_events = 1000;
+        let (input, events) = random_lines_with_stream(100, num_events);
 
-        let pump = sink.send_all(records);
+        let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
         // read back everything from the beginning
@@ -210,7 +256,7 @@ mod test {
         let (low, high) = consumer
             .fetch_watermarks(&topic, 0, Duration::from_secs(3))
             .unwrap();
-        assert_eq!((0, num_records as i64), (low, high));
+        assert_eq!((0, num_events as i64), (low, high));
 
         // loop instead of iter so we can set a timeout
         let mut failures = 0;
@@ -234,7 +280,7 @@ mod test {
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_records
+            num_events
         );
     }
 }

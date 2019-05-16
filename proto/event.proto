@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package event.proto;
+
+message EventWrapper {
+  oneof event {
+    Log log = 1;
+  }
+}
+
+message Value {
+  bytes data = 1;
+  bool explicit = 2;
+}
+
+message Log {
+  map<string, Value> structured = 1;
+}

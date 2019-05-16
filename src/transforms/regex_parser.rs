@@ -1,6 +1,5 @@
 use super::Transform;
-use crate::record::Record;
-use bytes::Bytes;
+use crate::event::{self, Event};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
@@ -31,47 +30,50 @@ impl RegexParser {
 }
 
 impl Transform for RegexParser {
-    fn transform(&self, mut record: Record) -> Option<Record> {
-        if let Some(captures) = self.regex.captures(&record.raw[..]) {
+    fn transform(&self, mut event: Event) -> Option<Event> {
+        if let Some(captures) = self
+            .regex
+            .captures(&event.as_log()[&event::MESSAGE].as_bytes().into_owned())
+        {
             for name in self.regex.capture_names().filter_map(|c| c) {
                 if let Some(capture) = captures.name(name) {
-                    record
-                        .structured
-                        .insert(name.into(), Bytes::from(capture.as_bytes()));
+                    event
+                        .as_mut_log()
+                        .insert_explicit(name.into(), capture.as_bytes().into());
                 }
             }
         }
 
-        Some(record)
+        Some(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::RegexParser;
-    use crate::record::Record;
     use crate::transforms::Transform;
+    use crate::Event;
     use regex::bytes::Regex;
 
     #[test]
-    fn regex_parser_adds_parsed_field_to_record() {
-        let record = Record::from("status=1234 time=5678");
+    fn regex_parser_adds_parsed_field_to_event() {
+        let event = Event::from("status=1234 time=5678");
         let parser =
             RegexParser::new(Regex::new(r"status=(?P<status>\d+) time=(?P<time>\d+)").unwrap());
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record.structured[&"status".into()], "1234");
-        assert_eq!(record.structured[&"time".into()], "5678");
+        assert_eq!(event.as_log()[&"status".into()], "1234".into());
+        assert_eq!(event.as_log()[&"time".into()], "5678".into());
     }
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let record = Record::from("asdf1234");
+        let event = Event::from("asdf1234");
         let parser = RegexParser::new(Regex::new(r"status=(?P<status>\d+)").unwrap());
 
-        let record = parser.transform(record).unwrap();
+        let event = parser.transform(event).unwrap();
 
-        assert_eq!(record.structured.get(&"status".into()), None);
+        assert_eq!(event.as_log().get(&"status".into()), None);
     }
 }

@@ -1,8 +1,8 @@
-use vector::topology::{Config, Topology};
+use vector::topology::{self, Config};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     Config::load(config.as_bytes())
-        .and_then(|c| Topology::build(c))
+        .and_then(|c| topology::builder::build_pieces(&c))
         .map(|(_topology, warnings)| warnings)
 }
 
@@ -208,7 +208,16 @@ fn bad_s3_region() {
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
-        endpoint = "https://example.com"
+        endpoint = "https://localhost"
+
+        [sinks.out4]
+        type = "s3"
+        inputs = ["in"]
+        buffer_size = 100000
+        gzip = true
+        bucket = "asdf"
+        key_prefix = "logs/"
+        endpoint = "this shoudlnt work"
       "#,
     )
     .unwrap_err();
@@ -219,6 +228,7 @@ fn bad_s3_region() {
             "Sink \"out1\": Must set 'region' or 'endpoint'",
             "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
+            "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
         ]
     )
 }
@@ -254,4 +264,47 @@ fn warnings() {
             "Source \"in\" has no outputs",
         ]
     )
+}
+
+#[test]
+fn cycle() {
+    let errors = load(
+        r#"
+        [sources.in]
+        type = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.one]
+        type = "sampler"
+        inputs = ["in"]
+        rate = 10
+        pass_list = []
+
+        [transforms.two]
+        type = "sampler"
+        inputs = ["one", "four"]
+        rate = 10
+        pass_list = []
+
+        [transforms.three]
+        type = "sampler"
+        inputs = ["two"]
+        rate = 10
+        pass_list = []
+
+        [transforms.four]
+        type = "sampler"
+        inputs = ["three"]
+        rate = 10
+        pass_list = []
+
+        [sinks.out]
+        type = "tcp"
+        inputs = ["four"]
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .unwrap_err();
+
+    assert_eq!(errors, vec!["Configured topology contains a cycle"])
 }

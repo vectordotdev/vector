@@ -1,9 +1,10 @@
 use futures::{Future, Stream};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Seek, Write};
 use stream_cancel::Tripwire;
 use tempfile::tempdir;
-use vector::bytes::BytesExt;
+use vector::event;
 use vector::sources::file;
 use vector::test_util::shutdown_on_idle;
 
@@ -44,19 +45,19 @@ fn happy_path() {
     let mut hello_i = 0;
     let mut goodbye_i = 0;
 
-    for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+    for event in received {
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
         if line.starts_with("hello") {
             assert_eq!(line, format!("hello {}", hello_i));
             assert_eq!(
-                record.structured[&"file".into()].as_utf8_lossy(),
+                event.as_log()[&"file".into()].to_string_lossy(),
                 path1.to_str().unwrap()
             );
             hello_i += 1;
         } else {
             assert_eq!(line, format!("goodbye {}", goodbye_i));
             assert_eq!(
-                record.structured[&"file".into()].as_utf8_lossy(),
+                event.as_log()[&"file".into()].to_string_lossy(),
                 path2.to_str().unwrap()
             );
             goodbye_i += 1;
@@ -110,10 +111,13 @@ fn truncate() {
     let mut i = 0;
     let mut pre_trunc = true;
 
-    for record in received {
-        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+    for event in received {
+        assert_eq!(
+            event.as_log()[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
 
         if pre_trunc {
             assert_eq!(line, format!("pretrunc {}", i));
@@ -174,10 +178,13 @@ fn rotate() {
     let mut i = 0;
     let mut pre_rot = true;
 
-    for record in received {
-        assert_eq!(record.structured[&"file".into()], path.to_str().unwrap());
+    for event in received {
+        assert_eq!(
+            event.as_log()[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
 
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
 
         if pre_rot {
             assert_eq!(line, format!("prerot {}", i));
@@ -236,8 +243,8 @@ fn multiple_paths() {
 
     let mut is = [0; 3];
 
-    for record in received {
-        let line = std::str::from_utf8(&record.raw[..]).unwrap();
+    for event in received {
+        let line = event.as_log()[&event::MESSAGE].to_string_lossy();
         let mut split = line.split(" ");
         let file = split.next().unwrap().parse::<usize>().unwrap();
         assert_ne!(file, 4);
@@ -277,7 +284,10 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert_eq!(received.structured[&"file".into()], path.to_str().unwrap());
+        assert_eq!(
+            received.as_log()[&"file".into()].to_string_lossy(),
+            path.to_str().unwrap()
+        );
     }
 
     // Custom
@@ -303,7 +313,7 @@ fn context_key() {
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
         assert_eq!(
-            received.structured[&"source".into()],
+            received.as_log()[&"source".into()].to_string_lossy(),
             path.to_str().unwrap()
         );
     }
@@ -330,7 +340,12 @@ fn context_key() {
         writeln!(&mut file, "hello").unwrap();
 
         let received = rx.into_future().wait().unwrap().0.unwrap();
-        assert!(received.structured.is_empty());
+        assert_eq!(
+            received.as_log().keys().cloned().collect::<HashSet<_>>(),
+            vec![event::MESSAGE.clone(), event::TIMESTAMP.clone()]
+                .into_iter()
+                .collect::<HashSet<_>>()
+        );
     }
 
     drop(trigger);
@@ -366,7 +381,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["second line"]);
     }
@@ -400,7 +415,7 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let lines = received
             .into_iter()
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(lines, vec!["first line", "second line"]);
     }
@@ -472,25 +487,80 @@ fn start_position() {
         let received = rx.collect().wait().unwrap();
         let before_lines = received
             .iter()
-            .filter(|r| {
-                r.structured[&"file".into()]
-                    .as_utf8_lossy()
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|r| {
-                r.structured[&"file".into()]
-                    .as_utf8_lossy()
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|r| std::str::from_utf8(&r.raw[..]).unwrap().to_string())
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["first line", "second line"]);
     }
+}
+
+#[test]
+fn file_max_line_bytes() {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let (trigger, tripwire) = Tripwire::new();
+
+    let dir = tempdir().unwrap();
+    let config = file::FileConfig {
+        include: vec![dir.path().join("*")],
+        max_line_bytes: 10,
+        ..Default::default()
+    };
+
+    let source = file::file_source(&config, tx);
+
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+    let path = dir.path().join("file");
+    let mut file = File::create(&path).unwrap();
+
+    sleep(); // The files must be observed at their original lengths before writing to them
+
+    writeln!(&mut file, "short").unwrap();
+    writeln!(&mut file, "this is too long").unwrap();
+    writeln!(&mut file, "11 eleven11").unwrap();
+    let super_long = std::iter::repeat("This line is super long and will take up more space that BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+    writeln!(&mut file, "{}", super_long).unwrap();
+    writeln!(&mut file, "exactly 10").unwrap();
+    writeln!(&mut file, "it can end on a line that's too long").unwrap();
+
+    sleep();
+    sleep();
+
+    writeln!(&mut file, "and then continue").unwrap();
+    writeln!(&mut file, "last short").unwrap();
+
+    sleep();
+    sleep();
+
+    drop(trigger);
+    shutdown_on_idle(rt);
+
+    let received = rx
+        .map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+        .collect()
+        .wait()
+        .unwrap();
+
+    assert_eq!(
+        received,
+        vec!["short".into(), "exactly 10".into(), "last short".into()]
+    );
 }
 
 fn sleep() {

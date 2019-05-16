@@ -3,7 +3,9 @@ use crate::buffers;
 use futures::prelude::*;
 use futures::{sync::mpsc, Future};
 use std::collections::HashMap;
+use std::time::Duration;
 use stream_cancel::{Trigger, Tripwire};
+use tokio::util::FutureExt;
 use tokio_trace_futures::Instrument;
 
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
@@ -67,12 +69,12 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         };
 
         let (input_tx, input_rx) = futures::sync::mpsc::channel(100);
-        let input_tx = buffers::BufferInputCloner::Memory(input_tx);
+        let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
         let task = input_rx
-            .filter_map(move |r| transform.transform(r))
+            .filter_map(move |event| transform.transform(event))
             .forward(output)
             .map(|_| ());
         let task: Task = Box::new(task);
@@ -107,6 +109,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let task: Task = Box::new(task);
 
         let healthcheck_task = healthcheck
+            .timeout(Duration::from_secs(10))
             .map(move |_| info!("Healthcheck: Passed."))
             .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
         let healthcheck_span = info_span!("healthcheck", name = name.as_str());
@@ -166,6 +169,12 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
                 name
             ));
         }
+    }
+
+    if config.contains_cycle() {
+        errors.push(format!("Configured topology contains a cycle"));
+    } else if let Err(type_errors) = config.typecheck() {
+        errors.extend(type_errors);
     }
 
     if errors.is_empty() {

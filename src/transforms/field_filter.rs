@@ -1,6 +1,5 @@
 use super::Transform;
-use crate::record::Record;
-use bytes::Bytes;
+use crate::Event;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -36,9 +35,14 @@ impl FieldFilter {
 }
 
 impl Transform for FieldFilter {
-    fn transform(&self, record: Record) -> Option<Record> {
-        if record.structured.get(&self.field_name) == Some(&Bytes::from(&self.value[..])) {
-            Some(record)
+    fn transform(&self, event: Event) -> Option<Event> {
+        if event
+            .as_log()
+            .get(&self.field_name)
+            .map(|f| f.as_bytes())
+            .map_or(false, |b| b == self.value.as_bytes())
+        {
+            Some(event)
         } else {
             None
         }

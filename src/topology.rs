@@ -1,4 +1,4 @@
-mod builder;
+pub mod builder;
 pub mod config;
 mod fanout;
 
@@ -18,18 +18,8 @@ use stream_cancel::Trigger;
 use tokio::timer;
 use tokio_trace_futures::Instrument;
 
-pub struct Topology {
-    state: State,
-}
-
-enum State {
-    Ready(builder::Pieces, Config),
-    Running(RunningTopology),
-    Stopped,
-}
-
 #[allow(dead_code)]
-struct RunningTopology {
+pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, oneshot::SpawnHandle<(), ()>>,
@@ -39,142 +29,36 @@ struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-impl Topology {
-    pub fn build(config: Config) -> Result<(Self, Vec<String>), Vec<String>> {
-        let (components, warnings) = builder::build_pieces(&config)?;
+pub fn start(
+    config: Result<Config, Vec<String>>,
+    rt: &mut tokio::runtime::Runtime,
+    require_healthy: bool,
+) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
+    let (abort_tx, abort_rx) = mpsc::unbounded();
 
-        let topology = Self {
-            state: State::Ready(components, config),
-        };
+    let mut running_topology = RunningTopology {
+        inputs: HashMap::new(),
+        outputs: HashMap::new(),
+        config: Config::empty(),
+        shutdown_triggers: HashMap::new(),
+        source_tasks: HashMap::new(),
+        tasks: HashMap::new(),
+        abort_tx,
+    };
 
-        Ok((topology, warnings))
+    let success = running_topology.reload_config(config, rt, require_healthy, true);
+
+    if success {
+        Some((running_topology, abort_rx))
+    } else {
+        None
     }
+}
 
-    pub fn healthchecks(&mut self) -> impl Future<Item = (), Error = ()> {
-        if let State::Ready(ref mut components, _) = &mut self.state {
-            let healthchecks = components
-                .healthchecks
-                .drain()
-                .map(|(_, v)| v)
-                .collect::<Vec<_>>();
-            futures::future::join_all(healthchecks).map(|_| ())
-        } else {
-            // TODO: make healthchecks reusable
-            unimplemented!("Can only run healthchecks before calling start");
-        }
-    }
-
-    pub fn start(&mut self, rt: &mut tokio::runtime::Runtime) -> mpsc::UnboundedReceiver<()> {
-        let state = std::mem::replace(&mut self.state, State::Stopped);
-        let (components, config) = if let State::Ready(components, config) = state {
-            (components, config)
-        } else {
-            panic!("Can only call start once, immediately after building");
-        };
-
-        let builder::Pieces {
-            inputs,
-            outputs,
-            shutdown_triggers,
-            mut tasks,
-            mut source_tasks,
-            healthchecks: _healthchecks,
-        } = components;
-
-        let mut new_inputs = HashMap::new();
-        for (name, (tx, input_names)) in inputs {
-            for input_name in input_names {
-                outputs[&input_name]
-                    .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
-                    .unwrap();
-            }
-
-            new_inputs.insert(name, tx);
-        }
-
-        let (abort_tx, abort_rx) = mpsc::unbounded();
-
-        let mut spawned_tasks = HashMap::new();
-
-        for (name, sink) in &config.sinks {
-            let name = name.as_str();
-            let typetag = sink.inner.typetag_name();
-
-            info!("Starting sink {:?} of type {}", name, typetag);
-            let task = tasks.remove(name).unwrap();
-            let task = handle_errors(task, abort_tx.clone());
-
-            let span = info_span!("sink", name = name, r#type = typetag);
-            let task = task.instrument(span);
-            let spawned = oneshot::spawn(task, &rt.executor());
-            spawned_tasks.insert(name.to_string(), spawned);
-        }
-
-        for (name, transform) in &config.transforms {
-            let name = name.as_str();
-            let typetag = transform.inner.typetag_name();
-
-            info!("Starting transform {:?} of type {}", name, typetag);
-            let task = tasks.remove(name).unwrap();
-            let task = handle_errors(task, abort_tx.clone());
-
-            let span = info_span!("transform", name = name, r#type = typetag);
-            let task = task.instrument(span);
-            let spawned = oneshot::spawn(task, &rt.executor());
-            spawned_tasks.insert(name.to_string(), spawned);
-        }
-
-        let mut spawned_source_tasks = HashMap::new();
-        for (name, source) in &config.sources {
-            let name = name.as_str();
-            let typetag = source.typetag_name();
-
-            info!("Starting source {:?} of type {}", name, typetag);
-
-            {
-                let task = tasks.remove(name).unwrap();
-                let task = handle_errors(task, abort_tx.clone());
-
-                let span = info_span!("source-pump", name = name, r#type = typetag);
-                let task = task.instrument(span);
-                let spawned = oneshot::spawn(task, &rt.executor());
-                spawned_tasks.insert(name.to_string(), spawned);
-            }
-
-            {
-                let task = source_tasks.remove(name).unwrap();
-                let task = handle_errors(task, abort_tx.clone());
-
-                let span = info_span!("source", name = name, r#type = typetag);
-                let task = task.instrument(span);
-                let spawned = oneshot::spawn(task, &rt.executor());
-                spawned_source_tasks.insert(name.to_string(), spawned);
-            }
-        }
-
-        self.state = State::Running(RunningTopology {
-            inputs: new_inputs,
-            outputs,
-            config,
-            shutdown_triggers,
-            source_tasks: spawned_source_tasks,
-            tasks: spawned_tasks,
-            abort_tx,
-        });
-
-        abort_rx
-    }
-
+impl RunningTopology {
     #[must_use]
-    pub fn stop(&mut self) -> impl Future<Item = (), Error = ()> {
-        let old_state = std::mem::replace(&mut self.state, State::Stopped);
-        let running = if let State::Running(running) = old_state {
-            running
-        } else {
-            unreachable!()
-        };
-
-        let mut running_tasks = running.tasks;
+    pub fn stop(self) -> impl Future<Item = (), Error = ()> {
+        let mut running_tasks = self.tasks;
 
         let mut wait_handles = Vec::new();
         let mut check_handles = HashMap::new();
@@ -245,30 +129,24 @@ impl Topology {
 
     pub fn reload_config(
         &mut self,
-        new_config: Config,
+        new_config: Result<Config, Vec<String>>,
         rt: &mut tokio::runtime::Runtime,
         require_healthy: bool,
-    ) {
-        if let State::Running(running) = &mut self.state {
-            running.reload_config(new_config, rt, require_healthy);
-        } else {
-            panic!("Can only reload config on a running Topology");
-        }
-    }
-}
+        initial_load: bool,
+    ) -> bool {
+        let new_config = match new_config {
+            Ok(config) => config,
+            Err(errors) => {
+                for error in errors {
+                    error!("Configuration error: {}", error);
+                }
+                return false;
+            }
+        };
 
-impl RunningTopology {
-    fn reload_config(
-        &mut self,
-        new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
-        require_healthy: bool,
-    ) {
-        info!("Reloading config");
-
-        if self.config.data_dir != new_config.data_dir {
+        if !initial_load && self.config.data_dir != new_config.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
-            return;
+            return false;
         }
 
         let mut new_pieces = match builder::build_pieces(&new_config) {
@@ -276,7 +154,7 @@ impl RunningTopology {
                 for error in errors {
                     error!("Configuration error: {}", error);
                 }
-                return;
+                return false;
             }
             Ok((new_pieces, warnings)) => {
                 for warning in warnings {
@@ -299,9 +177,12 @@ impl RunningTopology {
             let to_change = old_names
                 .intersection(&new_names)
                 .filter(|&n| {
-                    let old_toml = toml::Value::try_from(&old[n]).unwrap();
-                    let new_toml = toml::Value::try_from(&new[n]).unwrap();
-                    old_toml != new_toml
+                    // This is a hack around the issue of comparing two
+                    // trait objects. Json is used here over toml since
+                    // toml does not support serializing `None`.
+                    let old_json = serde_json::to_vec(&old[n]).unwrap();
+                    let new_json = serde_json::to_vec(&new[n]).unwrap();
+                    old_json != new_json
                 })
                 .cloned()
                 .collect::<HashSet<_>>();
@@ -322,14 +203,15 @@ impl RunningTopology {
             .collect::<Vec<_>>();
         let healthchecks = futures::future::join_all(healthchecks).map(|_| ());
 
+        info!("Running healthchecks.");
         if require_healthy {
             let success = rt.block_on(healthchecks);
 
             if success.is_ok() {
                 info!("All healthchecks passed");
             } else {
-                error!("Sinks unhealthy; reload aborted");
-                return;
+                error!("Sinks unhealthy");
+                return false;
             }
         } else {
             rt.spawn(healthchecks);
@@ -360,7 +242,7 @@ impl RunningTopology {
         }
 
         for name in sources_to_add {
-            info!("Adding source {:?}", name);
+            info!("Starting source {:?}", name);
 
             self.setup_outputs(&name, &mut new_pieces);
             self.spawn_source(&name, &mut new_pieces, rt);
@@ -379,21 +261,27 @@ impl RunningTopology {
             self.remove_outputs(&name);
         }
 
+        // Make sure all transform outputs are set up before another transform might try use
+        // it as an input
+        for name in &transforms_to_change {
+            self.setup_outputs(&name, &mut new_pieces);
+        }
+        for name in &transforms_to_add {
+            self.setup_outputs(&name, &mut new_pieces);
+        }
+
         for name in transforms_to_change {
             info!("Rebuilding transform {:?}", name);
 
-            self.spawn_transform(&name, &mut new_pieces, rt);
-
-            self.setup_outputs(&name, &mut new_pieces);
             self.replace_inputs(&name, &mut new_pieces);
+            self.spawn_transform(&name, &mut new_pieces, rt);
         }
 
         for name in transforms_to_add {
-            info!("Adding transform {:?}", name);
+            info!("Starting transform {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn_transform(&name, &mut new_pieces, rt);
-            self.setup_outputs(&name, &mut new_pieces);
         }
 
         // Sinks
@@ -416,13 +304,15 @@ impl RunningTopology {
         }
 
         for name in sinks_to_add {
-            info!("Adding sink {:?}", name);
+            info!("Starting sink {:?}", name);
 
             self.setup_inputs(&name, &mut new_pieces);
             self.spawn_sink(&name, &mut new_pieces, rt);
         }
 
         self.config = new_config;
+
+        true
     }
 
     fn spawn_sink(
@@ -475,6 +365,7 @@ impl RunningTopology {
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
         let source_task = handle_errors(source_task, self.abort_tx.clone());
+        let source_task = source_task.instrument(info_span!("source", name = name.as_str()));
         self.source_tasks
             .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
     }
@@ -534,14 +425,14 @@ impl RunningTopology {
 
     fn setup_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
-        // TODO: tx needs to get added to self.inputs, but I'm purposely holding off on doing
-        // so until a test exposes this hole
 
         for input in inputs {
             self.outputs[&input]
                 .unbounded_send(fanout::ControlMessage::Add(name.clone(), tx.get()))
                 .unwrap();
         }
+
+        self.inputs.insert(name.clone(), tx);
     }
 
     fn replace_inputs(&mut self, name: &String, new_pieces: &mut builder::Pieces) {
@@ -608,8 +499,8 @@ mod tests {
         block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for,
         wait_for_tcp,
     };
+    use crate::topology;
     use crate::topology::config::Config;
-    use crate::topology::Topology;
     use crate::transforms::sampler::SamplerConfig;
     use futures::{future::Either, stream, Future, Stream};
     use matches::assert_matches;
@@ -635,11 +526,10 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
+        old_config.add_sink("out1", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -648,11 +538,11 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        new_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
+        new_config.add_sink("out2", &["in"], TcpSinkConfig::new(out2_addr.to_string()));
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -687,12 +577,11 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink("out1", &["in"], TcpSinkConfig { address: out1_addr });
-        old_config.add_sink("out2", &["in"], TcpSinkConfig { address: out2_addr });
+        old_config.add_sink("out1", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
+        old_config.add_sink("out2", &["in"], TcpSinkConfig::new(out2_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -705,7 +594,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         // out2 should disconnect after the reload
         let output_lines2 = output_lines2.wait();
@@ -742,11 +631,10 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -755,11 +643,12 @@ mod tests {
         let send = send_lines(in_addr, input_lines1.clone().into_iter());
         rt.block_on(send).unwrap();
 
-        new_config.sinks[&"out".to_string()].inner = Box::new(TcpSinkConfig { address: out2_addr });
+        new_config.sinks[&"out".to_string()].inner =
+            Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -780,7 +669,7 @@ mod tests {
 
     // The previous test pauses to make sure the old version of the sink has receieved all messages
     // sent before the reload. This test does not pause, making sure the new sink is atomically
-    // swapped in for the old one and that no records are lost in the changeover.
+    // swapped in for the old one and that no events are lost in the changeover.
     #[test]
     fn topology_change_sink_no_gap() {
         let in_addr = next_addr();
@@ -795,11 +684,10 @@ mod tests {
 
             let mut old_config = Config::empty();
             old_config.add_source("in", TcpConfig::new(in_addr));
-            old_config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
+            old_config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
             let mut new_config = old_config.clone();
-            let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-            topology.start(&mut rt);
+            let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
             // Wait for server to accept traffic
             wait_for_tcp(in_addr);
@@ -820,11 +708,11 @@ mod tests {
             rt.spawn(send);
 
             new_config.sinks[&"out".to_string()].inner =
-                Box::new(TcpSinkConfig { address: out2_addr });
+                Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
             wait_for(|| output_lines1.count() > 0);
 
-            topology.reload_config(new_config, &mut rt, false);
+            topology.reload_config(Ok(new_config), &mut rt, false, false);
             wait_for(|| output_lines2.count() > 0);
 
             // Shut down server
@@ -856,11 +744,10 @@ mod tests {
         let output_lines = receive(&out_addr);
 
         let mut old_config = Config::empty();
-        old_config.add_sink("out", &[], TcpSinkConfig { address: out_addr });
+        old_config.add_sink("out", &[], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert!(std::net::TcpStream::connect(in_addr).is_err());
@@ -870,7 +757,7 @@ mod tests {
             .inputs
             .push("in".to_string());
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         wait_for_tcp(in_addr);
 
@@ -900,11 +787,10 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         wait_for_tcp(in_addr);
 
@@ -915,7 +801,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
@@ -941,11 +827,10 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", TcpConfig::new(in_addr));
-        old_config.add_sink("out", &["in1"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink("out", &["in1"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         wait_for_tcp(in_addr);
 
@@ -959,7 +844,7 @@ mod tests {
         new_config.add_source("in2", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -994,16 +879,16 @@ mod tests {
         old_config.add_source(
             "in",
             TcpConfig {
-                address: in_addr,
+                address: in_addr.to_string(),
                 max_length: 20,
+                host_key: None,
                 shutdown_timeout_secs: 30,
             },
         );
-        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         wait_for_tcp(in_addr);
 
@@ -1023,12 +908,13 @@ mod tests {
         wait_for(|| output_lines.count() >= 4);
 
         new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
-            address: in_addr,
+            address: in_addr.to_string(),
             max_length: 10,
+            host_key: None,
             shutdown_timeout_secs: 30,
         });
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         wait_for_tcp(in_addr);
@@ -1082,11 +968,10 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(in_addr));
-        old_config.add_sink("out", &["in"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink("out", &["in"], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1107,7 +992,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= num_lines);
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1150,11 +1035,14 @@ mod tests {
                 pass_list: vec![],
             },
         );
-        old_config.add_sink("out", &["sampler"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink(
+            "out",
+            &["sampler"],
+            TcpSinkConfig::new(out_addr.to_string()),
+        );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1169,7 +1057,7 @@ mod tests {
         wait_for(|| output_lines1.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1212,11 +1100,14 @@ mod tests {
                 pass_list: vec![],
             },
         );
-        old_config.add_sink("out", &["sampler"], TcpSinkConfig { address: out_addr });
+        old_config.add_sink(
+            "out",
+            &["sampler"],
+            TcpSinkConfig::new(out_addr.to_string()),
+        );
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
@@ -1236,7 +1127,7 @@ mod tests {
             pass_list: vec![],
         });
 
-        topology.reload_config(new_config, &mut rt, false);
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -1278,24 +1169,18 @@ mod tests {
         use std::path::Path;
 
         let mut old_config = Config::empty();
+        old_config.add_source("in", TcpConfig::new(next_addr()));
         old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
-        let (mut topology, _warnings) = Topology::build(old_config).unwrap();
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(old_config), &mut rt, false).unwrap();
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config(new_config, &mut rt, false);
-
-        let current_config = if let super::State::Running(running) = topology.state {
-            running.config
-        } else {
-            panic!();
-        };
+        topology.reload_config(Ok(new_config), &mut rt, false, false);
 
         assert_eq!(
-            current_config.data_dir,
+            topology.config.data_dir,
             Some(Path::new("/asdf").to_path_buf())
         );
     }
@@ -1347,16 +1232,15 @@ mod tests {
 
         let mut config = Config::empty();
         config.add_source("in", TcpConfig::new(in_addr));
-        config.add_sink("out", &["in"], TcpSinkConfig { address: out1_addr });
-        let (mut topology, _warnings) = Topology::build(config.clone()).unwrap();
+        config.add_sink("out", &["in"], TcpSinkConfig::new(out1_addr.to_string()));
 
-        topology.start(&mut rt);
+        let (mut topology, _crash) = topology::start(Ok(config.clone()), &mut rt, false).unwrap();
 
         // Require-healthy reload with failing healthcheck
         {
-            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out2_addr });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config(config.clone(), &mut rt, true);
+            topology.reload_config(Ok(config.clone()), &mut rt, true, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
@@ -1370,9 +1254,9 @@ mod tests {
         {
             let healthcheck_receiver = receive(&out2_addr);
 
-            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out2_addr });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config(config.clone(), &mut rt, true);
+            topology.reload_config(Ok(config.clone()), &mut rt, true, false);
             healthcheck_receiver.wait();
 
             let receive = receive_one(&out1_addr, &out2_addr);
@@ -1385,9 +1269,9 @@ mod tests {
 
         // non-require-healthy reload with failing healthcheck
         {
-            config.sinks["out"].inner = Box::new(TcpSinkConfig { address: out1_addr });
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
 
-            topology.reload_config(config.clone(), &mut rt, false);
+            topology.reload_config(Ok(config.clone()), &mut rt, false, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
