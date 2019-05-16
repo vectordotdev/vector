@@ -386,7 +386,7 @@ mod integration_tests {
                     .unwrap();
 
             let err = rt.block_on(healthcheck).unwrap_err();
-            assert!(err.starts_with("an error occurred trying to connect"));
+            assert!(err.contains("Connection refused"));
         }
 
         // Invalid token
