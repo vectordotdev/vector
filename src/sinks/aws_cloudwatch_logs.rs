@@ -271,12 +271,6 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Text
-    }
-}
-
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
