@@ -12,35 +12,6 @@ use tokio_trace::field;
 
 mod parser;
 
-#[derive(Debug, PartialEq)]
-pub enum Metric {
-    Counter {
-        name: String,
-        val: usize,
-        sampling: Option<f32>,
-    },
-    Timer {
-        name: String,
-        val: usize,
-        sampling: Option<f32>,
-    },
-    Gauge {
-        name: String,
-        val: usize,
-        direction: Option<Direction>,
-    },
-    Set {
-        name: String,
-        val: String,
-    },
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Direction {
-    Plus,
-    Minus,
-}
-
 #[derive(Deserialize, Serialize, Debug)]
 struct StatsdConfig {
     address: SocketAddr,
@@ -50,6 +21,10 @@ struct StatsdConfig {
 impl crate::topology::config::SourceConfig for StatsdConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         Ok(statsd(self.address.clone(), out))
+    }
+
+    fn output_type(&self) -> crate::topology::config::DataType {
+        crate::topology::config::DataType::Metric
     }
 }
 
@@ -76,7 +51,7 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
                         .lines()
                         .map(parse)
                         .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                        .map(Event::from)
+                        .map(Event::Metric)
                         .collect::<Vec<_>>();
                     futures::stream::iter_ok::<_, std::io::Error>(metrics)
                 })
@@ -88,26 +63,11 @@ fn statsd(addr: SocketAddr, out: mpsc::Sender<Event>) -> super::Source {
     )
 }
 
-impl From<Metric> for Event {
-    fn from(metric: Metric) -> Event {
-        match metric {
-            Metric::Counter { name, val, .. } | Metric::Gauge { name, val, .. } => {
-                let mut event = Event::new_empty_log();
-                event
-                    .as_mut_log()
-                    .insert_explicit(name.into(), val.to_string().into());
-                event
-            }
-            _ => Event::from(format!("{:?}", metric)),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::StatsdConfig;
     use crate::{
-        sinks::prometheus::{Counter, Gauge, PrometheusSinkConfig},
+        sinks::prometheus::PrometheusSinkConfig,
         test_util::{block_on, next_addr, shutdown_on_idle},
         topology::{self, config},
     };
@@ -121,24 +81,7 @@ mod test {
 
         let mut config = config::Config::empty();
         config.add_source("in", StatsdConfig { address: in_addr });
-        config.add_sink(
-            "out",
-            &["in"],
-            PrometheusSinkConfig {
-                address: out_addr,
-                counters: vec![Counter {
-                    key: "foo".into(),
-                    label: "foo".into(),
-                    doc: "foo".into(),
-                    parse_value: true,
-                }],
-                gauges: vec![Gauge {
-                    key: "bar".into(),
-                    label: "bar".into(),
-                    doc: "bar".into(),
-                }],
-            },
-        );
+        config.add_sink("out", &["in"], PrometheusSinkConfig { address: out_addr });
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 

@@ -1,15 +1,16 @@
-use crate::buffers::Acker;
-use crate::Event;
+use crate::{
+    buffers::Acker,
+    event::{metric::Direction, Metric},
+    Event,
+};
 use futures::{future, Async, AsyncSink, Future, Sink};
-use hyper::service::service_fn;
-use hyper::{header::HeaderValue, Body, Method, Request, Response, Server, StatusCode};
+use hyper::{
+    header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
+};
 use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
-use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -17,23 +18,6 @@ use tokio_trace::field;
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    pub counters: Vec<Counter>,
-    pub gauges: Vec<Gauge>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Counter {
-    pub key: Atom,
-    pub label: String,
-    pub doc: String,
-    pub parse_value: bool,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Gauge {
-    pub key: Atom,
-    pub label: String,
-    pub doc: String,
 }
 
 pub fn default_address() -> SocketAddr {
@@ -45,15 +29,14 @@ pub fn default_address() -> SocketAddr {
 #[typetag::serde(name = "prometheus")]
 impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(PrometheusSink::new(
-            self.address,
-            self.counters.clone(),
-            self.gauges.clone(),
-            acker,
-        ));
+        let sink = Box::new(PrometheusSink::new(self.address, acker));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> crate::topology::config::DataType {
+        crate::topology::config::DataType::Metric
     }
 }
 
@@ -61,8 +44,8 @@ struct PrometheusSink {
     registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
     address: SocketAddr,
-    counters: HashMap<Counter, prometheus::Counter>,
-    gauges: HashMap<Gauge, prometheus::Gauge>,
+    counters: HashMap<String, prometheus::Counter>,
+    gauges: HashMap<String, prometheus::Gauge>,
     acker: Acker,
 }
 
@@ -98,38 +81,36 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, counters: Vec<Counter>, gauges: Vec<Gauge>, acker: Acker) -> Self {
-        let registry = Registry::new();
-
-        let counters = counters
-            .into_iter()
-            .map(|config| {
-                let counter =
-                    prometheus::Counter::new(config.label.clone(), config.doc.clone()).unwrap();
-                registry.register(Box::new(counter.clone())).unwrap();
-
-                (config, counter)
-            })
-            .collect();
-
-        let gauges = gauges
-            .into_iter()
-            .map(|config| {
-                let gauge =
-                    prometheus::Gauge::new(config.label.clone(), config.doc.clone()).unwrap();
-                registry.register(Box::new(gauge.clone())).unwrap();
-
-                (config, gauge)
-            })
-            .collect();
-
+    fn new(address: SocketAddr, acker: Acker) -> Self {
         Self {
-            registry: Arc::new(registry),
+            registry: Arc::new(Registry::new()),
             server_shutdown_trigger: None,
             address,
-            counters,
-            gauges,
+            counters: HashMap::new(),
+            gauges: HashMap::new(),
             acker,
+        }
+    }
+
+    fn with_counter(&mut self, name: String, f: impl Fn(&prometheus::Counter)) {
+        if let Some(counter) = self.counters.get(&name) {
+            f(counter);
+        } else {
+            let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
+            self.registry.register(Box::new(counter.clone())).unwrap();
+            f(&counter);
+            self.counters.insert(name, counter);
+        }
+    }
+
+    fn with_gauge(&mut self, name: String, f: impl Fn(&prometheus::Gauge)) {
+        if let Some(gauge) = self.gauges.get(&name) {
+            f(gauge);
+        } else {
+            let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
+            self.registry.register(Box::new(gauge.clone())).unwrap();
+            f(&gauge);
+            self.gauges.insert(name.clone(), gauge);
         }
     }
 
@@ -174,37 +155,27 @@ impl Sink for PrometheusSink {
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
         self.start_server_if_needed();
 
-        for (field, counter) in &self.counters {
-            if let Some(val) = event.as_log().get(&field.key) {
-                if field.parse_value {
-                    let val = val.to_string_lossy();
-
-                    if let Ok(count) = val.parse() {
-                        counter.inc_by(count);
-                    } else {
-                        warn!(
-                            "Unable to parse value from field {} with value {}",
-                            field.key, val
-                        );
-                    }
-                } else {
-                    counter.inc_by(1.0);
+        match event.into_metric() {
+            Metric::Counter {
+                name,
+                val,
+                // TODO: take sampling into account
+                sampling: _,
+            } => self.with_counter(name, |counter| counter.inc_by(val as f64)),
+            Metric::Gauge {
+                name,
+                val,
+                direction,
+            } => self.with_gauge(name, |gauge| {
+                let val = val as f64;
+                match direction {
+                    None => gauge.set(val),
+                    Some(Direction::Plus) => gauge.add(val),
+                    Some(Direction::Minus) => gauge.sub(val),
                 }
-            }
-        }
-
-        for (field, gauge) in &self.gauges {
-            if let Some(val) = event.as_log().get(&field.key) {
-                let val = val.to_string_lossy();
-
-                if let Ok(count) = val.parse() {
-                    gauge.set(count);
-                } else {
-                    warn!(
-                        "Unable to parse value from field {} with value {}",
-                        field.key, val
-                    );
-                }
+            }),
+            _ => {
+                // TODO: support all the metric types
             }
         }
 

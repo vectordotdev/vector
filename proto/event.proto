@@ -5,7 +5,12 @@ package event.proto;
 message EventWrapper {
   oneof event {
     Log log = 1;
+    Metric metric = 2;
   }
+}
+
+message Log {
+  map<string, Value> structured = 1;
 }
 
 message Value {
@@ -13,6 +18,39 @@ message Value {
   bool explicit = 2;
 }
 
-message Log {
-  map<string, Value> structured = 1;
+message Metric {
+  oneof metric {
+    Counter counter = 1;
+    Timer timer = 2;
+    Gauge gauge = 3;
+    Set set = 4;
+  }
+}
+
+message Counter {
+  string name = 1;
+  uint32 val = 2;
+  float sampling = 3;
+}
+
+message Timer {
+  string name = 1;
+  uint32 val = 2;
+  float sampling = 3;
+}
+
+message Gauge {
+  string name = 1;
+  uint32 val = 2;
+  enum Direction {
+    None = 0;
+    Plus = 1;
+    Minus = 2;
+  }
+  Direction direction = 3;
+}
+
+message Set {
+  string name = 1;
+  string val = 2;
 }
