@@ -17,9 +17,7 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::time::Duration;
-use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
@@ -32,6 +30,7 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -40,6 +39,13 @@ pub struct HttpSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -78,6 +84,9 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
+    let headers = config.headers.clone();
+    let basic_auth = config.basic_auth.clone();
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -90,13 +99,16 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         builder.method(Method::POST);
         builder.uri(uri.clone());
 
-        builder.header("Content-Type", "application/x-ndjson");
+        match encoding {
+            Encoding::Text => builder.header("Content-Type", "text/plain"),
+            Encoding::Json => builder.header("Content-Type", "application/x-ndjson"),
+        };
 
         if gzip {
             builder.header("Content-Encoding", "gzip");
         }
 
-        if let Some(headers) = &config.headers {
+        if let Some(headers) = &headers {
             for (header, value) in headers.iter() {
                 builder.header(header.as_str(), value.as_str());
             }
@@ -104,12 +116,13 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
         let mut request = builder.body(body.into()).unwrap();
 
-        if let Some(auth) = &config.basic_auth {
+        if let Some(auth) = &basic_auth {
             auth.apply(request.headers_mut());
         }
 
         request
     });
+
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
         .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
@@ -117,22 +130,10 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .timeout(Duration::from_secs(timeout))
         .service(http_service);
 
+    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
-        .with(move |event: Event| {
-            let mut body = json!({
-                "msg": event.as_log()[&event::MESSAGE].to_string_lossy(),
-                "ts": event.as_log()[&event::TIMESTAMP].to_string_lossy(),
-                "fields": event.as_log().explicit_fields(),
-            });
-
-            if let Some(host) = event.as_log().get(&Atom::from("host")) {
-                body["host"] = json!(host);
-            }
-            let mut body = serde_json::to_vec(&body).unwrap();
-            body.push(b'\n');
-            Ok(body)
-        });
+        .with(move |event| encode_event(event, &encoding));
 
     Ok(Box::new(sink))
 }
@@ -196,8 +197,30 @@ fn build_uri(raw: &str) -> Result<Uri, String> {
         .expect("bug building uri"))
 }
 
+fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
+    let event = event.into_log();
+
+    let mut body = match encoding {
+        Encoding::Text => event[&event::MESSAGE].to_string_lossy().into_bytes(),
+
+        Encoding::Json => serde_json::to_vec(&event.all_fields())
+            .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,
+    };
+
+    body.push(b'\n');
+
+    Ok(body)
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Encoding::Text
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         sinks::http::HttpSinkConfig,
@@ -209,10 +232,40 @@ mod tests {
     use headers::{Authorization, HeaderMapExt};
     use hyper::service::service_fn_ok;
     use hyper::{Body, Request, Response, Server};
+    use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
     #[test]
-    fn validates_normal_headers() {
+    fn http_encode_event_text() {
+        let encoding = Encoding::Text;
+        let event = Event::from("hello world");
+
+        let bytes = encode_event(event, &encoding).unwrap();
+
+        assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
+    }
+
+    #[test]
+    fn http_encode_event_json() {
+        let encoding = Encoding::Json;
+        let event = Event::from("hello world");
+
+        let bytes = encode_event(event, &encoding).unwrap();
+
+        #[derive(Deserialize, Debug)]
+        #[serde(deny_unknown_fields)]
+        struct ExpectedEvent {
+            message: String,
+            timestamp: chrono::DateTime<chrono::Utc>,
+        }
+
+        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
+
+        assert_eq!(output.message, "hello world".to_string());
+    }
+
+    #[test]
+    fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         [headers]
@@ -225,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn catches_bad_header_names() {
+    fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         [headers]
@@ -240,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_http_happy_path() {
+    fn http_happy_path() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -249,6 +302,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         user = "waldo"
         password = "hunter2"
+        encoding = "json"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -284,7 +338,7 @@ mod tests {
             .map(Result::unwrap)
             .map(|s| {
                 let val: serde_json::Value = serde_json::from_str(&s).unwrap();
-                val.get("msg").unwrap().as_str().unwrap().to_owned()
+                val.get("message").unwrap().as_str().unwrap().to_owned()
             })
             .collect::<Vec<_>>();
 
@@ -295,13 +349,14 @@ mod tests {
     }
 
     #[test]
-    fn passes_custom_headers() {
+    fn http_passes_custom_headers() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "json"
         [headers]
         foo = "bar"
         baz = "quux"
@@ -344,7 +399,7 @@ mod tests {
             .map(Result::unwrap)
             .map(|s| {
                 let val: serde_json::Value = serde_json::from_str(&s).unwrap();
-                val.get("msg").unwrap().as_str().unwrap().to_owned()
+                val.get("message").unwrap().as_str().unwrap().to_owned()
             })
             .collect::<Vec<_>>();
 
