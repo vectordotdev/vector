@@ -1,9 +1,6 @@
 use super::retries::RetryLogic;
 use futures::Poll;
-// use http::{
-//     header::{HeaderName, HeaderValue},
-//     HeaderMap, Method, Uri,
-// };
+use http::StatusCode;
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     Body, Client,
@@ -63,13 +60,16 @@ impl RetryLogic for HttpRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> bool {
-        response.status().is_server_error()
+        let status = response.status();
+
+        (status.is_server_error() && status != StatusCode::NOT_IMPLEMENTED)
+            || status == StatusCode::TOO_MANY_REQUESTS
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::HttpService;
+    use super::*;
     use futures::{Future, Sink, Stream};
     use http::Method;
     use hyper::service::service_fn;
@@ -77,7 +77,22 @@ mod test {
     use tower::Service;
 
     #[test]
-    fn it_makes_http_requests() {
+    fn util_http_retry_logic() {
+        let logic = HttpRetryLogic;
+
+        let response_429 = Response::builder().status(429).body(Body::empty()).unwrap();
+        let response_500 = Response::builder().status(500).body(Body::empty()).unwrap();
+        let response_400 = Response::builder().status(400).body(Body::empty()).unwrap();
+        let response_501 = Response::builder().status(501).body(Body::empty()).unwrap();
+
+        assert!(logic.should_retry_response(&response_429));
+        assert!(logic.should_retry_response(&response_500));
+        assert!(!logic.should_retry_response(&response_400));
+        assert!(!logic.should_retry_response(&response_501));
+    }
+
+    #[test]
+    fn util_http_it_makes_http_requests() {
         let addr = crate::test_util::next_addr();
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
