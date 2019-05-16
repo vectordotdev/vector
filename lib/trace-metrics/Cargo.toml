@@ -9,7 +9,7 @@ tokio-trace-core = "0.2"
 hotmic = "0.8"
 
 [dev-dependencies]
-tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace = "0.1"
 serde_json = "1.0"
 
 # echo

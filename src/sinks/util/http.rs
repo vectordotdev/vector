@@ -1,13 +1,13 @@
 use super::retries::RetryLogic;
 use futures::{Future, Poll};
-use hyper::{client::HttpConnector, Body};
+use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tokio_trace::field;
 use tokio_trace_tower_http::InstrumentedHttpService;
 use tower::Service;
-use tower_hyper::{body::LiftBody, client::Client};
+use tower_hyper::{body::Body, client::Client};
 
 type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 
@@ -35,7 +35,7 @@ impl HttpService {
 }
 
 impl Service<Vec<u8>> for HttpService {
-    type Response = hyper::Response<LiftBody<Body>>;
+    type Response = hyper::Response<Body>;
     type Error = hyper::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
@@ -65,7 +65,7 @@ pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
-    type Response = hyper::Response<LiftBody<Body>>;
+    type Response = hyper::Response<Body>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
