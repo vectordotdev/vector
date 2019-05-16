@@ -309,7 +309,7 @@ mod tests {
     use crate::{
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
-        sinks::cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
+        sinks::aws_cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };

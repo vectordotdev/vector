@@ -196,7 +196,7 @@ mod integration_tests {
     fn splunk_insert_message() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -227,7 +227,7 @@ mod integration_tests {
     fn splunk_insert_many() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -259,7 +259,7 @@ mod integration_tests {
     fn splunk_custom_fields() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -291,7 +291,7 @@ mod integration_tests {
     fn splunk_hostname() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let sink = sinks::splunk::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -332,7 +332,7 @@ mod integration_tests {
             ..config()
         };
 
-        let sink = sinks::splunk::hec(config, Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config, Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -374,7 +374,7 @@ mod integration_tests {
         // OK
         {
             let healthcheck =
-                sinks::splunk::healthcheck(get_token(), "http://localhost:8088".to_string())
+                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:8088".to_string())
                     .unwrap();
             rt.block_on(healthcheck).unwrap();
         }
@@ -382,7 +382,7 @@ mod integration_tests {
         // Server not listening at address
         {
             let healthcheck =
-                sinks::splunk::healthcheck(get_token(), "http://localhost:1111".to_string())
+                sinks::splunk_hec::healthcheck(get_token(), "http://localhost:1111".to_string())
                     .unwrap();
 
             let err = rt.block_on(healthcheck).unwrap_err();
@@ -400,7 +400,7 @@ mod integration_tests {
         // Unhealthy server
         {
             let healthcheck =
-                sinks::splunk::healthcheck(get_token(), "http://503.returnco.de".to_string())
+                sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
                     .unwrap();
             assert_eq!(
                 rt.block_on(healthcheck).unwrap_err(),

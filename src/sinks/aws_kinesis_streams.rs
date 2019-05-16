@@ -239,7 +239,7 @@ mod integration_tests {
 
     use crate::buffers::Acker;
     use crate::region::RegionOrEndpoint;
-    use crate::sinks::kinesis::{KinesisService, KinesisSinkConfig};
+    use crate::sinks::aws_kinesis_streams::{KinesisService, KinesisSinkConfig};
     use crate::test_util::random_lines_with_stream;
     use futures::{Future, Sink};
     use rusoto_core::Region;

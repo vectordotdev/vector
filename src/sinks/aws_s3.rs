@@ -258,7 +258,7 @@ mod integration_tests {
     use crate::{
         event::Event,
         region::RegionOrEndpoint,
-        sinks::s3::{S3Sink, S3SinkConfig},
+        sinks::aws_s3::{S3Sink, S3SinkConfig},
         test_util::{block_on, random_lines_with_stream, random_string},
     };
     use flate2::read::GzDecoder;
