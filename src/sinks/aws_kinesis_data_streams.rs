@@ -43,7 +43,7 @@ pub struct KinesisSinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[typetag::serde(name = "kinesis")]
+#[typetag::serde(name = "aws_kinesis_data_streams")]
 impl crate::topology::config::SinkConfig for KinesisSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let config = self.clone();

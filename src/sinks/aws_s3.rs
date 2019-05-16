@@ -48,7 +48,7 @@ pub struct S3SinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[typetag::serde(name = "s3")]
+#[typetag::serde(name = "aws_s3")]
 impl crate::topology::config::SinkConfig for S3SinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = S3Sink::new(self, acker)?;

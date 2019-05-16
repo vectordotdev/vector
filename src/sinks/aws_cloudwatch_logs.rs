@@ -61,7 +61,7 @@ pub enum CloudwatchError {
     ServiceDropped,
 }
 
-#[typetag::serde(name = "cloudwatch_logs")]
+#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let cloudwatch = CloudwatchLogsSvc::new(self.clone())?;
