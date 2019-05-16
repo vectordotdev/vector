@@ -147,25 +147,25 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     }
 }
 
-fn encode_event(host_field: &Atom, mut event: Event) -> Result<Vec<u8>, ()> {
-    let host = event.as_log().get(&host_field).map(|h| h.clone());
-    let timestamp =
-        if let Some(ValueKind::Timestamp(ts)) = event.as_mut_log().remove(&event::TIMESTAMP) {
-            ts.timestamp()
-        } else {
-            chrono::Utc::now().timestamp()
-        };
+fn encode_event(host_field: &Atom, event: Event) -> Result<Vec<u8>, ()> {
+    let mut event = event.into_log();
 
-    let mut body = if event.as_log().is_structured() {
+    let host = event.get(&host_field).map(|h| h.clone());
+    let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
+        ts.timestamp()
+    } else {
+        chrono::Utc::now().timestamp()
+    };
+
+    let mut body = if event.is_structured() {
         json!({
-            "event": event.as_log().all_fields(),
-            "fields": event.as_log().explicit_fields(),
+            "event": event.all_fields(),
+            "fields": event.explicit_fields(),
             "time": timestamp,
         })
     } else {
         json!({
-            "event": event.as_log()[&event::MESSAGE].to_string_lossy(),
-            "fields": event.as_log().explicit_fields(),
+            "event": event[&event::MESSAGE].to_string_lossy(),
             "time": timestamp,
         })
     };
