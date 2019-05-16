@@ -93,10 +93,10 @@ mod test {
     fn util_http_retry_logic() {
         let logic = HttpRetryLogic;
 
-        let response_429 = Response::builder().status(429).body(Body::empty()).unwrap();
-        let response_500 = Response::builder().status(500).body(Body::empty()).unwrap();
-        let response_400 = Response::builder().status(400).body(Body::empty()).unwrap();
-        let response_501 = Response::builder().status(501).body(Body::empty()).unwrap();
+        let response_429 = Response::builder().status(429).body(Body::empty().into()).unwrap();
+        let response_500 = Response::builder().status(500).body(Body::empty().into()).unwrap();
+        let response_400 = Response::builder().status(400).body(Body::empty().into()).unwrap();
+        let response_501 = Response::builder().status(501).body(Body::empty().into()).unwrap();
 
         assert!(logic.should_retry_response(&response_429));
         assert!(logic.should_retry_response(&response_500));
