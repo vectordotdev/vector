@@ -61,7 +61,7 @@ pub enum CloudwatchError {
     ServiceDropped,
 }
 
-#[typetag::serde(name = "cloudwatch_logs")]
+#[typetag::serde(name = "aws_cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let cloudwatch = CloudwatchLogsSvc::new(self.clone())?;
@@ -309,7 +309,7 @@ mod tests {
     use crate::{
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
-        sinks::cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
+        sinks::aws_cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };

@@ -184,7 +184,7 @@ fn bad_s3_region() {
         address = "127.0.0.1:1235"
 
         [sinks.out1]
-        type = "s3"
+        type = "aws_s3"
         inputs = ["in"]
         buffer_size = 100000
         gzip = true
@@ -192,7 +192,7 @@ fn bad_s3_region() {
         key_prefix = "logs/"
 
         [sinks.out2]
-        type = "s3"
+        type = "aws_s3"
         inputs = ["in"]
         buffer_size = 100000
         gzip = true
@@ -201,7 +201,7 @@ fn bad_s3_region() {
         region = "moonbase-alpha"
 
         [sinks.out3]
-        type = "s3"
+        type = "aws_s3"
         inputs = ["in"]
         buffer_size = 100000
         gzip = true
@@ -211,7 +211,7 @@ fn bad_s3_region() {
         endpoint = "https://localhost"
 
         [sinks.out4]
-        type = "s3"
+        type = "aws_s3"
         inputs = ["in"]
         buffer_size = 100000
         gzip = true
