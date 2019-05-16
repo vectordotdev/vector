@@ -1,4 +1,7 @@
-use crate::{event::Event, topology::config::SourceConfig};
+use crate::{
+    event::{self, Event},
+    topology::config::SourceConfig,
+};
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -42,7 +45,7 @@ where
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
-        let host_key = config.host_key.clone().unwrap_or("host".into());
+        let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
         let hostname = hostname::get_hostname();
 
         let source = FramedRead::new(

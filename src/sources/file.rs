@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::event::{self, Event};
 use bytes::Bytes;
 use file_source::file_server::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
@@ -65,7 +65,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
     };
 
     let context_key = config.context_key.clone().map(Atom::from);
-    let host_key = config.host_key.clone().unwrap_or("host".into());
+    let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
     let hostname = hostname::get_hostname();
 
     let out = out
