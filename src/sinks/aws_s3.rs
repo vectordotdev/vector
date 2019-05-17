@@ -36,7 +36,7 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
-    pub compression: bool,
+    pub compression: Compression,
     pub max_linger_secs: Option<u64>,
     pub encoding: Option<Encoding>,
 
@@ -54,6 +54,19 @@ pub struct S3SinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    Gzip,
+    None,
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        Compression::Gzip
+    }
 }
 
 #[typetag::serde(name = "aws_s3")]
@@ -83,7 +96,10 @@ impl S3Sink {
         );
 
         let max_linger_secs = config.max_linger_secs.unwrap_or(300);
-        let compression = config.compression;
+        let compression = match config.compression {
+            Compression::Gzip => true,
+            Compression::None => false,
+        };
         let buffer_size = config.buffer_size;
 
         let region = config.region.clone();
@@ -263,7 +279,7 @@ mod tests {
 #[cfg(feature = "s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         event::Event,
@@ -384,7 +400,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             buffer_size: 1000,
-            compression: true,
+            compression: Compression::Gzip,
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -450,7 +466,7 @@ mod integration_tests {
             key_prefix: random_string(10) + "/",
             buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
-            compression: false,
+            compression: Compression::None,
             max_linger_secs: Some(5),
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
