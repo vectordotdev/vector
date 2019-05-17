@@ -21,6 +21,7 @@ pub struct SyslogConfig {
     pub mode: Mode,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    pub host_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -39,6 +40,7 @@ impl SyslogConfig {
     pub fn new(mode: Mode) -> Self {
         Self {
             mode,
+            host_key: None,
             max_length: default_max_length(),
         }
     }
@@ -47,15 +49,22 @@ impl SyslogConfig {
 #[typetag::serde(name = "syslog")]
 impl crate::topology::config::SourceConfig for SyslogConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+        let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
+
         match self.mode.clone() {
-            Mode::Tcp { address } => Ok(tcp(address, self.max_length, out)),
-            Mode::Udp { address } => Ok(udp(address, self.max_length, out)),
-            Mode::Unix { path } => Ok(unix(path, self.max_length, out)),
+            Mode::Tcp { address } => Ok(tcp(address, self.max_length, host_key, out)),
+            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
+            Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
     }
 }
 
-pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
+pub fn tcp(
+    addr: SocketAddr,
+    max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -72,6 +81,7 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> sup
             .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let out = out.clone();
+                let host_key = host_key.clone();
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
 
                 let span = info_span!("connection");
@@ -82,6 +92,13 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> sup
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(event_from_str)
+                    .map(move |mut e| {
+                        if let Some(addr) = peer_addr {
+                            e.as_mut_log()
+                                .insert_implicit(host_key.clone().into(), addr.to_string().into());
+                        }
+                        e
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));
@@ -91,7 +108,12 @@ pub fn tcp(addr: SocketAddr, max_length: usize, out: mpsc::Sender<Event>) -> sup
     }))
 }
 
-pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
+pub fn udp(
+    addr: SocketAddr,
+    _max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(
@@ -106,9 +128,18 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Event>) -> su
 
             future::ok(socket)
         })
-        .and_then(|socket| {
+        .and_then(move |socket| {
+            let host_key = host_key.clone();
+
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .filter_map(|(bytes, _sock)| event_from_bytes(&bytes))
+                .filter_map(move |(bytes, addr)| {
+                    let host_key = host_key.clone();
+                    event_from_bytes(&bytes).map(|mut e| {
+                        e.as_mut_log()
+                            .insert_implicit(host_key.into(), addr.to_string().into());
+                        e
+                    })
+                })
                 .map_err(|e| error!("error reading line: {:?}", e));
 
             lines_in.forward(out).map(|_| info!("finished sending"))
@@ -116,7 +147,12 @@ pub fn udp(addr: SocketAddr, _max_length: usize, out: mpsc::Sender<Event>) -> su
     )
 }
 
-pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Event>) -> super::Source {
+pub fn unix(
+    path: PathBuf,
+    max_length: usize,
+    host_key: String,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
     Box::new(future::lazy(move || {
@@ -134,16 +170,31 @@ pub fn unix(path: PathBuf, max_length: usize, out: mpsc::Sender<Event>) -> super
             .for_each(move |socket| {
                 let out = out.clone();
                 let peer_addr = socket.peer_addr().ok();
+                let host_key = host_key.clone();
 
                 let span = info_span!("connection");
-                if let Some(addr) = &peer_addr {
-                    if let Some(path) = addr.as_pathname() {
+                let path = if let Some(addr) = peer_addr.clone() {
+                    if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
                         span.record("peer_path", &field::debug(&path));
+                        Some(path.clone())
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    None
+                };
 
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
                     .filter_map(event_from_str)
+                    .map(move |mut e| {
+                        if let Some(path) = &path {
+                            e.as_mut_log().insert_implicit(
+                                host_key.clone().into(),
+                                path.to_string_lossy().into_owned().into(),
+                            );
+                        }
+                        e
+                    })
                     .map_err(|e| error!("error reading line: {:?}", e));
 
                 let handler = lines_in.forward(out).map(|_| info!("finished sending"));

@@ -76,7 +76,7 @@ impl Sink for KafkaSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.clone();
 
-        let bytes = item.as_log()[&event::MESSAGE].as_bytes();
+        let bytes = encode_event(&item);
 
         let record = FutureRecord::to(&topic).key(&()).payload(&bytes[..]);
 
@@ -160,9 +160,49 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
     Box::new(check)
 }
 
+fn encode_event(event: &Event) -> Vec<u8> {
+    let log = event.as_log();
+
+    if log.is_structured() {
+        serde_json::to_vec(&log.all_fields()).unwrap()
+    } else {
+        log[&event::MESSAGE].as_bytes().into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{self, Event};
+    use std::collections::HashMap;
+
+    #[test]
+    fn kafka_encode_event_non_structured() {
+        let message = "hello world".to_string();
+        let bytes = encode_event(&message.clone().into());
+
+        assert_eq!(&bytes[..], message.as_bytes())
+    }
+
+    #[test]
+    fn kafka_encode_event_structured() {
+        let message = "hello world".to_string();
+        let mut event = Event::from(message.clone());
+        event
+            .as_mut_log()
+            .insert_explicit("key".into(), "value".into());
+        let bytes = encode_event(&event);
+
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(map[&event::MESSAGE.to_string()], message);
+        assert_eq!(map["key"], "value".to_string())
+    }
+}
+
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
-mod test {
+mod integration_test {
     use super::{KafkaSink, KafkaSinkConfig};
     use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};

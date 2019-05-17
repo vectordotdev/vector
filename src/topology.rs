@@ -177,9 +177,12 @@ impl RunningTopology {
             let to_change = old_names
                 .intersection(&new_names)
                 .filter(|&n| {
-                    let old_toml = toml::Value::try_from(&old[n]).unwrap();
-                    let new_toml = toml::Value::try_from(&new[n]).unwrap();
-                    old_toml != new_toml
+                    // This is a hack around the issue of comparing two
+                    // trait objects. Json is used here over toml since
+                    // toml does not support serializing `None`.
+                    let old_json = serde_json::to_vec(&old[n]).unwrap();
+                    let new_json = serde_json::to_vec(&new[n]).unwrap();
+                    old_json != new_json
                 })
                 .cloned()
                 .collect::<HashSet<_>>();
@@ -878,6 +881,7 @@ mod tests {
             TcpConfig {
                 address: in_addr.to_string(),
                 max_length: 20,
+                host_key: None,
                 shutdown_timeout_secs: 30,
             },
         );
@@ -906,6 +910,7 @@ mod tests {
         new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
             address: in_addr.to_string(),
             max_length: 10,
+            host_key: None,
             shutdown_timeout_secs: 30,
         });
 

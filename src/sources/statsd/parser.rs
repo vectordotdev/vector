@@ -1,4 +1,4 @@
-use super::{Direction, Metric};
+use crate::event::{metric::Direction, Metric};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -137,7 +137,8 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use super::{parse, sanitize_key, Direction, Metric};
+    use super::{parse, sanitize_key};
+    use crate::event::{metric::Direction, Metric};
 
     #[test]
     fn basic_counter() {
