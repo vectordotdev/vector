@@ -1,4 +1,8 @@
-use crate::{event::Event, topology::config::SourceConfig};
+use crate::{
+    event::{self, Event},
+    topology::config::SourceConfig,
+};
+use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -12,12 +16,14 @@ use tokio::{
 pub struct StdinConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
+    pub host_key: Option<String>,
 }
 
 impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
             max_length: default_max_length(),
+            host_key: None,
         }
     }
 }
@@ -40,17 +46,32 @@ where
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
+        let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
+        let hostname = hostname::get_hostname();
+
         let source = FramedRead::new(
             stream,
             BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
         )
-        .map(Event::from)
+        .map(move |line| create_event(line, &host_key, &hostname))
         .map_err(|e| error!("error reading line: {:?}", e))
         .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
         .map(|_| info!("finished sending"));
 
         source
     }))
+}
+
+fn create_event(line: Bytes, host_key: &String, hostname: &Option<String>) -> Event {
+    let mut event = Event::from(line);
+
+    if let Some(hostname) = &hostname {
+        event
+            .as_mut_log()
+            .insert_implicit(host_key.clone().into(), hostname.clone().into());
+    }
+
+    event
 }
 
 #[cfg(test)]
@@ -61,6 +82,19 @@ mod tests {
     use futures::Async::*;
     use std::io::Cursor;
     use tokio::runtime::current_thread::Runtime;
+
+    #[test]
+    fn stdin_create_event() {
+        let line = Bytes::from("hello world");
+        let host_key = "host".to_string();
+        let hostname = Some("Some.Machine".to_string());
+
+        let event = create_event(line, &host_key, &hostname);
+        let log = event.into_log();
+
+        assert_eq!(log[&"host".into()], "Some.Machine".into());
+        assert_eq!(log[&event::MESSAGE], "hello world".into());
+    }
 
     #[test]
     fn stdin_decodes_line() {
