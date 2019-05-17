@@ -135,31 +135,23 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        // if the log is structured and the encoding isn't set to `Text` or the encoding
-        // is set to `Json` then encode the payload as json. Otherwise, text.
-        if (log.is_structured() && self.config.encoding != Some(Encoding::Text))
-            || self.config.encoding == Some(Encoding::Json)
-        {
-            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
-                ts.timestamp_millis()
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
-
-            let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
-            let message = String::from_utf8(bytes).unwrap();
-
-            InputLogEvent { message, timestamp }
+        let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+            ts.timestamp_millis()
         } else {
-            let message = log[&event::MESSAGE].to_string_lossy();
+            chrono::Utc::now().timestamp_millis()
+        };
 
-            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
-                ts.timestamp_millis()
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
+        match (&self.config.encoding, log.is_structured()) {
+            (&Some(Encoding::Json), _) | (_, true) => {
+                let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
+                let message = String::from_utf8(bytes).unwrap();
 
-            InputLogEvent { message, timestamp }
+                InputLogEvent { message, timestamp }
+            }
+            (&Some(Encoding::Text), _) | (_, false) => {
+                let message = log[&event::MESSAGE].to_string_lossy();
+                InputLogEvent { message, timestamp }
+            }
         }
     }
 }

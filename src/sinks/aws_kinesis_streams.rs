@@ -204,13 +204,14 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
 fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
     let log = event.into_log();
 
-    if (log.is_structured() && encoding != &Some(Encoding::Text))
-        || encoding == &Some(Encoding::Json)
-    {
-        serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
-    } else {
-        let bytes = log[&event::MESSAGE].as_bytes().into_owned();
-        Ok(bytes)
+    match (encoding, log.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => {
+            serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
+        }
+        (&Some(Encoding::Text), _) | (_, false) => {
+            let bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            Ok(bytes)
+        }
     }
 }
 

@@ -214,19 +214,18 @@ impl RetryLogic for S3RetryLogic {
 fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
     let log = event.into_log();
 
-    if (log.is_structured() && encoding != &Some(Encoding::Text))
-        || encoding == &Some(Encoding::Ndjson)
-    {
-        serde_json::to_vec(&log.all_fields())
+    match (encoding, log.is_structured()) {
+        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
-            .map_err(|e| panic!("Error encoding: {}", e))
-    } else {
-        let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
-        bytes.push(b'\n');
-        Ok(bytes)
+            .map_err(|e| panic!("Error encoding: {}", e)),
+        (&Some(Encoding::Text), _) | (_, false) => {
+            let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            bytes.push(b'\n');
+            Ok(bytes)
+        }
     }
 }
 
