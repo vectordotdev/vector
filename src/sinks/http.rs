@@ -268,6 +268,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "text"
         [headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -281,6 +282,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "text"
         [headers]
         "\u0001" = "bad"
         "#;
@@ -302,7 +304,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         user = "waldo"
         password = "hunter2"
-        encoding = "json"
+        encoding = "ndjson"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -356,7 +358,7 @@ mod tests {
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "json"
+        encoding = "ndjson"
         [headers]
         foo = "bar"
         baz = "quux"
