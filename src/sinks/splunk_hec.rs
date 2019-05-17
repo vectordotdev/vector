@@ -208,6 +208,10 @@ mod tests {
         let kv = event.get("key".into()).unwrap();
 
         assert_eq!(kv, &"value".to_string());
+        assert_eq!(
+            event[&event::MESSAGE.to_string()],
+            "hello world".to_string()
+        );
         assert!(event.get(&event::TIMESTAMP.to_string()).is_none());
     }
 
