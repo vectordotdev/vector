@@ -25,7 +25,7 @@ pub struct S3Sink {
     client: S3Client,
     key_prefix: String,
     bucket: String,
-    gzip: bool,
+    compression: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -36,7 +36,7 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
-    pub gzip: bool,
+    pub compression: bool,
     pub max_linger_secs: Option<u64>,
     pub encoding: Option<Encoding>,
 
@@ -83,7 +83,7 @@ impl S3Sink {
         );
 
         let max_linger_secs = config.max_linger_secs.unwrap_or(300);
-        let gzip = config.gzip;
+        let compression = config.compression;
         let buffer_size = config.buffer_size;
 
         let region = config.region.clone();
@@ -91,7 +91,7 @@ impl S3Sink {
             client: Self::create_client(region.try_into()?),
             key_prefix: config.key_prefix.clone(),
             bucket: config.bucket.clone(),
-            gzip,
+            compression,
         };
 
         let svc = ServiceBuilder::new()
@@ -103,7 +103,7 @@ impl S3Sink {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(
-                Buffer::new(gzip),
+                Buffer::new(compression),
                 buffer_size,
                 Duration::from_secs(max_linger_secs),
             )
@@ -168,7 +168,7 @@ impl Service<Vec<u8>> for S3Sink {
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         // TODO: make this based on the last event in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-        let extension = if self.gzip { ".log.gz" } else { ".log" };
+        let extension = if self.compression { ".log.gz" } else { ".log" };
         let key = format!("{}{}{}", self.key_prefix, filename, extension);
 
         debug!(
@@ -182,7 +182,7 @@ impl Service<Vec<u8>> for S3Sink {
             body: Some(body.into()),
             bucket: self.bucket.clone(),
             key,
-            content_encoding: if self.gzip {
+            content_encoding: if self.compression {
                 Some("gzip".to_string())
             } else {
                 None
@@ -384,7 +384,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             buffer_size: 1000,
-            gzip: true,
+            compression: true,
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -450,7 +450,7 @@ mod integration_tests {
             key_prefix: random_string(10) + "/",
             buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
-            gzip: false,
+            compression: false,
             max_linger_secs: Some(5),
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
