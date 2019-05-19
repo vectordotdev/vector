@@ -8,24 +8,47 @@
   <a href="https://slack.linkerd.io/badge.svg"><img src="https://slack.linkerd.io/badge.svg"></a>
 </p>
 
-Vector is a high-performance log and metrics router. It's designed to be deployed across your entire infrastructure, serving both as a [light-weight agent][agent] that collects logs and metrics data and a [highly efficient centralized service][centralized_service] for aggregation and routing.
+Vector is a high-performance routing layer for observability data. It makes [collecting][sources],
+[transforming][transforms], and [routing][sinks] logs and metrics easy. It's designed to be
+[deployed][deployment] across your entire infrastructure, serving both as a light-weight [agent]
+and a highly efficient [service].
 
-Vector is designed with a *keen* focus on [performance][benchmarks] and operator friendliness. Its purpose is to decouple routing from the underlying components, giving you complete flexibility to adopt the tools of your choice, among [many other benefits][use_cases].
+Vector is designed with a [*keen* focus on performance][performance] and
+[operator friendliness][administration]. Its purpose is to decouple routing from the services,
+giving you complete flexibility to adopt the services of your choice, among
+[many other benefits][use_cases].
 
 ---
+
+#### About
+
+* [**Use cases**][use_cases]
+* [**Performance**][performance]
+* [**Correctness**][correctness]
+* [**Concepts**][concepts]
+* [**Data Model**][data_model]
+
+#### Setup
 
 * [**Installation**][installation]
-* [**Configuration**][configuration]
+* [**Getting started**][getting_started]
+* [**Deployment**][deployment]
+
+#### Usage
+
+* [**Configuration**][configuration] - [sources], [transforms], [sinks]
 * [**Administration**][administration]
-* [**Use cases**][use_cases]
 * [**Guides**][guides]
-* [**Benchmarks**][benchmarks]
 
 ---
 
-### Development
+## Performance
 
-#### Sample Logs
+## Correctness
+
+## Development
+
+### Sample Logs
 
 We use `flog` to build a sample set of log files to test sending logs from a file. This can
 be done with the following commands on mac with homebrew.
@@ -36,20 +59,26 @@ brew install flog
 $ flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
 
-This will create a `100MB` sample log file in the `sample.log` file.
+This will create a `100MiB` sample log file in the `sample.log` file.
 
-#### Building
+### Building
 
-Vector compiles with Rust 1.34.0 (stable) or newer. In general, Vector tracks the latest stable release of the Rust compiler.
+Vector compiles with [Rust][rust] 1.34.0 (stable) or newer. In general, Vector tracks the
+latest stable release of the Rust compiler.
 
-Building is very easy, all you need to do is use `cargo`:
+Building is very easy, all you need to do is install Rust:
+
+```
+curl https://sh.rustup.rs -sSf | sh
+```
+
+And then use `cargo` to build:
 
 ``` bash
 cargo build
 ```
 
-
-#### Testing
+### Testing
 
 Testing is a bit more complicated, this because to test all the sinks we need to stand
 up local mock versions of the sources we send logs too. To do this we use `docker` and 
@@ -63,7 +92,7 @@ cargo test
 cargo test --features docker
 ```
 
-#### Code Style
+### Code Style
 
 We use `rustfmt` on `stable` to format our code and CI will verify that your code follows
 this format style. To run the following command make sure `rustfmt` has been installed on
@@ -86,10 +115,19 @@ unsure, open a pull request.
 </p>
 
 [administration]: https://docs.vectorproject.io/usage/administration
-[agent]: https://docs.vectorproject.io/setup/deployment/as_an_agent
-[benchmarks]: https://docs.vectorproject.io/benchmarks
-[centralized_service]: https://docs.vectorproject.io/setup/deployment/as_a_centralized_service
+[agent]: https://docs.vectorproject.io/setup/deployment/roles/agent
 [configuration]: https://docs.vectorproject.io/usage/configuration
+[concepts]: https://docs.vectorproject.io/about/concepts
+[correctness]: https://docs.vectorproject.io/about/correctness
+[data_model]: https://docs.vectorproject.io/about/data_model
+[deployment]: https://docs.vectorproject.io/setup/deployment
+[getting_started]: https://docs.vectorproject.io/setup/getting_started
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
-[use_cases]: https://docs.vectorproject.io/usage/use_cases
+[performance]: https://docs.vectorproject.io/about/performance
+[rust]: https://www.rust-lang.org/
+[service]: https://docs.vectorproject.io/setup/deployment/roles/service
+[sinks]: https://docs.vectorproject.io/usage/configuration/sinks
+[sources]: https://docs.vectorproject.io/usage/configuration/sources
+[transforms]: https://docs.vectorproject.io/usage/configuration/transforms
+[use_cases]: https://docs.vectorproject.io/use_cases
