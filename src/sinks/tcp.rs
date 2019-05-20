@@ -56,7 +56,7 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
     }
 }
 
-struct TcpSink {
+pub struct TcpSink {
     addr: SocketAddr,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
