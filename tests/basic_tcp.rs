@@ -1,6 +1,7 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
 use serde_json::json;
+use std::collections::HashMap;
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
@@ -153,8 +154,12 @@ fn test_parse() {
     block_on(topology.stop()).unwrap();
 
     shutdown_on_idle(rt);
-    let output_lines = output_lines.wait();
-    assert_eq!(output_lines, vec!["missing status=404".to_owned()]);
+    let output_line = output_lines.wait().into_iter().next().unwrap();
+    let output = serde_json::from_str::<HashMap<String, String>>(&output_line[..]).unwrap();
+
+    assert_eq!(output["message"], "missing status=404");
+    assert_eq!(output["host"], "127.0.0.1");
+    assert_eq!(output["status"], "404");
 }
 
 #[test]

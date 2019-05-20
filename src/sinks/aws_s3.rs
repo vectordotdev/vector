@@ -38,6 +38,7 @@ pub struct S3SinkConfig {
     pub buffer_size: usize,
     pub gzip: bool,
     pub max_linger_secs: Option<u64>,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -46,6 +47,13 @@ pub struct S3SinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Ndjson,
 }
 
 #[typetag::serde(name = "aws_s3")]
@@ -66,6 +74,7 @@ impl S3Sink {
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(15);
         let retry_attempts = config.request_retry_attempts.unwrap_or(5);
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let encoding = config.encoding.clone();
 
         let policy = FixedRetryPolicy::new(
             retry_attempts,
@@ -98,7 +107,7 @@ impl S3Sink {
                 buffer_size,
                 Duration::from_secs(max_linger_secs),
             )
-            .with(encode_event);
+            .with(move |e| encode_event(e, &encoding));
 
         Ok(Box::new(sink))
     }
@@ -202,20 +211,21 @@ impl RetryLogic for S3RetryLogic {
     }
 }
 
-fn encode_event(event: Event) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
     let log = event.into_log();
 
-    if log.is_structured() {
-        serde_json::to_vec(&log.all_fields())
+    match (encoding, log.is_structured()) {
+        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
-            .map_err(|e| panic!("Error encoding: {}", e))
-    } else {
-        let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
-        bytes.push(b'\n');
-        Ok(bytes)
+            .map_err(|e| panic!("Error encoding: {}", e)),
+        (&Some(Encoding::Text), _) | (_, false) => {
+            let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            bytes.push(b'\n');
+            Ok(bytes)
+        }
     }
 }
 
@@ -228,7 +238,7 @@ mod tests {
     #[test]
     fn s3_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let bytes = encode_event(message.clone().into()).unwrap();
+        let bytes = encode_event(message.clone().into(), &None).unwrap();
 
         let encoded_message = message + "\n";
         assert_eq!(&bytes[..], encoded_message.as_bytes());
@@ -241,7 +251,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let bytes = encode_event(event).unwrap();
+        let bytes = encode_event(event, &None).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 

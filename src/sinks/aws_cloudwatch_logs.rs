@@ -30,7 +30,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
-    pub encoding: Encoding,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -135,27 +135,23 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
-        if log.is_structured() || self.config.encoding == Encoding::Json {
-            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
-                ts.timestamp_millis()
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
-
-            let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
-            let message = String::from_utf8(bytes).unwrap();
-
-            InputLogEvent { message, timestamp }
+        let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.remove(&event::TIMESTAMP) {
+            ts.timestamp_millis()
         } else {
-            let message = log[&event::MESSAGE].to_string_lossy();
+            chrono::Utc::now().timestamp_millis()
+        };
 
-            let timestamp = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
-                ts.timestamp_millis()
-            } else {
-                chrono::Utc::now().timestamp_millis()
-            };
+        match (&self.config.encoding, log.is_structured()) {
+            (&Some(Encoding::Json), _) | (_, true) => {
+                let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
+                let message = String::from_utf8(bytes).unwrap();
 
-            InputLogEvent { message, timestamp }
+                InputLogEvent { message, timestamp }
+            }
+            (&Some(Encoding::Text), _) | (_, false) => {
+                let message = log[&event::MESSAGE].to_string_lossy();
+                InputLogEvent { message, timestamp }
+            }
         }
     }
 }
@@ -267,12 +263,6 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Text
-    }
-}
-
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -303,27 +293,13 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
 
 #[cfg(test)]
 mod tests {
-    #![cfg(feature = "cloudwatch-integration-tests")]
-
-    use crate::buffers::Acker;
     use crate::{
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
         sinks::aws_cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
-        test_util::{block_on, random_lines_with_stream},
-        topology::config::SinkConfig,
-    };
-    use futures::Sink;
-    use rusoto_core::Region;
-    use rusoto_logs::{
-        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
-        GetLogEventsRequest,
     };
     use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
-
-    const STREAM_NAME: &'static str = "test-1";
-    const GROUP_NAME: &'static str = "router";
 
     #[test]
     fn cloudwatch_encode_log() {
@@ -353,6 +329,28 @@ mod tests {
 
         assert!(map.get(&event::TIMESTAMP).is_none());
     }
+}
+
+#[cfg(feature = "cloudwatch-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+
+    use crate::buffers::Acker;
+    use crate::{
+        region::RegionOrEndpoint,
+        sinks::aws_cloudwatch_logs::CloudwatchLogsSinkConfig,
+        test_util::{block_on, random_lines_with_stream},
+        topology::config::SinkConfig,
+    };
+    use futures::Sink;
+    use rusoto_core::Region;
+    use rusoto_logs::{
+        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
+        GetLogEventsRequest,
+    };
+
+    const STREAM_NAME: &'static str = "test-1";
+    const GROUP_NAME: &'static str = "router";
 
     #[test]
     fn cloudwatch_insert_log_event() {

@@ -30,7 +30,7 @@ pub struct HttpSinkConfig {
     pub headers: Option<IndexMap<String, String>>,
     pub buffer_size: Option<usize>,
     pub compression: Option<Compression>,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -45,7 +45,7 @@ pub struct HttpSinkConfig {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
-    Json,
+    Ndjson,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -84,7 +84,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
-    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
+    let encoding = config.encoding.clone();
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
 
@@ -101,7 +101,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
         match encoding {
             Encoding::Text => builder.header("Content-Type", "text/plain"),
-            Encoding::Json => builder.header("Content-Type", "application/x-ndjson"),
+            Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
         };
 
         if gzip {
@@ -130,7 +130,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         .timeout(Duration::from_secs(timeout))
         .service(http_service);
 
-    let encoding = config.encoding.clone().unwrap_or(Encoding::default());
+    let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), 2 * 1024 * 1024)
         .with(move |event| encode_event(event, &encoding));
@@ -203,7 +203,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
     let mut body = match encoding {
         Encoding::Text => event[&event::MESSAGE].to_string_lossy().into_bytes(),
 
-        Encoding::Json => serde_json::to_vec(&event.all_fields())
+        Encoding::Ndjson => serde_json::to_vec(&event.all_fields())
             .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,
     };
 
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_json() {
-        let encoding = Encoding::Json;
+        let encoding = Encoding::Ndjson;
         let event = Event::from("hello world");
 
         let bytes = encode_event(event, &encoding).unwrap();
@@ -268,6 +268,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "text"
         [headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -281,6 +282,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
+        encoding = "text"
         [headers]
         "\u0001" = "bad"
         "#;
@@ -302,7 +304,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         user = "waldo"
         password = "hunter2"
-        encoding = "json"
+        encoding = "ndjson"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
@@ -356,7 +358,7 @@ mod tests {
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "json"
+        encoding = "ndjson"
         [headers]
         foo = "bar"
         baz = "quux"

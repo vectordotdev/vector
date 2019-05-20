@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    sinks::encoders::{default_string_encoder, Encoder, EncoderConfig},
+    event::{self, Event},
     sinks::util::SinkExt,
 };
 use bytes::Bytes;
@@ -21,15 +21,21 @@ use tokio_trace::field;
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    #[serde(default = "default_string_encoder")]
-    pub encoder: Box<dyn EncoderConfig>,
+    pub encoding: Option<Encoding>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 impl TcpSinkConfig {
     pub fn new(address: String) -> Self {
         Self {
             address,
-            encoder: default_string_encoder(),
+            encoding: None,
         }
     }
 }
@@ -44,7 +50,7 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
             .next()
             .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
 
-        let sink = raw_tcp(addr, acker, self.encoder.build());
+        let sink = raw_tcp(addr, acker, self.encoding.clone());
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
@@ -179,15 +185,11 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(
-    addr: SocketAddr,
-    acker: Acker,
-    encoder: Box<dyn Encoder + Send>,
-) -> super::RouterSink {
+pub fn raw_tcp(addr: SocketAddr, acker: Acker, encoding: Option<Encoding>) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
-            .with(move |event| Ok(encoder.encode(event))),
+            .with(move |event| encode_event(event, &encoding)),
     )
 }
 
@@ -200,4 +202,20 @@ pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     });
 
     Box::new(check)
+}
+
+fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> {
+    let log = event.into_log();
+
+    let b = match (encoding, log.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => {
+            serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
+        }
+        (&Some(Encoding::Text), _) | (_, false) => {
+            let bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            Ok(bytes)
+        }
+    };
+
+    b.map(Bytes::from)
 }

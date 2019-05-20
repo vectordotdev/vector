@@ -33,6 +33,7 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: usize,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -41,6 +42,13 @@ pub struct KinesisSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]
@@ -68,6 +76,7 @@ impl KinesisService {
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
         let retry_attempts = config.request_retry_attempts.unwrap_or(5);
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+        let encoding = config.encoding.clone();
 
         let policy = FixedRetryPolicy::new(
             retry_attempts,
@@ -86,7 +95,7 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched(Vec::new(), batch_size)
-            .with(encode_event);
+            .with(move |e| encode_event(e, &encoding));
 
         Ok(sink)
     }
@@ -192,14 +201,17 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
     Ok(Box::new(fut))
 }
 
-fn encode_event(event: Event) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
     let log = event.into_log();
 
-    if log.is_structured() {
-        serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
-    } else {
-        let bytes = log[&event::MESSAGE].as_bytes().into_owned();
-        Ok(bytes)
+    match (encoding, log.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => {
+            serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
+        }
+        (&Some(Encoding::Text), _) | (_, false) => {
+            let bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            Ok(bytes)
+        }
     }
 }
 
@@ -212,7 +224,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let bytes = encode_event(message.clone().into()).unwrap();
+        let bytes = encode_event(message.clone().into(), &None).unwrap();
 
         assert_eq!(&bytes[..], message.as_bytes())
     }
@@ -224,7 +236,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let bytes = encode_event(event).unwrap();
+        let bytes = encode_event(event, &None).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
