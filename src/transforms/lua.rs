@@ -334,6 +334,6 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event[&"new field".into()], "new value".into());
+        assert_eq!(event.as_log()[&"new field".into()], "new value".into());
     }
 }
