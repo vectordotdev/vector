@@ -1,33 +1,35 @@
 use super::retries::RetryLogic;
-use futures::Poll;
+use futures::{Future, Poll};
 use http::StatusCode;
-use hyper::{
-    client::{HttpConnector, ResponseFuture},
-    Body, Client,
-};
+use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
+use tokio_trace::field;
+use tokio_trace_tower_http::InstrumentedHttpService;
 use tower::Service;
+use tower_hyper::{body::Body, client::Client};
 
-type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send>;
+type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 
 #[derive(Clone)]
 pub struct HttpService {
-    client: Client<HttpsConnector<HttpConnector>, Body>,
+    inner: InstrumentedHttpService<Client<HttpsConnector<HttpConnector>, Vec<u8>>>,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl HttpService {
-    pub fn new(
-        request_builder: impl Fn(Vec<u8>) -> hyper::Request<Body> + Sync + Send + 'static,
-    ) -> Self {
+    pub fn new<F>(request_builder: F) -> Self
+    where
+        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client: Client<_, Body> = Client::builder()
+        let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
+        let inner = InstrumentedHttpService::new(Client::with_client(client));
         Self {
-            client,
+            inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
     }
@@ -36,7 +38,7 @@ impl HttpService {
 impl Service<Vec<u8>> for HttpService {
     type Response = hyper::Response<Body>;
     type Error = hyper::Error;
-    type Future = ResponseFuture;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         Ok(().into())
@@ -44,7 +46,18 @@ impl Service<Vec<u8>> for HttpService {
 
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         let request = (self.request_builder)(body);
-        self.client.request(request.into())
+
+        debug!(message = "sending request.");
+
+        let fut = self.inner.call(request).inspect(|res| {
+            debug!(
+                message = "response.",
+                status = &field::display(res.status()),
+                version = &field::debug(res.version()),
+            )
+        });
+
+        Box::new(fut)
     }
 }
 
@@ -80,10 +93,22 @@ mod test {
     fn util_http_retry_logic() {
         let logic = HttpRetryLogic;
 
-        let response_429 = Response::builder().status(429).body(Body::empty()).unwrap();
-        let response_500 = Response::builder().status(500).body(Body::empty()).unwrap();
-        let response_400 = Response::builder().status(400).body(Body::empty()).unwrap();
-        let response_501 = Response::builder().status(501).body(Body::empty()).unwrap();
+        let response_429 = Response::builder()
+            .status(429)
+            .body(Body::empty().into())
+            .unwrap();
+        let response_500 = Response::builder()
+            .status(500)
+            .body(Body::empty().into())
+            .unwrap();
+        let response_400 = Response::builder()
+            .status(400)
+            .body(Body::empty().into())
+            .unwrap();
+        let response_501 = Response::builder()
+            .status(501)
+            .body(Body::empty().into())
+            .unwrap();
 
         assert!(logic.should_retry_response(&response_429));
         assert!(logic.should_retry_response(&response_500));

@@ -114,7 +114,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
             }
         }
 
-        let mut request = builder.body(body.into()).unwrap();
+        let mut request = builder.body(body).unwrap();
 
         if let Some(auth) = &basic_auth {
             auth.apply(request.headers_mut());

@@ -103,7 +103,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
         builder.header("Authorization", token.clone());
 
-        builder.body(body.into()).unwrap()
+        builder.body(body).unwrap()
     });
 
     let service = ServiceBuilder::new()
@@ -452,17 +452,21 @@ mod integration_tests {
                 sinks::splunk_hec::healthcheck(get_token(), "http://localhost:1111".to_string())
                     .unwrap();
 
-            let err = rt.block_on(healthcheck).unwrap_err();
-            assert!(err.starts_with("an error occurred trying to connect"));
+            rt.block_on(healthcheck).unwrap_err();
         }
 
         // Invalid token
         // The HEC REST docs claim that the healthcheck endpoint will validate the auth token,
         // but my local testing server returns 200 even with a bad token.
-        {
-            // let healthcheck = sinks::splunk::hec_healthcheck("asdf".to_string(), "http://localhost:8088".to_string());
-            // assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid HEC token");
-        }
+        // {
+        //     let healthcheck = sinks::splunk::healthcheck(
+        //         "wrong".to_string(),
+        //         "http://localhost:8088".to_string(),
+        //     )
+        //     .unwrap();
+
+        //     assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Invalid HEC token");
+        // }
 
         // Unhealthy server
         {

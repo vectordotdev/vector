@@ -21,16 +21,17 @@ trace-metrics = { path = "lib/trace-metrics" }
 
 # Tokio / Futures
 futures = "0.1.25"
-tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"]}
+tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
 
 # Tracing
-tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace = "0.1"
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tokio-trace-tower-http = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
 
 # Metrics
 hotmic = "0.8"
@@ -44,6 +45,7 @@ rusoto_credential = "0.16.0"
 
 # Tower
 tower = "0.1"
+tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
