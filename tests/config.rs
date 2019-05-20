@@ -186,16 +186,16 @@ fn bad_s3_region() {
         [sinks.out1]
         type = "aws_s3"
         inputs = ["in"]
-        buffer_size = 100000
-        gzip = true
+        batch_size = 100000
+        compression = "gzip"
         bucket = "asdf"
         key_prefix = "logs/"
 
         [sinks.out2]
         type = "aws_s3"
         inputs = ["in"]
-        buffer_size = 100000
-        gzip = true
+        batch_size = 100000
+        compression = "gzip"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "moonbase-alpha"
@@ -203,8 +203,8 @@ fn bad_s3_region() {
         [sinks.out3]
         type = "aws_s3"
         inputs = ["in"]
-        buffer_size = 100000
-        gzip = true
+        batch_size = 100000
+        compression = "gzip"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
@@ -213,8 +213,8 @@ fn bad_s3_region() {
         [sinks.out4]
         type = "aws_s3"
         inputs = ["in"]
-        buffer_size = 100000
-        gzip = true
+        batch_size = 100000
+        compression = "gzip"
         bucket = "asdf"
         key_prefix = "logs/"
         endpoint = "this shoudlnt work"
