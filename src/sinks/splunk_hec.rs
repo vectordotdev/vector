@@ -25,7 +25,7 @@ pub struct HecSinkConfig {
     pub host: String,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
-    pub buffer_size: Option<usize>,
+    pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub encoding: Option<Encoding>,
@@ -66,7 +66,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let token = config.token.clone();
     let host_field = config.host_field;
 
-    let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
+    let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
@@ -118,7 +118,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let sink = BatchServiceSink::new(service, acker)
         .batched_with_min(
             Buffer::new(gzip),
-            buffer_size,
+            batch_size,
             Duration::from_secs(batch_timeout),
         )
         .with(move |e| encode_event(&host_field, e, &encoding));
@@ -508,8 +508,6 @@ mod integration_tests {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
-            buffer_size: None,
-            compression: None,
             host_field: "host".into(),
             ..Default::default()
         }
