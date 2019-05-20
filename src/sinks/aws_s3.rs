@@ -25,7 +25,7 @@ pub struct S3Sink {
     client: S3Client,
     key_prefix: String,
     bucket: String,
-    compression: bool,
+    gzip: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -107,7 +107,7 @@ impl S3Sink {
             client: Self::create_client(region.try_into()?),
             key_prefix: config.key_prefix.clone(),
             bucket: config.bucket.clone(),
-            compression,
+            gzip: compression,
         };
 
         let svc = ServiceBuilder::new()
@@ -184,7 +184,7 @@ impl Service<Vec<u8>> for S3Sink {
     fn call(&mut self, body: Vec<u8>) -> Self::Future {
         // TODO: make this based on the last event in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-        let extension = if self.compression { ".log.gz" } else { ".log" };
+        let extension = if self.gzip { ".log.gz" } else { ".log" };
         let key = format!("{}{}{}", self.key_prefix, filename, extension);
 
         debug!(
@@ -198,7 +198,7 @@ impl Service<Vec<u8>> for S3Sink {
             body: Some(body.into()),
             bucket: self.bucket.clone(),
             key,
-            content_encoding: if self.compression {
+            content_encoding: if self.gzip {
                 Some("gzip".to_string())
             } else {
                 None
