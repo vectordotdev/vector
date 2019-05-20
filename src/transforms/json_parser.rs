@@ -158,6 +158,33 @@ mod test {
     }
 
     #[test]
+    fn json_parser_parse_inner_json() {
+        let parser_outter = JsonParser::from(JsonParserConfig {
+            ..Default::default()
+        });
+
+        let parser_inner = JsonParser::from(JsonParserConfig {
+            field: "log".into(),
+            ..Default::default()
+        });
+
+        let event = Event::from(r#"{"log":"{\"type\":\"response\",\"@timestamp\":\"2018-10-04T21:12:33Z\",\"tags\":[],\"pid\":1,\"method\":\"post\",\"statusCode\":200,\"req\":{\"url\":\"/elasticsearch/_msearch\",\"method\":\"post\",\"headers\":{\"host\":\"logs.com\",\"connection\":\"close\",\"x-real-ip\":\"120.21.3.1\",\"x-forwarded-for\":\"121.91.2.2\",\"x-forwarded-host\":\"logs.com\",\"x-forwarded-port\":\"443\",\"x-forwarded-proto\":\"https\",\"x-original-uri\":\"/elasticsearch/_msearch\",\"x-scheme\":\"https\",\"content-length\":\"1026\",\"accept\":\"application/json, text/plain, */*\",\"origin\":\"https://logs.com\",\"kbn-version\":\"5.2.3\",\"user-agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/532.30 (KHTML, like Gecko) Chrome/62.0.3361.210 Safari/533.21\",\"content-type\":\"application/x-ndjson\",\"referer\":\"https://domain.com/app/kibana\",\"accept-encoding\":\"gzip, deflate, br\",\"accept-language\":\"en-US,en;q=0.8\"},\"remoteAddress\":\"122.211.22.11\",\"userAgent\":\"22.322.32.22\",\"referer\":\"https://domain.com/app/kibana\"},\"res\":{\"statusCode\":200,\"responseTime\":417,\"contentLength\":9},\"message\":\"POST /elasticsearch/_msearch 200 225ms - 8.0B\"}\n","stream":"stdout","time":"2018-10-02T21:14:48.2233245241Z"}"#);
+
+        let parsed_event = parser_outter.transform(event).unwrap();
+
+        assert_eq!(
+            parsed_event.as_log()[&Atom::from("stream")],
+            "stdout".into()
+        );
+
+        let parsed_inner_event = parser_inner.transform(parsed_event).unwrap();
+        let log = parsed_inner_event.into_log();
+
+        assert_eq!(log[&Atom::from("type")], "response".into());
+        assert_eq!(log[&Atom::from("statusCode")], "200".into());
+    }
+
+    #[test]
     fn json_parser_invalid_json() {
         let invalid = r#"{"greeting": "hello","#;
 
