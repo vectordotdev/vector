@@ -27,6 +27,7 @@ pub struct HecSinkConfig {
     pub compression: Option<Compression>,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -35,6 +36,13 @@ pub struct HecSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 fn default_host_field() -> Atom {
@@ -69,6 +77,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let encoding = config.encoding.clone();
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -106,7 +115,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |e| encode_event(&host_field, e));
+        .with(move |e| encode_event(&host_field, e, &encoding));
 
     Ok(Box::new(sink))
 }
@@ -147,7 +156,11 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     }
 }
 
-fn encode_event(host_field: &Atom, event: Event) -> Result<Vec<u8>, ()> {
+fn encode_event(
+    host_field: &Atom,
+    event: Event,
+    encoding: &Option<Encoding>,
+) -> Result<Vec<u8>, ()> {
     let mut event = event.into_log();
 
     let host = event.get(&host_field).map(|h| h.clone());
@@ -157,17 +170,16 @@ fn encode_event(host_field: &Atom, event: Event) -> Result<Vec<u8>, ()> {
         chrono::Utc::now().timestamp()
     };
 
-    let mut body = if event.is_structured() {
-        json!({
+    let mut body = match (encoding, event.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => json!({
             "event": event.all_fields(),
             "fields": event.explicit_fields(),
             "time": timestamp,
-        })
-    } else {
-        json!({
+        }),
+        (&Some(Encoding::Text), _) | (_, false) => json!({
             "event": event[&event::MESSAGE].to_string_lossy(),
             "time": timestamp,
-        })
+        }),
     };
 
     if let Some(host) = host {
@@ -200,7 +212,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
 
-        let bytes = encode_event(&host, event).unwrap();
+        let bytes = encode_event(&host, event, &None).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
