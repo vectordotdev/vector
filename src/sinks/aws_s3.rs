@@ -37,7 +37,7 @@ pub struct S3SinkConfig {
     pub region: RegionOrEndpoint,
     pub buffer_size: usize,
     pub compression: Compression,
-    pub max_linger_secs: Option<u64>,
+    pub batch_timeout: Option<u64>,
     pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
@@ -95,7 +95,7 @@ impl S3Sink {
             S3RetryLogic,
         );
 
-        let max_linger_secs = config.max_linger_secs.unwrap_or(300);
+        let batch_timeout = config.batch_timeout.unwrap_or(300);
         let compression = match config.compression {
             Compression::Gzip => true,
             Compression::None => false,
@@ -121,7 +121,7 @@ impl S3Sink {
             .batched_with_min(
                 Buffer::new(compression),
                 buffer_size,
-                Duration::from_secs(max_linger_secs),
+                Duration::from_secs(batch_timeout),
             )
             .with(move |e| encode_event(e, &encoding));
 
@@ -467,7 +467,7 @@ mod integration_tests {
             buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
             compression: Compression::None,
-            max_linger_secs: Some(5),
+            batch_timeout: Some(5),
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }
