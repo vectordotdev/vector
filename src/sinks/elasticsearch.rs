@@ -24,6 +24,7 @@ pub struct ElasticSearchConfig {
     pub doc_type: String,
     pub id_key: Option<String>,
     pub buffer_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
 
     // Tower Request based configuration
@@ -53,6 +54,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         Compression::None => false,
         Compression::Gzip => true,
     };
+    let batch_timeout = config.batch_timeout.unwrap_or(300);
 
     let timeout = config.request_timeout_secs.unwrap_or(10);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
@@ -92,7 +94,11 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched(Buffer::new(gzip), buffer_size)
+        .batched_with_min(
+            Buffer::new(gzip),
+            buffer_size,
+            Duration::from_secs(batch_timeout),
+        )
         .with(move |event: Event| {
             let mut action = json!({
                 "index": {
