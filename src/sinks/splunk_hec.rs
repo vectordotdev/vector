@@ -23,10 +23,11 @@ use tower::ServiceBuilder;
 pub struct HecSinkConfig {
     pub token: String,
     pub host: String,
-    pub buffer_size: Option<usize>,
-    pub compression: Option<Compression>,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
+    pub compression: Option<Compression>,
     pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
@@ -65,11 +66,12 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let token = config.token.clone();
     let host_field = config.host_field;
 
-    let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
+    let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };
+    let batch_timeout = config.batch_timeout.unwrap_or(300);
 
     let timeout = config.request_timeout_secs.unwrap_or(10);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
@@ -114,7 +116,11 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
         .service(http_service);
 
     let sink = BatchServiceSink::new(service, acker)
-        .batched(Buffer::new(gzip), buffer_size)
+        .batched_with_min(
+            Buffer::new(gzip),
+            batch_size,
+            Duration::from_secs(batch_timeout),
+        )
         .with(move |e| encode_event(&host_field, e, &encoding));
 
     Ok(Box::new(sink))
@@ -502,8 +508,6 @@ mod integration_tests {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
-            buffer_size: None,
-            compression: None,
             host_field: "host".into(),
             ..Default::default()
         }

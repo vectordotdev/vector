@@ -35,9 +35,9 @@ pub struct S3SinkConfig {
     pub key_prefix: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub buffer_size: usize,
-    pub gzip: bool,
-    pub max_linger_secs: Option<u64>,
+    pub batch_size: Option<usize>,
+    pub compression: Compression,
+    pub batch_timeout: Option<u64>,
     pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
@@ -54,6 +54,19 @@ pub struct S3SinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    Gzip,
+    None,
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        Compression::Gzip
+    }
 }
 
 #[typetag::serde(name = "aws_s3")]
@@ -82,16 +95,19 @@ impl S3Sink {
             S3RetryLogic,
         );
 
-        let max_linger_secs = config.max_linger_secs.unwrap_or(300);
-        let gzip = config.gzip;
-        let buffer_size = config.buffer_size;
+        let batch_timeout = config.batch_timeout.unwrap_or(300);
+        let compression = match config.compression {
+            Compression::Gzip => true,
+            Compression::None => false,
+        };
+        let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
 
         let region = config.region.clone();
         let s3 = S3Sink {
             client: Self::create_client(region.try_into()?),
             key_prefix: config.key_prefix.clone(),
             bucket: config.bucket.clone(),
-            gzip,
+            gzip: compression,
         };
 
         let svc = ServiceBuilder::new()
@@ -103,9 +119,9 @@ impl S3Sink {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(
-                Buffer::new(gzip),
-                buffer_size,
-                Duration::from_secs(max_linger_secs),
+                Buffer::new(compression),
+                batch_size,
+                Duration::from_secs(batch_timeout),
             )
             .with(move |e| encode_event(e, &encoding));
 
@@ -263,7 +279,7 @@ mod tests {
 #[cfg(feature = "s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         event::Event,
@@ -308,7 +324,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
+            batch_size: Some(1000),
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -337,7 +353,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
+            batch_size: Some(1000),
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -383,8 +399,8 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
-            gzip: true,
+            batch_size: Some(1000),
+            compression: Compression::Gzip,
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -448,10 +464,9 @@ mod integration_tests {
 
         S3SinkConfig {
             key_prefix: random_string(10) + "/",
-            buffer_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
-            gzip: false,
-            max_linger_secs: Some(5),
+            compression: Compression::None,
+            batch_timeout: Some(5),
             region: RegionOrEndpoint::with_endpoint("http://localhost:9000".to_owned()),
             ..Default::default()
         }

@@ -28,7 +28,8 @@ pub struct HttpSinkConfig {
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
     pub headers: Option<IndexMap<String, String>>,
-    pub buffer_size: Option<usize>,
+    pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
     pub encoding: Encoding,
 
@@ -77,6 +78,8 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         Compression::None => false,
         Compression::Gzip => true,
     };
+    let batch_timeout = config.batch_timeout.unwrap_or(300);
+    let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
 
     let timeout = config.request_timeout_secs.unwrap_or(10);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
@@ -132,7 +135,11 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
     let encoding = config.encoding.clone();
     let sink = BatchServiceSink::new(service, acker)
-        .batched(Buffer::new(gzip), 2 * 1024 * 1024)
+        .batched_with_min(
+            Buffer::new(gzip),
+            batch_size,
+            Duration::from_secs(batch_timeout),
+        )
         .with(move |event| encode_event(event, &encoding));
 
     Ok(Box::new(sink))
