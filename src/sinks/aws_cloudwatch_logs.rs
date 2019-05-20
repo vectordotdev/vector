@@ -29,6 +29,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub group_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub batch_timeout: Option<u64>,
     pub buffer_size: usize,
     pub encoding: Option<Encoding>,
 
@@ -71,6 +72,8 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
 
+        let batch_timeout = self.batch_timeout.unwrap_or(300);
+
         let svc = ServiceBuilder::new()
             .concurrency_limit(in_flight_limit)
             .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
@@ -78,7 +81,11 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             .service(cloudwatch);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, acker).batched(Vec::new(), self.buffer_size);
+            let svc_sink = BatchServiceSink::new(svc, acker).batched_with_min(
+                Vec::new(),
+                self.buffer_size,
+                Duration::from_secs(batch_timeout),
+            );
             Box::new(svc_sink)
         };
 
