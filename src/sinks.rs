@@ -6,7 +6,6 @@ pub mod aws_s3;
 pub mod blackhole;
 pub mod console;
 pub mod elasticsearch;
-pub mod encoders;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
