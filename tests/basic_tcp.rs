@@ -154,7 +154,7 @@ fn test_parse() {
 
     shutdown_on_idle(rt);
     let output_lines = output_lines.wait();
-    assert_eq!(output_lines, vec!["missing status=404".to_owned()]);
+    assert_eq!(output_lines, vec!["{\"timestamp\":\"2019-05-20T15:13:29.827Z\",\"message\":\"missing status=404\",\"status\":\"404\",\"host\":\"127.0.0.1\"}".to_owned()]);
 }
 
 #[test]
