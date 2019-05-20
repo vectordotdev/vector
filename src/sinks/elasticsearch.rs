@@ -23,7 +23,7 @@ pub struct ElasticSearchConfig {
     pub index: String,
     pub doc_type: String,
     pub id_key: Option<String>,
-    pub buffer_size: Option<usize>,
+    pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
 
@@ -49,7 +49,7 @@ impl crate::topology::config::SinkConfig for ElasticSearchConfig {
 fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
-    let buffer_size = config.buffer_size.unwrap_or(2 * 1024 * 1024);
+    let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
@@ -96,7 +96,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let sink = BatchServiceSink::new(service, acker)
         .batched_with_min(
             Buffer::new(gzip),
-            buffer_size,
+            batch_size,
             Duration::from_secs(batch_timeout),
         )
         .with(move |event: Event| {
