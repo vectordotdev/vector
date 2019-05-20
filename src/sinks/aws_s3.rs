@@ -35,7 +35,7 @@ pub struct S3SinkConfig {
     pub key_prefix: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub buffer_size: usize,
+    pub batch_size: usize,
     pub compression: Compression,
     pub batch_timeout: Option<u64>,
     pub encoding: Option<Encoding>,
@@ -100,7 +100,7 @@ impl S3Sink {
             Compression::Gzip => true,
             Compression::None => false,
         };
-        let buffer_size = config.buffer_size;
+        let batch_size = config.batch_size;
 
         let region = config.region.clone();
         let s3 = S3Sink {
@@ -120,7 +120,7 @@ impl S3Sink {
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(
                 Buffer::new(compression),
-                buffer_size,
+                batch_size,
                 Duration::from_secs(batch_timeout),
             )
             .with(move |e| encode_event(e, &encoding));
@@ -324,7 +324,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
+            batch_size: 1000,
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -353,7 +353,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
+            batch_size: 1000,
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -399,7 +399,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         let config = S3SinkConfig {
-            buffer_size: 1000,
+            batch_size: 1000,
             compression: Compression::Gzip,
             ..config()
         };
@@ -464,7 +464,7 @@ mod integration_tests {
 
         S3SinkConfig {
             key_prefix: random_string(10) + "/",
-            buffer_size: 2 * 1024 * 1024,
+            batch_size: 2 * 1024 * 1024,
             bucket: BUCKET.to_string(),
             compression: Compression::None,
             batch_timeout: Some(5),
