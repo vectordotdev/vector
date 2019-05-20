@@ -4,6 +4,7 @@ extern crate tokio_codec;
 
 use bytes::{BufMut, BytesMut};
 use codec::BytesDelimitedCodec;
+use std::collections::HashMap;
 use tokio_codec::{Decoder, Encoder};
 
 #[test]
@@ -38,4 +39,27 @@ fn bytes_decode_max_length() {
     assert!(codec.decode(buf).is_err());
     assert!(codec.decode(buf).is_ok());
     assert!(codec.decode_eof(buf).is_err());
+}
+
+#[test]
+fn bytes_decode_json_escaped() {
+    let mut input = HashMap::new();
+    input.insert("key", "value");
+    input.insert("new", "li\nne");
+
+    let mut bytes = serde_json::to_vec(&input).unwrap();
+    bytes.push(b'\n');
+
+    println!("json {:?}", String::from_utf8(bytes.clone()).unwrap());
+
+    let mut codec = BytesDelimitedCodec::new(b'\n');
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(bytes.len());
+    buf.extend(bytes);
+
+    let result = codec.decode(buf).unwrap();
+
+    assert!(result.is_some());
+    assert!(buf.is_empty());
 }
