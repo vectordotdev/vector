@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event},
+    event::{self, Event, ValueKind},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -27,6 +27,7 @@ pub struct HecSinkConfig {
     pub compression: Option<Compression>,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -35,6 +36,13 @@ pub struct HecSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 fn default_host_field() -> Atom {
@@ -69,6 +77,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+    let encoding = config.encoding.clone();
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -106,21 +115,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let sink = BatchServiceSink::new(service, acker)
         .batched(Buffer::new(gzip), buffer_size)
-        .with(move |event: Event| {
-            let host = event.as_log().get(&host_field).map(|h| h.clone());
-
-            let mut body = json!({
-                "event": event.as_log()[&event::MESSAGE].to_string_lossy(),
-                "fields": event.as_log().explicit_fields(),
-            });
-
-            if let Some(host) = host {
-                let host = host.to_string_lossy();
-                body["host"] = json!(host);
-            }
-            let body = serde_json::to_vec(&body).unwrap();
-            Ok(body)
-        });
+        .with(move |e| encode_event(&host_field, e, &encoding));
 
     Ok(Box::new(sink))
 }
@@ -161,9 +156,76 @@ pub fn validate_host(host: &String) -> Result<(), String> {
     }
 }
 
+fn encode_event(
+    host_field: &Atom,
+    event: Event,
+    encoding: &Option<Encoding>,
+) -> Result<Vec<u8>, ()> {
+    let mut event = event.into_log();
+
+    let host = event.get(&host_field).map(|h| h.clone());
+    let timestamp = if let Some(ValueKind::Timestamp(ts)) = event.remove(&event::TIMESTAMP) {
+        ts.timestamp()
+    } else {
+        chrono::Utc::now().timestamp()
+    };
+
+    let mut body = match (encoding, event.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => json!({
+            "event": event.all_fields(),
+            "fields": event.explicit_fields(),
+            "time": timestamp,
+        }),
+        (&Some(Encoding::Text), _) | (_, false) => json!({
+            "event": event[&event::MESSAGE].to_string_lossy(),
+            "time": timestamp,
+        }),
+    };
+
+    if let Some(host) = host {
+        let host = host.to_string_lossy();
+        body["host"] = json!(host);
+    }
+
+    serde_json::to_vec(&body).map_err(|e| panic!("Error encoding json body: {}", e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{self, Event};
+    use serde::Deserialize;
+    use std::collections::HashMap;
+
+    #[derive(Deserialize, Debug)]
+    struct HecEvent {
+        time: i64,
+        event: HashMap<String, String>,
+        fields: HashMap<String, String>,
+    }
+
+    #[test]
+    fn splunk_encode_event_structured() {
+        let host = "host".into();
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_explicit("key".into(), "value".into());
+
+        let bytes = encode_event(&host, event, &None).unwrap();
+
+        let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
+
+        let event = &hec_event.event;
+        let kv = event.get("key".into()).unwrap();
+
+        assert_eq!(kv, &"value".to_string());
+        assert_eq!(
+            event[&event::MESSAGE.to_string()],
+            "hello world".to_string()
+        );
+        assert!(event.get(&event::TIMESTAMP.to_string()).is_none());
+    }
 
     #[test]
     fn splunk_validate_host() {
@@ -275,7 +337,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -283,8 +345,9 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
     }
 
     #[test]
@@ -310,7 +373,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -318,9 +381,11 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
-        assert_eq!("example.com:1234", entry["host"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("example.com:1234", host);
     }
 
     #[test]
@@ -354,7 +419,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap() == message)
+                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -362,9 +427,11 @@ mod integration_tests {
             })
             .expect("Didn't find event in Splunk");
 
-        assert_eq!(message, entry["_raw"].as_str().unwrap());
-        assert_eq!("hello", entry["asdf"].as_str().unwrap());
-        assert_eq!("beef.example.com:1234", entry["host"].as_str().unwrap());
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("beef.example.com:1234", host);
     }
 
     #[test]
