@@ -50,8 +50,6 @@ fn bytes_decode_json_escaped() {
     let mut bytes = serde_json::to_vec(&input).unwrap();
     bytes.push(b'\n');
 
-    println!("json {:?}", String::from_utf8(bytes.clone()).unwrap());
-
     let mut codec = BytesDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
 
