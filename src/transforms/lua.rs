@@ -6,12 +6,14 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
     source: String,
+    #[serde(default)]
+    search_dirs: Vec<String>,
 }
 
 #[typetag::serde(name = "lua")]
 impl crate::topology::config::TransformConfig for LuaConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Lua::new(&self.source).map(|l| {
+        Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
         })
@@ -23,10 +25,25 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str) -> Result<Self, String> {
+    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, String> {
         let lua = rlua::Lua::new();
 
+        let additional_paths = search_dirs
+            .into_iter()
+            .map(|d| format!("{}/?.lua", d))
+            .collect::<Vec<_>>()
+            .join(";");
+
         lua.context(|ctx| {
+            if !additional_paths.is_empty() {
+                let package = ctx.globals().get::<_, rlua::Table>("package")?;
+                let current_paths = package
+                    .get::<_, String>("path")
+                    .unwrap_or_else(|_| ";".to_string());
+                let paths = format!("{};{}", additional_paths, current_paths);
+                package.set("path", paths)?;
+            }
+
             let func = ctx.load(&source).into_function()?;
             ctx.set_named_registry_value("vector_func", func)?;
             Ok(())
@@ -110,6 +127,7 @@ mod tests {
             r#"
               event["hello"] = "goodbye"
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -127,6 +145,7 @@ mod tests {
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
               event["name"] = name
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -143,6 +162,7 @@ mod tests {
             r#"
               event["name"] = nil
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -161,6 +181,7 @@ mod tests {
             r#"
               event = nil
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -183,6 +204,7 @@ mod tests {
                 event["result"] = "found"
               end
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -198,6 +220,7 @@ mod tests {
             r#"
               event["number"] = 3
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -211,6 +234,7 @@ mod tests {
             r#"
               event["junk"] = {"asdf"}
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -225,6 +249,7 @@ mod tests {
             r#"
               event[false] = "hello"
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -239,6 +264,7 @@ mod tests {
             r#"
               print(event[false])
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -253,6 +279,7 @@ mod tests {
             r#"
               error("this is an error")
             "#,
+            vec![],
         )
         .unwrap();
 
@@ -267,10 +294,46 @@ mod tests {
             r#"
               1234 = sadf <>&*!#@
             "#,
+            vec![],
         )
         .map(|_| ())
         .unwrap_err();
 
         assert!(err.contains("syntax error:"), err);
+    }
+
+    #[test]
+    fn lua_load_file() {
+        use std::fs::File;
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut file = File::create(dir.path().join("script2.lua")).unwrap();
+        write!(
+            &mut file,
+            r#"
+              local M = {{}}
+
+              local function modify(event2)
+                event2["new field"] = "new value"
+              end
+              M.modify = modify
+
+              return M
+            "#
+        )
+        .unwrap();
+
+        let source = r#"
+          local script2 = require("script2")
+          script2.modify(event)
+        "#;
+
+        let transform = Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
+        let event = Event::new_empty_log();
+        let event = transform.transform(event).unwrap();
+
+        assert_eq!(event[&"new field".into()], "new value".into());
     }
 }
