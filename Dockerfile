@@ -34,6 +34,7 @@ COPY --from=build /vector/target/release/vector /vector
 
 RUN apt-get update && apt-get install -y \
 	libssl-dev && \
-	rm -rf /var/lib/apt/lists/*
+	rm -rf /var/lib/apt/lists/* && \
+	rm -rf /var/cache/apt/*
 
 ENTRYPOINT ["/vector/vector"]
