@@ -216,7 +216,7 @@ jobs:
           name: Build
           command: |
             # TODO: fetch tag
-            docker build -t timberio/vector:latest
+            docker build -t timberio/vector:latest .
 
 test-workflow-filters: &test-workflow-filters
   filters:
