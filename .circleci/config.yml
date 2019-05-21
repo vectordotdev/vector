@@ -208,6 +208,16 @@ jobs:
             brew install awscli
             ./ci/release.sh
 
+  release-docker:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            # TODO: fetch tag
+            docker build -t timberio/vector:latest
+
 test-workflow-filters: &test-workflow-filters
   filters:
     branches:
@@ -232,6 +242,9 @@ workflows:
       - check-stable:
           <<: *test-workflow-filters
       - test-stable:
+          <<: *test-workflow-filters
+      # TODO: move this to release
+      - release-docker:
           <<: *test-workflow-filters
   
   release:
