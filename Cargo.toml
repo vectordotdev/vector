@@ -3,6 +3,10 @@ name = "vector"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
+description = "Vector Contributors <vector@timber.io>"
+homepage = "vectorproject.io"
+license = "apache-2.0"
+readme = "README.md"
 publish = false
 
 [workspace]
@@ -100,8 +104,8 @@ elastic = { git = "https://github.com/elastic-rs/elastic" }
 matches = "0.1.8"
 
 [features]
-"default" = ["rdkafka", "leveldb"]
-"docker" = [
+default = ["rdkafka", "leveldb"]
+docker = [
   "cloudwatch-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
@@ -109,12 +113,12 @@ matches = "0.1.8"
   "s3-integration-tests",
   "splunk-integration-tests",
 ]
-"cloudwatch-integration-tests" = []
-"es-integration-tests" = []
-"kafka-integration-tests" = []
-"kinesis-integration-tests" = []
-"s3-integration-tests" = []
-"splunk-integration-tests" = []
+cloudwatch-integration-tests = []
+es-integration-tests = []
+kafka-integration-tests = []
+kinesis-integration-tests = []
+s3-integration-tests = []
+splunk-integration-tests = []
 
 [[bench]]
 name = "bench"
