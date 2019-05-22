@@ -1,6 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::borrow::Cow;
@@ -225,7 +225,7 @@ impl ValueKind {
 }
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339()
+    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 fn decode_value(input: proto::Value) -> Option<Value> {
