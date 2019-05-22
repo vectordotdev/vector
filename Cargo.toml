@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.1.0"
+version = "0.2.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 publish = false
