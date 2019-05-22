@@ -1,4 +1,8 @@
 <p align="center">
+  <strong>Join our beta! Timber is looking for select beta testers to hep shape the future of Vector</strong>
+</p>
+
+<p align="center">
   <img src="./assets/readme_diagram.svg" alt="Vector">
 </p>
 
@@ -13,7 +17,7 @@ Vector is a high-performance routing layer for observability data. It makes [col
 [deployed][deployment] across your entire infrastructure, serving both as a light-weight [agent]
 and a highly efficient [service].
 
-Vector is designed with a [*keen* focus on performance][performance] and
+Built in [Rust][rust], Vector has a [*keen* focus on performance][performance] and
 [operator friendliness][administration]. Its purpose is to decouple routing from the services,
 giving you complete flexibility to adopt the services of your choice, among
 [many other benefits][use_cases].
@@ -22,7 +26,7 @@ giving you complete flexibility to adopt the services of your choice, among
 
 #### About
 
-* [**Use cases**][use_cases]
+* [**Use cases**][use_cases] - [cost], [governance], [security], [backups], [lock-in], [multi-cloud]
 * [**Performance**][performance]
 * [**Correctness**][correctness]
 * [**Concepts**][concepts]
@@ -32,15 +36,30 @@ giving you complete flexibility to adopt the services of your choice, among
 
 * [**Installation**][installation]
 * [**Getting started**][getting_started]
-* [**Deployment**][deployment]
+* [**Deployment**][deployment] - [topologies], [roles]
 
 #### Usage
 
 * [**Configuration**][configuration] - [sources], [transforms], [sinks]
-* [**Administration**][administration]
+* [**Administration**][administration] - [start], [stop], [reload], [update]
 * [**Guides**][guides]
 
 ---
+
+## Why?
+
+With the shift towards cloud-native archictectures the approch to managing observability data
+is rapidly changing. Legacy approaches to managing logare becoming increasingly awkward and
+untenable. From sheer scaling and management to cost, sophisticated architectures no longer
+shove log data into a single.
+
+- Cloud-scale
+- Sophi
+- Mercy of vendors
+- Siophisticated pipelines are composed of multiple systems,
+- Achieving these sophisticted setups requires a talented team, deep big dat experience, and
+deep pockets. Vectors aims to tear that down, enabling engineers to build out sophisticated
+pipelines by simply specifying their toploogy in a configuration file.
 
 ## Performance
 
@@ -53,7 +72,7 @@ giving you complete flexibility to adopt the services of your choice, among
 We use `flog` to build a sample set of log files to test sending logs from a file. This can
 be done with the following commands on mac with homebrew.
 
-``` bash
+```bash
 brew tap mingrammer/flog
 brew install flog
 $ flog --bytes $((100 * 1024 * 1024)) > sample.log
@@ -68,13 +87,13 @@ latest stable release of the Rust compiler.
 
 Building is very easy, all you need to do is install Rust:
 
-```
+```bash
 curl https://sh.rustup.rs -sSf | sh
 ```
 
 And then use `cargo` to build:
 
-``` bash
+```bash
 cargo build
 ```
 
@@ -92,13 +111,27 @@ cargo test
 cargo test --features docker
 ```
 
+### Benchmarking
+
+You can run the internal project benchmarks with
+
+```
+cargo bench
+```
+
+### Test Harness
+
+In addition, we maintain a separate higher-level [test harness][test_harness] designed
+for performance and correctness testing.
+
+
 ### Code Style
 
 We use `rustfmt` on `stable` to format our code and CI will verify that your code follows
 this format style. To run the following command make sure `rustfmt` has been installed on
 the stable toolchain locally.
 
-``` bash
+```bash
 cargo fmt
 ```
 
@@ -116,18 +149,31 @@ unsure, open a pull request.
 
 [administration]: https://docs.vectorproject.io/usage/administration
 [agent]: https://docs.vectorproject.io/setup/deployment/roles/agent
+[backups]: https://docs.vectorproject.io/about/use_cases/backups
 [configuration]: https://docs.vectorproject.io/usage/configuration
 [concepts]: https://docs.vectorproject.io/about/concepts
+[cost]: https://docs.vectorproject.io/about/use_cases/cost
 [correctness]: https://docs.vectorproject.io/about/correctness
 [data_model]: https://docs.vectorproject.io/about/data_model
 [deployment]: https://docs.vectorproject.io/setup/deployment
 [getting_started]: https://docs.vectorproject.io/setup/getting_started
+[governance]: https://docs.vectorproject.io/about/use_cases/governance
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
+[lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
+[multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/about/performance
+[reload]: https://docs.vectorproject.io/usage/administration/reloading
+[roles]: https://docs.vectorproject.io/setup/deployment/roles
 [rust]: https://www.rust-lang.org/
+[security]: https://docs.vectorproject.io/about/use_cases/security-and-compliance
 [service]: https://docs.vectorproject.io/setup/deployment/roles/service
 [sinks]: https://docs.vectorproject.io/usage/configuration/sinks
 [sources]: https://docs.vectorproject.io/usage/configuration/sources
+[start]: https://docs.vectorproject.io/usage/administration/starting
+[stop]: https://docs.vectorproject.io/usage/administration/stopping
+[test_harness]: https://github.com/timberio/vector-test-harness
+[topologies]: https://docs.vectorproject.io/setup/deployment/topologies
 [transforms]: https://docs.vectorproject.io/usage/configuration/transforms
+[update]: https://docs.vectorproject.io/usage/administration/updating
 [use_cases]: https://docs.vectorproject.io/use_cases
