@@ -9,11 +9,11 @@ pub mod elasticsearch;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
-pub mod native;
 pub mod prometheus;
 pub mod splunk_hec;
 pub mod tcp;
 pub mod util;
+pub mod vector;
 
 use crate::Event;
 

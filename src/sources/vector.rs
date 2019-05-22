@@ -15,7 +15,7 @@ use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct NativeConfig {
+pub struct VectorConfig {
     pub address: String,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
@@ -25,7 +25,7 @@ fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
-impl NativeConfig {
+impl VectorConfig {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
             address: addr.to_string(),
@@ -34,18 +34,18 @@ impl NativeConfig {
     }
 }
 
-#[typetag::serde(name = "native")]
-impl crate::topology::config::SourceConfig for NativeConfig {
+#[typetag::serde(name = "vector")]
+impl crate::topology::config::SourceConfig for VectorConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        let native = native(self.clone(), out)?;
-        Ok(native)
+        let vector = vector(self.clone(), out)?;
+        Ok(vector)
     }
 }
 
-pub fn native(config: NativeConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+pub fn vector(config: VectorConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
-    let NativeConfig {
+    let VectorConfig {
         address,
         shutdown_timeout_secs,
     } = config;
@@ -129,26 +129,26 @@ pub fn native(config: NativeConfig, out: mpsc::Sender<Event>) -> Result<super::S
 
 #[cfg(test)]
 mod test {
-    use super::NativeConfig;
+    use super::VectorConfig;
     use crate::{
         buffers::Acker,
-        sinks::native::native,
+        sinks::vector::vector,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
         Event,
     };
     use futures::{stream, sync::mpsc, Future, Sink};
 
     #[test]
-    fn tcp_it_works_with_native_sink() {
+    fn tcp_it_works_with_vector_sink() {
         let (tx, rx) = mpsc::channel(100);
 
         let addr = next_addr();
-        let server = super::native(NativeConfig::new(addr.clone()), tx).unwrap();
+        let server = super::vector(VectorConfig::new(addr.clone()), tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let sink = native(addr, Acker::Null);
+        let sink = vector(addr, Acker::Null);
         let events = vec![
             Event::from("test"),
             Event::from("events"),

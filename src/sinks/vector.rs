@@ -13,18 +13,18 @@ use tokio::net::TcpStream;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct NativeSinkConfig {
+pub struct VectorSinkConfig {
     pub address: String,
 }
 
-impl NativeSinkConfig {
+impl VectorSinkConfig {
     pub fn new(address: String) -> Self {
         Self { address }
     }
 }
 
-#[typetag::serde(name = "native")]
-impl crate::topology::config::SinkConfig for NativeSinkConfig {
+#[typetag::serde(name = "vector")]
+impl crate::topology::config::SinkConfig for VectorSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let addr = self
             .address
@@ -33,14 +33,14 @@ impl crate::topology::config::SinkConfig for NativeSinkConfig {
             .next()
             .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
 
-        let sink = native(addr, acker);
+        let sink = vector(addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
     }
 }
 
-pub fn native(addr: SocketAddr, acker: Acker) -> super::RouterSink {
+pub fn vector(addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
         TcpSink::new(addr)
             .stream_ack(acker)
@@ -48,7 +48,7 @@ pub fn native(addr: SocketAddr, acker: Acker) -> super::RouterSink {
     )
 }
 
-pub fn native_healthcheck(addr: SocketAddr) -> super::Healthcheck {
+pub fn vector_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
