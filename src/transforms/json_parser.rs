@@ -4,20 +4,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
+#[derivative(Default)]
 pub struct JsonParserConfig {
-    pub field: Atom,
+    pub field: Option<String>,
     pub drop_invalid: bool,
-}
-
-impl Default for JsonParserConfig {
-    fn default() -> Self {
-        Self {
-            field: event::MESSAGE.clone(),
-            drop_invalid: false,
-        }
-    }
+    #[derivative(Default(value = "true"))]
+    pub drop_field: bool,
 }
 
 #[typetag::serde(name = "json_parser")]
@@ -28,18 +22,40 @@ impl crate::topology::config::TransformConfig for JsonParserConfig {
 }
 
 struct JsonParser {
-    config: JsonParserConfig,
+    field: Option<Atom>,
+    drop_invalid: bool,
+    drop_field: bool,
 }
 
 impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
-        JsonParser { config }
+        JsonParser {
+            field: config.field.map(Atom::from),
+            drop_invalid: config.drop_invalid,
+            drop_field: config.drop_field,
+        }
     }
 }
 
 impl Transform for JsonParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let to_parse = event.as_log().get(&self.config.field).map(|s| s.as_bytes());
+        let field = if let Some(field) = &self.field {
+            field
+        } else {
+            &event::MESSAGE
+        };
+
+        let to_parse = if self.drop_field {
+            event
+                .as_mut_log()
+                .remove(&field)
+                .map(|s| s.as_bytes().into_owned())
+        } else {
+            event
+                .as_log()
+                .get(&field)
+                .map(|s| s.as_bytes().into_owned())
+        };
 
         let parsed = to_parse
             .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse.as_ref()).ok())
@@ -56,7 +72,7 @@ impl Transform for JsonParser {
                 insert(&mut event, name, value);
             }
         } else {
-            if self.config.drop_invalid {
+            if self.drop_invalid {
                 return None;
             }
         }
@@ -108,8 +124,34 @@ mod test {
     use string_cache::DefaultAtom as Atom;
 
     #[test]
+    fn json_parser_drop_field() {
+        let parser = JsonParser::from(JsonParserConfig::default());
+
+        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+
+        let event = parser.transform(event).unwrap();
+
+        assert!(event.as_log().get(&event::MESSAGE).is_none());
+    }
+
+    #[test]
+    fn json_parser_doesnt_drop_field() {
+        let parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
+            ..Default::default()
+        });
+
+        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+
+        let event = parser.transform(event).unwrap();
+
+        assert!(event.as_log().get(&event::MESSAGE).is_some());
+    }
+
+    #[test]
     fn json_parser_parse_raw() {
         let parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
             ..Default::default()
         });
 
@@ -128,7 +170,8 @@ mod test {
     #[test]
     fn json_parser_parse_field() {
         let parser = JsonParser::from(JsonParserConfig {
-            field: "data".into(),
+            field: Some("data".into()),
+            drop_field: false,
             ..Default::default()
         });
 
@@ -164,7 +207,7 @@ mod test {
         });
 
         let parser_inner = JsonParser::from(JsonParserConfig {
-            field: "log".into(),
+            field: Some("log".into()),
             ..Default::default()
         });
 
@@ -190,6 +233,7 @@ mod test {
 
         // Raw
         let parser = JsonParser::from(JsonParserConfig {
+            drop_field: false,
             ..Default::default()
         });
 
@@ -202,7 +246,8 @@ mod test {
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: "data".into(),
+            field: Some("data".into()),
+            drop_field: false,
             ..Default::default()
         });
 
@@ -240,7 +285,7 @@ mod test {
 
         // Field
         let parser = JsonParser::from(JsonParserConfig {
-            field: "data".into(),
+            field: Some("data".into()),
             drop_invalid: true,
             ..Default::default()
         });
@@ -274,7 +319,7 @@ mod test {
             ..Default::default()
         });
         let parser2 = JsonParser::from(JsonParserConfig {
-            field: "nested".into(),
+            field: Some("nested".into()),
             ..Default::default()
         });
 

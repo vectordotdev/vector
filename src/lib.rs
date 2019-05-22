@@ -2,9 +2,10 @@
 
 #[macro_use]
 extern crate tokio_trace;
-
 #[macro_use]
 extern crate prost_derive;
+#[macro_use]
+extern crate derivative;
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
