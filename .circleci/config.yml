@@ -236,10 +236,10 @@ jobs:
           name: Upload
           command: |
             # TODO: fetch version number from cargo.toml
-            export VERSION="0.1.0"
-            ./ci/package_cloud.sh debian/9 $VERSION
-            ./ci/package_cloud.sh debian/10 $VERSION
-            ./ci/package_cloud.sh ubuntu/17.04 $VERSION
+            # export VERSION="0.1.0"
+            # ./ci/package_cloud.sh debian/9 $VERSION
+            # ./ci/package_cloud.sh debian/10 $VERSION
+            # ./ci/package_cloud.sh ubuntu/17.04 $VERSION
 
 test-workflow-filters: &test-workflow-filters
   filters:
@@ -266,11 +266,6 @@ workflows:
           <<: *test-workflow-filters
       - test-stable:
           <<: *test-workflow-filters
-      - release-docker:
-          <<: *test-workflow-filters
-      - release-apt:
-          <<: *test-workflow-filters
-
   
   release:
     jobs:
@@ -287,6 +282,18 @@ workflows:
             - check-stable
             - test-stable
       - release-x86_64-apple-darwin:
+          <<: *release-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-docker:
+          <<: *release-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-docker:
           <<: *release-workflow-filters
           requires:
             - rustfmt
