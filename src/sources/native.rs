@@ -1,65 +1,54 @@
-use super::util::StreamExt as _;
-use crate::event::{self, Event};
-use bytes::Bytes;
-use codec::{self, BytesDelimitedCodec};
+use crate::{event::proto, Event};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
+use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
 use stream_cancel::{StreamExt, Tripwire};
-use tokio::{codec::FramedRead, net::TcpListener, timer};
+use tokio::{
+    codec::{FramedRead, LengthDelimitedCodec},
+    net::TcpListener,
+    timer,
+};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct TcpConfig {
+pub struct NativeConfig {
     pub address: String,
-    #[serde(default = "default_max_length")]
-    pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
-    pub host_key: Option<String>,
-}
-
-fn default_max_length() -> usize {
-    100 * 1024
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
-impl TcpConfig {
+impl NativeConfig {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
             address: addr.to_string(),
-            max_length: default_max_length(),
-            host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
 }
 
-#[typetag::serde(name = "tcp")]
-impl crate::topology::config::SourceConfig for TcpConfig {
+#[typetag::serde(name = "native")]
+impl crate::topology::config::SourceConfig for NativeConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        let tcp = tcp(self.clone(), out)?;
-        Ok(tcp)
+        let native = native(self.clone(), out)?;
+        Ok(native)
     }
 }
 
-pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+pub fn native(config: NativeConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
     let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
 
-    let TcpConfig {
+    let NativeConfig {
         address,
-        max_length,
-        host_key,
         shutdown_timeout_secs,
     } = config;
-
-    let host_key = host_key.unwrap_or(event::HOST.to_string());
 
     let addr = address
         .to_socket_addrs()
@@ -91,15 +80,12 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
             .map_err(|e| error!("failed to accept socket; error = {}", e))
             .for_each(move |socket| {
                 let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
-                let host_key = host_key.clone();
 
                 let span = if let Some(addr) = &peer_addr {
                     info_span!("connection", peer_addr = field::display(addr))
                 } else {
                     info_span!("connection")
                 };
-
-                let host = peer_addr.map(Bytes::from);
 
                 let inner_span = span.clone();
                 let tripwire = tripwire
@@ -117,30 +103,17 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
 
                     let out = out.clone();
 
-                    let lines_in = FramedRead::new(
-                        socket,
-                        BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
-                    )
-                    .take_until(tripwire)
-                    .map(Event::from)
-                    .map(move |mut event| {
-                        if let Some(host) = &host {
-                            event
-                                .as_mut_log()
-                                .insert_implicit(host_key.clone().into(), host.clone().into());
-                        }
-
-                        trace!(message = "Received one line.", event = field::debug(&event));
-                        event
-                    })
-                    .filter_map_err(|err| match err {
-                        codec::Error::MaxLimitExceeded => {
-                            warn!("Received line longer than max_length. Discarding.");
-                            None
-                        }
-                        codec::Error::Io(io) => Some(io),
-                    })
-                    .map_err(|e| warn!("connection error: {:?}", e));
+                    let lines_in = FramedRead::new(socket, LengthDelimitedCodec::new())
+                        .take_until(tripwire)
+                        .filter_map(|bytes| match proto::EventWrapper::decode(bytes) {
+                            Ok(e) => Some(e),
+                            Err(e) => {
+                                error!("failed to parse protobuf message: {:?}", e);
+                                None
+                            }
+                        })
+                        .map(Event::from)
+                        .map_err(|e| warn!("connection error: {:?}", e));
 
                     let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
 
@@ -156,80 +129,43 @@ pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source,
 
 #[cfg(test)]
 mod test {
-    use super::TcpConfig;
-    use crate::event;
-    use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
-    use futures::sync::mpsc;
-    use futures::Stream;
+    use super::NativeConfig;
+    use crate::{
+        buffers::Acker,
+        sinks::native::native,
+        test_util::{next_addr, wait_for_tcp, CollectCurrent},
+        Event,
+    };
+    use futures::{stream, sync::mpsc, Future, Sink};
 
     #[test]
-    fn tcp_it_includes_host() {
-        let (tx, rx) = mpsc::channel(1);
+    fn tcp_it_works_with_native_sink() {
+        let (tx, rx) = mpsc::channel(100);
 
         let addr = next_addr();
-
-        let server = super::tcp(TcpConfig::new(addr), tx).unwrap();
+        let server = super::native(NativeConfig::new(addr.clone()), tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        rt.block_on(send_lines(addr, vec!["test".to_owned()].into_iter()))
-            .unwrap();
-
-        let event = rx.wait().next().unwrap().unwrap();
-        assert_eq!(event.as_log()[&event::HOST], "127.0.0.1".into());
-    }
-
-    #[test]
-    fn tcp_it_defaults_max_length() {
-        let with: super::TcpConfig = toml::from_str(
-            r#"
-            address = "127.0.0.1:1234"
-            max_length = 19
-            "#,
-        )
-        .unwrap();
-
-        let without: super::TcpConfig = toml::from_str(
-            r#"
-            address = "127.0.0.1:1234"
-            "#,
-        )
-        .unwrap();
-
-        assert_eq!(with.max_length, 19);
-        assert_eq!(without.max_length, super::default_max_length());
-    }
-
-    #[test]
-    fn tcp_continue_after_long_line() {
-        let (tx, rx) = mpsc::channel(10);
-
-        let addr = next_addr();
-
-        let mut config = TcpConfig::new(addr);
-        config.max_length = 10;
-
-        let server = super::tcp(config, tx).unwrap();
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        rt.spawn(server);
-        wait_for_tcp(addr);
-
-        let lines = vec![
-            "short".to_owned(),
-            "this is too long".to_owned(),
-            "more short".to_owned(),
+        let sink = native(addr, Acker::Null);
+        let events = vec![
+            Event::from("test"),
+            Event::from("events"),
+            Event::from("to roundtrip"),
+            Event::from("through"),
+            Event::from("the native"),
+            Event::from("sink"),
+            Event::from("and"),
+            Event::from("source"),
         ];
 
-        rt.block_on(send_lines(addr, lines.into_iter())).unwrap();
+        rt.block_on(sink.send_all(stream::iter_ok(events.clone().into_iter())))
+            .unwrap();
 
-        let (event, rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(event.unwrap().as_log()[&event::MESSAGE], "short".into());
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
-        let (event, _rx) = block_on(rx.into_future()).unwrap();
-        assert_eq!(
-            event.unwrap().as_log()[&event::MESSAGE],
-            "more short".into()
-        );
+        let (_, output) = CollectCurrent::new(rx).wait().unwrap();
+        assert_eq!(events, output);
     }
 }
