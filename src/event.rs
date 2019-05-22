@@ -225,7 +225,33 @@ impl ValueKind {
 }
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
+    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+}
+
+fn decode_value(input: proto::Value) -> Option<Value> {
+    let explicit = input.explicit;
+    let value = match proto::value::Kind::from_i32(input.kind) {
+        Some(proto::value::Kind::Bytes) => Some(input.data.into()),
+        Some(proto::value::Kind::Timestamp) => {
+            if let Ok(dt) =
+                DateTime::parse_from_rfc3339(String::from_utf8_lossy(&input.data).as_ref())
+                    .map(|dt| dt.with_timezone(&Utc))
+            {
+                Some(dt.into())
+            } else {
+                error!("encoded timestamp is invalid");
+                None
+            }
+        }
+        None => {
+            error!("encoded event contains unknown value kind");
+            None
+        }
+    };
+    value.map(|decoded| Value {
+        value: decoded,
+        explicit,
+    })
 }
 
 impl From<proto::EventWrapper> for Event {
@@ -237,13 +263,7 @@ impl From<proto::EventWrapper> for Event {
                 let structured = proto
                     .structured
                     .into_iter()
-                    .map(|(k, v)| {
-                        let value = Value {
-                            value: v.data.into(),
-                            explicit: v.explicit,
-                        };
-                        (Atom::from(k), value)
-                    })
+                    .filter_map(|(k, v)| decode_value(v).map(|value| (Atom::from(k), value)))
                     .collect::<HashMap<_, _>>();
 
                 Event::Log(LogEvent { structured })
@@ -307,6 +327,11 @@ impl From<Event> for proto::EventWrapper {
                         let value = proto::Value {
                             data: v.value.as_bytes().into_owned(),
                             explicit: v.explicit,
+                            kind: match v.value {
+                                ValueKind::Bytes(_) => proto::value::Kind::Bytes,
+                                ValueKind::Timestamp(_) => proto::value::Kind::Timestamp,
+                            }
+                            .into(),
                         };
                         (k.to_string(), value)
                     })

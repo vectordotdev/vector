@@ -16,6 +16,11 @@ message Log {
 message Value {
   bytes data = 1;
   bool explicit = 2;
+  enum Kind {
+    Bytes = 0;
+    Timestamp = 1;
+  }
+  Kind kind = 3;
 }
 
 message Metric {

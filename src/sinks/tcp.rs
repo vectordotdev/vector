@@ -4,13 +4,12 @@ use crate::{
     sinks::util::SinkExt,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
 use tokio::{
-    codec::FramedWrite,
+    codec::{BytesCodec, FramedWrite},
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
@@ -57,7 +56,7 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
     }
 }
 
-struct TcpSink {
+pub struct TcpSink {
     addr: SocketAddr,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
@@ -66,7 +65,7 @@ struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(ConnectFuture),
-    Connected(FramedWrite<TcpStream, BytesDelimitedCodec>),
+    Connected(FramedWrite<TcpStream, BytesCodec>),
     Backoff(Delay),
 }
 
@@ -86,7 +85,7 @@ impl TcpSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, BytesDelimitedCodec>, ()> {
+    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, BytesCodec>, ()> {
         loop {
             match self.state {
                 TcpSinkState::Disconnected => {
@@ -109,10 +108,8 @@ impl TcpSink {
                     Ok(Async::Ready(socket)) => {
                         let addr = socket.peer_addr().unwrap_or(self.addr);
                         debug!(message = "connected", addr = &field::display(&addr));
-                        self.state = TcpSinkState::Connected(FramedWrite::new(
-                            socket,
-                            BytesDelimitedCodec::new(b'\n'),
-                        ));
+                        self.state =
+                            TcpSinkState::Connected(FramedWrite::new(socket, BytesCodec::new()));
                         self.backoff = Self::fresh_backoff();
                     }
                     Ok(Async::NotReady) => {
@@ -217,5 +214,8 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> 
         }
     };
 
-    b.map(Bytes::from)
+    b.map(|mut b| {
+        b.push(b'\n');
+        Bytes::from(b)
+    })
 }

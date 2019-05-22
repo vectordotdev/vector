@@ -6,5 +6,6 @@ pub mod stdin;
 pub mod syslog;
 pub mod tcp;
 mod util;
+pub mod vector;
 
 pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
