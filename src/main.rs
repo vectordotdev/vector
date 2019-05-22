@@ -12,7 +12,7 @@ use vector::metrics;
 use vector::topology;
 
 fn main() {
-    let app = App::new("Vector").version("0.1.0").author("timber.io")
+    let app = App::new("Vector").version(built_info::PKG_VERSION).author("timber.io")
         .arg(
             Arg::with_name("config")
                 .short("c")
