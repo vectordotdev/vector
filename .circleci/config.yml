@@ -266,9 +266,11 @@ workflows:
           <<: *test-workflow-filters
       - test-stable:
           <<: *test-workflow-filters
-      # TODO: move this to release
       - release-docker:
           <<: *test-workflow-filters
+      - release-apt:
+          <<: *test-workflow-filters
+
   
   release:
     jobs:
