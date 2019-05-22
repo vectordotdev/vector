@@ -1,6 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::borrow::Cow;
@@ -225,7 +225,7 @@ impl ValueKind {
 }
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
+    timestamp.to_rfc3339()
 }
 
 impl From<proto::EventWrapper> for Event {
@@ -239,7 +239,18 @@ impl From<proto::EventWrapper> for Event {
                     .into_iter()
                     .map(|(k, v)| {
                         let value = Value {
-                            value: v.data.into(),
+                            value: match proto::value::Kind::from_i32(v.kind) {
+                                Some(proto::value::Kind::Bytes) => v.data.into(),
+                                Some(proto::value::Kind::Timestamp) => {
+                                    DateTime::parse_from_rfc3339(
+                                        String::from_utf8_lossy(&v.data).as_ref(),
+                                    )
+                                    .unwrap()
+                                    .with_timezone(&Utc)
+                                    .into()
+                                }
+                                None => unreachable!(),
+                            },
                             explicit: v.explicit,
                         };
                         (Atom::from(k), value)
@@ -307,6 +318,11 @@ impl From<Event> for proto::EventWrapper {
                         let value = proto::Value {
                             data: v.value.as_bytes().into_owned(),
                             explicit: v.explicit,
+                            kind: match v.value {
+                                ValueKind::Bytes(_) => proto::value::Kind::Bytes,
+                                ValueKind::Timestamp(_) => proto::value::Kind::Timestamp,
+                            }
+                            .into(),
                         };
                         (k.to_string(), value)
                     })
