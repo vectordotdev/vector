@@ -8,3 +8,4 @@ edition = "2018"
 bytes = "0.4"
 tokio-codec = "0.1"
 tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+serde_json = "1.0"
