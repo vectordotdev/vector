@@ -124,7 +124,7 @@ fn bytes_decode_json_multiline() {
     buf.extend(events.to_string().as_bytes());
 
     let mut i = 0;
-    while let Some(line) = codec.decode(buf).unwrap() {
+    while let Some(_) = codec.decode(buf).unwrap() {
         i += 1;
     }
 
