@@ -225,7 +225,7 @@ jobs:
   release-apt:
     resource_class: xlarge
     docker:
-      image: timberio/vector-deb-builder:latest
+      - image: timberio/vector-deb-builder:latest
     steps:
       - checkout
       - run:
