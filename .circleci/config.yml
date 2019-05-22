@@ -226,20 +226,20 @@ jobs:
     resource_class: xlarge
     docker:
       image: timberio/vector-deb-builder:latest
-      steps:
-        - checkout
-        - run:
-            name: Compile
-            command: |
-              cargo deb
-        - run:
-            name: Upload
-            command: |
-              # TODO: fetch version number from cargo.toml
-              export VERSION = "0.1.0"
-              ./ci/package_cloud.sh debian/9 $VERSION
-              ./ci/package_cloud.sh debian/10 $VERSION
-              ./ci/package_cloud.sh ubuntu/17.04 $VERSION
+    steps:
+      - checkout
+      - run:
+          name: Compile
+          command: |
+            cargo deb
+      - run:
+          name: Upload
+          command: |
+            # TODO: fetch version number from cargo.toml
+            export VERSION = "0.1.0"
+            ./ci/package_cloud.sh debian/9 $VERSION
+            ./ci/package_cloud.sh debian/10 $VERSION
+            ./ci/package_cloud.sh ubuntu/17.04 $VERSION
 
 test-workflow-filters: &test-workflow-filters
   filters:
