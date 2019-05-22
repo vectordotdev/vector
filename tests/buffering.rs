@@ -98,9 +98,6 @@ fn test_max_size() {
         example_event
             .as_mut_log()
             .insert_implicit("host".into(), "127.0.0.1".into());
-        example_event
-            .as_mut_log()
-            .insert_implicit("timestamp".into(), "2019-01-01T00:00:00.000Z".into());
 
         let mut proto = vec![];
         event::proto::EventWrapper::from(example_event)
