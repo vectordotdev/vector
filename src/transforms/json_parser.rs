@@ -46,15 +46,9 @@ impl Transform for JsonParser {
         };
 
         let to_parse = if self.drop_field {
-            event
-                .as_mut_log()
-                .remove(&field)
-                .map(|s| s.as_bytes().into_owned())
+            event.as_mut_log().remove(&field).map(|s| s.as_bytes())
         } else {
-            event
-                .as_log()
-                .get(&field)
-                .map(|s| s.as_bytes().into_owned())
+            event.as_log().get(&field).map(|s| s.as_bytes())
         };
 
         let parsed = to_parse

@@ -3,7 +3,6 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -207,11 +206,11 @@ impl ValueKind {
         }
     }
 
-    pub fn as_bytes(&self) -> Cow<'_, [u8]> {
+    pub fn as_bytes(&self) -> Bytes {
         match self {
-            ValueKind::Bytes(bytes) => Cow::from(bytes[..].as_ref()),
+            ValueKind::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
             ValueKind::Timestamp(timestamp) => {
-                Cow::from(timestamp_to_string(timestamp).into_bytes())
+                Bytes::from(timestamp_to_string(timestamp).into_bytes())
             }
         }
     }
@@ -325,7 +324,7 @@ impl From<Event> for proto::EventWrapper {
                     .into_iter()
                     .map(|(k, v)| {
                         let value = proto::Value {
-                            data: v.value.as_bytes().into_owned(),
+                            data: v.value.as_bytes().to_vec(),
                             explicit: v.explicit,
                             kind: match v.value {
                                 ValueKind::Bytes(_) => proto::value::Kind::Bytes,
@@ -411,7 +410,7 @@ impl From<Event> for Vec<u8> {
             .into_value(&MESSAGE)
             .unwrap()
             .as_bytes()
-            .into_owned()
+            .to_vec()
     }
 }
 

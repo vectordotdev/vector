@@ -238,7 +238,7 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
             })
             .map_err(|e| panic!("Error encoding: {}", e)),
         (&Some(Encoding::Text), _) | (_, false) => {
-            let mut bytes = log[&event::MESSAGE].as_bytes().into_owned();
+            let mut bytes = log[&event::MESSAGE].as_bytes().to_vec();
             bytes.push(b'\n');
             Ok(bytes)
         }

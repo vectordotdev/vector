@@ -42,10 +42,7 @@ impl Transform for RegexParser {
             &event::MESSAGE
         };
 
-        let field = event
-            .as_log()
-            .get(&field_name)
-            .map(|s| s.as_bytes().into_owned());
+        let field = event.as_log().get(&field_name).map(|s| s.as_bytes());
 
         if let Some(field) = &field {
             if let Some(captures) = self.regex.captures(&field) {
