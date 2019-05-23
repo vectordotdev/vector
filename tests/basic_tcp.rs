@@ -115,7 +115,7 @@ fn test_parse() {
         &["in"],
         transforms::regex_parser::RegexParserConfig {
             regex: r"status=(?P<status>\d+)".to_string(),
-            field_name: None,
+            field: None,
         },
     );
     config.add_transform(

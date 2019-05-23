@@ -9,13 +9,13 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
-    pub field_name: Option<Atom>,
+    pub field: Option<Atom>,
 }
 
 #[typetag::serde(name = "regex_parser")]
 impl crate::topology::config::TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field_name = self.field_name.clone();
+        let field_name = self.field.clone();
 
         Regex::new(&self.regex)
             .map_err(|err| err.to_string())
@@ -36,21 +36,16 @@ impl RegexParser {
 
 impl Transform for RegexParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let field = if let Some(field_name) = &self.field_name {
-            let field_value = event
-                .as_log()
-                .get(&field_name)
-                .map(|s| s.as_bytes().into_owned());
-
-            if let None = &field_value {}
-
-            field_value
+        let field_name = if let Some(field_name) = &self.field_name {
+            field_name
         } else {
-            event
-                .as_log()
-                .get(&event::MESSAGE)
-                .map(|s| s.as_bytes().into_owned())
+            &event::MESSAGE
         };
+
+        let field = event
+            .as_log()
+            .get(&field_name)
+            .map(|s| s.as_bytes().into_owned());
 
         if let Some(field) = &field {
             if let Some(captures) = self.regex.captures(&field) {
@@ -63,13 +58,10 @@ impl Transform for RegexParser {
                 }
             }
         } else {
-            let field_name = if let Some(field_name) = &self.field_name {
-                field_name.as_ref()
-            } else {
-                event::MESSAGE.as_ref()
-            };
-
-            debug!(message = "Field does not exist.", field = field_name);
+            debug!(
+                message = "Field does not exist.",
+                field = field_name.as_ref()
+            );
         }
 
         Some(event)
