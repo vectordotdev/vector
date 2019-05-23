@@ -40,17 +40,31 @@ impl RegexParser {
 impl Transform for RegexParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
         let field = if let Some(field) = &self.field {
-            event.as_log()[&field].as_bytes().into_owned()
+            let field_value = event
+                .as_log()
+                .get(&field)
+                .map(|s| s.as_bytes().into_owned());
+
+            if let None = &field_value {
+                debug!(message = "Field does not exist.", field = field.as_ref());
+            }
+
+            field_value
         } else {
-            event.as_log()[&event::MESSAGE].as_bytes().into_owned()
+            event
+                .as_log()
+                .get(&event::MESSAGE)
+                .map(|s| s.as_bytes().into_owned())
         };
 
-        if let Some(captures) = self.regex.captures(&field) {
-            for name in self.regex.capture_names().filter_map(|c| c) {
-                if let Some(capture) = captures.name(name) {
-                    event
-                        .as_mut_log()
-                        .insert_explicit(name.into(), capture.as_bytes().into());
+        if let Some(field) = &field {
+            if let Some(captures) = self.regex.captures(&field) {
+                for name in self.regex.capture_names().filter_map(|c| c) {
+                    if let Some(capture) = captures.name(name) {
+                        event
+                            .as_mut_log()
+                            .insert_explicit(name.into(), capture.as_bytes().into());
+                    }
                 }
             }
         }
