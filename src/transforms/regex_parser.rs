@@ -9,45 +9,40 @@ use string_cache::DefaultAtom as Atom;
 #[serde(deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
-    pub field: Option<String>,
+    pub field_name: Option<Atom>,
 }
 
 #[typetag::serde(name = "regex_parser")]
 impl crate::topology::config::TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field = self.field.clone();
+        let field_name = self.field_name.clone();
 
         Regex::new(&self.regex)
             .map_err(|err| err.to_string())
-            .map::<Box<dyn Transform>, _>(|r| Box::new(RegexParser::new(r, field)))
+            .map::<Box<dyn Transform>, _>(|r| Box::new(RegexParser::new(r, field_name)))
     }
 }
 
 pub struct RegexParser {
     regex: Regex,
-    field: Option<Atom>,
+    field_name: Option<Atom>,
 }
 
 impl RegexParser {
-    pub fn new(regex: Regex, field: Option<String>) -> Self {
-        Self {
-            regex,
-            field: field.map(Atom::from),
-        }
+    pub fn new(regex: Regex, field_name: Option<Atom>) -> Self {
+        Self { regex, field_name }
     }
 }
 
 impl Transform for RegexParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let field = if let Some(field) = &self.field {
+        let field = if let Some(field_name) = &self.field_name {
             let field_value = event
                 .as_log()
-                .get(&field)
+                .get(&field_name)
                 .map(|s| s.as_bytes().into_owned());
 
-            if let None = &field_value {
-                debug!(message = "Field does not exist.", field = field.as_ref());
-            }
+            if let None = &field_value {}
 
             field_value
         } else {
@@ -67,6 +62,14 @@ impl Transform for RegexParser {
                     }
                 }
             }
+        } else {
+            let field_name = if let Some(field_name) = &self.field_name {
+                field_name.as_ref()
+            } else {
+                event::MESSAGE.as_ref()
+            };
+
+            debug!(message = "Field does not exist.", field = field_name);
         }
 
         Some(event)
