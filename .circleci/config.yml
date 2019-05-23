@@ -176,7 +176,7 @@ jobs:
       - run:
           name: Test
           command: |
-            cargo test --all --features docker -- --test-threads 2
+            cargo test --all --features docker -- --test-threads 4
       - store_test_results:
           path: ./test-results
       - *save-git-cache
@@ -195,12 +195,6 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             cargo install cross
-      # - run:
-      #     name: Install AWS CLI
-      #   command: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y python3-pip
-      #     pip install --upgrade awscli
     - checkout
     - run:
         name: Cross Compile
@@ -226,8 +220,6 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            brew uninstall python
-            brew install awscli
             ./ci/release.sh
 
   release-docker:
@@ -254,14 +246,6 @@ jobs:
           name: Compile
           command: |
             cargo deb
-      - run:
-          name: Upload
-          command: |
-            # TODO: fetch version number from cargo.toml
-            # export VERSION="0.1.0"
-            # ./ci/package_cloud.sh debian/9 $VERSION
-            # ./ci/package_cloud.sh debian/10 $VERSION
-            # ./ci/package_cloud.sh ubuntu/17.04 $VERSION
 
 test-workflow-filters: &test-workflow-filters
   filters:
