@@ -11,10 +11,8 @@ hotmic = "0.8"
 [dev-dependencies]
 tokio-trace = "0.1"
 serde_json = "1.0"
-
-# echo
 futures = "0.1.25"
-tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
+tokio = "0.1.17"
 hyper = "0.12.18"
 tokio-connect = { git = "https://github.com/carllerche/tokio-connect" }
 tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
