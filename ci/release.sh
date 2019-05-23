@@ -42,10 +42,10 @@ function build_tar() {
   cd ..
 }
 
-function upload_s3() {
-  S3_URI="s3://packages.timber.io/vector/$S3_PATH"
-  aws s3 cp "$DIST_DIR/$TAR_NAME" "$S3_URI"
-}
+# function upload_s3() {
+#   S3_URI="s3://packages.timber.io/vector/$S3_PATH"
+#   aws s3 cp "$DIST_DIR/$TAR_NAME" "$S3_URI"
+# }
 
 # Temporarily allow unset variables in order to construct the BUILDSTAMP based
 # on variables that only _might_ be set
@@ -64,8 +64,8 @@ then
   build_release
   build_tar
 
-  S3_PATH="$TAR_NAME"
-  upload_s3
+  # S3_PATH="$TAR_NAME"
+  # upload_s3
 elif [ -n "$BRANCH" ]
 then
   TAG_DESCRIBE=$(git describe --tags)
@@ -73,8 +73,8 @@ then
   build_release
   build_tar
 
-  S3_PATH="$TAR_NAME"
-  upload_s3
+  # S3_PATH="$TAR_NAME"
+  # upload_s3
 else
   echo "error: neither TAG nor BRANCH was set"
   exit 1

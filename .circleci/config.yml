@@ -184,7 +184,29 @@ jobs:
       - *save-build-cache
 
   release-x86_64-unknown-linux-gnu:
-    <<: *release-job-defaults
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - run:
+          name: Install Cross
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            cargo install cross
+      # - run:
+      #     name: Install AWS CLI
+      #   command: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y python3-pip
+      #     pip install --upgrade awscli
+    - checkout
+    - run:
+        name: Cross Compile
+        command: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          ./ci/release.sh
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
