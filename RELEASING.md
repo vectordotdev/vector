@@ -21,6 +21,7 @@ branch structure:
 6. Create a new tag named `vMAJOR.MINOR.PATCH`
 7. Push the new tag
 8. Delete the temporary branch you created.
+9. [All done](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
 
 ### Major/Minor Releases
 
@@ -32,8 +33,9 @@ branch structure:
 6. Push the new tag.
 7. Update the [`/CHANGELOG.md`] header to reflect the new upcoming version `vNEW_MAJOR.NEW_MINOR-dev`
 8. Commit the changes above with message `"Start vNEW_MAJOR.NEW_MINOR+1"`
-9. ![](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
+9. [All done](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
 
 
+[All done]: https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp
 [`/Cargo.toml`]: /Cargo.toml
 [`/CHANGELOG.md`]: /CHANGELOG.md
