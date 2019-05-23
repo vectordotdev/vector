@@ -29,19 +29,10 @@ branch structure:
 3. Update the [`/CHANGELOG.md`] header to reflect the new version `vMAJOR.MINOR.0 - 2019-05-02`
 4. Commit the changes above with message `"Release vMAJOR.MINOR.PATCH"`
 5. Create a new tag named `vMAJOR.MINOR.PATCH`
-<<<<<<< HEAD
 6. Push the new tag.
 7. Update the [`/CHANGELOG.md`] header to reflect the new upcoming version `vNEW_MAJOR.NEW_MINOR-dev`
 8. Commit the changes above with message `"Start vNEW_MAJOR.NEW_MINOR+1"`
-9. https://media.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.gif
-=======
-6. Create a new branch named `vMAJOR.MINOR`
-7. Push the new branch.
-8. Switch back `master`
-9. Update the [`/CHANGELOG.md`] header to reflect the new upcoming version `vNEW_MAJOR.NEW_MINOR-dev`
-10. Commit the changes above with message `"Start vNEW_MAJOR.NEW_MINOR+1"`
-11. ![](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
->>>>>>> Implement critical change for releasing steps
+9. ![](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
 
 
 [`/Cargo.toml`]: /Cargo.toml
