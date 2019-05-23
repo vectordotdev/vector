@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 glob = "0.2.11"
 futures = "0.1.25"
-tokio-trace = { git = "https://github.com/tokio-rs/tokio" }
+tokio-trace = "0.1"
 bytes = { version = "0.4.10", features = ["serde"] }
 
 [dev-dependencies]
