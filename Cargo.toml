@@ -118,3 +118,6 @@ matches = "0.1.8"
 [[bench]]
 name = "bench"
 harness = false
+
+[patch.crates-io]
+tokio-trace-core = { git = "https://github.com/tokio-rs/tokio" }
