@@ -1,25 +1,22 @@
-use super::util::StreamExt as _;
+use super::util::TcpSource;
 use crate::event::{self, Event};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::time::{Duration, Instant};
-use stream_cancel::{StreamExt, Tripwire};
-use tokio::{codec::FramedRead, net::TcpListener, timer};
+use std::net::SocketAddr;
+use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
-use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
-    pub address: String,
+    pub address: SocketAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
-    pub host_key: Option<String>,
+    pub host_key: Option<Atom>,
 }
 
 fn default_max_length() -> usize {
@@ -31,9 +28,9 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(addr: SocketAddr) -> Self {
+    pub fn new(address: SocketAddr) -> Self {
         Self {
-            address: addr.to_string(),
+            address,
             max_length: default_max_length(),
             host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
@@ -44,114 +41,46 @@ impl TcpConfig {
 #[typetag::serde(name = "tcp")]
 impl crate::topology::config::SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        let tcp = tcp(self.clone(), out)?;
-        Ok(tcp)
+        let tcp = RawTcpSource {
+            config: self.clone(),
+        };
+        tcp.run(self.address, self.shutdown_timeout_secs, out)
     }
 }
 
-pub fn tcp(config: TcpConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+#[derive(Debug, Clone)]
+struct RawTcpSource {
+    config: TcpConfig,
+}
 
-    let TcpConfig {
-        address,
-        max_length,
-        host_key,
-        shutdown_timeout_secs,
-    } = config;
+impl TcpSource for RawTcpSource {
+    type Decoder = BytesDelimitedCodec;
 
-    let host_key = host_key.unwrap_or(event::HOST.to_string());
+    fn decoder(&self) -> Self::Decoder {
+        BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
+    }
 
-    let addr = address
-        .to_socket_addrs()
-        .map_err(|e| format!("IO Error: {}", e))?
-        .next()
-        .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+    fn build_event(&self, frame: Bytes, host: Option<Bytes>) -> Option<Event> {
+        let mut event = Event::from(frame);
 
-    let source = future::lazy(move || {
-        let listener = match TcpListener::bind(&addr) {
-            Ok(listener) => listener,
-            Err(err) => {
-                error!("Failed to bind to listener socket: {}", err);
-                return future::Either::B(future::err(()));
-            }
+        let host_key = if let Some(key) = &self.config.host_key {
+            key
+        } else {
+            &event::HOST
         };
 
-        info!(message = "listening.", addr = field::display(&addr));
+        if let Some(host) = host {
+            event
+                .as_mut_log()
+                .insert_implicit(host_key.clone(), host.into());
+        }
 
-        let (trigger, tripwire) = Tripwire::new();
-        let tripwire = tripwire
-            .and_then(move |_| {
-                timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
-                    .map_err(|err| panic!("Timer error: {:?}", err))
-            })
-            .shared();
-
-        let future = listener
-            .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {}", e))
-            .for_each(move |socket| {
-                let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
-                let host_key = host_key.clone();
-
-                let span = if let Some(addr) = &peer_addr {
-                    info_span!("connection", peer_addr = field::display(addr))
-                } else {
-                    info_span!("connection")
-                };
-
-                let host = peer_addr.map(Bytes::from);
-
-                let inner_span = span.clone();
-                let tripwire = tripwire
-                    .clone()
-                    .map(move |_| {
-                        info!(
-                            "Resetting connection (still open after {} seconds).",
-                            shutdown_timeout_secs
-                        )
-                    })
-                    .map_err(|_| ());
-
-                span.enter(|| {
-                    debug!("accepted a new socket.");
-
-                    let out = out.clone();
-
-                    let lines_in = FramedRead::new(
-                        socket,
-                        BytesDelimitedCodec::new_with_max_length(b'\n', max_length),
-                    )
-                    .take_until(tripwire)
-                    .map(Event::from)
-                    .map(move |mut event| {
-                        if let Some(host) = &host {
-                            event
-                                .as_mut_log()
-                                .insert_implicit(host_key.clone().into(), host.clone().into());
-                        }
-
-                        trace!(message = "Received one line.", event = field::debug(&event));
-                        event
-                    })
-                    .filter_map_err(|err| match err {
-                        codec::Error::MaxLimitExceeded => {
-                            warn!("Received line longer than max_length. Discarding.");
-                            None
-                        }
-                        codec::Error::Io(io) => Some(io),
-                    })
-                    .map_err(|e| warn!("connection error: {:?}", e));
-
-                    let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
-
-                    tokio::spawn(handler.instrument(inner_span))
-                })
-            })
-            .inspect(|_| trigger.cancel());
-        future::Either::A(future)
-    });
-
-    Ok(Box::new(source))
+        trace!(
+            message = "Received one event.",
+            event = field::debug(&event)
+        );
+        Some(event)
+    }
 }
 
 #[cfg(test)]
@@ -159,6 +88,7 @@ mod test {
     use super::TcpConfig;
     use crate::event;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
+    use crate::topology::config::SourceConfig;
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -168,7 +98,7 @@ mod test {
 
         let addr = next_addr();
 
-        let server = super::tcp(TcpConfig::new(addr), tx).unwrap();
+        let server = TcpConfig::new(addr).build(tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
@@ -210,7 +140,7 @@ mod test {
         let mut config = TcpConfig::new(addr);
         config.max_length = 10;
 
-        let server = super::tcp(config, tx).unwrap();
+        let server = config.build(tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);

@@ -5,7 +5,7 @@ extern crate tokio_codec;
 extern crate tokio_trace;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use std::{cmp, fmt, io, usize};
+use std::{cmp, io, usize};
 use tokio_codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -14,12 +14,6 @@ pub struct BytesDelimitedCodec {
     max_length: usize,
     is_discarding: bool,
     next_index: usize,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    MaxLimitExceeded,
-    Io(io::Error),
 }
 
 impl BytesDelimitedCodec {
@@ -66,9 +60,9 @@ impl BytesDelimitedCodec {
 
 impl Decoder for BytesDelimitedCodec {
     type Item = Bytes;
-    type Error = Error;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, io::Error> {
         loop {
             // Determine how far into the buffer we'll search for a newline. If
             // there's no max_length set, we'll read to the end of the buffer.
@@ -101,7 +95,12 @@ impl Decoder for BytesDelimitedCodec {
                     // delimiter so must discard the rest until we
                     // reach the next delimiter
                     self.is_discarding = true;
-                    Err(Error::MaxLimitExceeded)
+                    warn!(
+                        message = "discarding frame larger than max_length",
+                        buf_len = buf.len(),
+                        max_len = self.max_length,
+                    );
+                    Ok(None)
                 } else {
                     // We didn't find the delimiter and didn't
                     // reach the max frame length.
@@ -112,10 +111,10 @@ impl Decoder for BytesDelimitedCodec {
         }
     }
 
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, Error> {
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, io::Error> {
         let frame = match self.decode(buf)? {
             Some(frame) => Some(frame),
-            None if !buf.is_empty() => {
+            None if !buf.is_empty() && !self.is_discarding => {
                 let frame = buf.take();
                 self.next_index = 0;
 
@@ -130,29 +129,12 @@ impl Decoder for BytesDelimitedCodec {
 
 impl Encoder for BytesDelimitedCodec {
     type Item = Bytes;
-    type Error = Error;
+    type Error = io::Error;
 
-    fn encode(&mut self, item: Bytes, buf: &mut BytesMut) -> Result<(), Error> {
+    fn encode(&mut self, item: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {
         buf.reserve(item.len() + 1);
         buf.put(item);
         buf.put_u8(self.delim);
         Ok(())
     }
 }
-
-impl From<io::Error> for Error {
-    fn from(io: io::Error) -> Self {
-        Error::Io(io)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::MaxLimitExceeded => write!(f, "line length limit exceeded"),
-            Error::Io(io) => io.fmt(f),
-        }
-    }
-}
-
-impl ::std::error::Error for Error {}

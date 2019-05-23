@@ -34,11 +34,12 @@ fn bytes_decode_max_length() {
 
     buf.reserve(200);
     // limit is 6 so this should fail
-    buf.put_slice(b"1234567\n123456\n123412314");
+    buf.put_slice(b"1234567\n123456\n123412314\n123");
 
-    assert!(codec.decode(buf).is_err());
-    assert!(codec.decode(buf).is_ok());
-    assert!(codec.decode_eof(buf).is_err());
+    assert!(codec.decode(buf).unwrap().is_none());
+    assert!(codec.decode(buf).unwrap().is_some());
+    assert!(codec.decode_eof(buf).unwrap().is_none());
+    assert!(codec.decode_eof(buf).unwrap().is_some());
 }
 
 #[test]
