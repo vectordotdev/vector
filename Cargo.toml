@@ -56,6 +56,7 @@ prost = "0.5"
 prost-derive = "0.5"
 
 # External libs
+derivative = "1.0"
 chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.0.5"

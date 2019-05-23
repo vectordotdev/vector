@@ -3361,6 +3361,7 @@ dependencies = [
  "codec 0.1.0",
  "criterion 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "derivative 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_is_enum_variant 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "elastic 0.21.0-pre.4 (git+https://github.com/elastic-rs/elastic)",
  "file-source 0.1.0",
