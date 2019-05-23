@@ -13,12 +13,14 @@ branch structure:
 
 ### Patch Releases
 
-1. Switch to the appropriate `vMAJOR.MINOR` branch. **You should not make point releases on the `master` branch!**
-1. Update the `version` key in [`/Cargo.toml`]
-2. Update the [`/CHANGELOG.md`] header to reflect the new version `vMAJOR.MINOR.PATCH - 2019-05-02`
-3. Commit the changes above with message "Release vMAJOR.MINOR.PATCH"
-4. Create a new tag named `vMAJOR.MINOR.PATCH`
-5. Push changes and new tag
+1. Create a new branch from the latest `vMAJOR.MINOR.PATCH` tag. Ex: `git checkout -b v1.2.3 v1.2.2`
+2. Make the appropriate changes/fixes.
+3. Update the `version` key in [`/Cargo.toml`]
+4. Update the [`/CHANGELOG.md`] header to reflect the new version `vMAJOR.MINOR.PATCH - 2019-05-02`
+5. Commit the changes above with message "Release vMAJOR.MINOR.PATCH"
+6. Create a new tag named `vMAJOR.MINOR.PATCH`
+7. Push the new tag
+8. Delete the temporary branch you created.
 
 ### Major/Minor Releases
 
