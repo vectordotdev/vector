@@ -205,7 +205,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
-    use super::ElasticSearchConfig;
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         event,
@@ -227,6 +227,7 @@ mod integration_tests {
             index: index.clone(),
             doc_type: "log_lines".into(),
             id_key: Some("my_id".into()),
+            compression: Some(Compression::None),
             ..Default::default()
         };
 
@@ -278,6 +279,7 @@ mod integration_tests {
             host: "http://localhost:9200/".into(),
             index: index.clone(),
             doc_type: "log_lines".into(),
+            compression: Some(Compression::None),
             ..Default::default()
         };
 
