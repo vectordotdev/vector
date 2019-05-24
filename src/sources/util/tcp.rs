@@ -1,18 +1,22 @@
 use crate::Event;
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
-use std::net::SocketAddr;
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 use stream_cancel::{StreamExt, Tripwire};
-use tokio::{codec::FramedRead, net::TcpListener, timer};
+use tokio::{
+    codec::{Decoder, FramedRead},
+    net::TcpListener,
+    timer,
+};
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
 
-pub trait TcpSource
-where
-    Self: Clone + Send + 'static,
-{
-    type Decoder: tokio::codec::Decoder<Error = std::io::Error> + Send + 'static;
+pub trait TcpSource: Clone + Send + 'static {
+    type Decoder: Decoder<Error = io::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
@@ -51,7 +55,12 @@ where
 
             let future = listener
                 .incoming()
-                .map_err(|e| error!("failed to accept socket; error = {}", e))
+                .map_err(|e| {
+                    error!(
+                        message = "failed to accept socket",
+                        error = field::display(e)
+                    )
+                })
                 .for_each(move |socket| {
                     let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
 
@@ -73,19 +82,21 @@ where
                         })
                         .map_err(|_| ());
 
-                    let clone = self.clone();
+                    let source = self.clone();
                     span.enter(|| {
                         debug!("accepted a new socket.");
 
                         let out = out.clone();
 
-                        let events_in = FramedRead::new(socket, clone.decoder())
+                        let events_in = FramedRead::new(socket, source.decoder())
                             .take_until(tripwire)
                             .filter_map(move |frame| {
                                 let host = host.clone();
-                                clone.build_event(frame, host)
+                                source.build_event(frame, host)
                             })
-                            .map_err(|e| warn!("connection error: {:?}", e));
+                            .map_err(|e| {
+                                warn!(message = "connection error", error = field::display(e))
+                            });
 
                         let handler = events_in.forward(out).map(|_| debug!("connection closed"));
 
