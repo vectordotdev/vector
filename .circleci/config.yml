@@ -195,16 +195,16 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             cargo install cross
-    - checkout
-    - run:
-        name: Cross Compile
-        command: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          ./ci/release.sh
-    - persist_to_workspace:
-        root: dist
-        paths:
-          - *.tar.gz
+      - checkout
+      - run:
+          name: Cross Compile
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            ./ci/release.sh
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.tar.gz"
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
