@@ -252,7 +252,7 @@ jobs:
             cargo deb
       - run:
           name: Save
-          run: |
+          command: |
             mkdir dist
             cp -R target/debian/ dist
       - persist_to_workspace:
