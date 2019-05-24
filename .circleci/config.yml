@@ -306,7 +306,7 @@ workflows:
           <<: *test-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
-            - release-deb
+            - release-apt
   
   release:
     jobs:
