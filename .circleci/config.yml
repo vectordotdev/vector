@@ -225,6 +225,10 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             ./ci/release.sh
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.tar.gz"
 
   release-docker:
     machine: true
@@ -253,10 +257,8 @@ jobs:
       - run:
           name: Save
           command: |
-            ls -la target/debian
             mkdir dist
             cp -R target/debian/* dist
-            ls -la dist
       - persist_to_workspace:
           root: dist
           paths:
@@ -304,11 +306,14 @@ workflows:
           #   - test-stable
       - release-apt:
           <<: *test-workflow-filters
+      - release-x86_64-apple-darwin:
+          <<: *test-workflow-filters
       - release-github:
           <<: *test-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
             - release-apt
+            - release-x86_64-apple-darwin
   
   release:
     jobs:
