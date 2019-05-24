@@ -179,7 +179,6 @@ mod test {
     // the path under inspection. This function replicates a check that
     // file_watcher does internally.
     fn file_id(fp: &fs::File) -> (u64, u64) {
-        use std::os::unix::fs::MetadataExt;
         let metadata = fp.metadata().unwrap();
         let dev = metadata.dev();
         let ino = metadata.ino();
