@@ -255,7 +255,8 @@ jobs:
           command: |
             ls -la target/debian
             mkdir dist
-            cp -R target/debian dist
+            cp -R target/debian/* dist
+            ls -la dist
       - persist_to_workspace:
           root: dist
           paths:
