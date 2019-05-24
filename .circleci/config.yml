@@ -250,6 +250,15 @@ jobs:
           name: Compile
           command: |
             cargo deb
+      - run:
+          name: Save
+          run: |
+            mkdir dist
+            cp -R target/debian/ dist
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.deb"
 
   release-github:
     docker:
@@ -258,7 +267,7 @@ jobs:
       - attach_workspace:
           at: dist
       - run:
-          command: ls -la
+          command: ls -la dist
 
 test-workflow-filters: &test-workflow-filters
   filters:
@@ -291,10 +300,13 @@ workflows:
           #   - rustfmt
           #   - check-stable
           #   - test-stable
+      - release-deb:
+          <<: *test-workflow-filters
       - release-github:
           <<: *test-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
+            - release-deb
   
   release:
     jobs:
