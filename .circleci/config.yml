@@ -201,6 +201,10 @@ jobs:
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
           ./ci/release.sh
+    - persist_to_workspace:
+        root: dist
+        paths:
+          - *.tar.gz
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
@@ -247,6 +251,15 @@ jobs:
           command: |
             cargo deb
 
+  release-github:
+    docker:
+      - image: ubuntu
+    steps:
+      - attach_workspace:
+          at: dist
+      - run:
+          command: ls -la
+
 test-workflow-filters: &test-workflow-filters
   filters:
     branches:
@@ -272,6 +285,16 @@ workflows:
           <<: *test-workflow-filters
       - test-stable:
           <<: *test-workflow-filters
+      - release-x86_64-unknown-linux-gnu:
+          <<: *test-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-github:
+          <<: *test-workflow-filters
+          requires:
+            - release-x86_64-unknown-linux-gnu
   
   release:
     jobs:
