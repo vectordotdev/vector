@@ -253,7 +253,7 @@ jobs:
 
   release-github:
     docker:
-      - image: ubuntu
+      - image: timberio/vector-deb-builder:latest
     steps:
       - attach_workspace:
           at: dist
@@ -279,18 +279,18 @@ workflows:
 
   test:
     jobs:
-      - rustfmt:
-          <<: *test-workflow-filters
-      - check-stable:
-          <<: *test-workflow-filters
-      - test-stable:
-          <<: *test-workflow-filters
+      # - rustfmt:
+      #     <<: *test-workflow-filters
+      # - check-stable:
+      #     <<: *test-workflow-filters
+      # - test-stable:
+      #     <<: *test-workflow-filters
       - release-x86_64-unknown-linux-gnu:
           <<: *test-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+          # requires:
+          #   - rustfmt
+          #   - check-stable
+          #   - test-stable
       - release-github:
           <<: *test-workflow-filters
           requires:
