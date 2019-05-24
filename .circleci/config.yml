@@ -253,8 +253,9 @@ jobs:
       - run:
           name: Save
           command: |
+            ls -la target/debian
             mkdir dist
-            cp -R target/debian/ dist
+            cp -R target/debian dist
       - persist_to_workspace:
           root: dist
           paths:
