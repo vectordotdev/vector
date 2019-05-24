@@ -4,7 +4,6 @@ use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -58,7 +57,7 @@ impl Transform for RegexParser {
         } else {
             debug!(
                 message = "Field does not exist.",
-                field = field::display(&self.field)
+                field = self.field.as_ref(),
             );
         }
 

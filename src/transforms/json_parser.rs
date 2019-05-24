@@ -54,7 +54,7 @@ impl Transform for JsonParser {
                     .map_err(|e| {
                         debug!(
                             message = "Event failed to parse as JSON",
-                            field = field::display(&self.field),
+                            field = self.field.as_ref(),
                             error = field::display(e),
                         )
                     })
