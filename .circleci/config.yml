@@ -300,7 +300,7 @@ workflows:
           #   - rustfmt
           #   - check-stable
           #   - test-stable
-      - release-deb:
+      - release-apt:
           <<: *test-workflow-filters
       - release-github:
           <<: *test-workflow-filters
