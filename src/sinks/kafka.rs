@@ -175,7 +175,7 @@ fn encode_event(event: &Event, encoding: &Option<Encoding>) -> Vec<u8> {
 
     match (encoding, log.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.all_fields()).unwrap(),
-        (&Some(Encoding::Text), _) | (_, false) => log[&event::MESSAGE].as_bytes().into_owned(),
+        (&Some(Encoding::Text), _) | (_, false) => log[&event::MESSAGE].as_bytes().to_vec(),
     }
 }
 

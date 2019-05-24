@@ -3,12 +3,13 @@ use crate::event::{self, Event};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct JsonParserConfig {
-    pub field: Option<String>,
+    pub field: Option<Atom>,
     pub drop_invalid: bool,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
@@ -22,15 +23,21 @@ impl crate::topology::config::TransformConfig for JsonParserConfig {
 }
 
 struct JsonParser {
-    field: Option<Atom>,
+    field: Atom,
     drop_invalid: bool,
     drop_field: bool,
 }
 
 impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
+        let field = if let Some(field) = &config.field {
+            field
+        } else {
+            &event::MESSAGE
+        };
+
         JsonParser {
-            field: config.field.map(Atom::from),
+            field: field.clone(),
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
         }
@@ -39,26 +46,20 @@ impl From<JsonParserConfig> for JsonParser {
 
 impl Transform for JsonParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let field = if let Some(field) = &self.field {
-            field
-        } else {
-            &event::MESSAGE
-        };
-
-        let to_parse = if self.drop_field {
-            event
-                .as_mut_log()
-                .remove(&field)
-                .map(|s| s.as_bytes().into_owned())
-        } else {
-            event
-                .as_log()
-                .get(&field)
-                .map(|s| s.as_bytes().into_owned())
-        };
+        let to_parse = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         let parsed = to_parse
-            .and_then(|to_parse| serde_json::from_slice::<Value>(to_parse.as_ref()).ok())
+            .and_then(|to_parse| {
+                serde_json::from_slice::<Value>(to_parse.as_ref())
+                    .map_err(|e| {
+                        debug!(
+                            message = "Event failed to parse as JSON",
+                            field = self.field.as_ref(),
+                            error = field::display(e),
+                        )
+                    })
+                    .ok()
+            })
             .and_then(|value| {
                 if let Value::Object(object) = value {
                     Some(object)
@@ -75,6 +76,10 @@ impl Transform for JsonParser {
             if self.drop_invalid {
                 return None;
             }
+        }
+
+        if self.drop_field {
+            event.as_mut_log().remove(&self.field);
         }
 
         Some(event)
