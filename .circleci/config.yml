@@ -272,6 +272,7 @@ jobs:
     docker:
       - image: timberio/vector-release-builder:latest
     steps:
+      - checkout
       - attach_workspace:
           at: dist
       - run:
