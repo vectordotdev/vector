@@ -22,7 +22,7 @@ COPY benches benches
 COPY build.rs build.rs
 COPY proto proto
 
-RUN cargo fetch --locked
+RUN cargo fetch
 
 COPY src src
 RUN cargo build --release --frozen
