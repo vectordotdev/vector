@@ -237,11 +237,14 @@ jobs:
       - run:
           name: Build
           command: |
-            # TODO: fetch tag
+            export VERSION = $(./ci/version.sh)
+            docker build -t timberio/vector:$VERSION .
             docker build -t timberio/vector:latest .
       - run:
           name: Push
           command: |
+            export VERSION = $(./ci/version.sh)
+            # docker push timberio/vector:$VERSION
             # docker push timberio/vector:latest
             
   release-apt:
@@ -253,7 +256,8 @@ jobs:
       - run:
           name: Compile
           command: |
-            cargo deb
+            export VERSION=$(./ci/version.sh)
+            cargo deb --deb-version $VERSION
       - run:
           name: Save
           command: |
@@ -266,12 +270,18 @@ jobs:
 
   release-github:
     docker:
-      - image: timberio/vector-deb-builder:latest
+      - image: timberio/vector-release-builder:latest
     steps:
       - attach_workspace:
           at: dist
       - run:
           command: ls -la dist
+      - run:
+          name: Upload
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "Releasing $VERISON..."
+            # grease timberio/vector "dist/*"
 
 test-workflow-filters: &test-workflow-filters
   filters:
