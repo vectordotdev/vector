@@ -280,7 +280,7 @@ jobs:
           command: |
             export VERSION=$(./ci/version.sh)
             echo "Releasing $VERSION..."
-            grease timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
+            grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
 test-workflow-filters: &test-workflow-filters
   filters:
@@ -318,6 +318,12 @@ workflows:
       - release-x86_64-apple-darwin:
           <<: *test-workflow-filters
       - release-github:
+          <<: *test-workflow-filters
+          requires:
+            - release-x86_64-unknown-linux-gnu
+            - release-apt
+            - release-x86_64-apple-darwin
+      - release-docker:
           <<: *test-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
