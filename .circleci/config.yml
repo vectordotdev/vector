@@ -302,34 +302,12 @@ workflows:
 
   test:
     jobs:
-      # - rustfmt:
-      #     <<: *test-workflow-filters
-      # - check-stable:
-      #     <<: *test-workflow-filters
-      # - test-stable:
-      #     <<: *test-workflow-filters
-      - release-x86_64-unknown-linux-gnu:
+      - rustfmt:
           <<: *test-workflow-filters
-          # requires:
-          #   - rustfmt
-          #   - check-stable
-          #   - test-stable
-      - release-apt:
+      - check-stable:
           <<: *test-workflow-filters
-      - release-x86_64-apple-darwin:
+      - test-stable:
           <<: *test-workflow-filters
-      - release-github:
-          <<: *test-workflow-filters
-          requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
-      - release-docker:
-          <<: *test-workflow-filters
-          requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
   
   release:
     jobs:
@@ -351,15 +329,21 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
-      - release-docker:
-          <<: *release-workflow-filters
+      - release-apt:
+          <<: *test-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-docker:
-          <<: *release-workflow-filters
+      - release-github:
+          <<: *test-workflow-filters
           requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+            - release-x86_64-unknown-linux-gnu
+            - release-apt
+            - release-x86_64-apple-darwin
+      - release-docker:
+          <<: *test-workflow-filters
+          requires:
+            - release-x86_64-unknown-linux-gnu
+            - release-apt
+            - release-x86_64-apple-darwin
