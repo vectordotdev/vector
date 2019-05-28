@@ -170,18 +170,18 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
+      # - *restore-build-cache
       - checkout
       - *install-make
       - run:
           name: Test
           command: |
-            cargo test --all --features docker -- --test-threads 2
+            cargo test --all --features docker -- --test-threads 4
       - store_test_results:
           path: ./test-results
       - *save-git-cache
       - *save-cargo-cache
-      - *save-build-cache
+      # - *save-build-cache
 
   release-x86_64-unknown-linux-gnu:
     <<: *release-job-defaults
