@@ -13,6 +13,7 @@ pub mod prometheus;
 pub mod splunk_hec;
 pub mod tcp;
 pub mod util;
+pub mod vector;
 
 use crate::Event;
 

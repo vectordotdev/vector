@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.1.0"
+version = "0.2.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Log and Metrics Routing Layer"
@@ -60,7 +60,7 @@ prost = "0.5"
 prost-derive = "0.5"
 
 # External libs
-uuid = { version = "0.7.1", features = ["v4"] }
+derivative = "1.0"
 chrono = "0.4.6"
 rand = "0.5.5"
 regex = "1.0.5"
