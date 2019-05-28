@@ -244,8 +244,8 @@ jobs:
           name: Push
           command: |
             export VERSION = $(./ci/version.sh)
-            # docker push timberio/vector:$VERSION
-            # docker push timberio/vector:latest
+            docker push timberio/vector:$VERSION
+            docker push timberio/vector:latest
             
   release-apt:
     resource_class: xlarge
@@ -276,13 +276,11 @@ jobs:
       - attach_workspace:
           at: dist
       - run:
-          command: ls -la dist
-      - run:
           name: Upload
           command: |
             export VERSION=$(./ci/version.sh)
-            echo "Releasing $VERISON..."
-            # grease timberio/vector "dist/*"
+            echo "Releasing $VERSION..."
+            grease timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
 test-workflow-filters: &test-workflow-filters
   filters:

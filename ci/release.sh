@@ -42,11 +42,6 @@ function build_tar() {
   cd ..
 }
 
-# function upload_s3() {
-#   S3_URI="s3://packages.timber.io/vector/$S3_PATH"
-#   aws s3 cp "$DIST_DIR/$TAR_NAME" "$S3_URI"
-# }
-
 # Temporarily allow unset variables in order to construct the BUILDSTAMP based
 # on variables that only _might_ be set
 set +u
