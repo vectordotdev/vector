@@ -244,6 +244,7 @@ jobs:
           name: Push
           command: |
             export VERSION = $(./ci/version.sh)
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             docker push timberio/vector:$VERSION
             docker push timberio/vector:latest
             
