@@ -123,3 +123,8 @@ splunk-integration-tests = []
 [[bench]]
 name = "bench"
 harness = false
+
+[package.metadata.deb]
+assets = [
+  ["examples/*", "/etc/vector/", "644"]
+]
