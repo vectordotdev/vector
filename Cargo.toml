@@ -126,7 +126,6 @@ harness = false
 
 [package.metadata.deb]
 assets = [
-  ["examples/*", "/etc/vector/examples", "644"],
-  ["config.toml", "/etc/vector/vector.toml", "644"],
-  ["vector.service", "/etc/systemd/system/vector.service", "644"]
+  ["config/", "/etc/vector/config/", "644"],
+  ["dist/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
