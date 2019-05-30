@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package event.proto;
 
 message EventWrapper {
@@ -14,13 +16,11 @@ message Log {
 }
 
 message Value {
-  bytes data = 1;
-  bool explicit = 2;
-  enum Kind {
-    Bytes = 0;
-    Timestamp = 1;
+  oneof kind {
+    bytes raw_bytes = 1;
+    google.protobuf.Timestamp timestamp = 2;
   }
-  Kind kind = 3;
+  bool explicit = 3;
 }
 
 message Metric {

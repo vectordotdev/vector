@@ -54,6 +54,7 @@ serde_json = "1.0.33"
 # Prost
 prost = "0.5"
 prost-derive = "0.5"
+prost-types = "0.5"
 
 # External libs
 derivative = "1.0"
