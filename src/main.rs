@@ -2,17 +2,18 @@
 extern crate tokio_trace;
 
 use futures::{future, Future, Stream};
-use std::cmp::{max, min};
-use std::fs::File;
-use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::{
+    cmp::{max, min},
+    fs::File,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
-use vector::metrics;
-use vector::topology;
+use vector::{metrics, topology};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
