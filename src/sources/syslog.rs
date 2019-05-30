@@ -1,4 +1,6 @@
+use super::util::TcpSource;
 use crate::event::{self, Event};
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
@@ -7,7 +9,7 @@ use std::{net::SocketAddr, path::PathBuf};
 use tokio::{
     self,
     codec::{BytesCodec, FramedRead, LinesCodec},
-    net::{TcpListener, UdpFramed, UdpSocket},
+    net::{UdpFramed, UdpSocket},
 };
 use tokio_trace::field;
 use tokio_trace_futures::Instrument;
@@ -52,60 +54,48 @@ impl crate::topology::config::SourceConfig for SyslogConfig {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
         match self.mode.clone() {
-            Mode::Tcp { address } => Ok(tcp(address, self.max_length, host_key, out)),
+            Mode::Tcp { address } => {
+                let source = SyslogTcpSource {
+                    max_length: self.max_length,
+                    host_key,
+                };
+                let shutdown_secs = 30;
+                source.run(address, shutdown_secs, out)
+            }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
     }
 }
 
-pub fn tcp(
-    addr: SocketAddr,
+#[derive(Debug, Clone)]
+struct SyslogTcpSource {
     max_length: usize,
     host_key: String,
-    out: mpsc::Sender<Event>,
-) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+}
 
-    Box::new(future::lazy(move || {
-        let listener = TcpListener::bind(&addr).expect("failed to bind to tcp listener socket");
+impl TcpSource for SyslogTcpSource {
+    type Decoder = LinesCodec;
 
-        info!(
-            message = "listening.",
-            addr = &field::display(addr),
-            r#type = "tcp"
-        );
+    fn decoder(&self) -> Self::Decoder {
+        LinesCodec::new_with_max_length(self.max_length)
+    }
 
-        listener
-            .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {}", e))
-            .for_each(move |socket| {
-                let out = out.clone();
-                let host_key = host_key.clone();
-                let peer_addr = socket.peer_addr().ok().map(|s| s.ip());
+    fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
+        event_from_str(frame).map(|mut event| {
+            if let Some(host) = host {
+                event
+                    .as_mut_log()
+                    .insert_implicit(self.host_key.clone().into(), host.into());
+            }
 
-                let span = info_span!("connection");
-
-                if let Some(addr) = peer_addr {
-                    span.record("peer_addr", &field::display(&addr));
-                }
-
-                let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(event_from_str)
-                    .map(move |mut e| {
-                        if let Some(addr) = peer_addr {
-                            e.as_mut_log()
-                                .insert_implicit(host_key.clone().into(), addr.to_string().into());
-                        }
-                        e
-                    })
-                    .map_err(|e| error!("error reading line: {:?}", e));
-
-                let handler = lines_in.forward(out).map(|_| info!("finished sending"));
-
-                tokio::spawn(handler.instrument(span))
-            })
-    }))
+            trace!(
+                message = "Received one event.",
+                event = field::debug(&event)
+            );
+            event
+        })
+    }
 }
 
 pub fn udp(

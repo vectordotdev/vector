@@ -879,7 +879,7 @@ mod tests {
         old_config.add_source(
             "in",
             TcpConfig {
-                address: in_addr.to_string(),
+                address: in_addr,
                 max_length: 20,
                 host_key: None,
                 shutdown_timeout_secs: 30,
@@ -908,7 +908,7 @@ mod tests {
         wait_for(|| output_lines.count() >= 4);
 
         new_config.sources[&"in".to_string()] = Box::new(TcpConfig {
-            address: in_addr.to_string(),
+            address: in_addr,
             max_length: 10,
             host_key: None,
             shutdown_timeout_secs: 30,
