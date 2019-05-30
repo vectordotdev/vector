@@ -43,7 +43,10 @@ pub trait TcpSource: Clone + Send + 'static {
                 }
             };
 
-            info!(message = "listening.", addr = field::display(&addr));
+            info!(
+                message = "listening.",
+                addr = field::display(listener.local_addr().unwrap_or(addr))
+            );
 
             let (trigger, tripwire) = Tripwire::new();
             let tripwire = tripwire
