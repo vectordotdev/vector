@@ -2,6 +2,7 @@
 extern crate tokio_trace;
 
 use futures::{future, Future, Stream};
+use std::cmp::{max, min};
 use std::fs::File;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -109,9 +110,8 @@ fn main() {
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
 
-            if let Some(threads) = opts.threads {
-                builder.core_threads(threads);
-            }
+            let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
+            builder.core_threads(min(4, threads));
 
             builder.build().expect("Unable to create async runtime")
         };
