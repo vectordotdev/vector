@@ -1,9 +1,11 @@
 #[macro_use]
 extern crate tokio_trace;
 
-use clap::{App, Arg};
 use futures::{future, Future, Stream};
 use std::fs::File;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
@@ -11,68 +13,45 @@ use trace_metrics::MetricsSubscriber;
 use vector::metrics;
 use vector::topology;
 
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
+struct Opts {
+    /// Read configuration from the specified file
+    #[structopt(name = "config", value_name = "FILE", short, long)]
+    config_path: PathBuf,
+
+    /// Exit on startup if any sinks having failing healthchecks
+    #[structopt(short, long)]
+    require_healthy: bool,
+
+    /// Serve internal metrics from the given address
+    #[structopt(short, long)]
+    metrics_addr: Option<SocketAddr>,
+
+    /// Number of threads to use for processing (default is number of available cores)
+    #[structopt(short, long)]
+    threads: Option<usize>,
+
+    /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
+    #[structopt(short, long, parse(from_occurrences))]
+    verbose: u8,
+
+    /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
+    #[structopt(short, long, parse(from_occurrences))]
+    quiet: u8,
+}
+
 fn main() {
-    let app = App::new("Vector").version(built_info::PKG_VERSION).author("timber.io")
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .required(true)
-                .takes_value(true),
-        ).arg(
-            Arg::with_name("require-healthy")
-                .short("r")
-                .long("require-healthy")
-                .help("Causes vector to immediate exit on startup if any sinks having failing healthchecks")
-        )
-        .arg(
-            Arg::with_name("metrics-addr")
-                .short("m")
-                .long("metrics-addr")
-                .help("The address that metrics will be served from")
-                .takes_value(true)
-        )
-        .arg(
-            Arg::with_name("threads")
-                .short("t")
-                .long("threads")
-                .help("Number of threads vector's core processing should use. Defaults to number of cores available")
-                .takes_value(true)
-        )
-        .arg(Arg::with_name("verbose")
-             .short("v")
-             .help("Specify the verboseness of logs produced. If -q is supplied this will do nothing. Eg -v -vv")
-             .multiple(true)
-             .takes_value(false))
-        .arg(Arg::with_name("quiet")
-             .short("q")
-             .help("Specify the quietness of logs produced. If -v is supplied this will override that level. Eg -q -qq")
-             .conflicts_with("verbose")
-             .multiple(true)
-             .takes_value(false));
+    let opts = Opts::from_args();
 
-    let matches = app.get_matches();
-
-    let config_path = matches.value_of("config").unwrap();
-    let metrics_addr = matches.value_of("metrics-addr");
-
-    let verboseness = matches.occurrences_of("verbose");
-    let quietness = matches.occurrences_of("quiet");
-
-    let level = if quietness > 0 {
-        match quietness {
-            0 => "info",
-            1 => "warn",
-            2 | _ => "error",
-        }
-    } else {
-        match verboseness {
+    let level = match opts.quiet {
+        0 => match opts.verbose {
             0 => "info",
             1 => "debug",
-            2 | _ => "trace",
-        }
+            2...255 => "trace",
+        },
+        1 => "warn",
+        2...255 => "error",
     };
 
     let mut levels = [
@@ -95,45 +74,26 @@ fn main() {
     tokio_trace_env_logger::try_init().expect("init log adapter");
 
     let (metrics_controller, metrics_sink) = metrics::build();
-    let dispatch = if metrics_addr.is_some() {
+    let dispatch = if opts.metrics_addr.is_some() {
         Dispatch::new(MetricsSubscriber::new(subscriber, metrics_sink))
     } else {
         Dispatch::new(subscriber)
     };
 
     tokio_trace::dispatcher::with_default(&dispatch, || {
-        let threads = matches.value_of("threads").map(|string| {
-            match string
-                .parse::<usize>()
-                .ok()
-                .filter(|&t| t >= 1 && t <= 32768)
-            {
-                Some(t) => t,
-                None => {
-                    error!("threads must be a number between 1 and 32768 (inclusive)");
-                    std::process::exit(1);
-                }
-            }
-        });
-
-        let metrics_addr = metrics_addr.map(|addr| {
-            if let Ok(addr) = addr.parse() {
-                addr
-            } else {
-                error!(
-                    message = "Unable to parse metrics address.",
-                    addr = field::display(&addr)
-                );
+        if let Some(threads) = opts.threads {
+            if threads < 1 || threads > 4 {
+                error!("thread must be between 1 and 4 (inclusive)");
                 std::process::exit(1);
             }
-        });
+        }
 
         debug!(
             message = "Loading config.",
-            path = field::debug(&config_path)
+            path = field::debug(&opts.config_path)
         );
 
-        let file = if let Some(file) = open_config(config_path) {
+        let file = if let Some(file) = open_config(&opts.config_path) {
             file
         } else {
             std::process::exit(1);
@@ -141,7 +101,7 @@ fn main() {
 
         trace!(
             message = "Parsing config.",
-            path = field::debug(&config_path)
+            path = field::debug(&opts.config_path)
         );
 
         let config = vector::topology::Config::load(file);
@@ -149,7 +109,7 @@ fn main() {
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
 
-            if let Some(threads) = threads {
+            if let Some(threads) = opts.threads {
                 builder.core_threads(threads);
             }
 
@@ -158,7 +118,7 @@ fn main() {
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
-        if let Some(metrics_addr) = metrics_addr {
+        if let Some(metrics_addr) = opts.metrics_addr {
             debug!("Starting metrics server");
 
             rt.spawn(
@@ -170,8 +130,6 @@ fn main() {
             );
         }
 
-        let require_healthy = matches.is_present("require-healthy");
-
         info!(
             message = "Vector is starting.",
             version = built_info::PKG_VERSION,
@@ -180,8 +138,9 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let (mut topology, mut graceful_crash) = topology::start(config, &mut rt, require_healthy)
-            .unwrap_or_else(|| std::process::exit(1));
+        let (mut topology, mut graceful_crash) =
+            topology::start(config, &mut rt, opts.require_healthy)
+                .unwrap_or_else(|| std::process::exit(1));
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -212,10 +171,10 @@ fn main() {
             // Reload config
             info!(
                 message = "Reloading config.",
-                path = field::debug(&config_path)
+                path = field::debug(&opts.config_path)
             );
 
-            let file = if let Some(file) = open_config(config_path) {
+            let file = if let Some(file) = open_config(&opts.config_path) {
                 file
             } else {
                 continue;
@@ -224,7 +183,7 @@ fn main() {
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
-            let success = topology.reload_config(config, &mut rt, require_healthy, false);
+            let success = topology.reload_config(config, &mut rt, opts.require_healthy, false);
             if !success {
                 error!("Reload aborted");
             }
@@ -256,15 +215,21 @@ fn main() {
     });
 }
 
-fn open_config(path: &str) -> Option<File> {
+fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
         Err(e) => {
             if let std::io::ErrorKind::NotFound = e.kind() {
-                error!("Config file not found in: {}", path);
+                error!(
+                    message = "Config file not found in path",
+                    path = field::display(path.display()),
+                );
                 None
             } else {
-                error!("Error opening config file: {}", e);
+                error!(
+                    message = "Error opening config file",
+                    error = field::display(e),
+                );
                 None
             }
         }
