@@ -1,6 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
@@ -229,19 +229,11 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 
 fn decode_value(input: proto::Value) -> Option<Value> {
     let explicit = input.explicit;
-    let value = match proto::value::Kind::from_i32(input.kind) {
-        Some(proto::value::Kind::Bytes) => Some(input.data.into()),
-        Some(proto::value::Kind::Timestamp) => {
-            if let Ok(dt) =
-                DateTime::parse_from_rfc3339(String::from_utf8_lossy(&input.data).as_ref())
-                    .map(|dt| dt.with_timezone(&Utc))
-            {
-                Some(dt.into())
-            } else {
-                error!("encoded timestamp is invalid");
-                None
-            }
-        }
+    let value = match input.kind {
+        Some(proto::value::Kind::RawBytes(data)) => Some(ValueKind::Bytes(data.into())),
+        Some(proto::value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
+            chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
+        )),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -324,13 +316,18 @@ impl From<Event> for proto::EventWrapper {
                     .into_iter()
                     .map(|(k, v)| {
                         let value = proto::Value {
-                            data: v.value.as_bytes().to_vec(),
                             explicit: v.explicit,
                             kind: match v.value {
-                                ValueKind::Bytes(_) => proto::value::Kind::Bytes,
-                                ValueKind::Timestamp(_) => proto::value::Kind::Timestamp,
-                            }
-                            .into(),
+                                ValueKind::Bytes(b) => {
+                                    Some(proto::value::Kind::RawBytes(b.to_vec()))
+                                }
+                                ValueKind::Timestamp(ts) => {
+                                    Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
+                                        seconds: ts.timestamp(),
+                                        nanos: ts.timestamp_subsec_nanos() as i32,
+                                    }))
+                                }
+                            },
                         };
                         (k.to_string(), value)
                     })

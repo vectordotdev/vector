@@ -1,22 +1,17 @@
+use super::util::TcpSource;
 use crate::{event::proto, Event};
-use futures::{future, sync::mpsc, Future, Sink, Stream};
+use bytes::{Bytes, BytesMut};
+use futures::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::time::{Duration, Instant};
-use stream_cancel::{StreamExt, Tripwire};
-use tokio::{
-    codec::{FramedRead, LengthDelimitedCodec},
-    net::TcpListener,
-    timer,
-};
+use std::net::SocketAddr;
+use tokio::codec::LengthDelimitedCodec;
 use tokio_trace::field;
-use tokio_trace_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
-    pub address: String,
+    pub address: SocketAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
 }
@@ -26,9 +21,9 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
-    pub fn new(addr: SocketAddr) -> Self {
+    pub fn new(address: SocketAddr) -> Self {
         Self {
-            address: addr.to_string(),
+            address,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
         }
     }
@@ -37,94 +32,36 @@ impl VectorConfig {
 #[typetag::serde(name = "vector")]
 impl crate::topology::config::SourceConfig for VectorConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        let vector = vector(self.clone(), out)?;
-        Ok(vector)
+        let vector = VectorSource;
+        vector.run(self.address, self.shutdown_timeout_secs, out)
     }
 }
 
-pub fn vector(config: VectorConfig, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+#[derive(Debug, Clone)]
+struct VectorSource;
 
-    let VectorConfig {
-        address,
-        shutdown_timeout_secs,
-    } = config;
+impl TcpSource for VectorSource {
+    type Decoder = LengthDelimitedCodec;
 
-    let addr = address
-        .to_socket_addrs()
-        .map_err(|e| format!("IO Error: {}", e))?
-        .next()
-        .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+    fn decoder(&self) -> Self::Decoder {
+        LengthDelimitedCodec::new()
+    }
 
-    let source = future::lazy(move || {
-        let listener = match TcpListener::bind(&addr) {
-            Ok(listener) => listener,
-            Err(err) => {
-                error!("Failed to bind to listener socket: {}", err);
-                return future::Either::B(future::err(()));
+    fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
+        match proto::EventWrapper::decode(frame).map(Event::from) {
+            Ok(event) => {
+                trace!(
+                    message = "Received one event.",
+                    event = field::debug(&event)
+                );
+                Some(event)
             }
-        };
-
-        info!(message = "listening.", addr = field::display(&addr));
-
-        let (trigger, tripwire) = Tripwire::new();
-        let tripwire = tripwire
-            .and_then(move |_| {
-                timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
-                    .map_err(|err| panic!("Timer error: {:?}", err))
-            })
-            .shared();
-
-        let future = listener
-            .incoming()
-            .map_err(|e| error!("failed to accept socket; error = {}", e))
-            .for_each(move |socket| {
-                let peer_addr = socket.peer_addr().ok().map(|s| s.ip().to_string());
-
-                let span = if let Some(addr) = &peer_addr {
-                    info_span!("connection", peer_addr = field::display(addr))
-                } else {
-                    info_span!("connection")
-                };
-
-                let inner_span = span.clone();
-                let tripwire = tripwire
-                    .clone()
-                    .map(move |_| {
-                        info!(
-                            "Resetting connection (still open after {} seconds).",
-                            shutdown_timeout_secs
-                        )
-                    })
-                    .map_err(|_| ());
-
-                span.enter(|| {
-                    debug!("accepted a new socket.");
-
-                    let out = out.clone();
-
-                    let lines_in = FramedRead::new(socket, LengthDelimitedCodec::new())
-                        .take_until(tripwire)
-                        .filter_map(|bytes| match proto::EventWrapper::decode(bytes) {
-                            Ok(e) => Some(e),
-                            Err(e) => {
-                                error!("failed to parse protobuf message: {:?}", e);
-                                None
-                            }
-                        })
-                        .map(Event::from)
-                        .map_err(|e| warn!("connection error: {:?}", e));
-
-                    let handler = lines_in.forward(out).map(|_| debug!("connection closed"));
-
-                    tokio::spawn(handler.instrument(inner_span))
-                })
-            })
-            .inspect(|_| trigger.cancel());
-        future::Either::A(future)
-    });
-
-    Ok(Box::new(source))
+            Err(e) => {
+                error!("failed to parse protobuf message: {:?}", e);
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -134,6 +71,7 @@ mod test {
         buffers::Acker,
         sinks::vector::vector,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
+        topology::config::SourceConfig,
         Event,
     };
     use futures::{stream, sync::mpsc, Future, Sink};
@@ -143,7 +81,7 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let addr = next_addr();
-        let server = super::vector(VectorConfig::new(addr.clone()), tx).unwrap();
+        let server = VectorConfig::new(addr.clone()).build(tx).unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);

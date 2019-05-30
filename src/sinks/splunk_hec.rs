@@ -248,6 +248,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         sinks,
@@ -509,6 +510,7 @@ mod integration_tests {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
+            compression: Some(Compression::None),
             ..Default::default()
         }
     }
