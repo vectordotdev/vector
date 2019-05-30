@@ -184,7 +184,27 @@ jobs:
       # - *save-build-cache
 
   release-x86_64-unknown-linux-gnu:
-    <<: *release-job-defaults
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - run:
+          name: Install Cross
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            cargo install cross
+      - checkout
+      - run:
+          name: Cross Compile
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            ./ci/release.sh
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.tar.gz"
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
@@ -204,9 +224,64 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            brew uninstall python
-            brew install awscli
             ./ci/release.sh
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.tar.gz"
+
+  release-docker:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            export VERSION=$(./ci/version.sh)
+            docker build -t timberio/vector:$VERSION .
+            docker build -t timberio/vector:latest .
+      - run:
+          name: Push
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            docker push timberio/vector:$VERSION
+            docker push timberio/vector:latest
+            
+  release-apt:
+    resource_class: xlarge
+    docker:
+      - image: timberio/vector-deb-builder:latest
+    steps:
+      - checkout
+      - run:
+          name: Compile
+          command: |
+            export VERSION=$(./ci/version.sh)
+            cargo deb --deb-version $VERSION
+      - run:
+          name: Save
+          command: |
+            mkdir dist
+            cp -R target/debian/* dist
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.deb"
+
+  release-github:
+    docker:
+      - image: timberio/vector-release-builder:latest
+    steps:
+      - checkout
+      - attach_workspace:
+          at: dist
+      - run:
+          name: Upload
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "Releasing $VERSION..."
+            grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
 test-workflow-filters: &test-workflow-filters
   filters:
@@ -254,3 +329,21 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
+      - release-apt:
+          <<: *test-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - release-github:
+          <<: *test-workflow-filters
+          requires:
+            - release-x86_64-unknown-linux-gnu
+            - release-apt
+            - release-x86_64-apple-darwin
+      - release-docker:
+          <<: *test-workflow-filters
+          requires:
+            - release-x86_64-unknown-linux-gnu
+            - release-apt
+            - release-x86_64-apple-darwin
