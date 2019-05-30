@@ -128,7 +128,7 @@ harness = false
 maintainer-scripts = "distribution/debian/scripts/"
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
-  ["config/*", "/etc/vector/config/", "644"],
+  ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/config/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
