@@ -1,5 +1,6 @@
 [Unit]
 Description=Vector
+Documentation=http://vectorproject.io
 After=network-online.target
 Requires=network-online.target
 
