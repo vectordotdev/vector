@@ -1,7 +1,7 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
 use serde_json::json;
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
