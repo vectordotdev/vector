@@ -25,7 +25,7 @@ trace-metrics = { path = "lib/trace-metrics" }
 
 # Tokio / Futures
 futures = "0.1.25"
-tokio = { version = "0.1.17", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
+tokio = { version = "0.1.21", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
