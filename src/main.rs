@@ -22,7 +22,7 @@ struct Opts {
     #[structopt(name = "config", value_name = "FILE", short, long)]
     config_path: PathBuf,
 
-    /// Exit on startup if any sinks having failing healthchecks
+    /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
     require_healthy: bool,
 
