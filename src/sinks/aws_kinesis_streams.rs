@@ -32,7 +32,7 @@ pub struct KinesisSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub batch_size: usize,
+    pub batch_size: Option<usize>,
     pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
@@ -68,9 +68,10 @@ impl KinesisService {
     ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
-        let batch_size = config.batch_size;
+        let batch_size = config.batch_size.unwrap_or(1049000 * 5); // 5mib
+        let batch_timeout = self.batch_timeout.unwrap_or(1);
 
-        let timeout = config.request_timeout_secs.unwrap_or(10);
+        let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
@@ -94,7 +95,7 @@ impl KinesisService {
             .service(kinesis);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched(Vec::new(), batch_size)
+            .batched_with_min(Vec::new(), batch_size, Duration::from_secs(batch_timeout))
             .with(move |e| encode_event(e, &encoding));
 
         Ok(sink)
