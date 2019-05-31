@@ -344,6 +344,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
+                    .filter(|entry| !entry["message"].is_null())
                     .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -380,6 +381,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
+                    .filter(|entry| !entry["message"].is_null())
                     .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -426,6 +428,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
+                    .filter(|entry| !entry["message"].is_null())
                     .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -511,6 +514,7 @@ mod integration_tests {
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
+            batch_timeout: Some(1),
             ..Default::default()
         }
     }

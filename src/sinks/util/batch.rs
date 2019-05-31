@@ -94,7 +94,7 @@ where
 
     fn linger_elapsed(&mut self) -> bool {
         if let Some(delay) = &mut self.linger_deadline {
-            delay.poll().expect("timer error").is_ready()
+            delay.is_elapsed()
         } else {
             false
         }
@@ -175,6 +175,10 @@ where
                     return self.inner.poll_complete();
                 }
             } else {
+                if let Some(delay) = &mut self.linger_deadline {
+                    try_ready!(delay.poll().map_err(|e| panic!("Timer error: {}", e)));
+                }
+
                 // We have data to send, so check if we should send it and either attempt the send
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
