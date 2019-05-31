@@ -344,7 +344,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
+                    .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -380,7 +380,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
+                    .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
@@ -426,7 +426,7 @@ mod integration_tests {
             .find_map(|_| {
                 recent_entries()
                     .into_iter()
-                    .find(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
+                    .find(|entry| entry["message"].as_str().unwrap() == message.as_str())
                     .or_else(|| {
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         None
