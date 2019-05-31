@@ -55,7 +55,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     };
 
     let batch_size = config.batch_size.unwrap_or(1049000 * 10); // 10mib
-    let batch_timeout = config.batch_timeout.unwrap_or(10);
+    let batch_timeout = config.batch_timeout.unwrap_or(1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);

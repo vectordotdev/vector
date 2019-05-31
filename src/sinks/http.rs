@@ -78,7 +78,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(5);
+    let batch_timeout = config.batch_timeout.unwrap_or(1);
     let batch_size = config.batch_size.unwrap_or(1048576); // 1mib
 
     let timeout = config.request_timeout_secs.unwrap_or(30);
