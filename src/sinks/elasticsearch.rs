@@ -228,7 +228,7 @@ mod integration_tests {
             doc_type: "log_lines".into(),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
-            batch_timeout: Some(1),
+            batch_size: Some(1),
             ..Default::default()
         };
 
@@ -281,7 +281,7 @@ mod integration_tests {
             index: index.clone(),
             doc_type: "log_lines".into(),
             compression: Some(Compression::None),
-            batch_timeout: Some(1),
+            batch_size: Some(1),
             ..Default::default()
         };
 

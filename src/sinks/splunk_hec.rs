@@ -514,7 +514,7 @@ mod integration_tests {
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
-            batch_timeout: Some(1),
+            batch_size: Some(1),
             ..Default::default()
         }
     }
