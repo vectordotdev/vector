@@ -33,6 +33,7 @@ pub struct KinesisSinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
     pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
@@ -69,7 +70,7 @@ impl KinesisService {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size.unwrap_or(1049000 * 5); // 5mib
-        let batch_timeout = self.batch_timeout.unwrap_or(1);
+        let batch_timeout = config.batch_timeout.unwrap_or(1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
