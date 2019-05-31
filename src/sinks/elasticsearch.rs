@@ -54,7 +54,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         Compression::Gzip => true,
     };
 
-    let batch_size = config.batch_size.unwrap_or(1049000 * 10); // 10mib
+    let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
     let batch_timeout = config.batch_timeout.unwrap_or(1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);

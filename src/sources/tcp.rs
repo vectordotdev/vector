@@ -20,7 +20,7 @@ pub struct TcpConfig {
 }
 
 fn default_max_length() -> usize {
-    100 * 1024
+    bytesize::kib(100u64) as usize
 }
 
 fn default_shutdown_timeout_secs() -> u64 {

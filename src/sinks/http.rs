@@ -79,7 +79,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         Compression::Gzip => true,
     };
     let batch_timeout = config.batch_timeout.unwrap_or(1);
-    let batch_size = config.batch_size.unwrap_or(1048576); // 1mib
+    let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
 
     let timeout = config.request_timeout_secs.unwrap_or(30);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);

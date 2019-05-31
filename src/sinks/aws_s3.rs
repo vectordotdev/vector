@@ -100,7 +100,7 @@ impl S3Sink {
             Compression::Gzip => true,
             Compression::None => false,
         };
-        let batch_size = config.batch_size.unwrap_or(1049000 * 10); // 10mib
+        let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
 
         let region = config.region.clone();
         let s3 = S3Sink {

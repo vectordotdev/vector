@@ -73,7 +73,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
 
         let batch_timeout = self.batch_timeout.unwrap_or(1);
-        let batch_size = self.batch_size.unwrap_or(1048576); // 1mib
+        let batch_size = self.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
 
         let svc = ServiceBuilder::new()
             .concurrency_limit(in_flight_limit)

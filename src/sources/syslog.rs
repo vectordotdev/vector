@@ -35,7 +35,7 @@ pub enum Mode {
 }
 
 fn default_max_length() -> usize {
-    100 * 1024
+    bytesize::kib(100u64) as usize
 }
 
 impl SyslogConfig {
