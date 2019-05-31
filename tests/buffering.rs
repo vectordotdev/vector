@@ -3,8 +3,7 @@ use prost::Message;
 use tempfile::tempdir;
 use vector::event::{self, Event};
 use vector::test_util::{
-    block_on, next_addr, random_lines, random_string, receive, send_lines, shutdown_on_idle,
-    wait_for_tcp,
+    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, sinks, sources};
@@ -92,21 +91,20 @@ fn test_max_size() {
 
     let num_lines: usize = 1000;
     let line_size = 1000;
+    let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
 
-    let proto_size = {
-        let mut example_event = Event::from(random_string(line_size));
-        example_event
-            .as_mut_log()
-            .insert_implicit("host".into(), "127.0.0.1".into());
-
-        let mut proto = vec![];
-        event::proto::EventWrapper::from(example_event)
-            .encode(&mut proto)
-            .unwrap();
-        proto.len()
-    };
-
-    let max_size = num_lines * proto_size / 2;
+    let max_size = input_lines
+        .clone()
+        .into_iter()
+        .take(num_lines / 2)
+        .map(|line| {
+            let mut e = Event::from(line);
+            e.as_mut_log()
+                .insert_implicit("host".into(), "127.0.0.1".into());
+            event::proto::EventWrapper::from(e)
+        })
+        .map(|ew| ew.encoded_len())
+        .sum();
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -130,7 +128,6 @@ fn test_max_size() {
     let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
     wait_for_tcp(in_addr);
 
-    let input_lines = random_lines(line_size).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     rt.block_on(send).unwrap();
 

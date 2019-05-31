@@ -78,7 +78,9 @@ impl Sink for Writer {
         proto::EventWrapper::from(event).encode(&mut value).unwrap(); // This will not error when writing to a Vec
         let event_size = value.len();
 
-        if self.current_size.fetch_add(event_size, Ordering::Relaxed) + event_size > self.max_size {
+        if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
+            > self.max_size
+        {
             self.blocked_write_tasks
                 .lock()
                 .unwrap()
