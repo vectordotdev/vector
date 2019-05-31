@@ -103,65 +103,65 @@ fn test_sample() {
     }
 }
 
-#[test]
-fn test_parse() {
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+// #[test]
+// fn test_parse() {
+//     let in_addr = next_addr();
+//     let out_addr = next_addr();
 
-    let mut config = config::Config::empty();
-    config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-    config.add_transform(
-        "parser",
-        &["in"],
-        transforms::regex_parser::RegexParserConfig {
-            regex: r"status=(?P<status>\d+)".to_string(),
-            field: None,
-        },
-    );
-    config.add_transform(
-        "filter",
-        &["parser"],
-        transforms::field_filter::FieldFilterConfig {
-            field: "status".to_string(),
-            value: "404".to_string(),
-        },
-    );
-    config.add_sink(
-        "out",
-        &["filter"],
-        sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
-    );
+//     let mut config = config::Config::empty();
+//     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
+//     config.add_transform(
+//         "parser",
+//         &["in"],
+//         transforms::regex_parser::RegexParserConfig {
+//             regex: r"status=(?P<status>\d+)".to_string(),
+//             field: None,
+//         },
+//     );
+//     config.add_transform(
+//         "filter",
+//         &["parser"],
+//         transforms::field_filter::FieldFilterConfig {
+//             field: "status".to_string(),
+//             value: "404".to_string(),
+//         },
+//     );
+//     config.add_sink(
+//         "out",
+//         &["filter"],
+//         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
+//     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+//     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-    let output_lines = receive(&out_addr);
+//     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr);
+//     let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+//     // Wait for server to accept traffic
+//     wait_for_tcp(in_addr);
 
-    let input_lines = vec![
-        "good status=200",
-        "missing status=404",
-        "none foo=bar",
-        "blank status=",
-    ]
-    .into_iter()
-    .map(str::to_owned);
-    let send = send_lines(in_addr, input_lines.clone().into_iter());
-    rt.block_on(send).unwrap();
+//     let input_lines = vec![
+//         "good status=200",
+//         "missing status=404",
+//         "none foo=bar",
+//         "blank status=",
+//     ]
+//     .into_iter()
+//     .map(str::to_owned);
+//     let send = send_lines(in_addr, input_lines.clone().into_iter());
+//     rt.block_on(send).unwrap();
 
-    // Shut down server
-    block_on(topology.stop()).unwrap();
+//     // Shut down server
+//     block_on(topology.stop()).unwrap();
 
-    shutdown_on_idle(rt);
-    let output_line = output_lines.wait().into_iter().next().unwrap();
-    let output = serde_json::from_str::<HashMap<String, String>>(&output_line[..]).unwrap();
+//     shutdown_on_idle(rt);
+//     let output_line = output_lines.wait().into_iter().next().unwrap();
+//     let output = serde_json::from_str::<HashMap<String, String>>(&output_line[..]).unwrap();
 
-    assert_eq!(output["message"], "missing status=404");
-    assert_eq!(output["host"], "127.0.0.1");
-    assert_eq!(output["status"], "404");
-}
+//     assert_eq!(output["message"], "missing status=404");
+//     assert_eq!(output["host"], "127.0.0.1");
+//     assert_eq!(output["status"], "404");
+// }
 
 #[test]
 fn test_merge() {
