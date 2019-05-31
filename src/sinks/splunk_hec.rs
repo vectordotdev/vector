@@ -66,14 +66,14 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let token = config.token.clone();
     let host_field = config.host_field;
 
-    let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
+    let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };
-    let batch_timeout = config.batch_timeout.unwrap_or(300);
+    let batch_timeout = config.batch_timeout.unwrap_or(1);
 
-    let timeout = config.request_timeout_secs.unwrap_or(10);
+    let timeout = config.request_timeout_secs.unwrap_or(60);
     let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
     let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);

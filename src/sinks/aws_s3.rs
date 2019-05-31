@@ -81,7 +81,7 @@ impl crate::topology::config::SinkConfig for S3SinkConfig {
 
 impl S3Sink {
     pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
-        let timeout = config.request_timeout_secs.unwrap_or(10);
+        let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(15);
@@ -100,7 +100,7 @@ impl S3Sink {
             Compression::Gzip => true,
             Compression::None => false,
         };
-        let batch_size = config.batch_size.unwrap_or(2 * 1024 * 1024);
+        let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
 
         let region = config.region.clone();
         let s3 = S3Sink {

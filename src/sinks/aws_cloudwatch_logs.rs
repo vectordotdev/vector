@@ -67,13 +67,13 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let cloudwatch = CloudwatchLogsSvc::new(self.clone())?;
 
-        let timeout = self.request_timeout_secs.unwrap_or(10);
+        let timeout = self.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
         let rate_limit_duration = self.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = self.request_rate_limit_num.unwrap_or(5);
 
-        let batch_timeout = self.batch_timeout.unwrap_or(300);
-        let batch_size = self.batch_size.unwrap_or(2 * 1024 * 1024);
+        let batch_timeout = self.batch_timeout.unwrap_or(1);
+        let batch_size = self.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
 
         let svc = ServiceBuilder::new()
             .concurrency_limit(in_flight_limit)

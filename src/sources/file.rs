@@ -22,7 +22,7 @@ pub struct FileConfig {
 }
 
 fn default_max_line_bytes() -> usize {
-    100 * 1024
+    bytesize::kib(100u64) as usize
 }
 
 impl Default for FileConfig {
