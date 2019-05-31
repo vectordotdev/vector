@@ -90,7 +90,7 @@ fn main() {
             }
         }
 
-        debug!(
+        info!(
             message = "Loading config.",
             path = field::debug(&opts.config_path)
         );
