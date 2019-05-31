@@ -49,7 +49,7 @@ rusoto_credential = "0.16.0"
 
 # Tower
 tower = "0.1"
-tower-hyper = { git = "https://github.com/tower-rs/tower-hyper" }
+tower-hyper = "0.1"
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }
