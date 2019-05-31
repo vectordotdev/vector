@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>Join our beta! Timber is looking for select beta testers to hep shape the future of Vector</strong>
+  <strong><a href="beta">Join our beta!<a/> Timber is looking for select beta testers to help shape the future of Vector.</strong>
 </p>
 
 <p align="center">
@@ -12,12 +12,12 @@
   <a href="https://slack.linkerd.io/badge.svg"><img src="https://slack.linkerd.io/badge.svg"></a>
 </p>
 
-Vector is a high-performance routing layer for observability data. It makes [collecting][sources],
-[transforming][transforms], and [routing][sinks] logs and metrics easy. It's designed to be
-[deployed][deployment] across your entire infrastructure, serving both as a light-weight [agent]
-and a highly efficient [service].
+Vector is a [high-performance][performance] router for observability data. It makes
+[collecting][sources], [transforming][transforms], and [sending][sinks] logs and metrics easy.
+It's designed to be [deployed][deployment] across your entire infrastructure, serving both as a
+light-weight [agent] and a highly efficient [service].
 
-Built in [Rust][rust], Vector has a [*keen* focus on performance][performance] and
+Built in [Rust][rust], Vector places high-value on [performance] and
 [operator friendliness][administration]. Its purpose is to decouple routing from the services,
 giving you complete flexibility to adopt the services of your choice, among
 [many other benefits][use_cases].
@@ -27,15 +27,19 @@ giving you complete flexibility to adopt the services of your choice, among
 #### About
 
 * [**Use cases**][use_cases] - [cost], [governance], [security], [backups], [lock-in], [multi-cloud]
+* [**Concepts**][concepts]
+* [**Data model**][data_model]
+
+#### Comparisons
+
 * [**Performance**][performance]
 * [**Correctness**][correctness]
-* [**Concepts**][concepts]
-* [**Data Model**][data_model]
 
 #### Setup
 
 * [**Installation**][installation]
 * [**Getting started**][getting_started]
+* [**Migrating**][migrating]
 * [**Deployment**][deployment] - [topologies], [roles]
 
 #### Usage
@@ -45,25 +49,6 @@ giving you complete flexibility to adopt the services of your choice, among
 * [**Guides**][guides]
 
 ---
-
-## Why?
-
-With the shift towards cloud-native archictectures the approch to managing observability data
-is rapidly changing. Legacy approaches to managing logare becoming increasingly awkward and
-untenable. From sheer scaling and management to cost, sophisticated architectures no longer
-shove log data into a single.
-
-- Cloud-scale
-- Sophi
-- Mercy of vendors
-- Siophisticated pipelines are composed of multiple systems,
-- Achieving these sophisticted setups requires a talented team, deep big dat experience, and
-deep pockets. Vectors aims to tear that down, enabling engineers to build out sophisticated
-pipelines by simply specifying their toploogy in a configuration file.
-
-## Performance
-
-## Correctness
 
 ## Development
 
@@ -153,16 +138,18 @@ unsure, open a pull request.
 [configuration]: https://docs.vectorproject.io/usage/configuration
 [concepts]: https://docs.vectorproject.io/about/concepts
 [cost]: https://docs.vectorproject.io/about/use_cases/cost
-[correctness]: https://docs.vectorproject.io/about/correctness
+[correctness]: https://docs.vectorproject.io/comparisons/correctness
 [data_model]: https://docs.vectorproject.io/about/data_model
 [deployment]: https://docs.vectorproject.io/setup/deployment
+[features]: https://docs.vectorproject.io/comparisons/features
 [getting_started]: https://docs.vectorproject.io/setup/getting_started
 [governance]: https://docs.vectorproject.io/about/use_cases/governance
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
+[migrating]: https://docs.vectorproject.io/setup/migrating
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
-[performance]: https://docs.vectorproject.io/about/performance
+[performance]: https://docs.vectorproject.io/comparisons/performance
 [reload]: https://docs.vectorproject.io/usage/administration/reloading
 [roles]: https://docs.vectorproject.io/setup/deployment/roles
 [rust]: https://www.rust-lang.org/
