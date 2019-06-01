@@ -330,19 +330,19 @@ workflows:
             - check-stable
             - test-stable
       - release-apt:
-          <<: *test-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
       - release-github:
-          <<: *test-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
             - release-apt
             - release-x86_64-apple-darwin
       - release-docker:
-          <<: *test-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-x86_64-unknown-linux-gnu
             - release-apt
