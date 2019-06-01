@@ -70,14 +70,21 @@ install-make: &install-make
     name: Install make and friends
     command: |
       apt-get update
-      apt-get -y install build-essential g++
+      apt-get -y install build-essential
 
 install-make-sudo: &install-make-sudo
   run:
     name: Install make and friends
     command: |
       sudo apt-get update
-      sudo apt-get -y install build-essential g++
+      sudo apt-get -y install build-essential
+
+install-g++: &install-g++
+  run:
+    name: Install g++
+    command: |
+      sudo apt-get update
+      sudo apt-get -y install g++
 
 install-rust: &install-rust
   run:
@@ -216,6 +223,8 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
+      - *install-make-sudo
+      - *install-g++
       - *install-rust
       - *install-cross
       - checkout
@@ -231,6 +240,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
+      - *install-g++
       - *install-rust
       - *install-cross
       - checkout
@@ -260,6 +270,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
+      - *install-g++
       - *install-rust
       - *install-cross
       - checkout
