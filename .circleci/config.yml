@@ -183,7 +183,7 @@ jobs:
       - *save-cargo-cache
       # - *save-build-cache
 
-  release-x86_64-unknown-linux-gnu:
+  compile-x86_64-unknown-linux-gnu:
     machine: true
     steps:
       - *restore-git-cache
@@ -208,7 +208,7 @@ jobs:
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
-  release-x86_64-apple-darwin:
+  compile-x86_64-apple-darwin:
     macos:
       xcode: "9.0"
     environment:
@@ -230,25 +230,7 @@ jobs:
           paths:
             - "*.tar.gz"
 
-  release-docker:
-    machine: true
-    steps:
-      - checkout
-      - run:
-          name: Build
-          command: |
-            export VERSION=$(./ci/version.sh)
-            docker build -t timberio/vector:$VERSION .
-            docker build -t timberio/vector:latest .
-      - run:
-          name: Push
-          command: |
-            export VERSION=$(./ci/version.sh)
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker push timberio/vector:$VERSION
-            docker push timberio/vector:latest
-            
-  release-apt:
+  compile-apt:
     resource_class: xlarge
     docker:
       - image: timberio/vector-deb-builder:latest
@@ -269,6 +251,24 @@ jobs:
           paths:
             - "*.deb"
 
+  release-docker:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            export VERSION=$(./ci/version.sh)
+            docker build -t timberio/vector:$VERSION .
+            docker build -t timberio/vector:latest .
+      - run:
+          name: Push
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            docker push timberio/vector:$VERSION
+            docker push timberio/vector:latest
+
   release-github:
     docker:
       - image: timberio/vector-release-builder:latest
@@ -283,6 +283,18 @@ jobs:
             echo "Releasing $VERSION..."
             grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
+  release-s3:
+    steps:
+      - checkout
+      - attach_workspace:
+          at: dist
+      - run:
+          name: Upload
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "Releasing $VERSION..."
+            aws s3 cp "dist/" "s3://packages.timber.io/vector/" --recursive
+
 test-workflow-filters: &test-workflow-filters
   filters:
     branches:
@@ -290,12 +302,26 @@ test-workflow-filters: &test-workflow-filters
     tags:
       ignore: /.*/
 
-release-workflow-filters: &release-workflow-filters
+compile-workflow-filters: &compile-workflow-filters
+  filters:
+    branches:
+      ignore: master
+    tags:
+      only: /v.*/
+
+tag-release-workflow-filters: &tag-release-workflow-filters
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /v.*/
+
+edge-release-workflow-filters: &edge-release-workflow-filters
   filters:
     branches:
       only: master
     tags:
-      only: /v.*/
+      ignore: /.*/
 
 workflows:
   version: 2
@@ -312,38 +338,50 @@ workflows:
   release:
     jobs:
       - rustfmt:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
       - check-stable:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
       - test-stable:
-          <<: *release-workflow-filters
-      - release-x86_64-unknown-linux-gnu:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
+      - compile-x86_64-unknown-linux-gnu:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-x86_64-apple-darwin:
-          <<: *release-workflow-filters
+      - compile-x86_64-apple-darwin:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-apt:
-          <<: *release-workflow-filters
+      - compile-apt:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-github:
-          <<: *release-workflow-filters
+      - release-s3:
+          <<: *edge-release-workflow-filters
           requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
+            - compile-apt
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
       - release-docker:
-          <<: *release-workflow-filters
+          <<: *tag-release-workflow-filters
           requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
+            - compile-apt
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
+      - release-github:
+          <<: *tag-release-workflow-filters
+          requires:
+            - compile-apt
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
+      - release-s3:
+          <<: *edge-release-workflow-filters
+          requires:
+            - compile-apt
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
