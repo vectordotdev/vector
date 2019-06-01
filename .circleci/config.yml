@@ -79,7 +79,7 @@ install-make-sudo: &install-make-sudo
       sudo apt-get update
       sudo apt-get -y install build-essential
 
-install-g++: &install-g++
+install-gplusplus: &install-gplusplus
   run:
     name: Install g++
     command: |
@@ -224,7 +224,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
-      - *install-g++
+      - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
@@ -240,7 +240,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
-      - *install-g++
+      - *install-gplusplus++
       - *install-rust
       - *install-cross
       - checkout
@@ -270,7 +270,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
-      - *install-g++
+      - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
