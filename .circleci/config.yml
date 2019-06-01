@@ -284,6 +284,7 @@ jobs:
             grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
   release-s3:
+    machine: true
     steps:
       - checkout
       - attach_workspace:
