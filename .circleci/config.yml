@@ -211,14 +211,6 @@ jobs:
       - *restore-build-cache
       - *install-rust
       - *install-cross
-      - run:
-          name: Install the C cross toolchain
-          command: |
-            sudo apt-get install -qq gcc-arm-linux-gnueabihf
-      - run:
-          name: Install the cross compiled standard crates
-          command: |
-            rustup target add armv7-unknown-linux-gnueabihf
       - checkout
       - *cross-compile
       - *persist-dist-to-workspace
@@ -231,6 +223,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
+      - *install-make
       - *install-rust
       - *install-cross
       - checkout
@@ -259,6 +252,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
+      - *install-make
       - *install-rust
       - *install-cross
       - checkout
@@ -266,20 +260,6 @@ jobs:
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-netbsd"
-
-  compile-x86_64-unknown-openbsd:
-    machine: true
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-rust
-      - *install-cross
-      - checkout
-      - *cross-compile
-      - *persist-dist-to-workspace
-    environment:
-      TARGET: "x86_64-unknown-openbsd"
 
   compile-x86_64-apple-darwin:
     macos:
@@ -453,12 +433,6 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
-      - compile-x86_64-unknown-openbsd:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
       - compile-x86_64-apple-darwin:
           <<: *compile-workflow-filters
           requires:
@@ -472,7 +446,6 @@ workflows:
             - compile-deb
             - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-openbsd
             - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-docker:
@@ -482,7 +455,6 @@ workflows:
             - compile-deb
             - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-openbsd
             - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-github:
@@ -492,7 +464,6 @@ workflows:
             - compile-deb
             - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-openbsd
             - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-s3:
@@ -502,6 +473,5 @@ workflows:
             - compile-deb
             - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-openbsd
             - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
