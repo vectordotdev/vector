@@ -305,7 +305,7 @@ test-workflow-filters: &test-workflow-filters
 compile-workflow-filters: &compile-workflow-filters
   filters:
     branches:
-      ignore: master
+      only: master
     tags:
       only: /v.*/
 
