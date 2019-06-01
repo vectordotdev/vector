@@ -51,6 +51,27 @@ save-build-cache: &save-build-cache
 # Run macros
 #
 
+cross-compile: &cross-compile
+  run:
+    name: Cross Compile
+    command: |
+      export PATH="$HOME/.cargo/bin:$PATH"
+      ./ci/release.sh
+
+install-cross: &install-cross
+  run:
+    name: Install Cross
+    command: |
+      export PATH="$HOME/.cargo/bin:$PATH"
+      cargo install cross
+
+install-make: &install-make
+  run:
+    name: Install make and friends
+    command: |
+      apt-get update
+      apt-get -y install build-essential
+
 install-rust: &install-rust
   run:
     name: Install Rust
@@ -59,12 +80,11 @@ install-rust: &install-rust
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       export PATH="$HOME/.cargo/bin:$PATH"
 
-install-make: &install-make
-  run:
-    name: Install make and friends
-    command: |
-      apt-get update
-      apt-get -y install build-essential
+persist-dist-to-workspace: &persist-dist-to-workspace
+  persist_to_workspace:
+    root: dist
+    paths:
+      - "*.tar.gz"
 
 #
 # Job macros
@@ -183,6 +203,42 @@ jobs:
       - *save-cargo-cache
       # - *save-build-cache
 
+  compile-armv7-unknown-linux-gnueabihf:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - *install-cross
+      - run:
+          name: Install the C cross toolchain
+          command: |
+            sudo apt-get install -qq gcc-arm-linux-gnueabihf
+      - run:
+          name: Install the cross compiled standard crates
+          command: |
+            rustup target add armv7-unknown-linux-gnueabihf
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "armv7-unknown-linux-gnueabihf"
+
+  compile-x86_64-unknown-freebsd:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "x86_64-unknown-freebsd"
+
   compile-x86_64-unknown-linux-gnu:
     machine: true
     steps:
@@ -190,23 +246,40 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-rust
-      - run:
-          name: Install Cross
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo install cross
+      - *install-cross
       - checkout
-      - run:
-          name: Cross Compile
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            ./ci/release.sh
-      - persist_to_workspace:
-          root: dist
-          paths:
-            - "*.tar.gz"
+      - *cross-compile
+      - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
+
+  compile-x86_64-unknown-netbsd:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "x86_64-unknown-netbsd"
+
+  compile-x86_64-unknown-openbsd:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "x86_64-unknown-openbsd"
 
   compile-x86_64-apple-darwin:
     macos:
@@ -350,7 +423,25 @@ workflows:
           <<: *compile-workflow-filters
       - test-stable:
           <<: *compile-workflow-filters
+      - compile-x86_64-unknown-freebsd:
+          <<: *compile-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
       - compile-x86_64-unknown-linux-gnu:
+          <<: *compile-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - compile-x86_64-unknown-netbsd:
+          <<: *compile-workflow-filters
+          requires:
+            - rustfmt
+            - check-stable
+            - test-stable
+      - compile-x86_64-unknown-openbsd:
           <<: *compile-workflow-filters
           requires:
             - rustfmt
@@ -372,23 +463,35 @@ workflows:
           <<: *edge-release-workflow-filters
           requires:
             - compile-deb
+            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-unknown-openbsd
+            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-docker:
           <<: *tag-release-workflow-filters
           requires:
             - compile-deb
+            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-unknown-openbsd
+            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-github:
           <<: *tag-release-workflow-filters
           requires:
             - compile-deb
+            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-unknown-openbsd
+            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-s3:
           <<: *edge-release-workflow-filters
           requires:
             - compile-deb
+            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-unknown-openbsd
+            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
