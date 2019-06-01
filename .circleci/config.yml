@@ -422,19 +422,7 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
-      - compile-x86_64-unknown-freebsd:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
       - compile-x86_64-unknown-linux-gnu:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - compile-x86_64-unknown-netbsd:
           <<: *compile-workflow-filters
           requires:
             - rustfmt
