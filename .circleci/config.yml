@@ -69,8 +69,8 @@ install-make: &install-make
   run:
     name: Install make and friends
     command: |
-      apt-get update
-      apt-get -y install build-essential
+      sudo apt-get update
+      sudo apt-get -y install build-essential
 
 install-rust: &install-rust
   run:
