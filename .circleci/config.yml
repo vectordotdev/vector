@@ -69,6 +69,13 @@ install-make: &install-make
   run:
     name: Install make and friends
     command: |
+      apt-get update
+      apt-get -y install build-essential
+
+install-make-sudo: &install-make-sudo
+  run:
+    name: Install make and friends
+    command: |
       sudo apt-get update
       sudo apt-get -y install build-essential
 
@@ -223,7 +230,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
-      - *install-make
+      - *install-make-sudo
       - *install-rust
       - *install-cross
       - checkout
@@ -252,7 +259,7 @@ jobs:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
-      - *install-make
+      - *install-make-sudo
       - *install-rust
       - *install-cross
       - checkout
