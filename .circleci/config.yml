@@ -439,34 +439,26 @@ workflows:
           requires:
             - compile-armv7-unknown-linux-gnueabihf
             - compile-deb
-            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-docker:
           <<: *tag-release-workflow-filters
           requires:
             - compile-armv7-unknown-linux-gnueabihf
             - compile-deb
-            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-github:
           <<: *tag-release-workflow-filters
           requires:
             - compile-armv7-unknown-linux-gnueabihf
             - compile-deb
-            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
       - release-s3:
           <<: *edge-release-workflow-filters
           requires:
             - compile-armv7-unknown-linux-gnueabihf
             - compile-deb
-            - compile-x86_64-unknown-freebsd
             - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-unknown-netbsd
             - compile-x86_64-apple-darwin
