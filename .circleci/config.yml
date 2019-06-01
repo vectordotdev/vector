@@ -290,6 +290,12 @@ jobs:
       - attach_workspace:
           at: dist
       - run:
+        name: Install AWS CLI
+        command: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip install --upgrade awscli
+      - run:
           name: Upload
           command: |
             export VERSION=$(./ci/version.sh)
