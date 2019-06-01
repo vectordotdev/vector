@@ -240,7 +240,7 @@ jobs:
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-make-sudo
-      - *install-gplusplus++
+      - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
