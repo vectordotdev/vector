@@ -51,6 +51,41 @@ save-build-cache: &save-build-cache
 # Run macros
 #
 
+cross-compile: &cross-compile
+  run:
+    name: Cross Compile
+    command: |
+      export PATH="$HOME/.cargo/bin:$PATH"
+      ./ci/release.sh
+
+install-cross: &install-cross
+  run:
+    name: Install Cross
+    command: |
+      export PATH="$HOME/.cargo/bin:$PATH"
+      cargo install cross
+
+install-make: &install-make
+  run:
+    name: Install make and friends
+    command: |
+      apt-get update
+      apt-get -y install build-essential
+
+install-make-sudo: &install-make-sudo
+  run:
+    name: Install make and friends
+    command: |
+      sudo apt-get update
+      sudo apt-get -y install build-essential
+
+install-gplusplus: &install-gplusplus
+  run:
+    name: Install g++
+    command: |
+      sudo apt-get update
+      sudo apt-get -y install g++
+
 install-rust: &install-rust
   run:
     name: Install Rust
@@ -59,12 +94,11 @@ install-rust: &install-rust
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       export PATH="$HOME/.cargo/bin:$PATH"
 
-install-make: &install-make
-  run:
-    name: Install make and friends
-    command: |
-      apt-get update
-      apt-get -y install build-essential
+persist-dist-to-workspace: &persist-dist-to-workspace
+  persist_to_workspace:
+    root: dist
+    paths:
+      - "*.tar.gz"
 
 #
 # Job macros
@@ -183,32 +217,69 @@ jobs:
       - *save-cargo-cache
       # - *save-build-cache
 
-  release-x86_64-unknown-linux-gnu:
+  compile-armv7-unknown-linux-gnueabihf:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-make-sudo
+      - *install-gplusplus
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "armv7-unknown-linux-gnueabihf"
+
+  compile-x86_64-unknown-freebsd:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-make-sudo
+      - *install-gplusplus
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "x86_64-unknown-freebsd"
+
+  compile-x86_64-unknown-linux-gnu:
     machine: true
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
       - *restore-build-cache
       - *install-rust
-      - run:
-          name: Install Cross
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo install cross
+      - *install-cross
       - checkout
-      - run:
-          name: Cross Compile
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            ./ci/release.sh
-      - persist_to_workspace:
-          root: dist
-          paths:
-            - "*.tar.gz"
+      - *cross-compile
+      - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
 
-  release-x86_64-apple-darwin:
+  compile-x86_64-unknown-netbsd:
+    machine: true
+    steps:
+      - *restore-git-cache
+      - *restore-cargo-cache
+      - *restore-build-cache
+      - *install-make-sudo
+      - *install-gplusplus
+      - *install-rust
+      - *install-cross
+      - checkout
+      - *cross-compile
+      - *persist-dist-to-workspace
+    environment:
+      TARGET: "x86_64-unknown-netbsd"
+
+  compile-x86_64-apple-darwin:
     macos:
       xcode: "9.0"
     environment:
@@ -230,25 +301,7 @@ jobs:
           paths:
             - "*.tar.gz"
 
-  release-docker:
-    machine: true
-    steps:
-      - checkout
-      - run:
-          name: Build
-          command: |
-            export VERSION=$(./ci/version.sh)
-            docker build -t timberio/vector:$VERSION .
-            docker build -t timberio/vector:latest .
-      - run:
-          name: Push
-          command: |
-            export VERSION=$(./ci/version.sh)
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker push timberio/vector:$VERSION
-            docker push timberio/vector:latest
-            
-  release-apt:
+  compile-deb:
     resource_class: xlarge
     docker:
       - image: timberio/vector-deb-builder:latest
@@ -269,6 +322,24 @@ jobs:
           paths:
             - "*.deb"
 
+  release-docker:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Build
+          command: |
+            export VERSION=$(./ci/version.sh)
+            docker build -t timberio/vector:$VERSION .
+            docker build -t timberio/vector:latest .
+      - run:
+          name: Push
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            docker push timberio/vector:$VERSION
+            docker push timberio/vector:latest
+
   release-github:
     docker:
       - image: timberio/vector-release-builder:latest
@@ -283,6 +354,25 @@ jobs:
             echo "Releasing $VERSION..."
             grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
 
+  release-s3:
+    machine: true
+    steps:
+      - checkout
+      - attach_workspace:
+          at: dist
+      - run:
+          name: Install AWS CLI
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y python3-pip
+            pip install --upgrade awscli
+      - run:
+          name: Upload
+          command: |
+            export VERSION=$(./ci/version.sh)
+            echo "Releasing $VERSION..."
+            aws s3 cp "dist/" "s3://packages.timber.io/vector/" --recursive
+
 test-workflow-filters: &test-workflow-filters
   filters:
     branches:
@@ -290,12 +380,26 @@ test-workflow-filters: &test-workflow-filters
     tags:
       ignore: /.*/
 
-release-workflow-filters: &release-workflow-filters
+compile-workflow-filters: &compile-workflow-filters
   filters:
     branches:
       only: master
     tags:
       only: /v.*/
+
+tag-release-workflow-filters: &tag-release-workflow-filters
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /v.*/
+
+edge-release-workflow-filters: &edge-release-workflow-filters
+  filters:
+    branches:
+      only: master
+    tags:
+      ignore: /.*/
 
 workflows:
   version: 2
@@ -312,38 +416,50 @@ workflows:
   release:
     jobs:
       - rustfmt:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
       - check-stable:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
       - test-stable:
-          <<: *release-workflow-filters
-      - release-x86_64-unknown-linux-gnu:
-          <<: *release-workflow-filters
+          <<: *compile-workflow-filters
+      - compile-deb:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-x86_64-apple-darwin:
-          <<: *release-workflow-filters
+      - compile-x86_64-unknown-linux-gnu:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-apt:
-          <<: *test-workflow-filters
+      - compile-x86_64-apple-darwin:
+          <<: *compile-workflow-filters
           requires:
             - rustfmt
             - check-stable
             - test-stable
-      - release-github:
-          <<: *test-workflow-filters
+      - release-s3:
+          <<: *edge-release-workflow-filters
           requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
+            - compile-deb
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
       - release-docker:
-          <<: *test-workflow-filters
+          <<: *tag-release-workflow-filters
           requires:
-            - release-x86_64-unknown-linux-gnu
-            - release-apt
-            - release-x86_64-apple-darwin
+            - compile-deb
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
+      - release-github:
+          <<: *tag-release-workflow-filters
+          requires:
+            - compile-deb
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
+      - release-s3:
+          <<: *edge-release-workflow-filters
+          requires:
+            - compile-deb
+            - compile-x86_64-unknown-linux-gnu
+            - compile-x86_64-apple-darwin
