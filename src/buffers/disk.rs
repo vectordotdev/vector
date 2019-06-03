@@ -16,6 +16,8 @@ use leveldb::database::{
 use prost::Message;
 use std::collections::VecDeque;
 use std::convert::TryInto;
+use std::io;
+use std::path::Path;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -237,11 +239,27 @@ impl Reader {
     }
 }
 
-pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader, super::Acker) {
+pub fn open(
+    data_dir: &Path,
+    buffer_dir: &Path,
+    max_size: usize,
+) -> Result<(Writer, Reader, super::Acker), String> {
+    let path = data_dir.join(buffer_dir);
+
+    // Check data dir
+    std::fs::metadata(&data_dir).map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => format!("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", path),
+            io::ErrorKind::NotFound => format!("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", path),
+            _ => format!("{}", e),
+        }).and_then(|m| if m.permissions().readonly() {
+        Err(format!("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", path))
+    } else { Ok(()) })?;
+
     let mut options = Options::new();
     options.create_if_missing = true;
 
-    let db: Database<Key> = Database::open(path, options).unwrap();
+    let db: Database<Key> = Database::open(&path, options)
+        .map_err(|e| format!("Unable to open `data_dir`: {:?} because: {}", path, e))?;
     let db = Arc::new(db);
 
     let head;
@@ -284,5 +302,5 @@ pub fn open(path: &std::path::Path, max_size: usize) -> (Writer, Reader, super::
         unacked_sizes: VecDeque::new(),
     };
 
-    (writer, reader, acker)
+    Ok((writer, reader, acker))
 }
