@@ -61,7 +61,7 @@ then
   build_tar
 elif [ -n "$BRANCH" ]
 then
-  TAG_DESCRIBE=$(git describe --tags)
+  TAG_DESCRIBE=$(./ci/version.sh)
   TAR_NAME="$APP_NAME-$TAG_DESCRIBE-$TARGET.tar.gz"
   build_release
   build_tar
