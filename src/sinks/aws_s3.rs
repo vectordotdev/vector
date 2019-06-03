@@ -85,7 +85,7 @@ impl S3Sink {
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(15);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
         let encoding = config.encoding.clone();
 
