@@ -160,7 +160,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
     }
 }
 
-fn build_index_name(index: &str, event: &Event, dynamic_date: bool) -> String {
+pub fn build_index_name(index: &str, event: &Event, dynamic_date: bool) -> String {
     if dynamic_date {
         if let Some(ts) = event
             .as_log()
