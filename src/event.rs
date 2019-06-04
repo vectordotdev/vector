@@ -221,6 +221,13 @@ impl ValueKind {
             ValueKind::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
         }
     }
+
+    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
+        match &self {
+            ValueKind::Timestamp(ts) => Some(ts),
+            _ => None,
+        }
+    }
 }
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {

@@ -1,12 +1,13 @@
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{self, Event},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
 };
+use chrono::Utc;
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -26,6 +27,7 @@ pub struct ElasticSearchConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub dynamic_date: Option<bool>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -64,6 +66,8 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
+    let dynamic_date = config.dynamic_date.unwrap_or(false);
+
     let policy = FixedRetryPolicy::new(
         retry_attempts,
         Duration::from_secs(retry_backoff_secs),
@@ -101,9 +105,11 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             Duration::from_secs(batch_timeout),
         )
         .with(move |event: Event| {
+            let index = build_index_name(&config.index, &event, dynamic_date);
+
             let mut action = json!({
                 "index": {
-                    "_index": config.index,
+                    "_index": index,
                     "_type": config.doc_type,
                 }
             });
@@ -154,10 +160,29 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
     }
 }
 
+fn build_index_name(index: &str, event: &Event, dynamic_date: bool) -> String {
+    if dynamic_date {
+        let date = if let Some(ts) = event
+            .as_log()
+            .get(&event::TIMESTAMP)
+            .and_then(|e| e.as_timestamp())
+        {
+            ts.format("%Y.%m.%d")
+        } else {
+            Utc::now().format("%Y.%m.%d")
+        };
+
+        format!("{}-{}", index, date)
+    } else {
+        index.to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::maybe_set_id;
-    use crate::Event;
+    use super::*;
+    use crate::event::{self, Event};
+    use chrono::{Datelike, Utc};
     use serde_json::json;
 
     #[test]
@@ -200,6 +225,33 @@ mod tests {
         maybe_set_id(id_key, &mut action, &event);
 
         assert_eq!(json!({}), action);
+    }
+
+    #[test]
+    fn dynamic_date_builds_date_index() {
+        let mut event = Event::from("hello world");
+        let date = Utc::now();
+        event
+            .as_mut_log()
+            .insert_implicit(event::TIMESTAMP.clone(), date.clone().into());
+
+        let index_name = build_index_name("index", &event, true);
+        assert_eq!(
+            index_name,
+            format!(
+                "index-{}.{:02}.{:02}",
+                date.year(),
+                date.month(),
+                date.day()
+            )
+        );
+    }
+
+    #[test]
+    fn dynamic_date_builds_non_date_index() {
+        let event = Event::from("hello world");
+        let index_name = build_index_name("index", &event, false);
+        assert_eq!(&index_name, "index");
     }
 }
 
