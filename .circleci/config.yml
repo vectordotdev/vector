@@ -316,11 +316,12 @@ jobs:
           name: Compile
           command: |
             export VERSION=$(./ci/version.sh)
-            cargo deb --deb-version $VERSION
+            cargo deb --deb-version $VERSION --output vector-$VERSION
       - run:
           name: Save
           command: |
             mkdir dist
+            rename 's/vector_/vector-/' target/debian/*
             cp -R target/debian/* dist
       - persist_to_workspace:
           root: dist
