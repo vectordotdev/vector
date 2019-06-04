@@ -316,9 +316,9 @@ jobs:
       - run:
           name: Save
           command: |
+            export VERSION=$(./ci/version.sh)
             mkdir dist
-            rename 's/vector_/vector-v/' target/debian/*
-            cp -R target/debian/* dist
+            mv $(find target/debian/ -name *.deb) "dist/vector-$VERSION-amd64.deb"
       - persist_to_workspace:
           root: dist
           paths:
