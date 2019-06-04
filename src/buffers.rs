@@ -112,8 +112,7 @@ impl BufferConfig {
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?;
                 let buffer_dir = format!("{}_buffer", sink_name);
 
-                let (tx, rx, acker) =
-                    disk::open(&data_dir, buffer_dir.as_ref(), *max_size).unwrap();
+                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
