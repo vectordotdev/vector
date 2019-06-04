@@ -316,7 +316,7 @@ jobs:
           name: Compile
           command: |
             export VERSION=$(./ci/version.sh)
-            cargo deb --deb-version $VERSION --output vector-$VERSION
+            cargo deb --deb-version $VERSION
       - run:
           name: Save
           command: |
