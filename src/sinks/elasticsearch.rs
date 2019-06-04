@@ -7,6 +7,7 @@ use crate::{
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
 };
+use chrono::format::strftime::StrftimeItems;
 use chrono::Utc;
 use futures::{Future, Sink};
 use http::{Method, Uri};
@@ -27,7 +28,6 @@ pub struct ElasticSearchConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
-    pub dynamic_date: Option<bool>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -66,7 +66,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
-    let dynamic_date = config.dynamic_date.unwrap_or(false);
+    let dynamic_date = detect_dynamic_date(&config.index);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -162,20 +162,23 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 
 fn build_index_name(index: &str, event: &Event, dynamic_date: bool) -> String {
     if dynamic_date {
-        let date = if let Some(ts) = event
+        if let Some(ts) = event
             .as_log()
             .get(&event::TIMESTAMP)
             .and_then(|e| e.as_timestamp())
         {
-            ts.format("%Y.%m.%d")
+            ts.format(index).to_string()
         } else {
-            Utc::now().format("%Y.%m.%d")
-        };
-
-        format!("{}-{}", index, date)
+            Utc::now().format(index).to_string()
+        }
     } else {
         index.to_owned()
     }
+}
+
+fn detect_dynamic_date(index: &str) -> bool {
+    let parsed_items = StrftimeItems::new(&index);
+    parsed_items.count() > 0
 }
 
 #[cfg(test)]
@@ -235,7 +238,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit(event::TIMESTAMP.clone(), date.clone().into());
 
-        let index_name = build_index_name("index", &event, true);
+        let index_name = build_index_name("index-%Y.%m.%d", &event, true);
         assert_eq!(
             index_name,
             format!(
@@ -252,6 +255,12 @@ mod tests {
         let event = Event::from("hello world");
         let index_name = build_index_name("index", &event, false);
         assert_eq!(&index_name, "index");
+    }
+
+    #[test]
+    fn dynamic_date_detect() {
+        assert!(detect_dynamic_date("%Y"));
+        assert!(!detect_dynamic_date(""));
     }
 }
 
