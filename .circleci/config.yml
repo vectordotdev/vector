@@ -218,7 +218,6 @@ jobs:
       # - *save-build-cache
 
   compile-armv7-unknown-linux-gnueabihf:
-    resource_class: xlarge
     machine: true
     steps:
       - *restore-git-cache
@@ -235,7 +234,6 @@ jobs:
       TARGET: "armv7-unknown-linux-gnueabihf"
 
   compile-x86_64-unknown-freebsd:
-    resource_class: xlarge
     machine: true
     steps:
       - *restore-git-cache
@@ -252,7 +250,6 @@ jobs:
       TARGET: "x86_64-unknown-freebsd"
 
   compile-x86_64-unknown-linux-gnu:
-    resource_class: xlarge
     machine: true
     steps:
       - *restore-git-cache
@@ -267,7 +264,6 @@ jobs:
       TARGET: "x86_64-unknown-linux-gnu"
 
   compile-x86_64-unknown-netbsd:
-    resource_class: xlarge
     machine: true
     steps:
       - *restore-git-cache
@@ -284,7 +280,6 @@ jobs:
       TARGET: "x86_64-unknown-netbsd"
 
   compile-x86_64-apple-darwin:
-    resource_class: xlarge
     macos:
       xcode: "9.0"
     environment:
@@ -329,7 +324,6 @@ jobs:
             - "*.deb"
 
   release-docker:
-    resource_class: xlarge
     machine: true
     steps:
       - checkout
