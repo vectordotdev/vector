@@ -310,7 +310,9 @@ jobs:
       - run:
           name: Compile
           command: |
-            cargo deb
+            export VERSION=$(./ci/version.sh)
+            VERSION=$(echo $VERSION | sed 's/^v//g')
+            cargo deb --deb-version $VERSION
       - run:
           name: Save
           command: |
