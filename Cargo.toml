@@ -100,6 +100,7 @@ lazy_static = "1.3.0"
 rlua = "0.16.3"
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
+grok = "1.0.0"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -114,6 +115,7 @@ libc = "0.2.43"
 walkdir = "2.2.7"
 elastic = { git = "https://github.com/elastic-rs/elastic" }
 matches = "0.1.8"
+pretty_assertions = "0.6.1"
 
 [features]
 default = ["rdkafka", "leveldb"]
