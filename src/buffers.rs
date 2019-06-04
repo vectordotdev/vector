@@ -113,7 +113,7 @@ impl BufferConfig {
                 let buffer_dir = format!("{}_buffer", sink_name);
 
                 let (tx, rx, acker) =
-                    disk::open(&data_dir, buffer_dir.as_ref(), *max_size).unwrap();
+                    disk::open(&data_dir, buffer_dir.as_ref(), *max_size)?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
