@@ -52,21 +52,10 @@ COMMIT_SHA=$CIRCLE_SHA1
 COMMIT_TIMESTAMP=$(git show -s --format=%ct $COMMIT_SHA)
 VERSION=$(./ci/version.sh)
 
-if [ -n "$TAG" ]
-then
-  echo "Building release for tag $TAG"
+echo "Building release for $VERSION"
 
-  TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
-  build_release
-  build_tar
-elif [ -n "$BRANCH" ]
-then
-  TAG_DESCRIBE=$(git describe --tags)
-  TAR_NAME="$APP_NAME-$TAG_DESCRIBE-$TARGET.tar.gz"
-  build_release
-  build_tar
-else
-  echo "error: neither TAG nor BRANCH was set"
-  exit 1
-fi
+TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
+build_release
+build_tar
+
 set -u
