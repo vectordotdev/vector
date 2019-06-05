@@ -59,7 +59,7 @@ impl Transform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                debug!(message = "No fields captured from grok pattern");
+                debug!(message = "No fields captured from grok pattern.");
             }
         } else {
             debug!(
