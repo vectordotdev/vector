@@ -50,7 +50,7 @@ impl Transform for RegexParser {
     fn transform(&self, mut event: Event) -> Option<Event> {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
-        let do_drop = if let Some(value) = &value {
+        if let Some(value) = &value {
             if let Some(captures) = self.regex.captures(&value) {
                 let mut do_drop = self.drop_field;
                 for name in self.regex.capture_names().filter_map(|c| c) {
@@ -63,22 +63,18 @@ impl Transform for RegexParser {
                             .insert_explicit(name.into(), capture.as_bytes().into());
                     }
                 }
-                do_drop
+                if do_drop {
+                    event.as_mut_log().remove(&self.field);
+                }
             } else {
                 debug!(message = "No fields captured from regex");
-                false
             }
         } else {
             debug!(
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
             );
-            false
         };
-
-        if do_drop {
-            event.as_mut_log().remove(&self.field);
-        }
 
         Some(event)
     }
