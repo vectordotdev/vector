@@ -11,6 +11,7 @@ pub struct RegexParserConfig {
     pub regex: String,
     pub field: Option<Atom>,
     pub drop_field: bool,
+    pub drop_failed: bool,
 }
 
 #[typetag::serde(name = "regex_parser")]
@@ -25,7 +26,12 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
         Regex::new(&self.regex)
             .map_err(|err| err.to_string())
             .map::<Box<dyn Transform>, _>(|r| {
-                Box::new(RegexParser::new(r, field.clone(), self.drop_field))
+                Box::new(RegexParser::new(
+                    r,
+                    field.clone(),
+                    self.drop_field,
+                    self.drop_failed,
+                ))
             })
     }
 }
@@ -34,10 +40,11 @@ pub struct RegexParser {
     regex: Regex,
     field: Atom,
     drop_field: bool,
+    drop_failed: bool,
 }
 
 impl RegexParser {
-    pub fn new(regex: Regex, field: Atom, mut drop_field: bool) -> Self {
+    pub fn new(regex: Regex, field: Atom, mut drop_field: bool, drop_failed: bool) -> Self {
         for name in regex.capture_names().filter_map(|c| c) {
             if name == field.as_ref() {
                 drop_field = false;
@@ -47,6 +54,7 @@ impl RegexParser {
             regex,
             field,
             drop_field,
+            drop_failed,
         }
     }
 }
@@ -67,6 +75,7 @@ impl Transform for RegexParser {
                 if self.drop_field {
                     event.as_mut_log().remove(&self.field);
                 }
+                return Some(event);
             } else {
                 debug!(message = "No fields captured from regex");
             }
@@ -75,9 +84,13 @@ impl Transform for RegexParser {
                 message = "Field does not exist.",
                 field = self.field.as_ref(),
             );
-        };
+        }
 
-        Some(event)
+        if self.drop_failed {
+            None
+        } else {
+            Some(event)
+        }
     }
 }
 
@@ -87,19 +100,24 @@ mod tests {
     use crate::event::LogEvent;
     use crate::{topology::config::TransformConfig, Event};
 
-    fn do_transform(event: &str, regex: &str, field: Option<&str>, drop_field: bool) -> LogEvent {
+    fn do_transform(
+        event: &str,
+        regex: &str,
+        field: Option<&str>,
+        drop_field: bool,
+        drop_failed: bool,
+    ) -> Option<LogEvent> {
         let event = Event::from(event);
         let parser = RegexParserConfig {
             regex: regex.into(),
             field: field.map(|field| field.into()),
             drop_field,
+            drop_failed,
         }
         .build()
         .unwrap();
 
-        let event = parser.transform(event).unwrap();
-
-        event.into_log()
+        parser.transform(event).map(|event| event.into_log())
     }
 
     #[test]
@@ -109,7 +127,9 @@ mod tests {
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
             None,
             false,
-        );
+            false,
+        )
+        .unwrap();
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
@@ -118,7 +138,7 @@ mod tests {
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", None, false);
+        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", None, false, false).unwrap();
 
         assert_eq!(log.get(&"status".into()), None);
         assert!(log.get(&"message".into()).is_some());
@@ -131,7 +151,9 @@ mod tests {
             r"status=(?P<status>\d+) time=(?P<time>\d+)",
             Some("message"),
             true,
-        );
+            false,
+        )
+        .unwrap();
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
@@ -145,21 +167,37 @@ mod tests {
             r"status=(?P<status>\d+) message=(?P<message>\S+)",
             Some("message"),
             true,
-        );
+            false,
+        )
+        .unwrap();
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
     #[test]
-    fn regex_parser_does_not_drop_if_no_match() {
+    fn regex_parser_does_not_drop_field_if_no_match() {
         let log = do_transform(
             "asdf1234",
             r"status=(?P<message>\S+)",
             Some("message"),
             true,
-        );
+            false,
+        )
+        .unwrap();
 
         assert!(log.get(&"message".into()).is_some());
+    }
+
+    #[test]
+    fn regex_parser_does_not_drop_event_if_match() {
+        let log = do_transform("asdf1234", r"asdf", None, false, true);
+        assert!(log.is_some());
+    }
+
+    #[test]
+    fn regex_parser_does_drop_event_if_no_match() {
+        let log = do_transform("asdf1234", r"something", None, false, true);
+        assert!(log.is_none());
     }
 }

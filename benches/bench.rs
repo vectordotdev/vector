@@ -288,6 +288,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                             regex: r"status=(?P<status>\d+)".to_string(),
                             field: None,
                             drop_field: false,
+                            drop_failed: false,
                         },
                     );
                     config.add_transform(
@@ -362,6 +363,7 @@ fn benchmark_complex(c: &mut Criterion) {
                             regex: r"status=(?P<status>\d+)".to_string(),
                             field: None,
                             drop_field: false,
+                            drop_failed: false,
                         },
                     );
                     config.add_transform(
