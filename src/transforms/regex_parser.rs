@@ -100,6 +100,7 @@ mod tests {
 
         assert_eq!(event.as_log()[&"status".into()], "1234".into());
         assert_eq!(event.as_log()[&"time".into()], "5678".into());
+        assert!(event.as_log().get(&"message".into()).is_some());
     }
 
     #[test]
@@ -116,6 +117,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
 
         assert_eq!(event.as_log().get(&"status".into()), None);
+        assert!(event.as_log().get(&"message".into()).is_some());
     }
 
     #[test]
