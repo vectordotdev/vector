@@ -27,7 +27,7 @@ impl crate::topology::config::TransformConfig for GrokParserConfig {
         let mut grok = grok::Grok::with_patterns();
 
         grok.compile(&self.pattern, true)
-            .map_err(|err| err.to_string())
+            .map_err(|err| format!("Grok pattern failed to compile: {}", err))
             .map::<Box<dyn Transform>, _>(|p| {
                 Box::new(GrokParser {
                     pattern: p,
