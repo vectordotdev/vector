@@ -163,7 +163,6 @@ fn bad_regex() {
         type = "regex_parser"
         inputs = ["in"]
         regex = "(["
-        drop_field = false
 
         [sinks.out]
         type = "tcp"
