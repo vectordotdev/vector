@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Default)]
+#[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
     pub regex: String,
     pub field: Option<Atom>,
@@ -91,7 +91,7 @@ mod tests {
         let parser = RegexParserConfig {
             regex: r"status=(?P<status>\d+) time=(?P<time>\d+)".into(),
             field: None,
-            drop_field: false,
+            ..Default::default()
         }
         .build()
         .unwrap();
@@ -109,7 +109,7 @@ mod tests {
         let parser = RegexParserConfig {
             regex: r"status=(?P<status>\d+)".into(),
             field: None,
-            drop_field: false,
+            ..Default::default()
         }
         .build()
         .unwrap();
