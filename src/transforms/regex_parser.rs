@@ -83,57 +83,55 @@ impl Transform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
+    use crate::event::LogEvent;
     use crate::{topology::config::TransformConfig, Event};
 
-    #[test]
-    fn regex_parser_adds_parsed_field_to_event() {
-        let event = Event::from("status=1234 time=5678");
+    fn do_transform(event: &str, regex: &str, field: Option<&str>, drop_field: bool) -> LogEvent {
+        let event = Event::from(event);
         let parser = RegexParserConfig {
-            regex: r"status=(?P<status>\d+) time=(?P<time>\d+)".into(),
-            field: None,
-            ..Default::default()
+            regex: regex.into(),
+            field: field.map(|field| field.into()),
+            drop_field,
         }
         .build()
         .unwrap();
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"status".into()], "1234".into());
-        assert_eq!(event.as_log()[&"time".into()], "5678".into());
-        assert!(event.as_log().get(&"message".into()).is_some());
+        event.into_log()
+    }
+
+    #[test]
+    fn regex_parser_adds_parsed_field_to_event() {
+        let log = do_transform(
+            "status=1234 time=5678",
+            r"status=(?P<status>\d+) time=(?P<time>\d+)",
+            None,
+            false,
+        );
+
+        assert_eq!(log[&"status".into()], "1234".into());
+        assert_eq!(log[&"time".into()], "5678".into());
+        assert!(log.get(&"message".into()).is_some());
     }
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let event = Event::from("asdf1234");
-        let parser = RegexParserConfig {
-            regex: r"status=(?P<status>\d+)".into(),
-            field: None,
-            ..Default::default()
-        }
-        .build()
-        .unwrap();
+        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", None, false);
 
-        let event = parser.transform(event).unwrap();
-
-        assert_eq!(event.as_log().get(&"status".into()), None);
-        assert!(event.as_log().get(&"message".into()).is_some());
+        assert_eq!(log.get(&"status".into()), None);
+        assert!(log.get(&"message".into()).is_some());
     }
 
     #[test]
     fn regex_parser_does_drop_parsed_field() {
-        let event = Event::from("status=1234 time=5678");
-        let parser = RegexParserConfig {
-            regex: r"status=(?P<status>\d+) time=(?P<time>\d+)".into(),
-            field: Some("message".into()),
-            drop_field: true,
-        }
-        .build()
-        .unwrap();
+        let log = do_transform(
+            "status=1234 time=5678",
+            r"status=(?P<status>\d+) time=(?P<time>\d+)",
+            Some("message"),
+            true,
+        );
 
-        let event = parser.transform(event).unwrap();
-
-        let log = event.into_log();
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
@@ -141,36 +139,26 @@ mod tests {
 
     #[test]
     fn regex_parser_does_not_drop_same_name_parsed_field() {
-        let event = Event::from("status=1234 message=yes");
-        let parser = RegexParserConfig {
-            regex: r"status=(?P<status>\d+) message=(?P<message>\S+)".into(),
-            field: Some("message".into()),
-            drop_field: true,
-        }
-        .build()
-        .unwrap();
+        let log = do_transform(
+            "status=1234 message=yes",
+            r"status=(?P<status>\d+) message=(?P<message>\S+)",
+            Some("message"),
+            true,
+        );
 
-        let event = parser.transform(event).unwrap();
-
-        let log = event.into_log();
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
     #[test]
     fn regex_parser_does_not_drop_if_no_match() {
-        let event = Event::from("asdf1234");
-        let parser = RegexParserConfig {
-            regex: r"status=(?P<message>\S+)".into(),
-            field: Some("message".into()),
-            drop_field: true,
-        }
-        .build()
-        .unwrap();
+        let log = do_transform(
+            "asdf1234",
+            r"status=(?P<message>\S+)",
+            Some("message"),
+            true,
+        );
 
-        let event = parser.transform(event).unwrap();
-
-        let log = event.into_log();
         assert!(log.get(&"message".into()).is_some());
     }
 }
