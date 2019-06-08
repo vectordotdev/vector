@@ -1,5 +1,5 @@
 <p align="center">
-  <strong><a href="beta">Join our beta!<a/> Timber is looking for select beta testers to help shape the future of Vector.</strong>
+  <strong><a href="https://vectorproject.typeform.com/to/wV0DC8">Join our beta!<a/> Timber is looking for select beta testers to help shape the future of Vector.</strong>
 </p>
 
 <p align="center">
