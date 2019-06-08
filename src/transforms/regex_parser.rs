@@ -37,7 +37,12 @@ pub struct RegexParser {
 }
 
 impl RegexParser {
-    pub fn new(regex: Regex, field: Atom, drop_field: bool) -> Self {
+    pub fn new(regex: Regex, field: Atom, mut drop_field: bool) -> Self {
+        for name in regex.capture_names().filter_map(|c| c) {
+            if name == field.as_ref() {
+                drop_field = false;
+            }
+        }
         Self {
             regex,
             field,
@@ -52,18 +57,14 @@ impl Transform for RegexParser {
 
         if let Some(value) = &value {
             if let Some(captures) = self.regex.captures(&value) {
-                let mut do_drop = self.drop_field;
                 for name in self.regex.capture_names().filter_map(|c| c) {
-                    if name == self.field.as_ref() {
-                        do_drop = false;
-                    }
                     if let Some(capture) = captures.name(name) {
                         event
                             .as_mut_log()
                             .insert_explicit(name.into(), capture.as_bytes().into());
                     }
                 }
-                if do_drop {
+                if self.drop_field {
                     event.as_mut_log().remove(&self.field);
                 }
             } else {
