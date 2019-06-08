@@ -9,11 +9,11 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
   <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
-  <a href="https://slack.linkerd.io/badge.svg"><img src="https://slack.linkerd.io/badge.svg"></a>
+  <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
 </p>
 
 Vector is a [high-performance][performance] router for observability data. It makes
-[collecting][sources], [transforming][transforms], and [sending][sinks] logs and metrics easy.
+[collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events easy.
 It's designed to be [deployed][deployment] across your entire infrastructure, serving both as a
 light-weight [agent] and a highly efficient [service].
 
@@ -26,7 +26,7 @@ giving you complete flexibility to adopt the services of your choice, among
 
 #### About
 
-* [**Use cases**][use_cases] - [cost], [governance], [security], [backups], [lock-in], [multi-cloud]
+* [**Use cases**][use_cases]
 * [**Concepts**][concepts]
 * [**Data model**][data_model]
 
@@ -45,7 +45,7 @@ giving you complete flexibility to adopt the services of your choice, among
 #### Usage
 
 * [**Configuration**][configuration] - [sources], [transforms], [sinks]
-* [**Administration**][administration] - [start], [stop], [reload], [update]
+* [**Administration**][administration] - [cli], [start], [stop], [reload], [update]
 * [**Guides**][guides]
 
 ---
@@ -135,6 +135,7 @@ unsure, open a pull request.
 [administration]: https://docs.vectorproject.io/usage/administration
 [agent]: https://docs.vectorproject.io/setup/deployment/roles/agent
 [backups]: https://docs.vectorproject.io/about/use_cases/backups
+[cli]: https://docs.vectorproject.io/administration/cli
 [configuration]: https://docs.vectorproject.io/usage/configuration
 [concepts]: https://docs.vectorproject.io/about/concepts
 [cost]: https://docs.vectorproject.io/about/use_cases/cost
