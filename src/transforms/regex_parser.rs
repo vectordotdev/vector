@@ -39,13 +39,18 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
 pub struct RegexParser {
     regex: Regex,
     field: Atom,
+    capture_names: Vec<String>,
     drop_field: bool,
     drop_failed: bool,
 }
 
 impl RegexParser {
     pub fn new(regex: Regex, field: Atom, mut drop_field: bool, drop_failed: bool) -> Self {
-        for name in regex.capture_names().filter_map(|c| c) {
+        let capture_names: Vec<String> = regex
+            .capture_names()
+            .filter_map(|c| c.map(|c| c.into()))
+            .collect();
+        for name in &capture_names {
             if name == field.as_ref() {
                 drop_field = false;
             }
@@ -53,6 +58,7 @@ impl RegexParser {
         Self {
             regex,
             field,
+            capture_names,
             drop_field,
             drop_failed,
         }
@@ -65,11 +71,11 @@ impl Transform for RegexParser {
 
         if let Some(value) = &value {
             if let Some(captures) = self.regex.captures(&value) {
-                for name in self.regex.capture_names().filter_map(|c| c) {
-                    if let Some(capture) = captures.name(name) {
+                for name in &self.capture_names {
+                    if let Some(capture) = captures.name(&name) {
                         event
                             .as_mut_log()
-                            .insert_explicit(name.into(), capture.as_bytes().into());
+                            .insert_explicit(name.as_str().into(), capture.as_bytes().into());
                     }
                 }
                 if self.drop_field {
