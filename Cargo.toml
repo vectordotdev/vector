@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.2.0"
+version = "0.3.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Log and Metrics Routing Layer"

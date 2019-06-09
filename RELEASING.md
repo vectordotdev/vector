@@ -3,11 +3,7 @@
 This document will cover how to properly release Vector.
 
 Vector adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html) and the release
-process is dependent on the version change. In addition, it's important to understand the
-branch structure:
-
-* `master` - Reflects the latest `MAJOR.MINOR-dev` version.
-* `vMAJOR.MINOR` - Contains `MAJOR.MINOR` specific changes and point releases.
+process is dependent on the version change.
 
 ## Quick Start
 
