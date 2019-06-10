@@ -22,7 +22,7 @@ use tower::ServiceBuilder;
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
     pub host: String,
-    pub index: String,
+    pub index: Option<String>,
     pub doc_type: String,
     pub id_key: Option<String>,
     pub batch_size: Option<usize>,
@@ -66,7 +66,9 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let retry_attempts = config.request_retry_attempts.unwrap_or(5);
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
-    let dynamic_date = detect_dynamic_date(&config.index);
+    let index = config.index.clone().unwrap_or("vector-%Y.%m.%d".into());
+
+    let dynamic_date = detect_dynamic_date(&index);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -105,7 +107,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             Duration::from_secs(batch_timeout),
         )
         .with(move |event: Event| {
-            let index = build_index_name(&config.index, &event, dynamic_date);
+            let index = build_index_name(&index, &event, dynamic_date);
 
             let mut action = json!({
                 "index": {
@@ -286,7 +288,7 @@ mod integration_tests {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
-            index: index.clone(),
+            index: Some(index.clone()),
             doc_type: "log_lines".into(),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
@@ -340,7 +342,7 @@ mod integration_tests {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
-            index: index.clone(),
+            index: Some(index.clone()),
             doc_type: "log_lines".into(),
             compression: Some(Compression::None),
             batch_size: Some(1),
