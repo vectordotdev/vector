@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod buffer;
 pub mod http;
+pub mod partition;
 pub mod retries;
 
 use crate::buffers::Acker;
