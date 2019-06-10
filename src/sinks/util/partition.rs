@@ -15,6 +15,7 @@ pub trait Partition {
 // TODO: Make this a concrete type
 type LingerDelay = Box<dyn Future<Item = String, Error = tokio::timer::Error> + Send + 'static>;
 
+#[derive(Debug)]
 pub struct PartitionedBatchSink<B, S, P> {
     batch: B,
     sink: S,
@@ -177,7 +178,7 @@ where
         let ready = self
             .partitions
             .iter()
-            .filter(|(_, b)| closing || (b.len() >= max_size || b.len() > min_size))
+            .filter(|(_, b)| closing || (b.len() >= max_size || b.len() >= min_size))
             .map(|(p, _)| p.clone())
             .collect::<Vec<_>>();
 
@@ -347,6 +348,32 @@ mod tests {
 
         let output = buffered.into_inner_sink();
         assert_eq!(output, vec![vec![1]]);
+    }
+
+    #[test]
+    fn batch_sink_cancels_linger() {
+        let mut buffered = PartitionedBatchSink::with_linger(
+            Vec::new(),
+            Vec::new(),
+            StaticPartitioner,
+            10,
+            2,
+            Duration::from_secs(1),
+        );
+
+        clock::mock(|handle| {
+            buffered.start_send(1 as usize).unwrap();
+            buffered.start_send(2 as usize).unwrap();
+            buffered.poll_complete().unwrap();
+
+            handle.advance(Duration::from_secs(2));
+
+            buffered.start_send(3 as usize).unwrap();
+            buffered.poll_complete().unwrap();
+        });
+
+        let output = buffered.into_inner_sink();
+        assert_eq!(output, vec![vec![1, 2]]);
     }
 
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
