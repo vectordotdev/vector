@@ -1,12 +1,19 @@
 use crate::sinks::util::Batch;
-use futures::{Async, AsyncSink, Poll, Sink, StartSend};
-use std::collections::{HashMap, VecDeque};
+use futures::{stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use std::{
+    collections::{HashMap, VecDeque},
+    time::{Duration, Instant},
+};
+use tokio::timer::Delay;
 
 pub trait Partition {
     type Item;
 
     fn partition(&self, event: &Self::Item) -> String;
 }
+
+// TODO: Make this a concrete type
+type LingerDelay = Box<dyn Future<Item = String, Error = tokio::timer::Error> + Send + 'static>;
 
 pub struct PartitionedBatchSink<B, S, P> {
     batch: B,
@@ -16,11 +23,12 @@ pub struct PartitionedBatchSink<B, S, P> {
     config: Config,
     closing: bool,
     sending: VecDeque<B>,
+    lingers: FuturesUnordered<LingerDelay>,
 }
 
 #[derive(Copy, Debug, Clone)]
 struct Config {
-    // max_linger: Duration,
+    max_linger: Option<Duration>,
     max_size: usize,
     min_size: usize,
 }
@@ -28,6 +36,7 @@ struct Config {
 impl<B, S, P> PartitionedBatchSink<B, S, P> {
     pub fn new(sink: S, batch: B, partitioner: P, max_size: usize) -> Self {
         let config = Config {
+            max_linger: None,
             max_size: max_size,
             min_size: 0,
         };
@@ -40,17 +49,51 @@ impl<B, S, P> PartitionedBatchSink<B, S, P> {
             config,
             closing: false,
             sending: VecDeque::new(),
+            lingers: FuturesUnordered::new(),
+        }
+    }
+
+    pub fn with_linger(
+        sink: S,
+        batch: B,
+        partitioner: P,
+        max_size: usize,
+        min_size: usize,
+        linger: Duration,
+    ) -> Self {
+        let config = Config {
+            max_linger: Some(linger),
+            max_size,
+            min_size,
+        };
+
+        Self {
+            batch,
+            sink,
+            partitioner,
+            partitions: HashMap::new(),
+            config,
+            closing: false,
+            sending: VecDeque::new(),
+            lingers: FuturesUnordered::new(),
         }
     }
 
     pub fn into_inner_sink(self) -> S {
         self.sink
     }
+
+    pub fn set_linger(&mut self, partition: String) {
+        if let Some(max_linger) = self.config.max_linger {
+            let delay = Delay::new(Instant::now() + max_linger).map(move |_| partition);
+            self.lingers.push(Box::new(delay));
+        }
+    }
 }
 
 impl<B, S, P> Sink for PartitionedBatchSink<B, S, P>
 where
-    B: Batch,
+    B: Batch + std::fmt::Debug,
     S: Sink<SinkItem = B>,
     P: Partition<Item = B::Input>,
 {
@@ -88,7 +131,10 @@ where
                 }
             } else {
                 let mut batch = self.batch.fresh();
+
                 batch.push(item.into());
+
+                self.set_linger(partition.clone());
 
                 if batch.len() >= self.config.max_size {
                     self.partitions.insert(partition.clone(), batch);
@@ -99,15 +145,8 @@ where
             }
         } else {
             batch.push(item.into());
+            self.set_linger(partition.clone());
         }
-
-        // if batch.is_empty() {
-        //     if let Some(duration) = &self.max_linger {
-        //         // We just inserted the first item of a new batch, so set our delay to the longest time
-        //         // we want to allow that item to linger in the batch before being flushed.
-        //         self.linger_deadline = Some(Delay::new(Instant::now() + duration.clone()));
-        //     }
-        // }
 
         Ok(AsyncSink::Ready)
     }
@@ -128,11 +167,28 @@ where
         let max_size = self.config.max_size;
         let min_size = self.config.min_size;
 
-        for (_, batch) in self
+        let mut partitions = Vec::new();
+        while let Ok(Async::Ready(Some(partition))) = self.lingers.poll() {
+            if let Some(batch) = self.partitions.remove(&partition) {
+                partitions.push(batch);
+            }
+        }
+
+        let ready = self
             .partitions
-            .drain()
+            .iter()
             .filter(|(_, b)| closing || (b.len() >= max_size || b.len() > min_size))
-        {
+            .map(|(p, _)| p.clone())
+            .collect::<Vec<_>>();
+
+        let mut ready_batches = Vec::new();
+        for partition in ready {
+            if let Some(batch) = self.partitions.remove(&partition) {
+                ready_batches.push(batch);
+            }
+        }
+
+        for batch in ready_batches.into_iter().chain(partitions) {
             if let AsyncSink::NotReady(batch) = self.sink.start_send(batch)? {
                 self.sending.push_front(batch);
                 return Ok(Async::NotReady);
@@ -155,6 +211,8 @@ mod tests {
     use super::*;
     use crate::sinks::util::Buffer;
     use futures::{Future, Sink};
+    use std::time::Duration;
+    use tokio_test::clock;
 
     #[test]
     fn batch_sink_buffers_messages_until_limit() {
@@ -232,7 +290,8 @@ mod tests {
             .wait()
             .unwrap();
 
-        let output = buffered.into_inner_sink();
+        let mut output = buffered.into_inner_sink();
+        output[..].sort();
         assert_eq!(
             output,
             vec![vec![(Partitions::A, 0)], vec![(Partitions::B, 1)]]
@@ -255,7 +314,8 @@ mod tests {
             .wait()
             .unwrap();
 
-        let output = buffered.into_inner_sink();
+        let mut output = buffered.into_inner_sink();
+        output[..].sort();
         assert_eq!(
             output,
             vec![
@@ -265,7 +325,31 @@ mod tests {
         );
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[test]
+    fn batch_sink_submits_after_linger() {
+        let mut buffered = PartitionedBatchSink::with_linger(
+            Vec::new(),
+            Vec::new(),
+            StaticPartitioner,
+            10,
+            2,
+            Duration::from_secs(1),
+        );
+
+        clock::mock(|handle| {
+            buffered.start_send(1 as usize).unwrap();
+            buffered.poll_complete().unwrap();
+
+            handle.advance(Duration::from_secs(2));
+
+            buffered.poll_complete().unwrap();
+        });
+
+        let output = buffered.into_inner_sink();
+        assert_eq!(output, vec![vec![1]]);
+    }
+
+    #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
     enum Partitions {
         A,
         B,
