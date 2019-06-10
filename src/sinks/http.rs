@@ -208,7 +208,10 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
     let event = event.into_log();
 
     let mut body = match encoding {
-        Encoding::Text => event[&event::MESSAGE].to_string_lossy().into_bytes(),
+        Encoding::Text => event
+            .get(&event::MESSAGE)
+            .map(|v| v.to_string_lossy().into_bytes())
+            .unwrap_or(Vec::new()),
 
         Encoding::Ndjson => serde_json::to_vec(&event.all_fields())
             .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,

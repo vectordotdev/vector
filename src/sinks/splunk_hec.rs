@@ -183,7 +183,7 @@ fn encode_event(
             "time": timestamp,
         }),
         (&Some(Encoding::Text), _) | (_, false) => json!({
-            "event": event[&event::MESSAGE].to_string_lossy(),
+            "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };

@@ -45,7 +45,11 @@ impl Sink for BlackholeSink {
     type SinkError = ();
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message_len = item.as_log()[&event::MESSAGE].as_bytes().len();
+        let message_len = item
+            .as_log()
+            .get(&event::MESSAGE)
+            .map(|v| v.as_bytes().len())
+            .unwrap_or(0);
 
         self.total_events += 1;
         self.total_raw_bytes += message_len;
