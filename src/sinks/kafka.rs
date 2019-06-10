@@ -183,7 +183,10 @@ fn encode_event(
 
     let body = match (encoding, log.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.all_fields()).unwrap(),
-        (&Some(Encoding::Text), _) | (_, false) => log[&event::MESSAGE].as_bytes().to_vec(),
+        (&Some(Encoding::Text), _) | (_, false) => log
+            .get(&event::MESSAGE)
+            .map(|v| v.as_bytes().to_vec())
+            .unwrap_or(Vec::new()),
     };
 
     let key = key_field

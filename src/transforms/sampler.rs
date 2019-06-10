@@ -33,7 +33,11 @@ impl Sampler {
 
 impl Transform for Sampler {
     fn transform(&self, mut event: Event) -> Option<Event> {
-        let message = event.as_log()[&event::MESSAGE].to_string_lossy();
+        let message = event
+            .as_log()
+            .get(&event::MESSAGE)
+            .map(|v| v.to_string_lossy())
+            .unwrap_or_else(|| "".into());
 
         if self.pass_list.is_match(&message) {
             return Some(event);

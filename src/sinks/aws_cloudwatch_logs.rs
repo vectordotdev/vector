@@ -157,7 +157,10 @@ impl CloudwatchLogsSvc {
                 InputLogEvent { message, timestamp }
             }
             (&Some(Encoding::Text), _) | (_, false) => {
-                let message = log[&event::MESSAGE].to_string_lossy();
+                let message = log
+                    .get(&event::MESSAGE)
+                    .map(|v| v.to_string_lossy())
+                    .unwrap_or_else(|| "".into());
                 InputLogEvent { message, timestamp }
             }
         }
