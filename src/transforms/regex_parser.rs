@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event};
-use regex::bytes::Regex;
+use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use std::str;
 use string_cache::DefaultAtom as Atom;
@@ -39,28 +39,32 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
 pub struct RegexParser {
     regex: Regex,
     field: Atom,
-    capture_names: Vec<String>,
     drop_field: bool,
     drop_failed: bool,
+    capture_names: Vec<(usize, Atom)>,
+    capture_locs: CaptureLocations,
 }
 
 impl RegexParser {
     pub fn new(regex: Regex, field: Atom, mut drop_field: bool, drop_failed: bool) -> Self {
-        let capture_names: Vec<String> = regex
+        let capture_locs = regex.capture_locations();
+        let capture_names: Vec<(usize, Atom)> = regex
             .capture_names()
-            .filter_map(|c| c.map(|c| c.into()))
+            .enumerate()
+            .filter_map(|(idx, cn)| cn.map(|cn| (idx, cn.into())))
             .collect();
-        for name in &capture_names {
-            if name == field.as_ref() {
+        for (_, name) in &capture_names {
+            if *name == field {
                 drop_field = false;
             }
         }
         Self {
             regex,
             field,
-            capture_names,
             drop_field,
             drop_failed,
+            capture_names,
+            capture_locs,
         }
     }
 }
@@ -70,13 +74,12 @@ impl Transform for RegexParser {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
-            if let Some(captures) = self.regex.captures(&value) {
-                for name in &self.capture_names {
-                    if let Some(capture) = captures.name(&name) {
-                        event
-                            .as_mut_log()
-                            .insert_explicit(name.as_str().into(), capture.as_bytes().into());
-                    }
+            if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
+                for (idx, name) in &self.capture_names {
+                    let (start, end) = self.capture_locs.get(*idx).unwrap();
+                    event
+                        .as_mut_log()
+                        .insert_explicit(name.clone(), value[start..end].into());
                 }
                 if self.drop_field {
                     event.as_mut_log().remove(&self.field);
