@@ -1,4 +1,5 @@
 use crate::sinks::util::Batch;
+use bytes::Bytes;
 use futures::{
     future::Either, stream::FuturesUnordered, sync::oneshot, Async, AsyncSink, Future, Poll, Sink,
     StartSend, Stream,
@@ -13,7 +14,7 @@ use tokio::timer::Delay;
 pub trait Partition {
     type Item;
 
-    fn partition(&self, event: &Self::Item) -> String;
+    fn partition(&self, event: &Self::Item) -> Bytes;
 }
 
 // TODO: Make this a concrete type
@@ -23,12 +24,12 @@ pub struct PartitionedBatchSink<B, S, P> {
     batch: B,
     sink: S,
     partitioner: P,
-    partitions: HashMap<String, B>,
+    partitions: HashMap<Bytes, B>,
     config: Config,
     closing: bool,
     sending: VecDeque<B>,
     lingers: FuturesUnordered<LingerDelay>,
-    linger_handles: HashMap<String, oneshot::Sender<String>>,
+    linger_handles: HashMap<Bytes, oneshot::Sender<Bytes>>,
 }
 
 #[derive(Copy, Debug, Clone)]
@@ -39,7 +40,7 @@ struct Config {
 }
 
 enum LingerState {
-    Elapsed(String),
+    Elapsed(Bytes),
     Canceled,
 }
 
@@ -95,7 +96,7 @@ impl<B, S, P> PartitionedBatchSink<B, S, P> {
         self.sink
     }
 
-    pub fn set_linger(&mut self, partition: String) {
+    pub fn set_linger(&mut self, partition: Bytes) {
         if let Some(max_linger) = self.config.max_linger {
             let (tx, rx) = oneshot::channel();
             let partition_clone = partition.clone();
@@ -400,7 +401,7 @@ mod tests {
             StaticPartitioner,
             10,
             2,
-            Duration::from_secs(1),
+            Duration::from_millis(5),
         );
 
         clock::mock(|handle| {
@@ -408,8 +409,8 @@ mod tests {
             buffered.start_send(2 as usize).unwrap();
             buffered.poll_complete().unwrap();
 
-            handle.advance(Duration::from_secs(2));
-            std::thread::sleep(Duration::from_secs(2));
+            handle.advance(Duration::from_millis(5));
+            std::thread::sleep(Duration::from_millis(8));
 
             buffered.start_send(3 as usize).unwrap();
             buffered.poll_complete().unwrap();
@@ -430,8 +431,8 @@ mod tests {
     impl Partition for DynamicPartitioner {
         type Item = (Partitions, usize);
 
-        fn partition(&self, event: &Self::Item) -> String {
-            format!("{:?}", event.0)
+        fn partition(&self, event: &Self::Item) -> Bytes {
+            format!("{:?}", event.0).into()
         }
     }
 
@@ -440,7 +441,7 @@ mod tests {
     impl Partition for StaticPartitioner {
         type Item = usize;
 
-        fn partition(&self, _event: &Self::Item) -> String {
+        fn partition(&self, _event: &Self::Item) -> Bytes {
             "key".into()
         }
     }
@@ -450,7 +451,7 @@ mod tests {
     impl Partition for StaticVecPartitioner {
         type Item = Vec<u8>;
 
-        fn partition(&self, _event: &Self::Item) -> String {
+        fn partition(&self, _event: &Self::Item) -> Bytes {
             "key".into()
         }
     }
