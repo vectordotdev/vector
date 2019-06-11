@@ -4,9 +4,10 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, Buffer, SinkExt,
+        Batch, BatchServiceSink, Buffer, Partition, SinkExt,
     },
 };
+use bytes::Bytes;
 use futures::{Future, Poll, Sink};
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_s3::{
@@ -61,6 +62,68 @@ pub enum Encoding {
 pub enum Compression {
     Gzip,
     None,
+}
+
+pub struct S3Buffer {
+    inner: Buffer,
+    key: Option<Bytes>,
+}
+
+#[derive(Clone)]
+pub struct InnerBuffer {
+    pub(self) inner: Vec<u8>,
+    key: Bytes,
+}
+
+impl Partition for InnerBuffer {
+    fn partition(&self) -> Bytes {
+        self.key.clone()
+    }
+}
+
+impl S3Buffer {
+    pub fn new(gzip: bool) -> Self {
+        Self {
+            inner: Buffer::new(gzip),
+            key: None,
+        }
+    }
+}
+
+impl Batch for S3Buffer {
+    type Input = InnerBuffer;
+    type Output = InnerBuffer;
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn push(&mut self, item: Self::Input) {
+        let partition = item.partition();
+        self.key = Some(partition);
+        self.inner.push(&item.inner[..])
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            key: None,
+        }
+    }
+
+    fn finish(mut self) -> Self::Output {
+        let key = self.key.take().unwrap();
+        let inner = self.inner.finish();
+        InnerBuffer { inner, key }
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
 }
 
 impl Default for Compression {
@@ -119,7 +182,7 @@ impl S3Sink {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(
-                Buffer::new(compression),
+                S3Buffer::new(compression),
                 batch_size,
                 Duration::from_secs(batch_timeout),
             )
@@ -172,7 +235,7 @@ impl S3Sink {
     }
 }
 
-impl Service<Vec<u8>> for S3Sink {
+impl Service<InnerBuffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -181,7 +244,7 @@ impl Service<Vec<u8>> for S3Sink {
         Ok(().into())
     }
 
-    fn call(&mut self, body: Vec<u8>) -> Self::Future {
+    fn call(&mut self, body: InnerBuffer) -> Self::Future {
         // TODO: make this based on the last event in the file
         let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
         let extension = if self.gzip { ".log.gz" } else { ".log" };
@@ -189,13 +252,13 @@ impl Service<Vec<u8>> for S3Sink {
 
         debug!(
             message = "sending events.",
-            bytes = &field::debug(body.len()),
+            bytes = &field::debug(body.inner.len()),
             bucket = &field::debug(&self.bucket),
             key = &field::debug(&key)
         );
 
         let request = PutObjectRequest {
-            body: Some(body.into()),
+            body: Some(body.inner.into()),
             bucket: self.bucket.clone(),
             key,
             content_encoding: if self.gzip {
@@ -227,7 +290,7 @@ impl RetryLogic for S3RetryLogic {
     }
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<InnerBuffer, ()> {
     let log = event.into_log();
 
     match (encoding, log.is_structured()) {
@@ -236,6 +299,10 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
                 b.push(b'\n');
                 b
             })
+            .map(|b| InnerBuffer {
+                inner: b,
+                key: "key".into(),
+            })
             .map_err(|e| panic!("Error encoding: {}", e)),
         (&Some(Encoding::Text), _) | (_, false) => {
             let mut bytes = log
@@ -243,7 +310,10 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
             bytes.push(b'\n');
-            Ok(bytes)
+            Ok(InnerBuffer {
+                inner: bytes,
+                key: "key".into(),
+            })
         }
     }
 }
@@ -260,7 +330,7 @@ mod tests {
         let bytes = encode_event(message.clone().into(), &None).unwrap();
 
         let encoded_message = message + "\n";
-        assert_eq!(&bytes[..], encoded_message.as_bytes());
+        assert_eq!(&bytes.inner[..], encoded_message.as_bytes());
     }
 
     #[test]
@@ -272,7 +342,7 @@ mod tests {
             .insert_explicit("key".into(), "value".into());
         let bytes = encode_event(event, &None).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes.inner[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
