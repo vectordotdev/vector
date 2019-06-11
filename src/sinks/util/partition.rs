@@ -1,7 +1,11 @@
 use crate::sinks::util::Batch;
-use futures::{stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
+use futures::{
+    future::Either, stream::FuturesUnordered, sync::oneshot, Async, AsyncSink, Future, Poll, Sink,
+    StartSend, Stream,
+};
 use std::{
     collections::{HashMap, VecDeque},
+    fmt,
     time::{Duration, Instant},
 };
 use tokio::timer::Delay;
@@ -13,9 +17,8 @@ pub trait Partition {
 }
 
 // TODO: Make this a concrete type
-type LingerDelay = Box<dyn Future<Item = String, Error = tokio::timer::Error> + Send + 'static>;
+type LingerDelay = Box<dyn Future<Item = LingerState, Error = ()> + Send + 'static>;
 
-#[derive(Debug)]
 pub struct PartitionedBatchSink<B, S, P> {
     batch: B,
     sink: S,
@@ -25,6 +28,7 @@ pub struct PartitionedBatchSink<B, S, P> {
     closing: bool,
     sending: VecDeque<B>,
     lingers: FuturesUnordered<LingerDelay>,
+    linger_handles: HashMap<String, oneshot::Sender<String>>,
 }
 
 #[derive(Copy, Debug, Clone)]
@@ -32,6 +36,11 @@ struct Config {
     max_linger: Option<Duration>,
     max_size: usize,
     min_size: usize,
+}
+
+enum LingerState {
+    Elapsed(String),
+    Canceled,
 }
 
 impl<B, S, P> PartitionedBatchSink<B, S, P> {
@@ -51,6 +60,7 @@ impl<B, S, P> PartitionedBatchSink<B, S, P> {
             closing: false,
             sending: VecDeque::new(),
             lingers: FuturesUnordered::new(),
+            linger_handles: HashMap::new(),
         }
     }
 
@@ -77,6 +87,7 @@ impl<B, S, P> PartitionedBatchSink<B, S, P> {
             closing: false,
             sending: VecDeque::new(),
             lingers: FuturesUnordered::new(),
+            linger_handles: HashMap::new(),
         }
     }
 
@@ -86,15 +97,32 @@ impl<B, S, P> PartitionedBatchSink<B, S, P> {
 
     pub fn set_linger(&mut self, partition: String) {
         if let Some(max_linger) = self.config.max_linger {
-            let delay = Delay::new(Instant::now() + max_linger).map(move |_| partition);
-            self.lingers.push(Box::new(delay));
+            let (tx, rx) = oneshot::channel();
+            let partition_clone = partition.clone();
+
+            let delay = Delay::new(Instant::now() + max_linger)
+                .map(move |_| LingerState::Elapsed(partition_clone))
+                .map_err(|_| ());
+
+            let cancel = rx.map(|_| LingerState::Canceled).map_err(|_| ());
+
+            let fut = cancel
+                .select2(delay)
+                .map(|state| match state {
+                    Either::A((state, _)) => state,
+                    Either::B((state, _)) => state,
+                })
+                .map_err(|_| ());
+
+            self.linger_handles.insert(partition, tx);
+            self.lingers.push(Box::new(fut));
         }
     }
 }
 
 impl<B, S, P> Sink for PartitionedBatchSink<B, S, P>
 where
-    B: Batch + std::fmt::Debug,
+    B: Batch,
     S: Sink<SinkItem = B>,
     P: Partition<Item = B::Input>,
 {
@@ -115,39 +143,32 @@ where
 
         let partition = self.partitioner.partition(&item);
 
-        // this should be zero cost right now
-        let new_batch = self.batch.fresh();
-        let batch = self
-            .partitions
-            .entry(partition.clone())
-            .or_insert(new_batch);
+        if let Some(batch) = self.partitions.get_mut(&partition) {
+            if batch.len() >= self.config.max_size {
+                self.poll_complete()?;
 
-        if batch.len() >= self.config.max_size {
-            self.poll_complete()?;
-
-            // Check if the poll_complete reset the batch
-            if let Some(batch) = self.partitions.get(&partition) {
-                if batch.len() > self.config.max_size {
-                    return Ok(AsyncSink::NotReady(item));
+                if let Some(batch) = self.partitions.get_mut(&partition) {
+                    if batch.len() >= self.config.max_size {
+                        return Ok(AsyncSink::NotReady(item));
+                    } else {
+                        batch.push(item);
+                        return Ok(AsyncSink::Ready);
+                    }
                 }
             } else {
-                let mut batch = self.batch.fresh();
-
-                batch.push(item.into());
-
-                self.set_linger(partition.clone());
-
-                if batch.len() >= self.config.max_size {
-                    self.partitions.insert(partition.clone(), batch);
-                    self.poll_complete()?;
-                } else {
-                    self.partitions.insert(partition, batch);
-                }
+                batch.push(item);
+                return Ok(AsyncSink::Ready);
             }
-        } else {
-            batch.push(item.into());
-            self.set_linger(partition.clone());
         }
+
+        // We fall through to this case, when there is no batch already
+        // or the batch got submitted by polling_complete above.
+        let mut batch = self.batch.fresh();
+
+        batch.push(item.into());
+        self.set_linger(partition.clone());
+
+        self.partitions.insert(partition, batch);
 
         Ok(AsyncSink::Ready)
     }
@@ -169,9 +190,14 @@ where
         let min_size = self.config.min_size;
 
         let mut partitions = Vec::new();
-        while let Ok(Async::Ready(Some(partition))) = self.lingers.poll() {
-            if let Some(batch) = self.partitions.remove(&partition) {
-                partitions.push(batch);
+        while let Ok(Async::Ready(Some(linger))) = self.lingers.poll() {
+            // Only if the linger has elapsed trigger the removal
+            if let LingerState::Elapsed(partition) = linger {
+                self.linger_handles.remove(&partition);
+
+                if let Some(batch) = self.partitions.remove(&partition) {
+                    partitions.push(batch);
+                }
             }
         }
 
@@ -185,6 +211,12 @@ where
         let mut ready_batches = Vec::new();
         for partition in ready {
             if let Some(batch) = self.partitions.remove(&partition) {
+                if let Some(linger_cancel) = self.linger_handles.remove(&partition) {
+                    linger_cancel
+                        .send(partition.clone())
+                        .expect("Linger deadline should be removed on elapsed.");
+                }
+
                 ready_batches.push(batch);
             }
         }
@@ -204,6 +236,16 @@ where
     fn close(&mut self) -> Poll<(), Self::SinkError> {
         self.closing = true;
         self.poll_complete()
+    }
+}
+
+impl<B, S, P> fmt::Debug for PartitionedBatchSink<B, S, P> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PartitionedBatchSink")
+            .field("max_linger", &self.config.max_linger)
+            .field("max_size", &self.config.max_size)
+            .field("min_size", &self.config.min_size)
+            .finish()
     }
 }
 
@@ -367,6 +409,7 @@ mod tests {
             buffered.poll_complete().unwrap();
 
             handle.advance(Duration::from_secs(2));
+            std::thread::sleep(Duration::from_secs(2));
 
             buffered.start_send(3 as usize).unwrap();
             buffered.poll_complete().unwrap();
