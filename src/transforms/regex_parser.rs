@@ -66,7 +66,7 @@ impl RegexParser {
 }
 
 impl Transform for RegexParser {
-    fn transform(&self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
         let value = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         if let Some(value) = &value {
@@ -114,7 +114,7 @@ mod tests {
         drop_failed: bool,
     ) -> Option<LogEvent> {
         let event = Event::from(event);
-        let parser = RegexParserConfig {
+        let mut parser = RegexParserConfig {
             regex: regex.into(),
             field: field.map(|field| field.into()),
             drop_field,

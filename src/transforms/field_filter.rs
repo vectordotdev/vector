@@ -35,7 +35,7 @@ impl FieldFilter {
 }
 
 impl Transform for FieldFilter {
-    fn transform(&self, event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         if event
             .as_log()
             .get(&self.field_name)

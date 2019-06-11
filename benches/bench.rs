@@ -363,7 +363,7 @@ fn benchmark_regex(c: &mut Criterion) {
 
                     (parser, src_lines)
                 },
-                |(parser, src_lines)| {
+                |(mut parser, src_lines)| {
                     let out_lines = src_lines.iter()
                         .filter_map(|line| parser.transform(Event::from(&line[..])))
                         .fold(0, |accum, _| accum + 1);
