@@ -19,6 +19,9 @@ message Value {
   oneof kind {
     bytes raw_bytes = 1;
     google.protobuf.Timestamp timestamp = 2;
+    int64 integer = 4;
+    double float = 5;
+    bool boolean = 6;
   }
   bool explicit = 3;
 }

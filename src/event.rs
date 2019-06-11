@@ -149,6 +149,9 @@ impl Serialize for Value {
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueKind {
     Bytes(Bytes),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
     Timestamp(DateTime<Utc>),
 }
 
@@ -197,29 +200,64 @@ impl From<DateTime<Utc>> for ValueKind {
     }
 }
 
+impl From<f32> for ValueKind {
+    fn from(value: f32) -> Self {
+        ValueKind::Float(value as f64)
+    }
+}
+
+impl From<f64> for ValueKind {
+    fn from(value: f64) -> Self {
+        ValueKind::Float(value)
+    }
+}
+
+macro_rules! impl_valuekind_from_integer {
+    ($t:ty) => {
+        impl From<$t> for ValueKind {
+            fn from(value: $t) -> Self {
+                ValueKind::Integer(value as i64)
+            }
+        }
+    };
+}
+
+impl_valuekind_from_integer!(i64);
+impl_valuekind_from_integer!(i32);
+impl_valuekind_from_integer!(i16);
+impl_valuekind_from_integer!(i8);
+impl_valuekind_from_integer!(isize);
+
+impl From<bool> for ValueKind {
+    fn from(value: bool) -> Self {
+        ValueKind::Boolean(value)
+    }
+}
+
 impl ValueKind {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
             ValueKind::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
             ValueKind::Timestamp(timestamp) => timestamp_to_string(timestamp),
+            ValueKind::Integer(num) => format!("{}", num),
+            ValueKind::Float(num) => format!("{}", num),
+            ValueKind::Boolean(b) => format!("{}", b),
         }
     }
 
     pub fn as_bytes(&self) -> Bytes {
         match self {
             ValueKind::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            ValueKind::Timestamp(timestamp) => {
-                Bytes::from(timestamp_to_string(timestamp).into_bytes())
-            }
+            ValueKind::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            ValueKind::Integer(num) => Bytes::from(format!("{}", num)),
+            ValueKind::Float(num) => Bytes::from(format!("{}", num)),
+            ValueKind::Boolean(b) => Bytes::from(format!("{}", b)),
         }
     }
 
     pub fn into_bytes(self) -> Bytes {
-        match self {
-            ValueKind::Bytes(bytes) => bytes,
-            ValueKind::Timestamp(timestamp) => timestamp_to_string(&timestamp).into_bytes().into(),
-        }
+        self.as_bytes()
     }
 }
 
@@ -234,6 +272,9 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
+        Some(proto::value::Kind::Integer(value)) => Some(ValueKind::Integer(value)),
+        Some(proto::value::Kind::Float(value)) => Some(ValueKind::Float(value)),
+        Some(proto::value::Kind::Boolean(value)) => Some(ValueKind::Boolean(value)),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -326,6 +367,13 @@ impl From<Event> for proto::EventWrapper {
                                         seconds: ts.timestamp(),
                                         nanos: ts.timestamp_subsec_nanos() as i32,
                                     }))
+                                }
+                                ValueKind::Integer(value) => {
+                                    Some(proto::value::Kind::Integer(value))
+                                }
+                                ValueKind::Float(value) => Some(proto::value::Kind::Float(value)),
+                                ValueKind::Boolean(value) => {
+                                    Some(proto::value::Kind::Boolean(value))
                                 }
                             },
                         };
