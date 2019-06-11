@@ -313,6 +313,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         user = "waldo"
+        compression = "gzip"
         password = "hunter2"
         encoding = "ndjson"
     "#
@@ -369,6 +370,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         encoding = "ndjson"
+        compression = "gzip"
         [headers]
         foo = "bar"
         baz = "quux"
