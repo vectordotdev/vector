@@ -28,7 +28,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         BufferConfig::Memory {
-            num_items: 100,
+            num_items: 500,
             when_full: Default::default(),
         }
     }
