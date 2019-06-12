@@ -13,14 +13,15 @@
 </p>
 
 Vector is a [high-performance][performance] router for observability data. It makes
-[collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events easy.
-It's designed to be [deployed][deployment] across your entire infrastructure, serving both as a
-light-weight [agent] and a highly efficient [service].
+[collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events
+easy. It decouples data collection & routing from your services, [future proofing][lock-in] your
+pipeline, and enabling you to freely adopt best-in-class services over time, among
+[many other benefits][use_cases].
 
 Built in [Rust][rust], Vector places high-value on [performance], [correctness], and
-[operator friendliness][administration]. Its purpose is to decouple routing from the services,
-giving you complete flexibility to adopt the services of your choice, among
-[many other benefits][use_cases].
+[operator friendliness][administration]. It compiles to a single static binary that is designed
+to be [deployed][deployment] across your entire infrastructure, serving both as a
+light-weight [agent] and a highly efficient [service], making it easy to get data from A to B.
 
 ---
 
