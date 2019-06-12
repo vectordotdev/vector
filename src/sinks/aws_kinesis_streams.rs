@@ -69,7 +69,7 @@ impl KinesisService {
     ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
-        let batch_size = config.batch_size.unwrap_or(bytesize::mib(5u64) as usize);
+        let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
