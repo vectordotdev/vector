@@ -17,7 +17,7 @@ Vector is a [high-performance][performance] router for observability data. It ma
 It's designed to be [deployed][deployment] across your entire infrastructure, serving both as a
 light-weight [agent] and a highly efficient [service].
 
-Built in [Rust][rust], Vector places high-value on [performance] and
+Built in [Rust][rust], Vector places high-value on [performance], [correctness], and
 [operator friendliness][administration]. Its purpose is to decouple routing from the services,
 giving you complete flexibility to adopt the services of your choice, among
 [many other benefits][use_cases].
