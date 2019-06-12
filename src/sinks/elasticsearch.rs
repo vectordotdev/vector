@@ -58,7 +58,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let batch_timeout = config.batch_timeout.unwrap_or(1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+    let in_flight_limit = config.request_in_flight_limit.unwrap_or(3);
     let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
     let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
