@@ -101,6 +101,7 @@ rlua = "0.16.3"
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
 grok = "1.0.0"
+uuid = { version = "0.7", features = ["serde", "v4"] }
 
 [build-dependencies]
 prost-build = "0.4.0"
