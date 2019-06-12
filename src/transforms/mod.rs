@@ -9,6 +9,7 @@ pub mod lua;
 pub mod regex_parser;
 pub mod remove_fields;
 pub mod sampler;
+pub mod tokenizer;
 
 pub trait Transform: Send {
     fn transform(&self, event: Event) -> Option<Event>;
