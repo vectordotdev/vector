@@ -138,3 +138,5 @@ splunk-integration-tests = []
 name = "bench"
 harness = false
 
+[profile.dev]
+lto = false
