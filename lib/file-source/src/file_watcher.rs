@@ -20,7 +20,6 @@ pub struct FileWatcher {
     previous_size: u64,
 }
 
-
 impl FileWatcher {
     /// Create a new `FileWatcher`
     ///
@@ -130,14 +129,11 @@ impl FileWatcher {
                         Err(e)
                     }
                 }
-            }
-            else {
+            } else {
                 self.set_dead();
                 Ok(0)
             }
-
-        }
-        else {
+        } else {
             Ok(0)
         }
     }

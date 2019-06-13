@@ -29,30 +29,23 @@ pub struct FileServer {
     pub max_line_bytes: usize,
 }
 
-type Fingerprint = u64;
-type Devno = u64;
-type Ino = u64;
-type FileId = (Fingerprint, Devno, Ino);
+type FileFingerprint = u64;
 
 #[inline]
-fn file_id(path: &PathBuf) -> Option<FileId> {
+fn file_id(path: &PathBuf) -> Option<FileFingerprint> {
     if let Ok(mut f) = fs::File::open(path) {
         let mut header = [0; 256];
         if let Ok(_) = f.read_exact(&mut header) {
             let fingerprint = crc::crc64::checksum_ecma(&header[..]);
             let metadata = f.metadata().unwrap();
-            let dev = metadata.dev();
-            let ino = metadata.ino();
-            Some((fingerprint, dev, ino))
-        }
-        else {
+            Some(fingerprint)
+        } else {
             None
         }
     } else {
         None
     }
 }
-
 
 /// `FileServer` as Source
 ///
@@ -110,7 +103,6 @@ impl FileServer {
                         }
 
                         if let Some(file_id) = file_id(&path) {
-
                             if fp_map.contains_key(&file_id) {
                                 let watcher = fp_map.get_mut(&file_id).unwrap();
                                 watcher.listed = true;
@@ -119,17 +111,15 @@ impl FileServer {
                                         message = "Watched file has been renamed.",
                                         path = field::debug(&path),
                                         old_path = field::debug(&watcher.path)
-                                     );
+                                    );
                                     watcher.path = path.clone();
                                 }
                             } else {
-                                if let Ok(watcher) =
-                                    FileWatcher::new(
-                                        &path,
-                                        self.start_at_beginning,
-                                        self.ignore_before,
-                                    )
-                                {
+                                if let Ok(watcher) = FileWatcher::new(
+                                    &path,
+                                    self.start_at_beginning,
+                                    self.ignore_before,
+                                ) {
                                     info!(
                                         message = "Found file to watch.",
                                         path = field::debug(&path),
