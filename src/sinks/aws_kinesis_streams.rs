@@ -309,7 +309,7 @@ mod integration_tests {
 
         input_lines.sort();
         output_lines.sort();
-        
+
         assert_eq!(output_lines, input_lines)
     }
 
