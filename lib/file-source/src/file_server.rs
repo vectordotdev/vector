@@ -5,7 +5,6 @@ use glob::{glob, Pattern};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
-use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
@@ -68,7 +67,7 @@ impl FileServer {
     ) {
         let mut buffer = Vec::new();
 
-        let mut fp_map: HashMap<FileId, FileWatcher> = Default::default();
+        let mut fp_map: HashMap<FileFingerprint, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
