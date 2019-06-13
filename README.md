@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="./assets/readme_diagram.svg" alt="Vector">
+  <img src="./docs/.gitbook/assets/readme_diagram.svg" alt="Vector">
 </p>
 
 <p align="center">
