@@ -50,7 +50,7 @@ TAG=$CIRCLE_TAG
 BRANCH=$CIRCLE_BRANCH
 COMMIT_SHA=$CIRCLE_SHA1
 COMMIT_TIMESTAMP=$(git show -s --format=%ct $COMMIT_SHA)
-VERSION=$(./ci/version.sh)
+VERSION=$(./.circleci/version.sh)
 
 echo "Building release for $VERSION"
 
