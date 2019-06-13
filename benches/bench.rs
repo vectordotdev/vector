@@ -485,8 +485,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_200,
                     output_lines_404,
                 )| {
-                    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
                     // One sender generates pure random lines
                     let send1 = send_lines(in_addr1, random_lines(100).take(num_lines));
                     let send1 = futures::sync::oneshot::spawn(send1, &rt.executor());
