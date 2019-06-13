@@ -5,4 +5,5 @@ sample.log
 .envrc
 miniodat
 dist
+.DS_Store
 .idea/

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="./assets/readme_diagram.svg" alt="Vector">
+  <img src="./docs/.gitbook/assets/readme_diagram.svg" alt="Vector">
 </p>
 
 <p align="center">
@@ -19,9 +19,10 @@ pipeline, and enabling you to freely adopt best-in-class services over time, amo
 [many other benefits][use_cases].
 
 Built in [Rust][rust], Vector places high-value on [performance], [correctness], and
-[operator friendliness][administration]. It compiles to a single static binary that is designed
+[operator friendliness][administration]. It compiles to a single static binary and is designed
 to be [deployed][deployment] across your entire infrastructure, serving both as a
-light-weight [agent] and a highly efficient [service], making it easy to get data from A to B.
+light-weight [agent] and a highly efficient [service], making it the single tool you need to
+get data from A to B.
 
 ---
 
