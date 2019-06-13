@@ -36,7 +36,6 @@ fn file_id(path: &PathBuf) -> Option<FileFingerprint> {
         let mut header = [0; 256];
         if let Ok(_) = f.read_exact(&mut header) {
             let fingerprint = crc::crc64::checksum_ecma(&header[..]);
-            let metadata = f.metadata().unwrap();
             Some(fingerprint)
         } else {
             None
