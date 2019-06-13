@@ -290,7 +290,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
         rt.block_on(pump).unwrap();
@@ -302,11 +302,13 @@ mod integration_tests {
             .block_on(fetch_records(STREAM_NAME.into(), timestamp, region))
             .unwrap();
 
-        let output_lines = records
+        let mut output_lines = records
             .into_iter()
             .map(|e| String::from_utf8(e.data).unwrap())
             .collect::<Vec<_>>();
 
+        input_lines.sort();
+        output_lines.sort();
         assert_eq!(output_lines, input_lines)
     }
 
