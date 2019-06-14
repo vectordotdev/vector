@@ -9,6 +9,9 @@ license = "apache-2.0"
 readme = "README.md"
 publish = false
 
+[profile.bench]
+debug = true
+
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
 assets = [

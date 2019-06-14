@@ -2,9 +2,13 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 
 use approx::assert_relative_eq;
 use futures::future;
+use rand::distributions::{Alphanumeric, Uniform};
+use rand::prelude::*;
+use vector::event::Event;
 use vector::test_util::{
     block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
 };
+use vector::topology::config::TransformConfig;
 use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
@@ -337,6 +341,42 @@ fn benchmark_transforms(c: &mut Criterion) {
     );
 }
 
+fn benchmark_regex(c: &mut Criterion) {
+    let num_lines: usize = 100_000;
+
+    c.bench(
+        "regex",
+        Benchmark::new("regex", move |b| {
+            b.iter_with_setup(
+                || {
+                    let parser =transforms::regex_parser::RegexParserConfig {
+                        // Many captures to stress the regex parser
+                        regex: r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into(),
+                        field: None,
+                        drop_failed: true,
+                        ..Default::default()
+                    }.build().unwrap();
+
+                    let src_lines = http_access_log_lines()
+                        .take(num_lines)
+                        .collect::<Vec<String>>();
+
+                    (parser, src_lines)
+                },
+                |(parser, src_lines)| {
+                    let out_lines = src_lines.iter()
+                        .filter_map(|line| parser.transform(Event::from(&line[..])))
+                        .fold(0, |accum, _| accum + 1);
+
+                    assert_eq!(out_lines, num_lines);
+                },
+            );
+        })
+        .sample_size(10)
+        .noise_threshold(0.05)
+    );
+}
+
 fn benchmark_complex(c: &mut Criterion) {
     let num_lines: usize = 100_000;
 
@@ -451,8 +491,6 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_200,
                     output_lines_404,
                 )| {
-                    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
                     // One sender generates pure random lines
                     let send1 = send_lines(in_addr1, random_lines(100).take(num_lines));
                     let send1 = futures::sync::oneshot::spawn(send1, &rt.executor());
@@ -508,6 +546,7 @@ criterion_group!(
     benchmark_interconnected,
     benchmark_transforms,
     benchmark_complex,
+    benchmark_regex,
 );
 criterion_main!(
     benches,
@@ -518,14 +557,34 @@ criterion_main!(
 );
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
-    use rand::distributions::Alphanumeric;
-    use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
-
     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
 
     std::iter::repeat(()).map(move |_| {
         rng.sample_iter(&Alphanumeric)
             .take(size)
             .collect::<String>()
+    })
+}
+
+fn http_access_log_lines() -> impl Iterator<Item = String> {
+    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+    let code = Uniform::from(200..600);
+    let year = Uniform::from(2010..2020);
+    let mday = Uniform::from(1..32);
+    let hour = Uniform::from(0..24);
+    let minsec = Uniform::from(0..60);
+    let size = Uniform::from(10..60); // FIXME
+
+    std::iter::repeat(()).map(move |_| {
+        let url_size = size.sample(&mut rng);
+        let browser_size = size.sample(&mut rng);
+        format!("{}.{}.{}.{} - - [{}/Jun/{}:{}:{}:{} -0400] \"GET /{} HTTP/1.1\" {} {} \"-\" \"Mozilla/5.0 ({})\"",
+                rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), // IP
+                year.sample(&mut rng), mday.sample(&mut rng), // date
+                hour.sample(&mut rng), minsec.sample(&mut rng), minsec.sample(&mut rng), // time
+                rng.sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
+                code.sample(&mut rng), size.sample(&mut rng),
+                rng.sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
+        )
     })
 }
