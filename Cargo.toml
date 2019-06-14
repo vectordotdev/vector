@@ -23,6 +23,7 @@ members = [
   ".",
   "lib/file-source",
   "lib/trace-metrics",
+  "lib/trace-limit",
   "lib/codec",
 ]
 
