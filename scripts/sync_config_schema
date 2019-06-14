@@ -1,0 +1,113 @@
+#!/usr/bin/env ruby
+
+# Sync Config Schema
+#
+# This script syncs the configuration schema defined in `/dist/config/schema.toml` to the
+# following files:
+#
+# * /config/spec.toml
+# * /docs/usage/configuration/sources/*
+# * /docs/usage/configuration/transforms/*
+# * /docs/usage/configuration/sinks/*
+
+#
+# Requirements
+#
+
+require "ostruct"
+require "rubygems"
+
+begin
+  require "active_support"
+  require "active_support/core_ext/array/conversions"
+  require "active_support/core_ext/string/indent"
+rescue LoadError
+  abort "`active_support` library not found, please install it via `sudo gem install active_support`"
+end
+
+begin
+  require "front_matter_parser"
+rescue LoadError
+  abort "`front_matter_parser` library not found, please install it via `sudo gem install front_matter_parser`"
+end
+
+begin
+  require "toml-rb"
+rescue LoadError
+  abort "`toml-rb` library not found, please install it via `sudo gem install toml-rb`"
+end
+
+begin
+  require "unindent"
+rescue LoadError
+  abort "`unindent` library not found, please install it via `sudo gem install unindent`"
+end
+
+require_relative "config_schema/schema"
+require_relative "generators/link_generator"
+require_relative "generators/sink_generator"
+require_relative "generators/source_generator"
+require_relative "generators/transform_generator"
+
+#
+# Load
+#
+
+SCHEMA_FILE_PATH = "dist/config/schema.toml"
+schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
+
+#
+# Constants
+#
+
+DOCS_ROOT = "../../.."
+ASSETS_PATH = "#{DOCS_ROOT}/.gitbook/assets/"
+CORRECTNESS_TESTS = schema_hash.fetch("enums").fetch("correctness_tests")
+DELIVERY_GUARANTEES = schema_hash.fetch("enums").fetch("delivery_guarantees")
+EVENT_TYPES = schema_hash.fetch("enums").fetch("event_types")
+PERFORMANCE_TESTS = schema_hash.fetch("enums").fetch("performance_tests")
+REPO_ROOT = "https://github.com/timberio/vector"
+REPO_ISSUES_ROOT = "#{REPO_ROOT}/issues"
+REPO_LABELS_ROOT = "#{REPO_ROOT}/labels"
+REPO_SRC_ROOT = "#{REPO_ROOT}/tree/master/src"
+
+schema = Schema.new(schema_hash)
+
+#
+# Sources
+#
+
+schema.sources.to_h.each do |_source_name, source|
+  source_generator = SourceGenerator.new(source, schema.guides)
+  content = source_generator.generate
+  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
+  content = link_generator.generate
+
+  File.write("docs/usage/configuration/sources/#{source.name}.md", content)
+end
+
+#
+# Transforms
+#
+
+schema.transforms.to_h.each do |_transform_name, transform|
+  transform_generator = TransformGenerator.new(transform, schema.guides)
+  content = transform_generator.generate
+  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
+  content = link_generator.generate
+
+  File.write("docs/usage/configuration/transforms/#{transform.name}.md", content)
+end
+
+#
+# Sinks
+#
+
+schema.sinks.to_h.each do |_sink_name, sink|
+  sink_generator = SinkGenerator.new(sink, schema.guides)
+  content = sink_generator.generate
+  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
+  content = link_generator.generate
+
+  File.write("docs/usage/configuration/sinks/#{sink.name}.md", content)
+end

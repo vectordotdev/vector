@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-
-adduser --force-badname --system --home /nonexistent --no-create-home --quiet vector || true
-
-mkdir -p /var/lib/vector
-chown -R vector /var/lib/vector

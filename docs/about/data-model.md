@@ -62,9 +62,9 @@ This makes it _much_ easier and faster to work with nested documents within Vect
 
 This ensures that the nested structure is preserved for your downstream services. Each [sink](../usage/configuration/sinks/) will document this behavior in a "Nested Documents" section, as well as any options to enable or disable it.
 
-#### Type Conversion
+#### Special Characters
 
-It is possible for multiple `log` events to be reduced into one or more `metric` events.
+As described above in the [Nested Keys](#nested-keys) section only `.` is trated as a special character to represent nesting.
 
 ### Metric
 
