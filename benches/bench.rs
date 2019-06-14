@@ -349,19 +349,25 @@ fn benchmark_regex(c: &mut Criterion) {
         Benchmark::new("regex", move |b| {
             b.iter_with_setup(
                 || {
-                    transforms::regex_parser::RegexParserConfig {
+                    let parser =transforms::regex_parser::RegexParserConfig {
                         // Many captures to stress the regex parser
                         regex: r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into(),
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build().unwrap()
-                },
-                |parser| {
-                    let out_lines = http_access_log_lines()
+                    }.build().unwrap();
+
+                    let src_lines = http_access_log_lines()
                         .take(num_lines)
-                        .filter_map(|line| parser.transform(Event::from(line)))
+                        .collect::<Vec<String>>();
+
+                    (parser, src_lines)
+                },
+                |(parser, src_lines)| {
+                    let out_lines = src_lines.iter()
+                        .filter_map(|line| parser.transform(Event::from(&line[..])))
                         .fold(0, |accum, _| accum + 1);
+
                     assert_eq!(out_lines, num_lines);
                 },
             );
