@@ -127,7 +127,7 @@ release-job-defaults: &release-job-defaults
         name: Cross Compile
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          ./circleci/release.sh
+          ./.circleci/release.sh
 
 #
 # Main document
@@ -295,7 +295,7 @@ jobs:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            ./circleci/release.sh
+            ./.circleci/release.sh
       - persist_to_workspace:
           root: dist
           paths:
