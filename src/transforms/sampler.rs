@@ -32,7 +32,7 @@ impl Sampler {
 }
 
 impl Transform for Sampler {
-    fn transform(&self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
             .get(&event::MESSAGE)
@@ -69,7 +69,7 @@ mod tests {
         let num_events = 10000;
 
         let events = random_events(num_events);
-        let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform(event))
@@ -79,7 +79,7 @@ mod tests {
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
         let events = random_events(num_events);
-        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform(event))
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn consistely_samples_the_same_events() {
         let events = random_events(1000);
-        let sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(2, RegexSet::new(&["na"]).unwrap());
 
         let first_run = events
             .clone()
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         let event = Event::from("i am important");
-        let sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
+        let mut sampler = Sampler::new(0, RegexSet::new(&["important"]).unwrap());
         let iterations = 0..1000;
         let total_passed = iterations
             .filter_map(|_| sampler.transform(event.clone()))
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
         let events = random_events(10000);
-        let sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(10, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
             .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
@@ -130,7 +130,7 @@ mod tests {
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
 
         let events = random_events(10000);
-        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
             .filter(|s| !s.as_log()[&event::MESSAGE].to_string_lossy().contains("na"))
@@ -139,7 +139,7 @@ mod tests {
         assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());
 
         // If the event passed the regex check, don't include the sampling rate
-        let sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(25, RegexSet::new(&["na"]).unwrap());
         let event = Event::from("nananana");
         let passing = sampler.transform(event).unwrap();
         assert!(passing.as_log().get(&Atom::from("sample_rate")).is_none());

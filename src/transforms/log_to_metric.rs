@@ -42,7 +42,7 @@ impl LogToMetric {
 }
 
 impl Transform for LogToMetric {
-    fn transform(&self, event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         let event = event.into_log();
 
         for counter in self.config.counters.iter() {
@@ -113,7 +113,7 @@ mod tests {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert_explicit("foo".into(), "42".into());
 
-        let transform = LogToMetric::new(config());
+        let mut transform = LogToMetric::new(config());
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -132,7 +132,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("bar".into(), "nineteen".into());
 
-        let transform = LogToMetric::new(config());
+        let mut transform = LogToMetric::new(config());
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -150,7 +150,7 @@ mod tests {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert_explicit("baz".into(), "666".into());
 
-        let transform = LogToMetric::new(config());
+        let mut transform = LogToMetric::new(config());
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -169,7 +169,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("foo".into(), "not a number".into());
 
-        let transform = LogToMetric::new(config());
+        let mut transform = LogToMetric::new(config());
         assert_eq!(None, transform.transform(log));
     }
 
@@ -179,7 +179,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("not foo".into(), "not a number".into());
 
-        let transform = LogToMetric::new(config());
+        let mut transform = LogToMetric::new(config());
         assert_eq!(None, transform.transform(log));
     }
 }

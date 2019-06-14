@@ -57,7 +57,7 @@ impl Tokenizer {
 }
 
 impl Transform for Tokenizer {
-    fn transform(&self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn tokenizer_adds_parsed_field_to_event() {
         let event = Event::from("1234 5678");
-        let parser = TokenizerConfig {
+        let mut parser = TokenizerConfig {
             field_names: vec!["status".into(), "time".into()],
             field: None,
             ..Default::default()
@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn tokenizer_does_drop_parsed_field() {
         let event = Event::from("1234 5678");
-        let parser = TokenizerConfig {
+        let mut parser = TokenizerConfig {
             field_names: vec!["status".into(), "time".into()],
             field: Some("message".into()),
             drop_field: true,
@@ -219,7 +219,7 @@ mod tests {
     #[test]
     fn tokenizer_does_not_drop_same_name_parsed_field() {
         let event = Event::from("1234 yes");
-        let parser = TokenizerConfig {
+        let mut parser = TokenizerConfig {
             field_names: vec!["status".into(), "message".into()],
             field: Some("message".into()),
             drop_field: true,

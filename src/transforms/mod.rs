@@ -12,5 +12,5 @@ pub mod sampler;
 pub mod tokenizer;
 
 pub trait Transform: Send {
-    fn transform(&self, event: Event) -> Option<Event>;
+    fn transform(&mut self, event: Event) -> Option<Event>;
 }
