@@ -13,7 +13,7 @@ use tokio_trace::{dispatcher, field};
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
-    pub context_key: Option<String>,
+    pub file_key: Option<String>,
     pub start_at_beginning: bool,
     pub ignore_older: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
@@ -30,7 +30,7 @@ impl Default for FileConfig {
         Self {
             include: vec![],
             exclude: vec![],
-            context_key: Some("file".to_string()),
+            file_key: Some("file".to_string()),
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
@@ -63,7 +63,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         max_line_bytes: config.max_line_bytes,
     };
 
-    let context_key = config.context_key.clone();
+    let file_key = config.file_key.clone();
     let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
     let hostname = hostname::get_hostname();
 
@@ -72,7 +72,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         .with(move |(line, file): (Bytes, String)| {
             trace!(message = "Recieved one event.", file = file.as_str());
 
-            let event = create_event(line, file, &host_key, &hostname, &context_key);
+            let event = create_event(line, file, &host_key, &hostname, &file_key);
 
             future::ok(event)
         });
@@ -108,14 +108,14 @@ fn create_event(
     file: String,
     host_key: &String,
     hostname: &Option<String>,
-    context_key: &Option<String>,
+    file_key: &Option<String>,
 ) -> Event {
     let mut event = Event::from(line);
 
-    if let Some(context_key) = &context_key {
+    if let Some(file_key) = &file_key {
         event
             .as_mut_log()
-            .insert_implicit(context_key.clone().into(), file.into());
+            .insert_implicit(file_key.clone().into(), file.into());
     }
 
     if let Some(hostname) = &hostname {
@@ -146,9 +146,9 @@ mod tests {
         let file = "some_file.rs".to_string();
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
-        let context_key = Some("file".to_string());
+        let file_key = Some("file".to_string());
 
-        let event = create_event(line, file, &host_key, &hostname, &context_key);
+        let event = create_event(line, file, &host_key, &hostname, &file_key);
         let log = event.into_log();
 
         assert_eq!(log[&"file".into()], "some_file.rs".into());
@@ -406,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn file_context_key() {
+    fn file_file_key() {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
         let (trigger, tripwire) = Tripwire::new();
@@ -444,7 +444,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                context_key: Some("source".to_string()),
+                file_key: Some("source".to_string()),
                 ..Default::default()
             };
 
@@ -472,7 +472,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                context_key: None,
+                file_key: None,
                 ..Default::default()
             };
 
