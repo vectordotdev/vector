@@ -76,10 +76,11 @@ impl Transform for RegexParser {
         if let Some(value) = &value {
             if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
                 for (idx, name) in &self.capture_names {
-                    let (start, end) = self.capture_locs.get(*idx).unwrap();
-                    event
-                        .as_mut_log()
-                        .insert_explicit(name.clone(), value[start..end].into());
+                    if let Some((start, end)) = self.capture_locs.get(*idx) {
+                        event
+                            .as_mut_log()
+                            .insert_explicit(name.clone(), value[start..end].into());
+                    }
                 }
                 if self.drop_field {
                     event.as_mut_log().remove(&self.field);
@@ -208,5 +209,17 @@ mod tests {
     fn regex_parser_does_drop_event_if_no_match() {
         let log = do_transform("asdf1234", r"something", None, false, true);
         assert!(log.is_none());
+    }
+
+    #[test]
+    fn regex_parser_handles_valid_optional_capture() {
+        let log = do_transform("1234", r"(?P<status>\d+)?", None, false, false).unwrap();
+        assert_eq!(log[&"status".into()], "1234".into());
+    }
+
+    #[test]
+    fn regex_parser_handles_missing_optional_capture() {
+        let log = do_transform("none", r"(?P<status>\d+)?", None, false, false).unwrap();
+        assert!(log.get(&"status".into()).is_none());
     }
 }
