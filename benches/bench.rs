@@ -537,6 +537,46 @@ fn benchmark_complex(c: &mut Criterion) {
     );
 }
 
+fn bench_elasticsearch_index(c: &mut Criterion) {
+    use chrono::Utc;
+    use vector::event;
+    use vector::sinks::elasticsearch::*;
+
+    c.bench(
+        "elasticsearch_indexes",
+        Benchmark::new("dynamic", move |b| {
+            b.iter_with_setup(
+                || {
+                    let mut event = Event::from("hello world");
+                    event
+                        .as_mut_log()
+                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
+
+                    ("index-%Y.%m.%d".to_string(), event)
+                },
+                |(index, event)| build_index_name(&index, &event, true),
+            )
+        }),
+    );
+
+    c.bench(
+        "elasticsearch_indexes",
+        Benchmark::new("static", move |b| {
+            b.iter_with_setup(
+                || {
+                    let mut event = Event::from("hello world");
+                    event
+                        .as_mut_log()
+                        .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
+
+                    ("index".to_string(), event)
+                },
+                |(index, event)| build_index_name(&index, &event, false),
+            )
+        }),
+    );
+}
+
 criterion_group!(
     benches,
     benchmark_simple_pipe,
@@ -546,6 +586,7 @@ criterion_group!(
     benchmark_interconnected,
     benchmark_transforms,
     benchmark_complex,
+    bench_elasticsearch_index,
     benchmark_regex,
 );
 criterion_main!(
