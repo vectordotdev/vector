@@ -79,6 +79,14 @@ impl RegexParser {
                 drop_field = false;
             }
         }
+        // Add conversions for all types
+        let conversions = regex
+            .capture_names()
+            .filter_map(|c| c)
+            .map(|c| (c, types.get(c).unwrap_or(&Conversion::String)))
+            .map(|(name, conv)| (name.into(), conv.clone()))
+            .collect::<HashMap<String, Conversion>>();
+
         Self {
             regex,
             field,
@@ -86,7 +94,7 @@ impl RegexParser {
             drop_failed,
             capture_names,
             capture_locs,
-            types,
+            types: conversions,
         }
     }
 }
