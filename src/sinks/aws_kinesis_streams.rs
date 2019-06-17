@@ -69,14 +69,14 @@ impl KinesisService {
     ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
-        let batch_size = config.batch_size.unwrap_or(bytesize::mib(5u64) as usize);
+        let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
-        let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-        let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
         let encoding = config.encoding.clone();
 
@@ -211,7 +211,10 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
             serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
         }
         (&Some(Encoding::Text), _) | (_, false) => {
-            let bytes = log[&event::MESSAGE].as_bytes().to_vec();
+            let bytes = log
+                .get(&event::MESSAGE)
+                .map(|v| v.as_bytes().to_vec())
+                .unwrap_or(Vec::new());
             Ok(bytes)
         }
     }
@@ -287,7 +290,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
         rt.block_on(pump).unwrap();
@@ -299,11 +302,13 @@ mod integration_tests {
             .block_on(fetch_records(STREAM_NAME.into(), timestamp, region))
             .unwrap();
 
-        let output_lines = records
+        let mut output_lines = records
             .into_iter()
             .map(|e| String::from_utf8(e.data).unwrap())
             .collect::<Vec<_>>();
 
+        input_lines.sort();
+        output_lines.sort();
         assert_eq!(output_lines, input_lines)
     }
 

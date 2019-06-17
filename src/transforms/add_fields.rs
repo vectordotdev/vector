@@ -30,7 +30,7 @@ impl AddFields {
 }
 
 impl Transform for AddFields {
-    fn transform(&self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
         for (key, value) in self.fields.clone() {
             event.as_mut_log().insert_explicit(key, value.into());
         }
@@ -51,7 +51,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
-        let augment = AddFields::new(fields);
+        let mut augment = AddFields::new(fields);
 
         let new_event = augment.transform(event).unwrap();
 

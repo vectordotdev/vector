@@ -23,7 +23,7 @@ pub struct PrometheusSinkConfig {
 pub fn default_address() -> SocketAddr {
     use std::net::{IpAddr, Ipv4Addr};
 
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9999)
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
 #[typetag::serde(name = "prometheus")]

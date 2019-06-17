@@ -67,17 +67,17 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let host_field = config.host_field;
 
     let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
-    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+    let gzip = match config.compression.unwrap_or(Compression::None) {
         Compression::None => false,
         Compression::Gzip => true,
     };
     let batch_timeout = config.batch_timeout.unwrap_or(1);
 
     let timeout = config.request_timeout_secs.unwrap_or(60);
-    let in_flight_limit = config.request_in_flight_limit.unwrap_or(1);
+    let in_flight_limit = config.request_in_flight_limit.unwrap_or(10);
     let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
     let rate_limit_num = config.request_rate_limit_num.unwrap_or(10);
-    let retry_attempts = config.request_retry_attempts.unwrap_or(5);
+    let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
     let encoding = config.encoding.clone();
 
@@ -183,7 +183,7 @@ fn encode_event(
             "time": timestamp,
         }),
         (&Some(Encoding::Text), _) | (_, false) => json!({
-            "event": event[&event::MESSAGE].to_string_lossy(),
+            "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
     };

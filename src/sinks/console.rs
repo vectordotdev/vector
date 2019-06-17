@@ -63,7 +63,10 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<String, ()>
             serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))?;
         String::from_utf8(bytes).map_err(|e| panic!("Unable to convert json to utf8: {}", e))
     } else {
-        let s = log[&event::MESSAGE].to_string_lossy();
+        let s = log
+            .get(&event::MESSAGE)
+            .map(|v| v.to_string_lossy())
+            .unwrap_or_else(|| "".into());
         Ok(s)
     }
 }
