@@ -55,9 +55,8 @@ pub struct RegexParser {
     field: Atom,
     drop_field: bool,
     drop_failed: bool,
-    capture_names: Vec<(usize, Atom)>,
+    capture_names: Vec<(usize, Atom, Conversion)>,
     capture_locs: CaptureLocations,
-    types: HashMap<String, Conversion>,
 }
 
 impl RegexParser {
@@ -68,24 +67,32 @@ impl RegexParser {
         drop_failed: bool,
         types: HashMap<String, Conversion>,
     ) -> Self {
+        // Build a buffer of the regex capture locations to avoid
+        // repeated allocations.
         let capture_locs = regex.capture_locations();
-        let capture_names: Vec<(usize, Atom)> = regex
+
+        // Calculate the location (index into the capture locations) of
+        // each named capture, and the required type coercion.
+        let capture_names: Vec<(usize, Atom, Conversion)> = regex
             .capture_names()
             .enumerate()
-            .filter_map(|(idx, cn)| cn.map(|cn| (idx, cn.into())))
+            .filter_map(|(idx, cn)| {
+                cn.map(|cn| {
+                    (
+                        idx,
+                        cn.into(),
+                        types.get(cn).unwrap_or(&Conversion::String).clone(),
+                    )
+                })
+            })
             .collect();
-        for (_, name) in &capture_names {
+
+        // Pre-calculate if the source field name should be dropped.
+        for (_, name, _) in &capture_names {
             if *name == field {
                 drop_field = false;
             }
         }
-        // Add conversions for all types
-        let conversions = regex
-            .capture_names()
-            .filter_map(|c| c)
-            .map(|c| (c, types.get(c).unwrap_or(&Conversion::String)))
-            .map(|(name, conv)| (name.into(), conv.clone()))
-            .collect::<HashMap<String, Conversion>>();
 
         Self {
             regex,
@@ -94,7 +101,6 @@ impl RegexParser {
             drop_failed,
             capture_names,
             capture_locs,
-            types: conversions,
         }
     }
 }
@@ -105,21 +111,18 @@ impl Transform for RegexParser {
 
         if let Some(value) = &value {
             if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
-                for (idx, name) in &self.capture_names {
+                for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
-                        let capture = match self.types.get(&name[..]) {
-                            Some(conversion) => match conversion.convert(capture) {
-                                Ok(value) => value,
-                                Err(err) => {
-                                    debug!(
-                                        message =
-                                            format!("Could not convert {}: {}", name, err).as_str()
-                                    );
-                                    continue;
-                                }
-                            },
-                            None => capture,
+                        let capture = match conversion.convert(capture) {
+                            Ok(value) => value,
+                            Err(err) => {
+                                debug!(
+                                    message =
+                                        format!("Could not convert {}: {}", name, err).as_str()
+                                );
+                                continue;
+                            }
                         };
                         event.as_mut_log().insert_explicit(name.clone(), capture);
                     }
