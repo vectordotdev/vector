@@ -22,6 +22,7 @@ message Value {
     int64 integer = 4;
     double float = 5;
     bool boolean = 6;
+    uint64 unsigned_integer = 7;
   }
   bool explicit = 3;
 }

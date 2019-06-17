@@ -150,6 +150,7 @@ impl Serialize for Value {
 pub enum ValueKind {
     Bytes(Bytes),
     Integer(i64),
+    UnsignedInteger(u64),
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
@@ -222,11 +223,26 @@ macro_rules! impl_valuekind_from_integer {
     };
 }
 
+macro_rules! impl_valuekind_from_unsigned_integer {
+    ($t:ty) => {
+        impl From<$t> for ValueKind {
+            fn from(value: $t) -> Self {
+                ValueKind::UnsignedInteger(value as u64)
+            }
+        }
+    };
+}
+
 impl_valuekind_from_integer!(i64);
 impl_valuekind_from_integer!(i32);
 impl_valuekind_from_integer!(i16);
 impl_valuekind_from_integer!(i8);
 impl_valuekind_from_integer!(isize);
+
+impl_valuekind_from_unsigned_integer!(u8);
+impl_valuekind_from_unsigned_integer!(u16);
+impl_valuekind_from_unsigned_integer!(u32);
+impl_valuekind_from_unsigned_integer!(u64);
 
 impl From<bool> for ValueKind {
     fn from(value: bool) -> Self {
@@ -241,6 +257,7 @@ impl ValueKind {
             ValueKind::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
             ValueKind::Timestamp(timestamp) => timestamp_to_string(timestamp),
             ValueKind::Integer(num) => format!("{}", num),
+            ValueKind::UnsignedInteger(num) => format!("{}", num),
             ValueKind::Float(num) => format!("{}", num),
             ValueKind::Boolean(b) => format!("{}", b),
         }
@@ -251,6 +268,7 @@ impl ValueKind {
             ValueKind::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
             ValueKind::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
             ValueKind::Integer(num) => Bytes::from(format!("{}", num)),
+            ValueKind::UnsignedInteger(num) => Bytes::from(format!("{}", num)),
             ValueKind::Float(num) => Bytes::from(format!("{}", num)),
             ValueKind::Boolean(b) => Bytes::from(format!("{}", b)),
         }
@@ -280,6 +298,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
         Some(proto::value::Kind::Integer(value)) => Some(ValueKind::Integer(value)),
+        Some(proto::value::Kind::UnsignedInteger(value)) => Some(ValueKind::UnsignedInteger(value)),
         Some(proto::value::Kind::Float(value)) => Some(ValueKind::Float(value)),
         Some(proto::value::Kind::Boolean(value)) => Some(ValueKind::Boolean(value)),
         None => {
@@ -377,6 +396,9 @@ impl From<Event> for proto::EventWrapper {
                                 }
                                 ValueKind::Integer(value) => {
                                     Some(proto::value::Kind::Integer(value))
+                                }
+                                ValueKind::UnsignedInteger(value) => {
+                                    Some(proto::value::Kind::UnsignedInteger(value))
                                 }
                                 ValueKind::Float(value) => Some(proto::value::Kind::Float(value)),
                                 ValueKind::Boolean(value) => {
