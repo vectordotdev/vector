@@ -1,7 +1,10 @@
 use super::Transform;
-use crate::event::{self, Event};
+use crate::event::{self, Event, ValueKind};
+use crate::types::Conversion;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -12,6 +15,7 @@ pub struct RegexParserConfig {
     pub field: Option<Atom>,
     pub drop_field: bool,
     pub drop_failed: bool,
+    pub types: HashMap<String, String>,
 }
 
 #[typetag::serde(name = "regex_parser")]
@@ -23,6 +27,15 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
             &event::MESSAGE
         };
 
+        let types = self
+            .types
+            .iter()
+            .map(|(field, typename)| {
+                Conversion::try_from(typename.as_ref()).map(|ct| (field.clone(), ct))
+            })
+            .collect::<Result<HashMap<String, Conversion>, _>>()
+            .map_err(|err| format!("Invalid conversion type: {}", err))?;
+
         Regex::new(&self.regex)
             .map_err(|err| err.to_string())
             .map::<Box<dyn Transform>, _>(|r| {
@@ -31,6 +44,7 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
                     field.clone(),
                     self.drop_field,
                     self.drop_failed,
+                    types,
                 ))
             })
     }
@@ -43,10 +57,17 @@ pub struct RegexParser {
     drop_failed: bool,
     capture_names: Vec<(usize, Atom)>,
     capture_locs: CaptureLocations,
+    types: HashMap<String, Conversion>,
 }
 
 impl RegexParser {
-    pub fn new(regex: Regex, field: Atom, mut drop_field: bool, drop_failed: bool) -> Self {
+    pub fn new(
+        regex: Regex,
+        field: Atom,
+        mut drop_field: bool,
+        drop_failed: bool,
+        types: HashMap<String, Conversion>,
+    ) -> Self {
         let capture_locs = regex.capture_locations();
         let capture_names: Vec<(usize, Atom)> = regex
             .capture_names()
@@ -65,6 +86,7 @@ impl RegexParser {
             drop_failed,
             capture_names,
             capture_locs,
+            types,
         }
     }
 }
@@ -77,9 +99,21 @@ impl Transform for RegexParser {
             if let Some(_) = self.regex.captures_read(&mut self.capture_locs, &value) {
                 for (idx, name) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
-                        event
-                            .as_mut_log()
-                            .insert_explicit(name.clone(), value[start..end].into());
+                        let capture: ValueKind = value[start..end].into();
+                        let capture = match self.types.get(&name[..]) {
+                            Some(conversion) => match conversion.convert(capture) {
+                                Ok(value) => value,
+                                Err(err) => {
+                                    debug!(
+                                        message =
+                                            format!("Could not convert {}: {}", name, err).as_str()
+                                    );
+                                    continue;
+                                }
+                            },
+                            None => capture,
+                        };
+                        event.as_mut_log().insert_explicit(name.clone(), capture);
                     }
                 }
                 if self.drop_field {
@@ -107,7 +141,7 @@ impl Transform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, ValueKind};
     use crate::{topology::config::TransformConfig, Event};
 
     fn do_transform(
@@ -116,6 +150,7 @@ mod tests {
         field: Option<&str>,
         drop_field: bool,
         drop_failed: bool,
+        types: &[(&str, &str)],
     ) -> Option<LogEvent> {
         let event = Event::from(event);
         let mut parser = RegexParserConfig {
@@ -123,6 +158,7 @@ mod tests {
             field: field.map(|field| field.into()),
             drop_field,
             drop_failed,
+            types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build()
         .unwrap();
@@ -138,6 +174,7 @@ mod tests {
             None,
             false,
             false,
+            &[],
         )
         .unwrap();
 
@@ -148,7 +185,15 @@ mod tests {
 
     #[test]
     fn regex_parser_doesnt_do_anything_if_no_match() {
-        let log = do_transform("asdf1234", r"status=(?P<status>\d+)", None, false, false).unwrap();
+        let log = do_transform(
+            "asdf1234",
+            r"status=(?P<status>\d+)",
+            None,
+            false,
+            false,
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(log.get(&"status".into()), None);
         assert!(log.get(&"message".into()).is_some());
@@ -162,6 +207,7 @@ mod tests {
             Some("message"),
             true,
             false,
+            &[],
         )
         .unwrap();
 
@@ -178,6 +224,7 @@ mod tests {
             Some("message"),
             true,
             false,
+            &[],
         )
         .unwrap();
 
@@ -193,6 +240,7 @@ mod tests {
             Some("message"),
             true,
             false,
+            &[],
         )
         .unwrap();
 
@@ -201,25 +249,41 @@ mod tests {
 
     #[test]
     fn regex_parser_does_not_drop_event_if_match() {
-        let log = do_transform("asdf1234", r"asdf", None, false, true);
+        let log = do_transform("asdf1234", r"asdf", None, false, true, &[]);
         assert!(log.is_some());
     }
 
     #[test]
     fn regex_parser_does_drop_event_if_no_match() {
-        let log = do_transform("asdf1234", r"something", None, false, true);
+        let log = do_transform("asdf1234", r"something", None, false, true, &[]);
         assert!(log.is_none());
     }
 
     #[test]
     fn regex_parser_handles_valid_optional_capture() {
-        let log = do_transform("1234", r"(?P<status>\d+)?", None, false, false).unwrap();
+        let log = do_transform("1234", r"(?P<status>\d+)?", None, false, false, &[]).unwrap();
         assert_eq!(log[&"status".into()], "1234".into());
     }
 
     #[test]
     fn regex_parser_handles_missing_optional_capture() {
-        let log = do_transform("none", r"(?P<status>\d+)?", None, false, false).unwrap();
+        let log = do_transform("none", r"(?P<status>\d+)?", None, false, false, &[]).unwrap();
         assert!(log.get(&"status".into()).is_none());
+    }
+
+    #[test]
+    fn regex_parser_coerces_fields_to_types() {
+        let log = do_transform(
+            "1234 6789.01 false",
+            r"(?P<status>\d+) (?P<time>[\d.]+) (?P<check>\S+)",
+            None,
+            false,
+            false,
+            &[("status", "int"), ("time", "float"), ("check", "boolean")],
+        )
+        .expect("Failed to parse log");
+        assert_eq!(log[&"check".into()], ValueKind::Boolean(false));
+        assert_eq!(log[&"status".into()], ValueKind::Integer(1234));
+        assert_eq!(log[&"time".into()], ValueKind::Float(6789.01));
     }
 }
