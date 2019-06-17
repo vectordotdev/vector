@@ -83,6 +83,8 @@ fn main() {
     };
 
     tokio_trace::dispatcher::with_default(&dispatch, || {
+        info!("Log level {:?} is enabled.", level);
+
         if let Some(threads) = opts.threads {
             if threads < 1 || threads > 4 {
                 error!("thread must be between 1 and 4 (inclusive)");
