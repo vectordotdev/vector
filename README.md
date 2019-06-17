@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/timberio/vector/releases"><img src="https://img.shields.io/github/release/timberio/vector.svg"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
   <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
   <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
@@ -50,6 +51,11 @@ get data from A to B.
 * [**Administration**][administration] - [cli], [start], [stop], [reload], [update]
 * [**Guides**][guides]
 
+#### Resources
+
+* [**Community**][community]
+* [**Roadmap**][roadmap]
+
 ---
 
 ## Development
@@ -92,7 +98,7 @@ up local mock versions of the sources we send logs too. To do this we use `docke
 
 ```bash
 # Test everything that does not require docker
-cargo test
+cargo test -- --test-threads=4
 
 # Test everything that can also be tested with docker
 cargo test --features docker
@@ -128,6 +134,22 @@ anything that merits more discussion or visibility, committing to a branch and
 opening a pull request is preferred. Just use your best judgement and if you're
 unsure, open a pull request.
 
+## License
+
+Copyright 2019, Vector Authors. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use these files except in compliance with the License. You may obtain a copy
+of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
 ---
 
 <p align="center">
@@ -138,6 +160,7 @@ unsure, open a pull request.
 [agent]: https://docs.vectorproject.io/setup/deployment/roles/agent
 [backups]: https://docs.vectorproject.io/about/use_cases/backups
 [cli]: https://docs.vectorproject.io/administration/cli
+[community]: https://vectorproject.io/community/
 [configuration]: https://docs.vectorproject.io/usage/configuration
 [concepts]: https://docs.vectorproject.io/about/concepts
 [cost]: https://docs.vectorproject.io/about/use_cases/cost
@@ -154,6 +177,7 @@ unsure, open a pull request.
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/comparisons/performance
 [reload]: https://docs.vectorproject.io/usage/administration/reloading
+[roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
 [roles]: https://docs.vectorproject.io/setup/deployment/roles
 [rust]: https://www.rust-lang.org/
 [security]: https://docs.vectorproject.io/about/use_cases/security-and-compliance

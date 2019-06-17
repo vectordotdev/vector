@@ -1,13 +1,13 @@
-### References
-
-<!-- Example: "Closes #123" or "Ref #123" -->
-
 ### Description
 
-<!-- Describe your change. Please provide a thoughtful description that respects the time of your reviewers. -->
+<!--
+Describe your changes. Please provide a thoughtful description
+that respects the time of your reviewers.
+
+Include any "Closes #123" or "Ref #123" statements.
+-->
 
 ### TODO
 
-- [ ] `CHANGELOG.md` has been updated to reflect these changes (if necessary)
-
-<!-- Add any remaining TODOs here -->
+- [ ] `CHANGELOG.md` has been updated to reflect noteworthy changes
+- [ ] `dist/config/spec.toml` has been updated to reflect configuration changes

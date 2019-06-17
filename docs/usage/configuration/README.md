@@ -109,7 +109,7 @@ You can find more examples in the [examples section](examples/).
   </tbody>
 </table>## How It Works
 
-### Composition \(Pipelines\)
+### Composition
 
 The primary purpose of the configuration file is to compose [pipelines](../../about/concepts.md#pipelines). Pipelines are form by connecting [sources](sources/), [transforms](transforms/), and [sinks](sinks/). You can learn more about creating pipelines with the the following guide:
 
