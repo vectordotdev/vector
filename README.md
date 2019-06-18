@@ -74,11 +74,7 @@ get data from A to B.
 * **Easy To Deploy** - Vector compiles to a single static binary with no runtime, making it easy to deploy and manage.
 * **Hot Reload** - Designed to [reload configuration][reloading], on the fly, without restarting or skipping a beat.
 
-## Comparisons
-
-As part of Vector's development, we invested in a robust [test harness](https://github.com/timberio/vector-test-harness) that provided a data-driven testing environment. Below are the results. To learn more, see [How It Works][test_harness_how_it_works].
-
-### Performance
+## Performance
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | SplunkUF | SplunkHF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -88,7 +84,9 @@ As part of Vector's development, we invested in a robust [test harness](https://
 | [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
 | [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | _**70.4mib/s**_ | 7.6mib/s |
 
-### Correctness
+To learn more about our performance tests, please see the [Vector test harness][test_harness].
+
+## Correctness
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -99,6 +97,8 @@ As part of Vector's development, we invested in a robust [test harness](https://
 | [Process \(SIGHUP\)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
 | TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | [JSON \(wrapped\)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+
+To learn more about our performance tests, please see the [Vector test harness][test_harness].
 
 ## License
 
