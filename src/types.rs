@@ -1,4 +1,5 @@
 use crate::event::ValueKind;
+use chrono::{TimeZone, Utc};
 use std::convert::TryFrom;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
@@ -15,14 +16,24 @@ pub enum Conversion {
 
 impl TryFrom<&str> for Conversion {
     type Error = String;
-    /// Convert the string into a type conversion.
+    /// Convert the string into a type conversion. The following
+    /// conversion names are supported:
+    ///
+    ///  * `"string"` => As-is (null)
+    ///  * `"int"` or `"integer"` => Signed integer
+    ///  * `"float"` => Floating point number
+    ///  * `"bool"` or `"boolean"` => Boolean
+    ///  * `"timestamp"` => Timestamp using the default format
+    ///  * `"timestamp|FORMAT"` => Timestamp using the given format
+    ///
+    /// Timestamp parsing does not yet support time zones.
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
             "string" => Ok(Conversion::String),
             "integer" | "int" => Ok(Conversion::Integer),
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
-            "timestamp" => Ok(Conversion::Timestamp("%d/%m/%Y:%H:%M:%S %z".into())),
+            "timestamp" => Ok(Conversion::Timestamp("%m/%d/%Y:%H:%M:%S".into())),
             _ if s.starts_with("timestamp|") => Ok(Conversion::Timestamp(s[10..].into())),
             _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
         }
@@ -51,7 +62,10 @@ impl Conversion {
             Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&value))
                 .map_err(|err| format!("Invalid boolean {:?}: {}", value, err))
                 .map(|value| ValueKind::Boolean(value)),
-            Conversion::Timestamp(_pattern) => Err("FIX#ME Timestamp".into()),
+            Conversion::Timestamp(format) => Utc
+                .datetime_from_str(&String::from_utf8_lossy(&value), &format)
+                .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
+                .map(|value| ValueKind::Timestamp(value)),
         }
     }
 }
@@ -88,42 +102,73 @@ fn parse_bool(s: &str) -> Result<bool, &'static str> {
     }
 }
 
-// These should perhaps each go into an individual test function to be
-// able to determine what part failed, but that would end up really
-// spamming the test logs.
+#[cfg(test)]
+mod tests {
+    use super::{parse_bool, Conversion};
+    use crate::event::ValueKind;
+    use chrono::prelude::*;
+    use std::convert::TryFrom;
 
-#[test]
-fn parse_bool_true() {
-    assert_eq!(parse_bool("true"), Ok(true));
-    assert_eq!(parse_bool("True"), Ok(true));
-    assert_eq!(parse_bool("t"), Ok(true));
-    assert_eq!(parse_bool("T"), Ok(true));
-    assert_eq!(parse_bool("yes"), Ok(true));
-    assert_eq!(parse_bool("YES"), Ok(true));
-    assert_eq!(parse_bool("y"), Ok(true));
-    assert_eq!(parse_bool("Y"), Ok(true));
-    assert_eq!(parse_bool("1"), Ok(true));
-    assert_eq!(parse_bool("23456"), Ok(true));
-    assert_eq!(parse_bool("-8"), Ok(true));
-}
+    fn dateref() -> ValueKind {
+        ValueKind::Timestamp(Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0)))
+    }
 
-#[test]
-fn parse_bool_false() {
-    assert_eq!(parse_bool("false"), Ok(false));
-    assert_eq!(parse_bool("fAlSE"), Ok(false));
-    assert_eq!(parse_bool("f"), Ok(false));
-    assert_eq!(parse_bool("F"), Ok(false));
-    assert_eq!(parse_bool("no"), Ok(false));
-    assert_eq!(parse_bool("NO"), Ok(false));
-    assert_eq!(parse_bool("n"), Ok(false));
-    assert_eq!(parse_bool("N"), Ok(false));
-    assert_eq!(parse_bool("0"), Ok(false));
-    assert_eq!(parse_bool("000"), Ok(false));
-}
+    fn convert(fmt: &str, value: &str) -> Result<ValueKind, String> {
+        Conversion::try_from(fmt)
+            .expect(&format!("Invalid conversion {:?}", fmt))
+            .convert(value.into())
+    }
 
-#[test]
-fn parse_bool_errors() {
-    assert!(parse_bool("X").is_err());
-    assert!(parse_bool("yes or no").is_err());
-    assert!(parse_bool("123.4").is_err());
+    #[test]
+    fn timestamp_conversion() {
+        assert_eq!(convert("timestamp", "02/03/2001:04:05:06"), Ok(dateref()));
+    }
+
+    #[test]
+    fn timestamp_param_conversion() {
+        assert_eq!(
+            convert("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 04:05:06"),
+            Ok(dateref())
+        );
+    }
+
+    // These should perhaps each go into an individual test function to be
+    // able to determine what part failed, but that would end up really
+    // spamming the test logs.
+
+    #[test]
+    fn parse_bool_true() {
+        assert_eq!(parse_bool("true"), Ok(true));
+        assert_eq!(parse_bool("True"), Ok(true));
+        assert_eq!(parse_bool("t"), Ok(true));
+        assert_eq!(parse_bool("T"), Ok(true));
+        assert_eq!(parse_bool("yes"), Ok(true));
+        assert_eq!(parse_bool("YES"), Ok(true));
+        assert_eq!(parse_bool("y"), Ok(true));
+        assert_eq!(parse_bool("Y"), Ok(true));
+        assert_eq!(parse_bool("1"), Ok(true));
+        assert_eq!(parse_bool("23456"), Ok(true));
+        assert_eq!(parse_bool("-8"), Ok(true));
+    }
+
+    #[test]
+    fn parse_bool_false() {
+        assert_eq!(parse_bool("false"), Ok(false));
+        assert_eq!(parse_bool("fAlSE"), Ok(false));
+        assert_eq!(parse_bool("f"), Ok(false));
+        assert_eq!(parse_bool("F"), Ok(false));
+        assert_eq!(parse_bool("no"), Ok(false));
+        assert_eq!(parse_bool("NO"), Ok(false));
+        assert_eq!(parse_bool("n"), Ok(false));
+        assert_eq!(parse_bool("N"), Ok(false));
+        assert_eq!(parse_bool("0"), Ok(false));
+        assert_eq!(parse_bool("000"), Ok(false));
+    }
+
+    #[test]
+    fn parse_bool_errors() {
+        assert!(parse_bool("X").is_err());
+        assert!(parse_bool("yes or no").is_err());
+        assert!(parse_bool("123.4").is_err());
+    }
 }
