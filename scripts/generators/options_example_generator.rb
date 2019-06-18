@@ -74,6 +74,10 @@ class OptionsExampleGenerator < Generator
             tags << option.unit
           end
 
+          if option.enum
+            tags << "one of: #{option.enum.join(", ")}"
+          end
+
           value = option.example.inspect
 
           if tags.any?
@@ -89,20 +93,24 @@ class OptionsExampleGenerator < Generator
           option.example.inspect
         end
       when :schema
-        type_string(option.type)
+        type_string(option)
       else
         raise("Unsupported options example format: #{format.inspect}")
       end
     end
 
-    def type_string(type)
-      case type
-      when "[string]"
-        "[\"<string>\", ...]"
-      when "string"
-        "\"<string>\""
+    def type_string(option)
+      if option.enum
+        "{#{option.enum.join(" | ")}}"
       else
-        "<#{type}>"
+        case option.type
+        when "[string]"
+          "[\"<string>\", ...]"
+        when "string"
+          "\"<string>\""
+        else
+          "<#{option.type}>"
+        end
       end
     end
 end

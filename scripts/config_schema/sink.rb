@@ -1,4 +1,5 @@
 require_relative "component"
+require_relative "output"
 require_relative "section"
 
 class Sink < Component
@@ -6,7 +7,7 @@ class Sink < Component
 
   attr_reader :delivery_guarantee,
     :input_types,
-    :output,
+    :outputs,
     :service_limits_url,
     :service_provider,
     :write_style,
@@ -17,7 +18,7 @@ class Sink < Component
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
     @input_types = hash.fetch("input_types")
-    @output = hash["output"]
+    outputs_hashes = hash["outputs"] || []
     @service_limits_url = hash["service_limits_url"]
     @service_provider = hash["service_provider"]
     @write_style = hash.fetch("write_style")
@@ -35,25 +36,32 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
-    # Output
+    # outputs
 
-    if @output.nil?
-      if streaming?
-        if @options.respond_to?("encoding")
-          @output = "The `#{name}` sink streams events in a real-time fashion. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info."
+    @outputs =
+      if outputs_hashes.nil? || outputs_hashes.length == 0
+        output = if streaming?
+          if @options.respond_to?("encoding")
+            Output.build("The `#{name}` sink streams events in a real-time fashion. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info.")
+          else
+            Output.build("The `#{name}` sink streams events in a real-time fashion.")
+          end
+        elsif batching?
+          if @options.respond_to?("encoding")
+            Output.build("The `#{name}` sink batches and flushes events over an configurable interval. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info.")
+          else
+            Output.build("The `#{name}` sink batches and flushes events over an configurable interval.")
+          end
         else
-          @output = "The `#{name}` sink streams events in a real-time fashion."
+          raise("Unknown write_style: #{@write_style.inspect}")
         end
-      elsif batching?
-        if @options.respond_to?("encoding")
-          @output = "The `#{name}` sink batches and flushes events over an configurable interval. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info."
-        else
-          @output = "The `#{name}` sink batches and flushes events over an configurable interval."
-        end
+
+        [output]
       else
-        raise("Unknown write_style: #{@write_style.inspect}")
+        @outputs = outputs_hashes.collect do |output_hash|
+          Output.new(output_hash)
+        end
       end
-    end
 
     # Common sections
 

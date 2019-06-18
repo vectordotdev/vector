@@ -38,7 +38,7 @@ class BatchingSink < Sink
     @options.batch_timeout = Option.new({
       "name" => "batch_timeout",
       "category" => "Batching",
-      "default" => @batch_size,
+      "default" => @batch_timeout,
       "description" => "The maximum age of a batch before it is flushed.",
       "null" => false,
       "type" => "int",

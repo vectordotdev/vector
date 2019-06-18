@@ -12,7 +12,7 @@ Sources are first in the [pipeline](../../../about/concepts.md#pipelines), respo
 
 ### Context
 
-When possible a source will add context to each [event](../../../about/concepts.md#events). For example, the [`tcp` source](tcp.md) adds the `"host"` context key representing the address of the upstream host. Context keys, when possible, will follow the [default schema](../../../about/data-model.md#default-schema) which is outlined in the [Data Model](../../../about/data-model.md) document. For explicitness, each source will document the context keys it adds as well as the expected event output structure.
+When possible a source will add context to each [event](../../../about/data-model.md#event). For example, the [`tcp` source](tcp.md) adds the `"host"` context key representing the address of the upstream host. Context keys, when possible, will follow the [default schema](../../../about/data-model.md#default-schema) which is outlined in the [Data Model](../../../about/data-model.md) document. For explicitness, each source will document the context keys it adds as well as the expected event output structure.
 
 ### Event Types
 

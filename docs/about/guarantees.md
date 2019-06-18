@@ -8,7 +8,7 @@ Vector was designed with a strong focus on reliable and performant data delivery
 
 ## At Least Once Delivery
 
-At least once delivery guarantees that an [event](concepts.md#events) received by Vector will be delivered at least once to the configured destination\(s\). While rare, it is possible for an event to be delivered more than once \(see the [Does Vector support exactly once delivery](guarantees.md#does-vector-support-exactly-once-delivery) FAQ below\).
+At least once delivery guarantees that an [event](data-model.md#event) received by Vector will be delivered at least once to the configured destination\(s\). While rare, it is possible for an event to be delivered more than once \(see the [Does Vector support exactly once delivery](guarantees.md#does-vector-support-exactly-once-delivery) FAQ below\).
 
 ### Quick Start
 

@@ -6,7 +6,7 @@ description: 'Parser, normalize, sample, and reduce log and metric events'
 
 ![](../../../.gitbook/assets/transforms.svg)
 
-Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipelines), sitting in-between [sources](../sources/) and [sinks](../sinks/). They transform [events](../../../about/concepts.md#events) or the stream as a whole.
+Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipelines), sitting in-between [sources](../sources/) and [sinks](../sinks/). They transform [events](../../../about/data-model.md#event) or the stream as a whole.
 
 ## How It Works
 

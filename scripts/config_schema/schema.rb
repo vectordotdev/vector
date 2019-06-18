@@ -8,15 +8,19 @@ class Schema
   attr_reader :enums,
     :guides,
     :links,
+    :options,
     :sinks,
     :sources,
     :transforms
 
   def initialize(hash)
     @enums = OpenStruct.new(hash.fetch("enums"))
+    @options = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
+
+    # sources
 
     hash["sources"].collect do |source_name, source_hash|
       source_hash["name"] = source_name
@@ -24,11 +28,15 @@ class Schema
       @sources.send("#{source_name}=", source)
     end
 
+    # transforms
+
     hash["transforms"].collect do |transform_name, transform_hash|
       transform_hash["name"] = transform_name
       transform = Transform.new(transform_hash)
       @transforms.send("#{transform_name}=", transform)
     end
+
+    # sinks
 
     hash["sinks"].collect do |sink_name, sink_hash|
       sink_hash["name"] = sink_name
@@ -48,10 +56,24 @@ class Schema
       transform.alternatives = alternatives.sort
     end
 
+    # options
+
+    hash.fetch("options").each do |option_name, option_hash|
+      option = Option.new(
+        option_hash.merge({"name" => option_name}
+      ))
+
+      @options.send("#{option_name}=", option)
+    end
+
+    # guides
+
     @guides =
       Dir["docs/usage/guides/*.md"].
         select { |file| file != "README.md" }.
         collect { |file| Guide.new(file) }
+
+    # links
 
     @links = Links.new(
       hash.fetch("links"),

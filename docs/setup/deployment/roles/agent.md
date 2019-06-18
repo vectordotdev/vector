@@ -40,7 +40,7 @@ There is nothing that prevents you from sending data to both a downstream Vector
 
 ### Limiting Resources
 
-Vector is designed to be [_highly_ efficient](../../../comparisons/performance.md), but this does not preclude Vector from consuming an excess amount of resources in certain scenarios. This is not ideal as an agent where priority should be given to the primary service on the host. Therefore, it is recommended to limit Vector resource usage. We strongly believe resource limiting should be achieved at higher levels, and depending on your platform this can be achieved through a variety of means. For example:
+Vector is designed to be [_highly_ efficient](../../../performance.md), but this does not preclude Vector from consuming an excess amount of resources in certain scenarios. This is not ideal as an agent where priority should be given to the primary service on the host. Therefore, it is recommended to limit Vector resource usage. We strongly believe resource limiting should be achieved at higher levels, and depending on your platform this can be achieved through a variety of means. For example:
 
 * [Limiting resources with Systemd](https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html)
 * [Limiting resources with cgroups](https://the.binbashtheory.com/control-resources-cgroups/)

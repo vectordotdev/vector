@@ -34,7 +34,7 @@ class OptionsTableGenerator < Generator
         category_options.each do |option|
           tags = []
 
-          if option.table?
+          if option.table? && !option.options.nil? && option.options.length > 0
             sub_generator = self.class.new(
               option.options,
               sections,

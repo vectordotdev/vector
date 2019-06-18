@@ -164,10 +164,9 @@ the License.
 [configuration]: https://docs.vectorproject.io/usage/configuration
 [concepts]: https://docs.vectorproject.io/about/concepts
 [cost]: https://docs.vectorproject.io/about/use_cases/cost
-[correctness]: https://docs.vectorproject.io/comparisons/correctness
+[correctness]: https://docs.vectorproject.io/comparisons
 [data_model]: https://docs.vectorproject.io/about/data_model
 [deployment]: https://docs.vectorproject.io/setup/deployment
-[features]: https://docs.vectorproject.io/comparisons/features
 [getting_started]: https://docs.vectorproject.io/setup/getting_started
 [governance]: https://docs.vectorproject.io/about/use_cases/governance
 [guides]: https://docs.vectorproject.io/usage/guides
@@ -175,7 +174,7 @@ the License.
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
 [migrating]: https://docs.vectorproject.io/setup/migrating
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
-[performance]: https://docs.vectorproject.io/comparisons/performance
+[performance]: https://docs.vectorproject.io/performance
 [reload]: https://docs.vectorproject.io/usage/administration/reloading
 [roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
 [roles]: https://docs.vectorproject.io/setup/deployment/roles
