@@ -4,7 +4,7 @@ description: How Vector can dramatically reduce logs & metrics costs
 
 # Reduce Cost
 
-![](../.gitbook/assets/reduce-cost.svg)
+![](../assets/reduce-cost.svg)
 
 One of Vector's primary uses cases is to reduce cost without disrupting workflows. This document will cover the various strategies to achieve this. The sections have intentional ordering, we recommend starting with the first section and working your way down until you achieve a satisfactory cost reduction.
 

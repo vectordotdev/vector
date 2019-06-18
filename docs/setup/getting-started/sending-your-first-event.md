@@ -10,7 +10,7 @@ This guide assumes you've already [installed](../installation/) Vector. If you h
 
 This is a "Hello World" style guide that walks through sending your first [event](../../about/data-model.md#event) through Vector. It designed to be followed locally, making it quick and easy. We'll start with the simplest of examples: accepting an event via the [`stdin` source](../../usage/configuration/sources/stdin.md), and then printing it out via the [`console` sink](../../usage/configuration/sinks/console.md).
 
-![](../../.gitbook/assets/getting-started-guide.svg)
+![](../../assets/getting-started-guide.svg)
 
 ## 1. Send Your Event
 
@@ -50,18 +50,19 @@ Notice that Vector prints the same raw line that you sent it. This is because Ve
 
 ## 2. Parse Your Event
 
-In most cases you'll want to parse your event into a structured format. Vector makes this easy with [transforms](../../usage/configuration/transforms/). In this case, we'll use the [`format_parser`](../../usage/configuration/transforms/format_parser.md), which includes parsers for common formats. Let's update your existing Vector configuration file:
+In most cases you'll want to parse your event into a structured format. Vector makes this easy with [transforms](../../usage/configuration/transforms/). In this case, we'll use the [`regex_parser`](../../usage/configuration/transforms/regex_parser.md). Let's update your existing Vector configuration file:
 
 ```bash
 echo '
 [sources.in]
     type = "stdin"
 
+# Structure and parse the data
 [transforms.apache_parser]
     inputs = ["in"]
-    type = "format_parser"
-    format = "apache_access_log"
-    
+    type   = "regex_parser"
+  regex    = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+
 [sinks.out]
     inputs = ["apache_parser"]
     type = "console"

@@ -4,7 +4,7 @@ description: Deploying and running Vector as an agent
 
 # Agent Role
 
-![](../../../.gitbook/assets/agent.svg)
+![](../../../assets/agent.svg)
 
 When Vector serves as an agent, its purpose is to efficiently and quietly collect data. In this scenario, Vector is typically sharing a host with a more important service. Therefore, it is critically important that Vector is a good citizen, limiting its resource usage and efficiently forwarding data.
 

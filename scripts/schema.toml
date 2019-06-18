@@ -55,7 +55,88 @@ type = "string"
 examples = ["/var/lib/vector"]
 description = """\
 The directory used for persisting Vector state, such as on-disk buffers. \
-Please make sure the Vector projectt has write permissions to this dir.\
+Please make sure the Vector project has write permissions to this dir.\
+"""
+
+[[sections]]
+title = "Composition"
+body = """\
+The primary purpose of the configuration file is to compose pipelines. \
+Pipelines are formed by connecting [sources][sources], \
+[transforms][transforms], and [sinks][sinks] through the `inputs` option.
+
+Notice in the above example each input references the `id` assigned to a \
+previous source or transform.
+"""
+
+[[sections]]
+title = "Data Directory"
+body = """\
+Vector requires a `data_dir` value for on-disk operations. Currently, \
+the only operation using this directory are Vector's on-disk buffers. \
+Buffers, by default, are memory-based, but if you switch them to disk-based \
+you'll need to specify a `data_directory`.
+"""
+
+[[sections]]
+title = "Environment Variables"
+body = """\
+Vector will interpolate environment variables within your configuration \
+file with the following syntax:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.add_host]
+    type = "add_fields"
+    
+    [transforms.add_host.fields]
+        host = "${HOSTNAME}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The entire `${HOSTNAME}` variable will be replaced, hence the requirement \
+of quotes around the definition.
+
+#### Escaping
+
+You can escape environment variable by preceding them with a `$` character. \
+For example `$${HOSTNAME}` will be treated _literally_ in the above \
+environment variable example.
+"""
+
+[[sections]]
+title = "Format"
+body = """\
+The Vector configuration file requires the [TOML][toml] format for it's \
+simplicity, explicitness, and relaxed white-space parsing. For more \
+information, please refer to the excellent [TOML documentation][toml].
+"""
+
+[[sections]]
+title = "Value Types"
+body = """\
+All TOML values types are supported. For convenience this includes:
+
+* [Strings](https://github.com/toml-lang/toml#string)
+* [Integers](https://github.com/toml-lang/toml#integer)
+* [Floats](https://github.com/toml-lang/toml#float)
+* [Booleans](https://github.com/toml-lang/toml#boolean)
+* [Offset Date-Times](https://github.com/toml-lang/toml#offset-date-time)
+* [Local Date-Times](https://github.com/toml-lang/toml#local-date-time)
+* [Local Dates](https://github.com/toml-lang/toml#local-date)
+* [Local Times](https://github.com/toml-lang/toml#local-time)
+* [Arrays](https://github.com/toml-lang/toml#array)
+* [Tables](https://github.com/toml-lang/toml#table)
+"""
+
+[[sections]]
+title = "Config File Location"
+body = """\
+The location of your Vector configuration file depends on your \
+[platform][platform] or [operating system][operating_system]. For most \
+Linux based systems the file can be found at `/etc/vector/vector.toml`.
 """
 
 # ------------------------------------------------------------------------------
@@ -689,8 +770,8 @@ via the TCP protocol.\
 allow_you_to_description = "add one or more fields"
 function_categories = ["change_fields"]
 guides = []
-input_types = ["log", "metric"]
-output_types = ["log", "metric"]
+input_types = ["log"]
+output_types = ["log"]
 resources = []
 
 [[transforms.add_fields.outputs]]
@@ -700,7 +781,7 @@ Given the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="/var/log/rails.log" %}
-```toml
+```coffeescript
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]
@@ -720,6 +801,8 @@ Given the following configuration:
 
 A [`log` event][log_event] will be emitted with the following structure:
 
+{% code-tabs %}
+{% code-tabs-item title="log" %}
 ```javascript
 {
   // ... existing fields
@@ -733,9 +816,11 @@ A [`log` event][log_event] will be emitted with the following structure:
   "field8": "my.hostname.com"
 }
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted \
-[types][config_value_types]. A few tgh
+[types][config_value_types].
 """
 
 [transforms.add_fields.options.fields]
@@ -751,6 +836,22 @@ examples = ["new_field = \"new field value\""]
 description = """\
 A key/value pair representing the new field to be added. Accepts all \
 [supported types][config_value_types]. Use `.` for adding nested fields.\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Arrays"
+body = """
+The `add_fields` transform will support [TOML arrays][toml_array]. Keep \
+in mind that the values must be simple type (not tables), and each value \
+must the same type. You cannot mix types:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    my_array = ["first", "second", "third"]
+```\
 """
 
 [[transforms.add_fields.sections]]
@@ -786,17 +887,16 @@ body = "Keys specified in this transform will replace existing keys."
 [[transforms.add_fields.sections]]
 title = "Nested Fields"
 body = """
-As described in the [Data Model][data_model] document, Vector \
-represents events as flat maps, and nested fields are denoted by a `.` \
-character in the key name. Therefore, adding nested fields is as \
-simple as adding a `.` to your key name:
+The `add_fields` transform will support dotted keys or \
+[TOML tables][toml_table]. We recommend the dotted key syntax since it \
+is less verbose for this usecase:
 
 ```
 [transforms.<transform-id>]
   # ...
   
   [transforms.<transform-id>.fields]
-    "parent.child.grandchild" = "<value>"
+    parent.child.grandchild = "<value>"
 ```\
 """
 
@@ -994,6 +1094,41 @@ resources = [
   {name = "Lua Reference Manual", url = "http://www.lua.org/manual/5.1/manual.html"}
 ]
 
+[[transforms.lua.outputs]]
+type = "text"
+body = """\
+Here are a few example Lua scripts that demonstrate working with the \
+[`event` variable](#global-variables). You can pass these examples to the \
+`source` option:
+
+{% code-tabs %}
+{% code-tabs-item title="add_fields.lua" %}
+```lua
+# Add root level field
+event["new_field"] = "new value"
+
+# Add nested field
+event["parent.child"] = "nested value"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="remove_fields.lua" %}
+```lua
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="drop_event.lua" %}
+```lua
+# To drop an event entirely
+event = nil
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
 [transforms.lua.options.source]
 type = "string"
 description = "The inline Lua source to evaluate."
@@ -1005,7 +1140,7 @@ if event["host"] == nil then
   local f = io.popen ("/bin/hostname")
   local hostname = f:read("*a") or ""
   f:close()
-  hostname = string.gsub(hostname, "\n$", "")
+  hostname = string.gsub(hostname, "\\n$", "")
   event["host"] = hostname
 end\
 """
@@ -1020,6 +1155,18 @@ function.\
 """
 
 [[transforms.lua.sections]]
+title = "Dropping Events"
+body = """\
+To drop events, simply set the `event` variable to `nil`. For example:
+
+```lua
+if event["message"].match(str, "debug") then
+  event = nil
+end
+```
+"""
+
+[[transforms.lua.sections]]
 title = "Global Variables"
 body = """\
 When evaluating the provided `source`, Vector will provide a single global \
@@ -1031,6 +1178,22 @@ variable representing the event:
 
 Note, a Lua `table` is an associative array. You can read more about \
 [Lua types][lua_types] in the [Lua docs][lua_docs].\
+"""
+
+[[transforms.lua.sections]]
+title = "Nested Fields"
+body = """\
+As described in the [Data Model document][data_model], Vector flatten events, \
+representing nested field with a `.` delimiter. Therefore, adding, accessing, \
+or removing nested fields is as simple as added a `.` in your key name:
+
+```lua
+# Add nested field
+event["parent.child"] = "nested value"
+
+# Remove nested field
+event["parent.child"] = nil
+```
 """
 
 [[transforms.lua.sections]]
@@ -1204,12 +1367,62 @@ description = "The maximum number of events allowed per second."
 # ------------------------------------------------------------------------------
 [transforms.tokenizer]
 allow_you_to_description = """\
-tokenize a field's value by splitting on white space and zipping the tokens \
-with ordered field names\
+tokenize a field's value by splitting on white space, ignoring special \
+wrapping characters, and zipping the tokens into ordered field names\
 """
 function_categories = ["parse"]
 input_types = ["log"]
 output_types = ["log"]
+
+[[transforms.tokenizer.outputs]]
+type = "*"
+body = """\
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "message": "5.86.210.12 - zieme4647 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```coffeescript
+[transforms.<transform-id>]
+type = "tokenizer"
+field = "message"
+fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "remote_addr": "5.86.210.12",
+  "user_id": "zieme4647",
+  "timestamp": "19/06/2019:17:20:49 -0400",
+  "message": "GET /embrace/supply-chains/dynamic/vertical",
+  "status": "201",
+  "bytes": "20574"
+}
+```
+
+A few things to note about the output:
+
+1. The `message` field was overwritten.
+2. The `ident` field was dropped since it contained a `"-"` value.
+3. All values are strings, we have plans to add type coercion.
+4. [Special wrapper characters](#special-characters) were dropped, such as wrapping `[...]` and `"..."` characters.
+"""
 
 [transforms.tokenizer.options.field]
 type = "string"
@@ -1229,59 +1442,14 @@ description = "If `true` the `field` will be dropped after parsing."
 [[transforms.tokenizer.sections]]
 title = "Special Characters"
 body = """\
-In order to extract raw values without noise we must treat certain characters \
-as special:
+In order to extract raw values and remove wrapping characters, we must treat \
+certain characters as special. These characters will be discarded:
 
 * `"..."` - Is used tp wrap phrases. Spaces are preserved, but the wrapping \
             quotes will be discarded.
 * `[...]` - Is used to wrap phrases. Spaces are preserved, but the wrapping \
             brackers will be discarded.
 * `\\` - Can be used to escape the above characters, making them literal.\
-"""
-
-[[transforms.tokenizer.sections]]
-title = "Example"
-body = """\
-The specified `field`'s value is tokenized by splitting on it's white space.
-
-For example, take this config:
-
-{% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
-```coffeescript
-[transforms.<transform-id>]
-type = "tokenizer"
-field = "message"
-fields = ["timestamp", "level", "message"]
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-And this event:
-
-```javascripton
-{
-  "message": "2019-05-22T23:22:55.256231Z [INFO] \"Hello world\""
-}
-```
-
-This transform will produce the following tokens:
-
-```
-["2019-05-22T23:22:55.256231Z", "INFO", "Hello world"]
-```
-
-You'll notice that the `[`, `]`, and `"` characters are not included, they \
-are [special characters](#special-characters). To proceed, these tokesn will \
-be zipped with the provided `field_names` and merged into the event:
-
-```javascripton
-{
-  "timestamp": "2019-05-22T23:22:55.256231Z",
-  "level": "INFO",
-  "message": "Hello world"
-}
-```\
 """
 
 # ------------------------------------------------------------------------------
@@ -1544,7 +1712,7 @@ body = """\
 By default, Vector will name your S3 objects in the following format:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 <key_prefix><timestamp>-<uuidv4>.log
 ```
@@ -1559,7 +1727,7 @@ By default, Vector will name your S3 objects in the following format:
 For example:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 ```
@@ -1582,7 +1750,7 @@ You can control the resulting name via the `key_prefix`, \
 [[sinks.aws_s3.sections]]
 title = "Partitioning"
 body = """\
-Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the object key name, creating time based partitions. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
+Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to create time based partitions based on the [event `timestamp`][default_schema]. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
 """
 
 [[sinks.aws_s3.sections]]
@@ -1606,7 +1774,7 @@ easier than ever.
     )   
     PARTITIONED BY (date string)
     ROW FORMAT  serde 'org.apache.hive.hcatalog.data.JsonSerDe'
-    with serdeproperties ( 'paths'='requestbegintime, adid, impressionid, referrer, useragent, usercookie, ip' )
+    with serdeproperties ( 'paths'='timestamp, message, host' )
     LOCATION 's3://<region>.<key_prefix>';
     ```
 
@@ -1984,6 +2152,7 @@ crc = "https://en.wikipedia.org/wiki/Cyclic_redundancy_check"
 data_model = "/about/data_model.md"
 default_schema = "/about/data_model.md#default-schema"
 elasticsearch = "https://www.elastic.co/products/elasticsearch"
+event = "/about/data-model.md#event"
 event_key_special_characters = "/about/data-model.md#special-characters"
 event_proto = "https://github.com/timberio/vector/blob/master/proto/event.proto"
 globbing = "https://en.wikipedia.org/wiki/Glob_(programming)"
@@ -2004,7 +2173,9 @@ lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 log_event = "/about/data-model.md#log"
 metric_event = "/about/data-model.md#metric"
 monitoring_logs = "/administration/moonitoring.md#logs"
+operating_system = "../../setup/installation/operating_systems/"
 performance = "/performance.md"
+platform = "../../setup/installation/platforms/"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
 roadmap = "https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open"
@@ -2012,6 +2183,7 @@ rust = "https://www.rust-lang.org/"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
 search_forum = "https://forum.vectorproject.io/search?expanded=true"
+sinks = "/usage/configuration/sinks"
 sources = "/usage/configuration/sources"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
@@ -2019,7 +2191,10 @@ standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
 starting = "/usage/administration/starting.md"
 strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
+toml = "https://github.com/toml-lang/toml"
+toml_array = "https://github.com/toml-lang/toml#user-content-array"
 toml_table = "https://github.com/toml-lang/toml#user-content-table"
 transforms = "/usage/configuration/transforms"
 troubleshooting = "/usages/guides/troubleshooting.md"
 uuidv4 = "https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)"
+vote_feature = "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"

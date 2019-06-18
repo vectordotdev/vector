@@ -2,8 +2,8 @@
 
 # Sync Config Schema
 #
-# This script syncs the configuration schema defined in `/dist/config/schema.toml` to the
-# following files:
+# This script syncs the configuration schema defined in `/scripts/schema.toml`
+# to the following files:
 #
 # * /config/spec.toml
 # * /docs/usage/configuration/sources/*
@@ -16,45 +16,50 @@
 
 require "ostruct"
 require "rubygems"
+require "bundler/setup"
 
 begin
   require "active_support"
   require "active_support/core_ext/array/conversions"
   require "active_support/core_ext/string/indent"
-rescue LoadError
-  abort "`active_support` library not found, please install it via `sudo gem install active_support`"
-end
-
-begin
   require "front_matter_parser"
-rescue LoadError
-  abort "`front_matter_parser` library not found, please install it via `sudo gem install front_matter_parser`"
-end
-
-begin
+  require "paint"
   require "toml-rb"
-rescue LoadError
-  abort "`toml-rb` library not found, please install it via `sudo gem install toml-rb`"
-end
-
-begin
   require "unindent"
-rescue LoadError
-  abort "`unindent` library not found, please install it via `sudo gem install unindent`"
+  require "word_wrap"
+rescue LoadError => e
+  abort <<~EOF
+  Unable to load gem:
+
+  #{e.message}
+
+  Please install the required Ruby gems:
+
+  sudo gem install bundler
+  cd scripts
+  bundle install
+  EOF
 end
 
 require_relative "config_schema/schema"
+require_relative "generators/config_specification_generator"
 require_relative "generators/global_generator"
+require_relative "generators/guarantees_generator"
 require_relative "generators/link_generator"
+require_relative "generators/readme_generator"
 require_relative "generators/sink_generator"
+require_relative "generators/sinks_generator"
 require_relative "generators/source_generator"
+require_relative "generators/sources_generator"
 require_relative "generators/transform_generator"
+require_relative "generators/transforms_generator"
 
 #
-# Load
+# Setup
 #
 
-SCHEMA_FILE_PATH = "dist/config/schema.toml"
+SCHEMA_FILE_PATH = "scripts/schema.toml"
+puts "-> Reading #{SCHEMA_FILE_PATH}\n"
 schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 
 #
@@ -62,7 +67,7 @@ schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 #
 
 DOCS_ROOT = "../../.."
-ASSETS_PATH = "#{DOCS_ROOT}/.gitbook/assets/"
+ASSETS_PATH = "#{DOCS_ROOT}/assets/"
 CORRECTNESS_TESTS = schema_hash.fetch("enums").fetch("correctness_tests")
 DELIVERY_GUARANTEES = schema_hash.fetch("enums").fetch("delivery_guarantees")
 EVENT_TYPES = schema_hash.fetch("enums").fetch("event_types")
@@ -72,51 +77,105 @@ REPO_ISSUES_ROOT = "#{REPO_ROOT}/issues"
 REPO_LABELS_ROOT = "#{REPO_ROOT}/labels"
 REPO_SRC_ROOT = "#{REPO_ROOT}/tree/master/src"
 
+#
+# Functions
+#
+
+def write_with_links(file_path, content, links)
+  link_generator = LinkGenerator.new(content, DOCS_ROOT, links)
+  content = link_generator.generate
+  write(file_path, content)
+end
+
+def write(file_path, content)
+  existing_content = File.read(file_path)
+
+  if existing_content != content
+    File.write(file_path, content)
+    puts Paint["-> ✔ Updated: #{file_path}", :green]
+  else
+    puts Paint["-> - Not changed: #{file_path}", :yellow]
+  end
+end
+
+#
+# Load
+#
+
 schema = Schema.new(schema_hash)
 
 #
-# Global options
+# README
+#
+
+guarantees_generator = ReadmeGenerator.new(schema.sources.to_h.values, schema.transforms.to_h.values, schema.sinks.to_h.values)
+content = guarantees_generator.generate()
+write("README.md", content)
+
+
+#
+# Guarantee
+#
+
+guarantees_generator = GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
+content = guarantees_generator.generate()
+write_with_links("docs/about/guarantees.md", content, schema.links)
+
+#
+# Configuration global options
 #
 
 global_generator = GlobalGenerator.new(schema)
 content = global_generator.generate()
-File.write("docs/usage/configuration/README.md", content)
+write_with_links("docs/usage/configuration/README.md", content, schema.links)
+
 
 #
 # Sources
 #
 
+sources_generator = SourcesGenerator.new(schema.sources.to_h.values.sort)
+content = sources_generator.generate
+write_with_links("docs/usage/configuration/sources/README.md", content, schema.links)
+
 schema.sources.to_h.each do |_source_name, source|
   source_generator = SourceGenerator.new(source, schema.guides)
   content = source_generator.generate
-  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
-  content = link_generator.generate
-
-  File.write("docs/usage/configuration/sources/#{source.name}.md", content)
+  write_with_links("docs/usage/configuration/sources/#{source.name}.md", content, schema.links)
 end
 
 #
 # Transforms
 #
 
+transforms_generator = TransformsGenerator.new(schema.transforms.to_h.values.sort)
+content = transforms_generator.generate
+write_with_links("docs/usage/configuration/transforms/README.md", content, schema.links)
+
 schema.transforms.to_h.each do |_transform_name, transform|
   transform_generator = TransformGenerator.new(transform, schema.guides)
   content = transform_generator.generate
-  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
-  content = link_generator.generate
-
-  File.write("docs/usage/configuration/transforms/#{transform.name}.md", content)
+  write_with_links("docs/usage/configuration/transforms/#{transform.name}.md", content, schema.links)
 end
 
 #
 # Sinks
 #
 
+sinks_generator = SinksGenerator.new(schema.sinks.to_h.values.sort)
+content = sinks_generator.generate
+write_with_links("docs/usage/configuration/sinks/README.md", content, schema.links)
+
 schema.sinks.to_h.each do |_sink_name, sink|
   sink_generator = SinkGenerator.new(sink, schema.guides)
   content = sink_generator.generate
-  link_generator = LinkGenerator.new(content, DOCS_ROOT, schema.links)
-  content = link_generator.generate
-
-  File.write("docs/usage/configuration/sinks/#{sink.name}.md", content)
+  write_with_links("docs/usage/configuration/sinks/#{sink.name}.md", content, schema.links)
 end
+
+#
+# Config specification
+#
+
+sinks_generator = ConfigSpecificationGenerator.new(schema)
+content = sinks_generator.generate
+write("config/vector.spec.toml", content)

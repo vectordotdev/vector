@@ -4,7 +4,7 @@ description: Core Vector concepts
 
 # Concepts
 
-![](../.gitbook/assets/components.svg)
+![](../assets/components.svg)
 
 Before you begin, it's useful to become familiar with the basic concepts that comprise Vector. These concepts are used throughout the documentation and are helpful to understand as you proceed. They are ordered by their natural progression.
 

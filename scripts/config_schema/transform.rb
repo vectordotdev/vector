@@ -4,7 +4,8 @@ class Transform < Component
   attr_reader :allow_you_to_description,
     :function_categories,
     :input_types,
-    :output_types
+    :output_types,
+    :outputs
 
   def initialize(hash)
     super(hash)
@@ -13,6 +14,7 @@ class Transform < Component
     @function_categories = hash.fetch("function_categories")
     @input_types = hash.fetch("input_types")
     @output_types = hash.fetch("output_types")
+    outputs_hashes = hash["outputs"] || []
 
     if @allow_you_to_description.strip[-1] == "."
       raise("#{self.class.name}#allow_you_to_description cannot not end with a period")
@@ -24,6 +26,12 @@ class Transform < Component
 
     if (invalid_types = @output_types - EVENT_TYPES) != []
       raise("#{self.class.name}#output_types contains invalid values: #{invalid_types.inspect}")
+    end
+
+    # outputs
+
+    @outputs = outputs_hashes.collect do |output_hash|
+      Output.new(output_hash)
     end
   end
 end

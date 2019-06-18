@@ -35,7 +35,7 @@ class SourceGenerator < Generator
       ![](#{source.diagram})
 
       #{beta(source)}
-      The `#{source.name}` source continuously ingests #{event_type_links(source.output_types)} events through #{source.through_description}.
+      The `#{source.name}` source continuously ingests #{event_type_links(source.output_types).to_sentence} events through #{source.through_description}.
 
       ## Example
 
@@ -51,6 +51,11 @@ class SourceGenerator < Generator
       {% code-tabs-item title="vector.toml (schema)" %}
       ```coffeescript
       #{options_example_generator.generate("sources.<source-id>", :schema)}
+      ```
+      {% endcode-tabs-item %}
+      {% code-tabs-item title="vector.toml (specification)" %}
+      ```coffeescript
+      #{options_example_generator.generate("sources.#{source.name}", :spec)}
       ```
       {% endcode-tabs-item %}
       {% endcode-tabs %}

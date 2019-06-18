@@ -35,7 +35,7 @@ class TransformGenerator < Generator
       ![](#{transform.diagram})
 
       #{beta(transform)}
-      The `#{transform.name}` transforms accepts #{event_type_links(transform.input_types)} events and allows you to #{transform.allow_you_to_description}.
+      The `#{transform.name}` transforms accepts #{event_type_links(transform.input_types).to_sentence} events and allows you to #{transform.allow_you_to_description}.
 
       ## Example
 
@@ -50,15 +50,18 @@ class TransformGenerator < Generator
       #{options_example_generator.generate("transforms.<transform-id>", :schema)}
       ```
       {% endcode-tabs-item %}
+      {% code-tabs-item title="vector.toml (specification)" %}
+      ```coffeescript
+      #{options_example_generator.generate("transforms.#{transform.name}", :spec)}
+      ```
+      {% endcode-tabs-item %}
       {% endcode-tabs %}
 
       ## Options
 
       #{options_table_generator.generate}
 
-      ## I/O
-
-      The `#{transform.name}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types)} events.
+      #{outputs_section(transform, output_prefix)}
 
       #{guides_section(transform)}
 
@@ -87,5 +90,11 @@ class TransformGenerator < Generator
 
         content.strip
       end
+    end
+
+    def output_prefix
+      <<~EOF
+      The #{component_name(transform)} accepts #{event_type_links(transform.input_types).to_sentence} events and outputs #{event_type_links(transform.output_types).to_sentence} events.
+      EOF
     end
 end

@@ -25,7 +25,7 @@ class SinkGenerator < Generator
   def generate
     content = <<~EOF
       ---
-      description: #{plural_write_verb.humanize} #{sink.input_types.to_sentence} events to #{remove_markdown_links(sink.write_to_description)}
+      description: #{sink.plural_write_verb.humanize} #{sink.input_types.to_sentence} events to #{remove_markdown_links(sink.write_to_description)}
       ---
 
       #{warning}
@@ -35,7 +35,7 @@ class SinkGenerator < Generator
       ![](#{sink.diagram})
 
       #{beta(sink)}
-      The `#{sink.name}` sink #{write_verb.pluralize} #{event_type_links(sink.input_types)} events to #{sink.write_to_description}.
+      The `#{sink.name}` sink #{sink.write_verb.pluralize} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
 
       ## Example
 
@@ -47,12 +47,12 @@ class SinkGenerator < Generator
       {% endcode-tabs-item %}
       {% code-tabs-item title="vector.toml (schema)" %}
       ```coffeescript
-      #{options_example_generator.generate("sink.<sink-id>", :schema)}
+      #{options_example_generator.generate("sinks.<sink-id>", :schema)}
       ```
       {% endcode-tabs-item %}
       {% code-tabs-item title="vector.toml (specification)" %}
       ```coffeescript
-      #{options_example_generator.generate("sink.#{sink.name}", :spec)}
+      #{options_example_generator.generate("sinks.#{sink.name}", :spec)}
       ```
       {% endcode-tabs-item %}
       {% endcode-tabs %}
@@ -90,27 +90,5 @@ class SinkGenerator < Generator
         end
 
       content.strip
-    end
-
-    def plural_write_verb
-      case sink.write_style
-      when "batching"
-        "batches and flushes"
-      when "streaming"
-        "streams"
-      else
-        raise("Unknown write_style: #{sink.write_style.inspect}")
-      end
-    end
-
-    def write_verb
-      case sink.write_style
-      when "batching"
-        "batch and flush"
-      when "streaming"
-        "stream"
-      else
-        raise("Unknown write_style: #{sink.write_style.inspect}")
-      end
     end
 end

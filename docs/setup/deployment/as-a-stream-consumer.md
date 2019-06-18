@@ -4,7 +4,7 @@ description: How Vector deploys as a stream consumer
 
 # As a Stream Consumer
 
-![](../../.gitbook/assets/stream-consumer.svg)
+![](../../assets/stream-consumer.svg)
 
 {% hint style="warning" %}
 **Coming soon!**  

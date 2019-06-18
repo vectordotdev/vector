@@ -25,7 +25,7 @@ class OptionsTableGenerator < Generator
 
     grouped_options =
       options.
-        select { |option| option.name != "type" }.
+        select { |option| option.name != "type" || !option.enum.nil? }.
         group_by do |option|
           title = "**#{option.required? ? "REQUIRED" : "OPTIONAL"}**"
 
@@ -86,7 +86,7 @@ class OptionsTableGenerator < Generator
               tags << "`unit: #{option.unit}`"
             end
 
-            description = option.description
+            description = option.description.clone
 
             section_links =
               option.get_relevant_sections(sections).collect do |section|

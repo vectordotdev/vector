@@ -1,6 +1,6 @@
 # What Is Vector?
 
-![](.gitbook/assets/components.svg)
+![](assets/components.svg)
 
 Vector is a [high-performance](performance.md), [open-source](https://github.com/timberio/vector) router for observability data. It makes [collecting](usage/configuration/sources/), [transforming](usage/configuration/transforms/), and [sending](usage/configuration/sinks/) logs, metrics, & events easy. It decouples data collection & routing from your services, giving you data ownership, and enabling you to freely adopt services over time, among [many other benefits](use-cases/).
 

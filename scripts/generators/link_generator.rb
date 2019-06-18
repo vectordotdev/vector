@@ -10,22 +10,23 @@ class LinkGenerator < Generator
   end
 
   def generate
-    link_names = content.scan(/\]\[([^\s]*)\]/).flatten.uniq
+    link_names = content.scan(/\]\[([a-zA-Z0-9_]*)\]/).flatten.uniq
 
     links_footer = ""
 
     link_names.each do |link_name|
       value = begin
         links.send(link_name)
-      rescue KeyError
+      rescue RuntimeError
         raise "The link #{link_name.inspect} is not defined, please add it to the [links] table"
       end
 
-      value = if value.start_with?("/")
-        "#{root_path}#{value}"
-      else
-        value
-      end 
+      value =
+        if value.start_with?("/")
+          "#{root_path}#{value}"
+        else
+          value
+        end 
 
       links_footer << "[#{link_name}]: #{value.inspect}\n"
     end

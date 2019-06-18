@@ -4,7 +4,7 @@ description: 'A deeper look at Vector''s data model: the event'
 
 # Data Model
 
-![](../.gitbook/assets/data-model.svg)
+![](../assets/data-model.svg)
 
 This page provides a deeper dive into Vector's data model and how data flows through Vector internally. Understanding this goes a long way in properly [configuring](../usage/configuration/) Vector for your use case.
 

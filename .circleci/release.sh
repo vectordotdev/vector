@@ -21,6 +21,7 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 DIST_DIR="$(pwd)/dist"
+ROOT_DIR="$(pwd)"
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
@@ -39,7 +40,11 @@ function build_tar() {
   cd $DIST_DIR
   tar cvpf $TAR_NAME $APP_NAME
   rm $APP_NAME
-  cd ..
+  cd $ROOT_DIR
+}
+
+function copy_config() {
+  cp -r config $DIST_DIR/config
 }
 
 # Temporarily allow unset variables in order to construct the BUILDSTAMP based
@@ -57,5 +62,6 @@ echo "Building release for $VERSION"
 TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
 build_release
 build_tar
+copy_config
 
 set -u

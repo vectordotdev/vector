@@ -160,7 +160,7 @@ class Component
     @options.type = Option.new({
         "name" => "type",
         "description" => "The component type",
-        "examples" => [name],
+        "enum" => [name],
         "null" => false,
         "type" => "string"
       })

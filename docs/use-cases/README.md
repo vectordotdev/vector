@@ -1,6 +1,6 @@
 # Use Cases
 
-![](../.gitbook/assets/use-cases.png)
+![](../assets/use-cases.png)
 
 Beyond Vector's functional purpose, Vector unlocks many business level benefits through a variety of use cases. This section will cover those use cases and provide guidance to optimize their value.
 

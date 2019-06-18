@@ -1,5 +1,6 @@
 require_relative "batching_sink"
 require_relative "links"
+require_relative "section"
 require_relative "source"
 require_relative "streaming_sink"
 require_relative "transform"
@@ -9,6 +10,7 @@ class Schema
     :guides,
     :links,
     :options,
+    :sections,
     :sinks,
     :sources,
     :transforms
@@ -17,6 +19,7 @@ class Schema
     @enums = OpenStruct.new(hash.fetch("enums"))
     @options = OpenStruct.new()
     @sinks = OpenStruct.new()
+    @sections = hash.fetch("sections").collect { |h| Section.new(h) }
     @sources = OpenStruct.new()
     @transforms = OpenStruct.new()
 
@@ -79,6 +82,7 @@ class Schema
       hash.fetch("links"),
       sources,
       transforms,
+      sinks,
       @enums.correctness_tests,
       @enums.performance_tests
     )

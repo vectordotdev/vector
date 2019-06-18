@@ -10,4 +10,4 @@ Include any "Closes #123" or "Ref #123" statements.
 ### TODO
 
 - [ ] `CHANGELOG.md` has been updated to reflect noteworthy changes
-- [ ] `dist/config/spec.toml` has been updated to reflect configuration changes
+- [ ] `scripts/schema.toml` has been updated to reflect configuration changes
