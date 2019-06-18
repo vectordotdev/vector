@@ -64,8 +64,6 @@ The `sampler` accepts [`log`][log_event] events and outputs [`log`][log_event] e
 
 
 
-## How It Works
-
 
 
 ## Troubleshooting

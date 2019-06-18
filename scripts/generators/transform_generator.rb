@@ -62,9 +62,7 @@ class TransformGenerator < Generator
 
       #{guides_section(transform)}
 
-      ## How It Works
-
-      #{sections_generator.generate}
+      #{how_it_works_section}
 
       #{troubleshooting(transform)}
 
@@ -72,4 +70,22 @@ class TransformGenerator < Generator
     EOF
     content
   end
+
+  private
+    def how_it_works_section
+      content = sections_generator.generate.strip
+
+      if content == ""
+        ""
+      else
+        content =
+          <<~EOF
+          ## How It Works
+
+          #{content}
+          EOF
+
+        content.strip
+      end
+    end
 end

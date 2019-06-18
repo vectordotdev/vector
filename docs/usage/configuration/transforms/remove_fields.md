@@ -59,8 +59,6 @@ The `remove_fields` accepts [`log`][log_event] and [`metric`][metric_event] even
 
 
 
-## How It Works
-
 
 
 ## Troubleshooting
