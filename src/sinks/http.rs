@@ -24,6 +24,7 @@ use tower::ServiceBuilder;
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: String,
+    pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
@@ -42,9 +43,20 @@ pub struct HttpSinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum HttpMethod {
+    #[derivative(Default)]
+    Post,
+    Put,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Ndjson,
 }
@@ -90,6 +102,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
+    let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -99,7 +112,14 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
+
+        let method = match method {
+            HttpMethod::Post => Method::POST,
+            HttpMethod::Put => Method::PUT,
+        };
+
+        builder.method(method);
+
         builder.uri(uri.clone());
 
         match encoding {
@@ -220,12 +240,6 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
     body.push(b'\n');
 
     Ok(body)
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Text
-    }
 }
 
 #[cfg(test)]
