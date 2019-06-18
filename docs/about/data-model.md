@@ -148,15 +148,11 @@ In all cases where a component must operate on a key, the following schema is us
 
 ### Metric
 
-{% hint style="warn" %}
+{% hint style="warning" %}
 The metric data model is in beta and still under development. We are working to address core issues such as supporting [ histograms](https://github.com/timberio/vector/issues/384) and [labels](https://github.com/timberio/vector/issues/512).
 {% endhint %}
 
 Vector characterizes a "metric" as an individual measurement with any number of labels. The measure must either be a `counter`, `guage`, `set`, or `timer`.
-
-{% hint style="info" %}
-Histgorams are not yet available. See [Issue #384](https://github.com/timberio/vector/issues/384) for more info.
-{% endhint %}
 
 For example:
 
