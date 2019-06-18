@@ -4,10 +4,9 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        Batch, BatchServiceSink, Buffer, Partition, SinkExt,
+        BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
 };
-use bytes::Bytes;
 use chrono::Utc;
 use futures::{Future, Poll, Sink};
 use rusoto_core::{Region, RusotoFuture};
@@ -68,68 +67,6 @@ pub enum Encoding {
 pub enum Compression {
     Gzip,
     None,
-}
-
-pub struct S3Buffer {
-    inner: Buffer,
-    key: Option<Bytes>,
-}
-
-#[derive(Clone)]
-pub struct InnerBuffer {
-    pub(self) inner: Vec<u8>,
-    key: Bytes,
-}
-
-impl Partition for InnerBuffer {
-    fn partition(&self) -> Bytes {
-        self.key.clone()
-    }
-}
-
-impl S3Buffer {
-    pub fn new(gzip: bool) -> Self {
-        Self {
-            inner: Buffer::new(gzip),
-            key: None,
-        }
-    }
-}
-
-impl Batch for S3Buffer {
-    type Input = InnerBuffer;
-    type Output = InnerBuffer;
-
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(&item.inner[..])
-    }
-
-    fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            key: None,
-        }
-    }
-
-    fn finish(mut self) -> Self::Output {
-        let key = self.key.take().unwrap();
-        let inner = self.inner.finish();
-        InnerBuffer { inner, key }
-    }
-
-    fn num_items(&self) -> usize {
-        self.inner.num_items()
-    }
 }
 
 impl Default for Compression {
@@ -197,7 +134,7 @@ impl S3Sink {
 
         let sink = BatchServiceSink::new(svc, acker)
             .partitioned_batched_with_min(
-                S3Buffer::new(compression),
+                PartitionBuffer::new(Buffer::new(compression)),
                 batch_size,
                 Duration::from_secs(batch_timeout),
             )
@@ -250,7 +187,7 @@ impl S3Sink {
     }
 }
 
-impl Service<InnerBuffer> for S3Sink {
+impl Service<PartitionInnerBuffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -259,8 +196,8 @@ impl Service<InnerBuffer> for S3Sink {
         Ok(().into())
     }
 
-    fn call(&mut self, body: InnerBuffer) -> Self::Future {
-        let InnerBuffer { inner, key } = body;
+    fn call(&mut self, body: PartitionInnerBuffer) -> Self::Future {
+        let (inner, key) = body.into_parts();
 
         // TODO: pull the seconds from the last event
         let filename = {
@@ -324,7 +261,7 @@ fn encode_event(
     event: Event,
     batch_time_format: &String,
     encoding: &Option<Encoding>,
-) -> Result<InnerBuffer, ()> {
+) -> Result<PartitionInnerBuffer, ()> {
     let log = event.into_log();
 
     let key = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
@@ -339,10 +276,7 @@ fn encode_event(
                 b.push(b'\n');
                 b
             })
-            .map(|b| InnerBuffer {
-                inner: b,
-                key: key.into(),
-            })
+            .map(|b| PartitionInnerBuffer::new(b, key.into()))
             .map_err(|e| panic!("Error encoding: {}", e)),
         (&Some(Encoding::Text), _) | (_, false) => {
             let mut bytes = log
@@ -350,10 +284,7 @@ fn encode_event(
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
             bytes.push(b'\n');
-            Ok(InnerBuffer {
-                inner: bytes,
-                key: key.into(),
-            })
+            Ok(PartitionInnerBuffer::new(bytes, key.into()))
         }
     }
 }

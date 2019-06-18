@@ -1,3 +1,5 @@
+use super::{batch::Batch, partition::Partition};
+use bytes::Bytes;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -63,7 +65,7 @@ impl Buffer {
     }
 }
 
-impl super::batch::Batch for Buffer {
+impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
@@ -103,6 +105,79 @@ impl super::batch::Batch for Buffer {
 
     fn num_items(&self) -> usize {
         self.num_items
+    }
+}
+
+#[derive(Debug)]
+pub struct PartitionBuffer<T> {
+    inner: T,
+    key: Option<Bytes>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PartitionInnerBuffer {
+    pub(self) inner: Vec<u8>,
+    key: Bytes,
+}
+
+impl<T> PartitionBuffer<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner, key: None }
+    }
+}
+
+impl<T> Batch for PartitionBuffer<T>
+where
+    T: Batch<Input = Vec<u8>, Output = Vec<u8>>,
+{
+    type Input = PartitionInnerBuffer;
+    type Output = PartitionInnerBuffer;
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn push(&mut self, item: Self::Input) {
+        let partition = item.partition();
+        self.key = Some(partition);
+        self.inner.push(item.inner)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            key: None,
+        }
+    }
+
+    fn finish(mut self) -> Self::Output {
+        let key = self.key.take().unwrap();
+        let inner = self.inner.finish();
+        PartitionInnerBuffer { inner, key }
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
+}
+
+impl PartitionInnerBuffer {
+    pub fn new(inner: Vec<u8>, key: Bytes) -> Self {
+        Self { inner, key }
+    }
+
+    pub fn into_parts(self) -> (Vec<u8>, Bytes) {
+        (self.inner, self.key)
+    }
+}
+
+impl Partition for PartitionInnerBuffer {
+    fn partition(&self) -> Bytes {
+        self.key.clone()
     }
 }
 

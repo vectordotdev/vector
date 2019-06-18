@@ -13,7 +13,7 @@ use std::time::Duration;
 use tower::Service;
 
 pub use batch::{Batch, BatchSink};
-pub use buffer::{Buffer, Compression};
+pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use partition::{Partition, PartitionedBatchSink};
 
 pub trait SinkExt<T>
