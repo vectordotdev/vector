@@ -82,17 +82,12 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Option<Bytes>) -> Option<Event> {
-        event_from_str(frame).map(|mut event| {
-            if let Some(host) = host {
-                event
-                    .as_mut_log()
-                    .insert_implicit(self.host_key.clone().into(), host.into());
-            }
-
+        event_from_str(&self.host_key, host, frame).map(|event| {
             trace!(
                 message = "Received one event.",
                 event = field::debug(&event)
             );
+
             event
         })
     }
@@ -124,7 +119,7 @@ pub fn udp(
             let lines_in = UdpFramed::new(socket, BytesCodec::new())
                 .filter_map(move |(bytes, addr)| {
                     let host_key = host_key.clone();
-                    event_from_bytes(&bytes).map(|mut e| {
+                    event_from_bytes(&host_key, &bytes).map(|mut e| {
                         e.as_mut_log()
                             .insert_implicit(host_key.into(), addr.to_string().into());
                         e
@@ -174,12 +169,13 @@ pub fn unix(
                     None
                 };
 
+                let host_key2 = host_key.clone();
                 let lines_in = FramedRead::new(socket, LinesCodec::new_with_max_length(max_length))
-                    .filter_map(event_from_str)
+                    .filter_map(move |event| event_from_str(&host_key.clone(), None, event))
                     .map(move |mut e| {
                         if let Some(path) = &path {
                             e.as_mut_log().insert_implicit(
-                                host_key.clone().into(),
+                                host_key2.clone().into(),
                                 path.to_string_lossy().into_owned().into(),
                             );
                         }
@@ -194,10 +190,10 @@ pub fn unix(
     }))
 }
 
-fn event_from_bytes(bytes: &[u8]) -> Option<Event> {
+fn event_from_bytes(host_key: &String, bytes: &[u8]) -> Option<Event> {
     std::str::from_utf8(bytes)
         .ok()
-        .and_then(|s| event_from_str(s))
+        .and_then(|s| event_from_str(host_key, None, s))
 }
 
 // TODO: many more cases to handle:
@@ -206,7 +202,7 @@ fn event_from_bytes(bytes: &[u8]) -> Option<Event> {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 
-fn event_from_str(raw: impl AsRef<str>) -> Option<Event> {
+fn event_from_str(host_key: &String, host: Option<Bytes>, raw: impl AsRef<str>) -> Option<Event> {
     let line = raw.as_ref();
     trace!(
         message = "Received line.",
@@ -221,7 +217,11 @@ fn event_from_str(raw: impl AsRef<str>) -> Option<Event> {
             if let Some(host) = &parsed.hostname {
                 event
                     .as_mut_log()
-                    .insert_implicit("host".into(), host.clone().into());
+                    .insert_implicit(host_key.clone().into(), host.clone().into());
+            } else if let Some(host) = host {
+                event
+                    .as_mut_log()
+                    .insert_implicit(host_key.clone().into(), host.into());
             }
 
             let timestamp = parsed
@@ -293,7 +293,10 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, event_from_str(raw).unwrap());
+        assert_eq!(
+            expected,
+            event_from_str(&"host".to_string(), None, raw).unwrap()
+        );
     }
 
     #[test]
@@ -313,7 +316,10 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, event_from_str(raw).unwrap());
+        assert_eq!(
+            expected,
+            event_from_str(&"host".to_string(), None, raw).unwrap()
+        );
     }
 
     #[test]
@@ -330,7 +336,10 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, event_from_str(raw).unwrap());
+        assert_eq!(
+            expected,
+            event_from_str(&"host".to_string(), None, raw).unwrap()
+        );
     }
 
     #[test]
@@ -347,7 +356,10 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, event_from_str(raw).unwrap());
+        assert_eq!(
+            expected,
+            event_from_str(&"host".to_string(), None, raw).unwrap()
+        );
     }
 
     #[test]
@@ -364,6 +376,9 @@ mod test {
             .as_mut_log()
             .insert_implicit("host".into(), "74794bfb6795".into());
 
-        assert_eq!(expected, event_from_str(raw).unwrap());
+        assert_eq!(
+            expected,
+            event_from_str(&"host".to_string(), None, raw).unwrap()
+        );
     }
 }
