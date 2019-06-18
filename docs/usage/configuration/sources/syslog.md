@@ -52,6 +52,37 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.syslog]
+  # REQUIRED - General
+
+  # The component type
+  type = "syslog"
+
+  # OPTIONAL - General
+
+  # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or `udp`.
+  address = "0.0.0.0:9000" # no default
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  max_length = 102400 # default, bytes
+
+  # The input mode.
+  mode = "tcp" # no default, one of: tcp, udp, unix
+  mode = "tcp" # no default, one of: tcp, udp, unix
+  mode = "tcp" # no default, one of: tcp, udp, unix
+
+  # The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.
+
+  path = "/path/to/socket" # no default
+
+  # OPTIONAL - Context
+
+  # The key name added to each event representing the current host.
+  host_key = "host" # default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

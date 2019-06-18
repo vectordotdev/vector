@@ -50,6 +50,11 @@ class TransformGenerator < Generator
       #{options_example_generator.generate("transforms.<transform-id>", :schema)}
       ```
       {% endcode-tabs-item %}
+      {% code-tabs-item title="vector.toml (specification)" %}
+      ```coffeescript
+      #{options_example_generator.generate("transforms.#{transform.name}", :spec)}
+      ```
+      {% endcode-tabs-item %}
       {% endcode-tabs %}
 
       ## Options

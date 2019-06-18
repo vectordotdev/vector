@@ -31,7 +31,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -40,7 +40,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.blackhole]
+[sinks.blackhole]
   # REQUIRED - General
 
   # The component type
@@ -79,7 +79,11 @@ delivery guarantee.
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Performance
 

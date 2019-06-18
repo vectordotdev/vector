@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/aws_s3-sink.svg)
 
 {% hint style="warning" %}
-The `aws_s3` sink is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3) as it will help shape the roadmap of this component.
+The `aws_s3` sink is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3) as it will help shape the roadmap of this component.
 {% endhint %}
 The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
@@ -54,7 +54,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -84,7 +84,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.aws_s3]
+[sinks.aws_s3]
   # REQUIRED - General
 
   # The component type
@@ -102,53 +102,53 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 10490000
+  batch_size = 10490000 # default, bytes
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 300
+  batch_timeout = 300 # default, bytes
 
   # OPTIONAL - Object Names
 
   # Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.
-  filename_append_uuid = true
+  filename_append_uuid = true # default
 
   # The format of the resulting object file name. `strftime` specifiers are supported. 
-  filename_time_format = "%s"
+  filename_time_format = "%s" # default
 
   # A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". `strftime` specifiers are supported. 
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F/" # default
 
   # OPTIONAL - Requests
 
   # The compression type to use before writing data.
-  compression = "gzip"
+  compression = "gzip" # no default, one of: gzip
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson"
-  encoding = "text"
+  encoding = "ndjson" # no default, one of: ndjson, text
+  encoding = "ndjson" # no default, one of: ndjson, text
 
   # Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth.
-  gzip = false
+  gzip = false # default
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1
+  rate_limit_duration = 1 # default, seconds
 
   # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5
+  rate_limit_num = 5 # default
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5
+  request_in_flight_limit = 5 # default
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30
+  request_timeout_secs = 30 # default, seconds
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5
+  retry_attempts = 5 # default
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5
+  retry_backoff_secs = 5 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -218,11 +218,8 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-
 ​2. [`credential_process` command][aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-
 ​3. [AWS credentials file][aws_credentials_file], usually located at `~/.aws/credentials`.
-
 4. ​[IAM instance profile][iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an error will be [logged][monitoring_logs].
@@ -244,6 +241,7 @@ Vector has plans to support column formats, such as ORC and Parquet, in [`v0.6`]
 The `aws_s3` sink compresses payloads before flushing. This helps to reduce the payload size, ultimately reducing bandwidth and cost. This is controlled via the `compression` option. Each compression type is described in more detail below:
 
 | Compression | Description |
+| :---------- | :---------- |
 | `gzip` | The payload will be compressed in [Gzip][gzip] format before being sent. |
 
 ### Delivery Guarantee
@@ -256,19 +254,24 @@ This component offers an **at least once** delivery guarantee if your
 The `aws_s3` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Object Naming
 
 By default, Vector will name your S3 objects in the following format:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 <key_prefix><timestamp>-<uuidv4>.log
 ```
@@ -283,7 +286,7 @@ By default, Vector will name your S3 objects in the following format:
 For example:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 ```
@@ -301,7 +304,7 @@ You can control the resulting name via the `key_prefix`, `filename_time_format`,
 
 ### Partitioning
 
-Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the object key name, creating time based partitions. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
+Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to create time based partitions based on the [event `timestamp`][default_schema]. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
 
 ### Rate Limiting
 

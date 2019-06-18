@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/aws_kinesis_streams-sink.svg)
 
 {% hint style="warning" %}
-The `aws_kinesis_streams` sink is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_kinesis_streams) as it will help shape the roadmap of this component.
+The `aws_kinesis_streams` sink is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_kinesis_streams) as it will help shape the roadmap of this component.
 {% endhint %}
 The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
@@ -47,7 +47,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -70,7 +70,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.aws_kinesis_streams]
+[sinks.aws_kinesis_streams]
   # REQUIRED - General
 
   # The component type
@@ -88,34 +88,34 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000
+  batch_size = 1049000 # default, bytes
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1
+  batch_timeout = 1 # default, bytes
 
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json"
-  encoding = "text"
+  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, one of: json, text
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1
+  rate_limit_duration = 1 # default, seconds
 
   # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5
+  rate_limit_num = 5 # default
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5
+  request_in_flight_limit = 5 # default
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30
+  request_timeout_secs = 30 # default, seconds
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5
+  retry_attempts = 5 # default
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5
+  retry_backoff_secs = 5 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -179,11 +179,8 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-
 ​2. [`credential_process` command][aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-
 ​3. [AWS credentials file][aws_credentials_file], usually located at `~/.aws/credentials`.
-
 4. ​[IAM instance profile][iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an error will be [logged][monitoring_logs].
@@ -206,12 +203,17 @@ This component offers an **at least once** delivery guarantee if your
 The `aws_kinesis_streams` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `json` | The payload will be encoded as a single JSON payload. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Rate Limiting
 

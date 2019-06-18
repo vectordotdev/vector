@@ -45,7 +45,7 @@ class OptionsExampleGenerator < Generator
               if option.name == "*"
                 content << "#{example}\n"
               else
-                content << "#{option.name} = #{example.inspect}\n"
+                content << "#{option.name} = #{example_value(option)}\n"
               end
             end
           else
@@ -89,9 +89,20 @@ class OptionsExampleGenerator < Generator
           tags << "one of: #{option.enum.join(", ")}"
         end
 
-        value = option.examples.first.inspect
+        example = option.examples.first
 
-        if tags.any?
+        value =
+          if example.is_a?(String) && example.include?("\n")
+            <<~EOF
+            """
+            #{example}
+            """
+            EOF
+          else
+             example.inspect
+          end
+
+        if !value.include?("\n") && tags.any?
           value << " # #{tags.join(", ")}"
         end
 

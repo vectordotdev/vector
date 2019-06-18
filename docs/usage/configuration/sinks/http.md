@@ -57,7 +57,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -81,18 +81,18 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   retry_backoff_secs = <int>
 
   # OPTIONAL - Basic auth
-  [sink.<sink-id>.basic_auth]
+  [sinks.<sink-id>.basic_auth]
     password = "<string>"
     user = "<string>"
 
   # OPTIONAL - Headers
-  [sink.<sink-id>.headers]
+  [sinks.<sink-id>.headers]
     * = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.http]
+[sinks.http]
   # REQUIRED - General
 
   # The component type
@@ -102,8 +102,8 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson"
-  encoding = "text"
+  encoding = "ndjson" # one of: ndjson, text
+  encoding = "ndjson" # one of: ndjson, text
 
   # The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
   uri = "https://10.22.212.22:9000/endpoint"
@@ -111,50 +111,50 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   # OPTIONAL - General
 
   # The compression strategy used to compress the payload before sending.
-  compression = "gzip"
+  compression = "gzip" # no default, one of: gzip
 
   # A URI that Vector can request in order to determine the service health.
-  healthcheck_uri = "https://10.22.212.22:9000/_health"
+  healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000
+  batch_size = 1049000 # default, bytes
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 5
+  batch_timeout = 5 # default, bytes
 
   # OPTIONAL - Requests
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1
+  rate_limit_duration = 1 # default, seconds
 
   # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 10
+  rate_limit_num = 10 # default
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 10
+  request_in_flight_limit = 10 # default
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30
+  request_timeout_secs = 30 # default, seconds
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 10
+  retry_attempts = 10 # default
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 10
+  retry_backoff_secs = 10 # default, seconds
 
   # OPTIONAL - Basic auth
-  [sink.http.basic_auth]
+  [sinks.http.basic_auth]
 
     # The basic authentication password.
-    password = "password"
+    password = "password" # no default
 
     # The basic authentication user name.
-    user = "username"
+    user = "username" # no default
 
   # OPTIONAL - Headers
-  [sink.http.headers]
+  [sinks.http.headers]
 
     # A custom header to be added to each outgoing HTTP request.
     X-Powered-By = "Vector"
@@ -224,6 +224,7 @@ By default, the `http` sink flushes every 5 seconds to ensure data is available 
 The `http` sink compresses payloads before flushing. This helps to reduce the payload size, ultimately reducing bandwidth and cost. This is controlled via the `compression` option. Each compression type is described in more detail below:
 
 | Compression | Description |
+| :---------- | :---------- |
 | `gzip` | The payload will be compressed in [Gzip][gzip] format before being sent. |
 
 ### Delivery Guarantee
@@ -236,6 +237,7 @@ This component offers an **at least once** delivery guarantee if your
 The `http` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 

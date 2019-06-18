@@ -53,6 +53,11 @@ class SourceGenerator < Generator
       #{options_example_generator.generate("sources.<source-id>", :schema)}
       ```
       {% endcode-tabs-item %}
+      {% code-tabs-item title="vector.toml (specification)" %}
+      ```coffeescript
+      #{options_example_generator.generate("sources.#{source.name}", :spec)}
+      ```
+      {% endcode-tabs-item %}
       {% endcode-tabs %}
 
       ## Options

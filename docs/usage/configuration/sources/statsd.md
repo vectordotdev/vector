@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/statsd-source.svg)
 
 {% hint style="warning" %}
-The `statsd` source is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd) as it will help shape the roadmap of this component.
+The `statsd` source is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd) as it will help shape the roadmap of this component.
 {% endhint %}
 The `statsd` source continuously ingests [`log`][log_event] events through the StatsD UDP protocol.
 
@@ -36,6 +36,18 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
   type = "<string>"
   address = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.statsd]
+  # REQUIRED - General
+
+  # The component type
+  type = "statsd"
+
+  # UDP socket address to bind to.
+  address = "127.0.0.1:8126"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -754,6 +754,22 @@ A key/value pair representing the new field to be added. Accepts all \
 """
 
 [[transforms.add_fields.sections]]
+title = "Arrays"
+body = """
+The `add_fields` transform will support [TOML arrays][toml_array]. Keep \
+in mind that the values must be simple type (not tables), and each value \
+must the same type. You cannot mix types:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    my_array = ["first", "second", "third"]
+```\
+"""
+
+[[transforms.add_fields.sections]]
 title = "Complex Transforming"
 body = """\
 The `add_fields` transform is designed for simple key additions. If \
@@ -786,17 +802,16 @@ body = "Keys specified in this transform will replace existing keys."
 [[transforms.add_fields.sections]]
 title = "Nested Fields"
 body = """
-As described in the [Data Model][data_model] document, Vector \
-represents events as flat maps, and nested fields are denoted by a `.` \
-character in the key name. Therefore, adding nested fields is as \
-simple as adding a `.` to your key name:
+The `add_fields` transform will support dotted keys or \
+[TOML tables][toml_table]. We recommend the dotted key syntax since it \
+is less verbose for this usecase:
 
 ```
 [transforms.<transform-id>]
   # ...
   
   [transforms.<transform-id>.fields]
-    "parent.child.grandchild" = "<value>"
+    parent.child.grandchild = "<value>"
 ```\
 """
 
@@ -1544,7 +1559,7 @@ body = """\
 By default, Vector will name your S3 objects in the following format:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 <key_prefix><timestamp>-<uuidv4>.log
 ```
@@ -1559,7 +1574,7 @@ By default, Vector will name your S3 objects in the following format:
 For example:
 
 {% code-tabs %}
-{% code-tabs-item title="non-gzip" %}
+{% code-tabs-item title="no compression" %}
 ```
 date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
 ```
@@ -1582,7 +1597,7 @@ You can control the resulting name via the `key_prefix`, \
 [[sinks.aws_s3.sections]]
 title = "Partitioning"
 body = """\
-Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the object key name, creating time based partitions. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
+Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to create time based partitions based on the [event `timestamp`][default_schema]. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
 """
 
 [[sinks.aws_s3.sections]]
@@ -2019,6 +2034,7 @@ standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
 starting = "/usage/administration/starting.md"
 strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
+toml_array = "https://github.com/toml-lang/toml#user-content-array"
 toml_table = "https://github.com/toml-lang/toml#user-content-table"
 transforms = "/usage/configuration/transforms"
 troubleshooting = "/usages/guides/troubleshooting.md"

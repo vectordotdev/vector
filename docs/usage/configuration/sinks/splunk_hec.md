@@ -47,7 +47,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -72,7 +72,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.splunk_hec]
+[sinks.splunk_hec]
   # REQUIRED - General
 
   # The component type
@@ -84,42 +84,42 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # OPTIONAL - General
 
   # Your Splunk HEC host.
-  host = "my-splunk-host.com"
+  host = "my-splunk-host.com" # no default
 
   # Your Splunk HEC token.
-  token = "A94A8FE5CCB19BA61C4C08"
+  token = "A94A8FE5CCB19BA61C4C08" # no default
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000
+  batch_size = 1049000 # default, bytes
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1
+  batch_timeout = 1 # default, bytes
 
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson"
-  encoding = "text"
+  encoding = "ndjson" # no default, one of: ndjson, text
+  encoding = "ndjson" # no default, one of: ndjson, text
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1
+  rate_limit_duration = 1 # default, seconds
 
   # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 10
+  rate_limit_num = 10 # default
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 10
+  request_in_flight_limit = 10 # default
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 60
+  request_timeout_secs = 60 # default, seconds
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5
+  retry_attempts = 5 # default
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5
+  retry_backoff_secs = 5 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -169,12 +169,17 @@ This component offers an **at least once** delivery guarantee if your
 The `splunk_hec` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Rate Limiting
 

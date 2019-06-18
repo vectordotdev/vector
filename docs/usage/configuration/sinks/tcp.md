@@ -36,7 +36,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -50,7 +50,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.tcp]
+[sinks.tcp]
   # REQUIRED - General
 
   # The component type
@@ -62,13 +62,13 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
   # OPTIONAL - General
 
   # The TCP address.
-  address = "92.12.333.224:5000"
+  address = "92.12.333.224:5000" # no default
 
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json"
-  encoding = "text"
+  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, one of: json, text
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -104,12 +104,17 @@ delivery guarantee.
 The `tcp` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `json` | The payload will be encoded as a single JSON payload. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Performance
 

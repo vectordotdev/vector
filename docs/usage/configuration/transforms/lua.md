@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/lua-transform.svg)
 
 {% hint style="warning" %}
-The `lua` transform is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua) as it will help shape the roadmap of this component.
+The `lua` transform is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua) as it will help shape the roadmap of this component.
 {% endhint %}
 The `lua` transforms accepts [`log`][log_event] events and allows you to transform events with a full embedded [Lua][lua] engine.
 
@@ -31,7 +31,18 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 
   # OPTIONAL - General
   search_dirs = true # no default
-  source = "require(\"script\") # a `script.lua` file must be in your `search_dirs`\n\nif event[\"host\"] == nil then\n  local f = io.popen (\"/bin/hostname\")\n  local hostname = f:read(\"*a\") or \"\"\n  f:close()\n  hostname = string.gsub(hostname, \"\n$\", \"\")\n  event[\"host\"] = hostname\nend" # no default
+  source = """
+  require("script") # a `script.lua` file must be in your `search_dirs`
+
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "
+  $", "")
+    event["host"] = hostname
+  end
+  """
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -44,6 +55,37 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   # OPTIONAL - General
   search_dirs = ["<string>", ...]
   source = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.lua]
+  # REQUIRED - General
+
+  # The component type
+  type = "lua"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # A list of directories search when loading a Lua file via the `require` function.
+  search_dirs = true # no default
+
+  # The inline Lua source to evaluate.
+  source = """
+  require("script") # a `script.lua` file must be in your `search_dirs`
+
+  if event["host"] == nil then
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname = string.gsub(hostname, "
+  $", "")
+    event["host"] = hostname
+  end
+  """
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -93,6 +135,7 @@ issue, please:
 1. Check for any [open transform issues](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22).
 2. [Search the forum][search_forum] for any similar issues.
 2. Reach out to the [community][community] for help.
+
 ### Alternatives
 
 Finally, consider the following alternatives:

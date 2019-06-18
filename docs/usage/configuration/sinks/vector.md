@@ -33,7 +33,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -44,7 +44,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.vector]
+[sinks.vector]
   # REQUIRED - General
 
   # The component type
@@ -56,7 +56,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   # OPTIONAL - General
 
   # The downstream Vector address.
-  address = "92.12.333.224:5000"
+  address = "92.12.333.224:5000" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -89,7 +89,11 @@ delivery guarantee.
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Streaming
 

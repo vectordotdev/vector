@@ -46,6 +46,25 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.stdin]
+  # REQUIRED - General
+
+  # The component type
+  type = "stdin"
+
+  # OPTIONAL - General
+
+  # The maxiumum bytes size of a message before it is discarded.
+  max_length = 102400 # default, bytes
+
+  # OPTIONAL - Context
+
+  # The key name added to each event representing the current host.
+  host_key = "host" # default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

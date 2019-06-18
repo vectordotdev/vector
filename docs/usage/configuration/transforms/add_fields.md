@@ -44,6 +44,24 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
     * = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.add_fields]
+  # REQUIRED - General
+
+  # The component type
+  type = "add_fields"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - Fields
+  [transforms.add_fields.fields]
+
+    # A key/value pair representing the new field to be added. Accepts all supported types. Use `.` for adding nested fields.
+    new_field = "new field value"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -63,6 +81,18 @@ The `add_fields` accepts [`log`][log_event] and [`metric`][metric_event] events 
 
 ## How It Works
 
+### Arrays
+
+The `add_fields` transform will support [TOML arrays][toml_array]. Keep in mind that the values must be simple type (not tables), and each value must the same type. You cannot mix types:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    my_array = ["first", "second", "third"]
+```
+
 ### Complex Transforming
 
 The `add_fields` transform is designed for simple key additions. If you need more complex transforming then we recommend using a more versatile transform like the [`lua` transform][lua_transform].
@@ -77,14 +107,14 @@ Keys specified in this transform will replace existing keys.
 
 ### Nested Fields
 
-As described in the [Data Model][data_model] document, Vector represents events as flat maps, and nested fields are denoted by a `.` character in the key name. Therefore, adding nested fields is as simple as adding a `.` to your key name:
+The `add_fields` transform will support dotted keys or [TOML tables][toml_table]. We recommend the dotted key syntax since it is less verbose for this usecase:
 
 ```
 [transforms.<transform-id>]
   # ...
   
   [transforms.<transform-id>.fields]
-    "parent.child.grandchild" = "<value>"
+    parent.child.grandchild = "<value>"
 ```
 
 ### Removing Fields
@@ -112,6 +142,7 @@ issue, please:
 1. Check for any [open transform issues](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22).
 2. [Search the forum][search_forum] for any similar issues.
 2. Reach out to the [community][community] for help.
+
 ### Alternatives
 
 Finally, consider the following alternatives:
@@ -130,11 +161,13 @@ Finally, consider the following alternatives:
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
 [config_value_types]: "../../../usage/configuration/README.md#value-types"
+[toml_array]: "https://github.com/toml-lang/toml#user-content-array"
 [lua_transform]: "../../../usage/configuration/transform/lua.md"
 [configuration]: "../../../usage/configuration/README.md"
-[data_model]: "../../../about/data_model.md"
+[toml_table]: "https://github.com/toml-lang/toml#user-content-table"
 [remove_fields_transform]: "../../../usage/configuration/transform/remove_fields.md"
 [event_key_special_characters]: "../../../about/data-model.md#special-characters"
+[data_model]: "../../../about/data_model.md"
 [monitoring_logs]: "../../../administration/moonitoring.md#logs"
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"
 [search_forum]: "https://forum.vectorproject.io/search?expanded=true"

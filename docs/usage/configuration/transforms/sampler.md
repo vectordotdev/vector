@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/sampler-transform.svg)
 
 {% hint style="warning" %}
-The `sampler` transform is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler) as it will help shape the roadmap of this component.
+The `sampler` transform is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler) as it will help shape the roadmap of this component.
 {% endhint %}
 The `sampler` transforms accepts [`log`][log_event] events and allows you to sample events with a configurable rate.
 
@@ -44,6 +44,26 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
   # OPTIONAL - General
   pass_list = ["<string>", ...]
   rate = <int>
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.sampler]
+  # REQUIRED - General
+
+  # The component type
+  type = "sampler"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.
+  pass_list = ["[error]", "field2"] # no default
+
+  # The maximum number of events allowed per second.
+  rate = ["field1", "field2"] # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

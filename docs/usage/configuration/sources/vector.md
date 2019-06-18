@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/vector-source.svg)
 
 {% hint style="warning" %}
-The `vector` source is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+vector) as it will help shape the roadmap of this component.
+The `vector` source is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+vector) as it will help shape the roadmap of this component.
 {% endhint %}
 The `vector` source continuously ingests [`log`][log_event] events through another upstream Vector instance.
 
@@ -42,6 +42,23 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
   # OPTIONAL - General
   address = "<string>"
   shutdown_timeout_secs = <int>
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.vector]
+  # REQUIRED - General
+
+  # The component type
+  type = "vector"
+
+  # OPTIONAL - General
+
+  # The TCP address to bind to.
+  address = "0.0.0.0:9000" # no default
+
+  # The timeout before a connection is forcefully closed during shutdown.
+  shutdown_timeout_secs = 30 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

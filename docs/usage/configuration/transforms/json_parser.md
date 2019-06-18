@@ -46,6 +46,29 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   field = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.json_parser]
+  # REQUIRED - General
+
+  # The component type
+  type = "json_parser"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # If `true` will drop the `field` after parsing.
+  drop_field = true # default
+
+  # If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through.
+  drop_invalid = true # no default
+
+  # The field decode as JSON. Must be a `string` value.
+  field = "message" # default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

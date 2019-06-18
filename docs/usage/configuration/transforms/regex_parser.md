@@ -48,6 +48,32 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
   field = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.regex_parser]
+  # REQUIRED - General
+
+  # The component type
+  type = "regex_parser"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
+
+  # OPTIONAL - General
+
+  # If `true`, events that fail to properly parse will be dropped.
+  drop_failed = false # default
+
+  # If the `field` should be dropped (removed) after parsing.
+  drop_field = true # default
+
+  # The field to parse.
+  field = "message" # default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -139,6 +165,7 @@ issue, please:
 1. Check for any [open transform issues](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22).
 2. [Search the forum][search_forum] for any similar issues.
 2. Reach out to the [community][community] for help.
+
 ### Alternatives
 
 Finally, consider the following alternatives:

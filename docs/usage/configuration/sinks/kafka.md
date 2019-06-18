@@ -36,7 +36,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -50,7 +50,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.kafka]
+[sinks.kafka]
   # REQUIRED - General
 
   # The component type
@@ -68,11 +68,11 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # OPTIONAL - General
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json"
-  encoding = "text"
+  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, one of: json, text
 
   # The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.
-  key_field = "partition_key"
+  key_field = "partition_key" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -109,12 +109,17 @@ This component offers an **at least once** delivery guarantee if your
 The `kafka` sink encodes events before flushing. This is controlled via the `encoding` option. Each encoding type is described in more detail below:
 
 | Encoding | Description |
+| :------- | :---------- |
 | `json` | The payload will be encoded as a single JSON payload. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Streaming
 

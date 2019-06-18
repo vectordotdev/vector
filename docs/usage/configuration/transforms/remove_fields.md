@@ -42,6 +42,23 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
   fields = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.remove_fields]
+  # REQUIRED - General
+
+  # The component type
+  type = "remove_fields"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # The field names to drop.
+  fields = ["field1", "field2"] # no default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -74,6 +91,7 @@ issue, please:
 1. Check for any [open transform issues](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22).
 2. [Search the forum][search_forum] for any similar issues.
 2. Reach out to the [community][community] for help.
+
 ### Alternatives
 
 Finally, consider the following alternatives:

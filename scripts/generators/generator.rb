@@ -35,7 +35,7 @@ class Generator
       if component.beta?
         content = <<~EOF
         {% hint style="warning" %}
-        The #{component_name(component)} is in `beta`. Please see the current [enhancements](#{component_issues_link(component, enhancement_label)}) and [bugs](#{component_issues_link(component, bug_label)}) for known issues. We kindly ask that you [add any missing issues](#{new_component_issue_url(component)}) as it will help shape the roadmap of this component.
+        The #{component_name(component)} is in beta. Please see the current [enhancements](#{component_issues_link(component, enhancement_label)}) and [bugs](#{component_issues_link(component, bug_label)}) for known issues. We kindly ask that you [add any missing issues](#{new_component_issue_url(component)}) as it will help shape the roadmap of this component.
         {% endhint %}
         EOF
         content.strip
@@ -225,6 +225,7 @@ class Generator
       1. Check for any [open #{component_type(component)} issues](#{component_issues_link(component)}).
       2. [Search the forum][search_forum] for any similar issues.
       2. Reach out to the [community][community] for help.
+      
       #{alternatives(component.alternatives)}
       EOF
       content.strip

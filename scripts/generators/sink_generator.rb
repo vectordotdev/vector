@@ -47,12 +47,12 @@ class SinkGenerator < Generator
       {% endcode-tabs-item %}
       {% code-tabs-item title="vector.toml (schema)" %}
       ```coffeescript
-      #{options_example_generator.generate("sink.<sink-id>", :schema)}
+      #{options_example_generator.generate("sinks.<sink-id>", :schema)}
       ```
       {% endcode-tabs-item %}
       {% code-tabs-item title="vector.toml (specification)" %}
       ```coffeescript
-      #{options_example_generator.generate("sink.#{sink.name}", :spec)}
+      #{options_example_generator.generate("sinks.#{sink.name}", :spec)}
       ```
       {% endcode-tabs-item %}
       {% endcode-tabs %}

@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/elasticsearch-sink.svg)
 
 {% hint style="warning" %}
-The `elasticsearch` sink is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch) as it will help shape the roadmap of this component.
+The `elasticsearch` sink is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch) as it will help shape the roadmap of this component.
 {% endhint %}
 The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
@@ -49,7 +49,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sink.<sink-id>]
+[sinks.<sink-id>]
   # REQUIRED - General
   type = "<string>"
   inputs = "<string>"
@@ -74,7 +74,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sink.elasticsearch]
+[sinks.elasticsearch]
   # REQUIRED - General
 
   # The component type
@@ -89,38 +89,38 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   # OPTIONAL - General
 
   # The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
-  doc_type = "_doc"
+  doc_type = "_doc" # default
 
   # Index name to write events to. `strftime` specifiers are supported.
-  index = "vector-%F"
+  index = "vector-%F" # default
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 10490000
+  batch_size = 10490000 # default, bytes
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1
+  batch_timeout = 1 # default, bytes
 
   # OPTIONAL - Requests
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1
+  rate_limit_duration = 1 # default, seconds
 
   # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5
+  rate_limit_num = 5 # default
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5
+  request_in_flight_limit = 5 # default
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 60
+  request_timeout_secs = 60 # default, seconds
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5
+  retry_attempts = 5 # default
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5
+  retry_backoff_secs = 5 # default, seconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -179,7 +179,11 @@ delivery guarantee.
 
 ### Health Checks
 
-Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
 
 ### Nested Documents
 

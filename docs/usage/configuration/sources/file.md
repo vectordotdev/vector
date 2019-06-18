@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/file-source.svg)
 
 {% hint style="warning" %}
-The `file` source is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+file) as it will help shape the roadmap of this component.
+The `file` source is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+file) as it will help shape the roadmap of this component.
 {% endhint %}
 The `file` source continuously ingests [`log`][log_event] events through one or more local files.
 
@@ -56,6 +56,40 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
   # OPTIONAL - Context
   file_key = "<string>"
   host_key = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.file]
+  # REQUIRED - General
+
+  # The component type
+  type = "file"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence over the `include` option.*
+  exclude = ["/var/log/nginx*.log"]
+
+  # Array of file patterns to include. Globbing is supported.
+  include = ["/var/log/nginx*.log"]
+
+  # OPTIONAL - General
+
+  # Ignore files with a data modification date that does not exceed this age.
+  ignore_older = 86400 # no default, seconds
+
+  # The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.
+  max_line_bytes = 102400 # default, bytes
+
+  # When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.
+  start_at_beginning = false # default
+
+  # OPTIONAL - Context
+
+  # The key name added to each event with the full path of the file.
+  file_key = "file" # default
+
+  # The key name added to each event representing the current host.
+  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/field_filter-transform.svg)
 
 {% hint style="warning" %}
-The `field_filter` transform is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter) as it will help shape the roadmap of this component.
+The `field_filter` transform is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter) as it will help shape the roadmap of this component.
 {% endhint %}
 The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_event] events and allows you to filter events by a field's value.
 
@@ -44,6 +44,26 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
   # OPTIONAL - General
   field = "<string>"
   value = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.field_filter]
+  # REQUIRED - General
+
+  # The component type
+  type = "field_filter"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # The target field to compare against the `value`.
+  field = "file" # no default
+
+  # If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.
+  value = "/var/log/nginx.log" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

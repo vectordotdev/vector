@@ -46,6 +46,29 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
   field_names = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.tokenizer]
+  # REQUIRED - General
+
+  # The component type
+  type = "tokenizer"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # If `true` the `field` will be dropped after parsing.
+  drop_field = true # default
+
+  # The field to tokenize.
+  field = "message" # default
+
+  # The field names assigned to the resulting tokens, in order.
+  field_names = ["timestamp", "level", "message"] # no default
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -129,6 +152,7 @@ issue, please:
 1. Check for any [open transform issues](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22).
 2. [Search the forum][search_forum] for any similar issues.
 2. Reach out to the [community][community] for help.
+
 ### Alternatives
 
 Finally, consider the following alternatives:
