@@ -59,13 +59,9 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
 | `pattern` | `string` | The [Grok pattern][grok_patterns]<br />`no default` `example: (see above)` |
 
-## Input
+## I/O
 
-The `grok_parser` accepts [`log`][log_event] events.
-
-## Output
-
-The `grok_parser` outputs [`log`][log_event] events.
+The `grok_parser` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

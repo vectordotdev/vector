@@ -60,6 +60,7 @@ The `stdin` source continuously ingests [`log`][log_event] through standard inpu
 ## I/O
 
 
+
 Given the following input line:
 
 {% code-tabs %}

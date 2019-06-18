@@ -59,13 +59,9 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`no default` `example: true` |
 | `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
-## Input
+## I/O
 
-The `json_parser` accepts [`log`][log_event] events.
-
-## Output
-
-The `json_parser` outputs [`log`][log_event] events.
+The `json_parser` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

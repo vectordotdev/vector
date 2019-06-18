@@ -42,10 +42,10 @@ The `statsd` source continuously ingests [`log`][log_event] through the StatsD U
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
 | `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## I/O
+
 
 
 {% tabs %}

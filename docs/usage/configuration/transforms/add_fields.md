@@ -55,13 +55,9 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 | **OPTIONAL** - Fields | | |
 | `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: new_field = "new field value"` |
 
-## Input
+## I/O
 
-The `add_fields` accepts [`log`][log_event] and [`metric`][metric_event] events.
-
-## Output
-
-The `add_fields` outputs [`log`][log_event] and [`metric`][metric_event] events.
+The `add_fields` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 

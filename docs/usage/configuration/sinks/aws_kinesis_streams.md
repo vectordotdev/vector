@@ -91,6 +91,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 ## I/O
 
 The `aws_kinesis_streams` sink batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
+
 ```http
 POST / HTTP/1.1
 Host: kinesis.<region>.<domain>

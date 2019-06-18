@@ -122,6 +122,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ## I/O
 
 The `http` sink batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to a generic HTTP endpoint. The encoding is dictated by the `encoding` option. For example:
+
 ```http
 POST <host>/_bulk HTTP/1.1
 Host: <host>

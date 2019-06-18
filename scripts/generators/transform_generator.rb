@@ -56,13 +56,9 @@ class TransformGenerator < Generator
 
       #{options_table_generator.generate}
 
-      ## Input
+      ## I/O
 
-      The `#{transform.name}` accepts #{event_type_links(transform.input_types)} events.
-
-      ## Output
-
-      The `#{transform.name}` outputs #{event_type_links(transform.output_types)} events.
+      The `#{transform.name}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types)} events.
 
       #{guides_section(transform)}
 

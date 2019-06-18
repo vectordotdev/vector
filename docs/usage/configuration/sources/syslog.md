@@ -70,6 +70,7 @@ The `syslog` source continuously ingests [`log`][log_event] through the Syslog 5
 ## I/O
 
 
+
 Given the following input line:
 
 {% code-tabs %}

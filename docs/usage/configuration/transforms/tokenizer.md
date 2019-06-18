@@ -59,13 +59,9 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 | `field` | `string` | The field to tokenize. See [Example](#example) for more info.<br />`default: "message"` |
 | `field_names` | `[string]` | The field names assigned to the resulting tokens, in order. See [Example](#example) for more info.<br />`no default` `example: (see above)` |
 
-## Input
+## I/O
 
-The `tokenizer` accepts [`log`][log_event] events.
-
-## Output
-
-The `tokenizer` outputs [`log`][log_event] events.
+The `tokenizer` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

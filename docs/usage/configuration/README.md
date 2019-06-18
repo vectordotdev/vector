@@ -69,7 +69,6 @@ data_dir = "/var/lib/vector"
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **OPTIONAL** - General | | |
 | `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers. Please make sure the Vector projectt has write permissions to this dir.<br />`no default` `example: "/var/lib/vector"` |
 
 ## How It Works

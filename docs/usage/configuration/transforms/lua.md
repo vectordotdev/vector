@@ -58,13 +58,9 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: true` |
 | `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`no default` `example: (see above)` |
 
-## Input
+## I/O
 
-The `lua` accepts [`log`][log_event] events.
-
-## Output
-
-The `lua` outputs [`log`][log_event] events.
+The `lua` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

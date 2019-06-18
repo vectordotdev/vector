@@ -58,13 +58,9 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 | `field` | `string` | The target field to compare against the `value`.<br />`no default` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`no default` `example: "/var/log/nginx.log"` |
 
-## Input
+## I/O
 
-The `field_filter` accepts [`log`][log_event] and [`metric`][metric_event] events.
-
-## Output
-
-The `field_filter` outputs [`log`][log_event] and [`metric`][metric_event] events.
+The `field_filter` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 

@@ -56,6 +56,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ## I/O
 
 The `vector` sink streams events to another downstream Vector instance. The encoding of each event is dictated by the `encoding` option. For example:
+
 The `vector` sink streams events in a real-time fashion.
 
 ## Guides

@@ -59,6 +59,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ## I/O
 
 The `console` sink streams events to the console, `STDOUT` or `STDERR`. The encoding of each event is dictated by the `encoding` option. For example:
+
 The `console` sink streams events in a real-time fashion. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info.
 
 

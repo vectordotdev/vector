@@ -62,13 +62,9 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 
-## Input
+## I/O
 
-The `regex_parser` accepts [`log`][log_event] events.
-
-## Output
-
-The `regex_parser` outputs [`log`][log_event] events.
+The `regex_parser` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

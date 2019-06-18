@@ -44,13 +44,13 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `print_amount` | `int` | The number of events that must be received in order to print a summary of activity.<br />`required` `example: "1000"` |
 
 ## I/O
 
 The `blackhole` sink streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. The encoding of each event is dictated by the `encoding` option. For example:
+
 The `blackhole` sink streams events in a real-time fashion.
 
 

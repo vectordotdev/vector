@@ -66,6 +66,7 @@ The `tcp` source continuously ingests [`log`][log_event] through the TCP protoco
 ## I/O
 
 
+
 Given the following input line:
 
 {% code-tabs %}

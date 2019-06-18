@@ -97,6 +97,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 ## I/O
 
 The `aws_s3` sink batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). The encoding is dictated by the `encoding` option. For example:
+
 ```http
 POST / HTTP/1.1
 Host: kinesis.<region>.<domain>

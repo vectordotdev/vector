@@ -53,13 +53,9 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 | **OPTIONAL** - General | | |
 | `fields` | `[string]` | The field names to drop.<br />`no default` `example: ["field1", "field2"]` |
 
-## Input
+## I/O
 
-The `remove_fields` accepts [`log`][log_event] and [`metric`][metric_event] events.
-
-## Output
-
-The `remove_fields` outputs [`log`][log_event] and [`metric`][metric_event] events.
+The `remove_fields` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 

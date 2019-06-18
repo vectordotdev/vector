@@ -96,6 +96,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 ## I/O
 
 The `elasticsearch` sink batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:
+
 ```http
 POST <host>/_bulk HTTP/1.1
 Host: <host>

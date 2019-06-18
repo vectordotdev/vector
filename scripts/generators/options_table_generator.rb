@@ -21,12 +21,26 @@ class OptionsTableGenerator < Generator
       EOF
     end
 
-    options.
-      select { |option| option.name != "type" }.
-      group_by do |option|
-        "**#{option.required? ? "REQUIRED" : "OPTIONAL"}** - #{option.category}"
-      end.
-      each do |title, category_options|
+    categories = options.collect(&:category)
+
+    grouped_options =
+      options.
+        select { |option| option.name != "type" }.
+        group_by do |option|
+          title = "**#{option.required? ? "REQUIRED" : "OPTIONAL"}**"
+
+          if categories.length > 1
+           "#{title} - #{option.category}"
+          else
+            title
+          end
+        end
+
+    if grouped_options.keys.length <= 1
+      @opts[:titles] = false
+    end
+
+    grouped_options.each do |title, category_options|
         if @opts[:titles]
           content << "| #{title} | | |\n"
         end

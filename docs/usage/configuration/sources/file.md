@@ -76,6 +76,7 @@ The `file` source continuously ingests [`log`][log_event] through one or more lo
 ## I/O
 
 
+
 Given the following input:
 
 {% code-tabs %}
@@ -101,7 +102,7 @@ A [`log` event][log_event] will be emitted with the following structure:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as context. You can further parser the `"message"` key with a [transform][transforms], such as the [`regeex` transform][regex_parser_transform].
+The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][transforms], such as the [`regeex` transform][regex_parser_transform].
 
 
 

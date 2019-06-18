@@ -58,13 +58,9 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 | `rate` | `int` | The maximum number of events allowed per second.<br />`no default` `example: ["field1", "field2"]` |
 
-## Input
+## I/O
 
-The `sampler` accepts [`log`][log_event] events.
-
-## Output
-
-The `sampler` outputs [`log`][log_event] events.
+The `sampler` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

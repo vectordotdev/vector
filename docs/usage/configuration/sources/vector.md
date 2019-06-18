@@ -48,11 +48,11 @@ The `vector` source continuously ingests [`log`][log_event] through another upst
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **OPTIONAL** - General | | |
 | `address` | `string` | The TCP address to bind to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 
 ## I/O
+
 
 
 The `vector` source simply forwards incoming events from other upstream Vector instances, unalterated.
