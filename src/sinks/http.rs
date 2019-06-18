@@ -24,7 +24,7 @@ use tower::ServiceBuilder;
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: String,
-    pub method: HttpMethod,
+    pub method: Option<HttpMethod>,
     pub healthcheck_uri: Option<String>,
     #[serde(flatten)]
     pub basic_auth: Option<BasicAuth>,
@@ -102,7 +102,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let encoding = config.encoding.clone();
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
-    let method = config.method.clone();
+    let method = config.method.clone().unwrap_or(HttpMethod::Post);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
