@@ -47,7 +47,7 @@ where
     where
         T: Batch,
     {
-        PartitionedBatchSink::with_linger(self, batch, min, 0, delay)
+        PartitionedBatchSink::with_linger(self, batch, min, min, delay)
     }
 }
 
