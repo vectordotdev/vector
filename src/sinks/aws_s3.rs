@@ -196,7 +196,7 @@ impl S3Sink {
             .service(s3);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(
+            .partitioned_batched_with_min(
                 S3Buffer::new(compression),
                 batch_size,
                 Duration::from_secs(batch_timeout),
