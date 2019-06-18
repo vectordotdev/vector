@@ -73,8 +73,11 @@ class Sink < Component
           Vector checks for AWS credentials in the following order:
 
           1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
           ​2. [`credential_process` command][aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
+
           ​3. [AWS credentials file][aws_credentials_file], usually located at `~/.aws/credentials`.
+          
           4. ​[IAM instance profile][iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
 
           If credentials are not found the [healtcheck](#healthchecks) will fail and an error will be [logged][monitoring_logs].
