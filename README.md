@@ -70,11 +70,11 @@ As part of Vector's development, we invested in a robust [test harness](https://
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | SplunkUF | SplunkHF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| [TCP to Blackhole](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**`86mib/s`**_ | `n/a` | `64.4mib/s` | `27.7mib/s` | `40.6mib/s` | `n/a` | `n/a` |
-| [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | **`76.7mib/s`** | `7.8mib/s` | `35mib/s` | `26.1mib/s` | `3.1mib/s` | `40.1mib/s` | `39mib/s` |
-| [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) | `13.2mib/s` | `n/a` | **`20.5mib/s`** | `2.6mib/s` | `4.6mib/s` | `n/a` | `7.8mib/s` |
-| [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | **`26.7mib/s`** | `n/a` | `19.6mib/s` | `<1mib/s` | `2.7mib/s` | `n/a` | `n/a` |
-| [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | `69.9mib/s` | `5mib/s` | `67.1mib/s` | `3.9mib/s` | `10mib/s` | **`70.4mib/s`** | `7.6mib/s` |
+| [TCP to Blackhole](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**86mib/s**_ | n/a | 64.4mib/s | 27.7mib/s | 40.6mib/s | n/a | n/a |
+| [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | **76.7mib/s** | 7.8mib/s | 35mib/s | 26.1mib/s | 3.1mib/s | 40.1mib/s | 39mib/s |
+| [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) | 13.2mib/s | n/a | **20.5mib/s** | 2.6mib/s | 4.6mib/s | n/a | 7.8mib/s |
+| [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | **26.7mib/s** | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
+| [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | **70.4mib/s** | 7.6mib/s |
 
 ### Correctness
 
