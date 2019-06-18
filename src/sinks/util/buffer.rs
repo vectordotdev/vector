@@ -24,7 +24,7 @@ pub enum InnerBuffer {
 impl Buffer {
     pub fn new(gzip: bool) -> Self {
         let inner = if gzip {
-            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
+            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
         } else {
             InnerBuffer::Plain(Vec::new())
         };
