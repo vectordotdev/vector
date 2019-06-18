@@ -235,7 +235,7 @@ mod test {
         let log = parsed_inner_event.into_log();
 
         assert_eq!(log[&Atom::from("type")], "response".into());
-        assert_eq!(log[&Atom::from("statusCode")], (200 as u64).into());
+        assert_eq!(log[&Atom::from("statusCode")], 200.into());
     }
 
     #[test]
@@ -370,16 +370,16 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("string")], "this is text".into());
         assert_eq!(event.as_log()[&Atom::from("null")], "".into());
         assert_eq!(event.as_log()[&Atom::from("float")], 12.34.into());
-        assert_eq!(event.as_log()[&Atom::from("int")], (56 as u64).into());
+        assert_eq!(event.as_log()[&Atom::from("int")], 56.into());
         assert_eq!(event.as_log()[&Atom::from("bool true")], true.into());
         assert_eq!(event.as_log()[&Atom::from("bool false")], false.into());
         assert_eq!(event.as_log()[&Atom::from("array[0]")], "z".into());
-        assert_eq!(event.as_log()[&Atom::from("array[1]")], (7 as u64).into());
+        assert_eq!(event.as_log()[&Atom::from("array[1]")], 7.into());
         assert_eq!(event.as_log()[&Atom::from("object.nested")], "data".into());
         assert_eq!(event.as_log()[&Atom::from("object.more")], "values".into());
         assert_eq!(
             event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
-            (1234 as u64).into()
+            1234.into()
         );
     }
 }
