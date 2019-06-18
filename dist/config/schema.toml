@@ -1,0 +1,1890 @@
+#                                    __   __  __  
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#
+#                               Configuration Schema
+#
+# ------------------------------------------------------------------------------
+#
+# This file is used to represent the Vector configuration schema in a
+# parseable format. It is not designed to be exposed to users, instead
+# this file is used to generate files that should be exposed to users.
+# Specifically:
+#
+# * /config/spec.toml
+# * /docs/usage/configuration/sources/*
+# * /docs/usage/configuration/transforms/*
+# * /docs/usage/configuration/sinks/*
+#
+# ------------------------------------------------------------------------------
+# Usage
+# ------------------------------------------------------------------------------
+#
+# 1. Update the file as needed.
+# 2. Run `bin/sync_config_schema`
+# 3. Commit changes
+# 4. Send Ben a thank you for making your life easier.
+
+[enums]
+correctness_tests = [
+  "file_rotate_create_correctness",
+  "file_rotate_truncate_correctness",
+  "file_truncate_correctness",
+  "wrapped_json_correctness"
+]
+
+performance_tests = [
+  "file_to_tcp_performance",
+  "regex_parsing_performance",
+  "tcp_to_blackhole_performance",
+  "tcp_to_tcp_performance"
+]
+
+delivery_guarantees = ["at_least_once", "best_effort"]
+event_types = ["log", "metric"]
+
+# ------------------------------------------------------------------------------
+# global
+# ------------------------------------------------------------------------------
+# The global section represents global configuration options.
+[options.data_dir]
+type = "string"
+example = "/var/lib/vector"
+description = """\
+The directory used for persisting Vector state, such as on-disk buffers. \
+Please make sure the Vector projectt has write permissions to this dir.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.file
+# ------------------------------------------------------------------------------
+[sources.file]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "one or more local files"
+
+[[sources.file.outputs]]
+type = "text"
+body = """\
+Given the following input:
+
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "file": "/var/log/rails.log", # original file
+  "host": "10.2.22.122" # current nostname
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as \
+context. You can further parse the `"message"` key with a \
+[transform][transforms], such as the [`regeex` transform][regex_parser_transform].
+"""
+
+[sources.file.options.include]
+type = "[string]"
+null = false
+example = ["/var/log/nginx*.log"]
+description = """\
+Array of file patterns to include. [Globbing](#globbing) is supported.\
+"""
+
+[sources.file.options.exclude]
+type = "[string]"
+null = false
+example = ["/var/log/nginx*.log"]
+description = """\
+Array of file patterns to exclude. [Globbing](#globbing) is supported. \
+*Takes precedence over the `include` option.*\
+"""
+
+[sources.file.options.ignore_older]
+type = "int"
+unit = "seconds"
+null = true
+example = 86400
+description = """\
+Ignore files with a data modification date that does not exceed this age.\
+"""
+
+[sources.file.options.max_line_bytes]
+type = "int"
+unit = "bytes"
+null = true
+default = 102400
+description = """\
+The maximum number of a bytes a line can contain before being \
+discarded. This protects against malformed lines or tailing incorrect \
+files.\
+"""
+
+[sources.file.options.start_at_beginning]
+type = "bool"
+null = false
+default = false
+description = """\
+When `true` Vector will read from the beginning of new files, when \
+`false` Vector will only read new data added to the file.\
+"""
+
+[sources.file.options.file_key]
+type = "string"
+category = "Context"
+null = false
+default = "file"
+section = "context"
+description = """\
+The key name added to each event with the full path of the file.\
+"""
+
+[sources.file.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[[sources.file.sections]]
+title = "Auto Discovery"
+body = """\
+Vector will continually look for new files matching any of your \
+include patterns. If a new file is added that matches any of the \
+supplied patterns, Vector will begin tailing it. Vector maintains a \
+unique list of files and will not tail a file more than once, even \
+if it matches multiple patterns. You can read more about how we \
+identify file in the Identification section.\
+"""
+
+[[sources.file.sections]]
+title = "Context"
+body = """\
+Each event is augmented with contextual fields controlled by the \
+`file_key` and `host_key` options. Please see the descriptions for \
+each respective option.\
+"""
+
+[[sources.file.sections]]
+title = "File Deletions"
+body = """\
+If a file is deleted Vector will flush the current buffer and stop \
+tailing the file.\
+"""
+
+[[sources.file.sections]]
+title = "File Identification"
+body = """\
+Vector identifies files by creating a [cyclic redundancy check \
+(CRC)][crc] on the first 256 bytes of the file. This serves as a \
+fingerprint to uniquely identify the file. This strategy avoids the \
+common pitfalls of using device and inode names since inode names, \
+allowing Vector to [properly tail files in the event of \
+rotation][correctness].\
+"""
+
+[[sources.file.sections]]
+title = "File Rotation"
+body = """\
+Vector will follow files across rotations in the manner of tail, and \
+because of the way Vector [identifies files](#file-identification), \
+Vector will properly recognize newly rotated files regardless if you \
+are using `copytruncate` or `create` directive. To ensure Vector \
+handles rotated files properly we recommend:
+
+1. Ensure the `includes` paths include rotated files. For example, use \
+`/var/log/nginx*.log` to recognize `/var/log/nginx.2.log`.
+2. Use either the `copytruncate` or `create` directives when rotating \
+files. If historical data is compressed, or altered in any way, \
+Vector will not be able to properly identify the file.
+3. Only delete files when they have exceeded the `ignore_older` age. \
+While extremely rare, this ensures you do not delete data before \
+Vector has a chance to ingest it.\
+"""
+
+[[sources.file.sections]]
+title = "Globbing"
+body = """\
+[Globbing][globbing] is supported in all provided file paths, files \
+will be [autodiscovered](#auto_discovery) continually.\
+"""
+
+[[sources.file.sections]]
+title = "Line Delimiters"
+body = """\
+Each line is read until a new line delimiter (the `0xA` byte) \
+or `EOF` is found.\
+"""
+
+[[sources.file.sections]]
+title = "Read Position"
+body = """\
+Vector defaults to reading new data only. Only data added to the file \
+after Vector starts tailing the file will be collected. To read from \
+the beginning of the file set the start_at_beginning option to true.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.statsd
+# ------------------------------------------------------------------------------
+[sources.statsd]
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["metric"]
+resources = []
+through_description = "the StatsD UDP protocol"
+
+[[sources.statsd.outputs]]
+type = "counter"
+body = """\
+Given the following Statsd counter:
+
+```
+login.invocations:1|c
+```
+
+A [`metric` event][metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "counter": {
+    "name": "login.invocations",
+    "val": 1
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[[sources.statsd.outputs]]
+type = "guage"
+body = """\
+Given the following Statsd guage:
+
+```
+gas_tank:0.50|g
+```
+
+A [`metric` event][metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "guage": {
+    "name": "gas_tank",
+    "val": 0.5
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[[sources.statsd.outputs]]
+type = "set"
+body = """\
+Given the following Statsd set:
+
+```
+unique_users:foo|s
+```
+
+A [`metric` event][metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "set": {
+    "name": "unique_users",
+    "val": 1
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[[sources.statsd.outputs]]
+type = "timer"
+body = """\
+Given the following Statsd timer:
+
+```
+login.time:22|ms 
+```
+
+A [`metric` event][metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "timer": {
+    "name": "login.time",
+    "val": 22
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[sources.statsd.options.address]
+type = "string"
+null = false
+example = "127.0.0.1:8126"
+description = "UDP socket address to bind to."
+
+# ------------------------------------------------------------------------------
+# sources.stdin
+# ------------------------------------------------------------------------------
+[sources.stdin]
+delivery_guarantee = "at_least_once"
+guides = []
+resources = []
+through_description = "standard input (STDIN)"
+
+[[sources.stdin.outputs]]
+type = "text"
+body = """\
+Given the following input line:
+
+{% code-tabs %}
+{% code-tabs-item title="stdin" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "10.2.22.122" # current nostname
+}
+```
+
+The "timestamp" and `"host"` keys were automatically added as \
+context. You can further parse the `"message"` key with a \
+[transform][transforms], such as the [`regeex` transform][regex_parser_transform].
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[sources.stdin.options.max_length]
+type = "int"
+default = 102400
+unit = "bytes"
+description = "The maxiumum bytes size of a message before it is discarded."
+
+[sources.stdin.options.host_key]
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[[sources.stdin.sections]]
+title = "Line Delimiters"
+body = """\
+Each line is read until a new line delimiter (the `0xA` byte) is found.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.syslog
+# ------------------------------------------------------------------------------
+[sources.syslog]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "the Syslog 5424 protocol"
+
+[[sources.syslog.outputs]]
+type = "text"
+body = """\
+Given the following input line:
+
+{% code-tabs %}
+{% code-tabs-item title="stdin" %}
+Given the following input
+
+```
+<34>1 2018-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <2018-10-11T22:14:15.003Z> # current time,
+  "message": "<34>1 2018-10-11T22:14:15.003Z mymachine.example.com su - ID47 - 'su root' failed for lonvick on /dev/pts/8",
+  "host": "mymachine.example.com",
+  "peer_path": "/path/to/unix/socket" # only relevant if `mode` is `unix`
+}
+```
+
+Vector only extracts the `"timestamp"` and `"host"` fields and leaves the \
+`"message"` in-tact. You can further parse the `"message"` key with a \
+[transform][transforms], such as the [`regeex` transform][regex_parser_transform].
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[sources.syslog.options.address]
+type = "string"
+example = "0.0.0.0:9000"
+description = """\
+The TCP or UDP address to listen on. Only relevant when `mode` is \
+`tcp` or `udp`.\
+"""
+
+[sources.syslog.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.syslog.options.max_length]
+type = "int"
+default = 102400
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+[sources.syslog.options.mode]
+type = "string"
+enum = ["tcp", "udp", "unix"]
+description = "The input mode."
+
+[sources.syslog.options.path]
+type = "string"
+example = "/path/to/socket"
+description = """\
+The unix socket path. *This should be absolute path.* Only relevant \
+when `mode` is `unix`.
+"""
+
+[[sources.syslog.sections]]
+title = "Line Delimiters"
+body = """\
+Each line is read until a new line delimiter (the `0xA` byte) is found.\
+"""
+
+[[sources.syslog.sections]]
+title = "Parsing"
+body = """\
+Vector will parse messages in the [Syslog 5424][syslog_5424] format.
+
+#### Successful parsing
+
+Upon successful parsing, Vector will create a structured event. For \
+example, given this Syslog message:
+
+```
+<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar
+```
+
+Vector will produce an event with this structure.
+
+```javascripton
+{
+  "message": "<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar",
+  "timestamp": "2019-02-13T19:48:34+00:00",
+  "host": "74794bfb6795"
+}
+```
+
+#### Unsuccessful parsing
+
+Anyone with Syslog experience knows there are often deviations from \
+the Syslog specifications. Vector tries its best to account for these \
+(note the tests here). In the event Vector fails to parse your format, \
+we recommend that you open an issue informing us of this, and then \
+proceed to use the `tcp`, `udp`, or `unix` source coupled with a \
+parser [transform][transforms] transform of your choice.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.tcp
+# ------------------------------------------------------------------------------
+[sources.tcp]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "the TCP protocol"
+
+[[sources.tcp.outputs]]
+type = "text"
+body = """\
+Given the following input line:
+
+{% code-tabs %}
+{% code-tabs-item title="stdin" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "10.2.22.122" # current nostname
+}
+```
+
+The "timestamp" and `"host"` keys were automatically added as \
+context. You can further parse the `"message"` key with a \
+[transform][transforms], such as the [`regeex` transform][regex_parser_transform].
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+"""
+
+[sources.tcp.options.address]
+type = "string"
+example = "0.0.0.0:9000"
+description = "The address to bind the socket to."
+
+[sources.tcp.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.tcp.options.max_length]
+type = "int"
+default = 102400
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+[sources.tcp.options.shutdown_timeout_secs]
+type = "int"
+default = 30
+unit = "seconds"
+description = """\
+The timeout before a connection is forcefully closed during shutdown.\
+"""
+
+[[sources.tcp.sections]]
+title = "Line Delimiters"
+body = """\
+Each line is read until a new line delimiter (the `0xA` byte) is found.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.vector
+# ------------------------------------------------------------------------------
+[sources.vector]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "another upstream Vector instance"
+
+[[sources.vector.outputs]]
+type = "*"
+body = """\
+The `vector` source simply forwards incoming events from other upstream \
+Vector instances, unalterated.
+"""
+
+[sources.vector.options.address]
+type = "string"
+example = "0.0.0.0:9000"
+description = "The TCP address to bind to."
+
+[sources.vector.options.shutdown_timeout_secs]
+type = "int"
+default = 30
+unit = "seconds"
+description = """\
+The timeout before a connection is forcefully closed during shutdown.\
+"""
+
+[[sources.vector.sections]]
+title = "Encoding"
+body = """\
+Data is encoded via Vector's [event protobuf][event_proto] before it \
+is sent over the wire.\
+"""
+
+[[sources.vector.sections]]
+title = "Message Acking"
+body = """\
+Currently, Vector does not perform any application level message \
+acknowledgement. While rare, this means the individual message could \
+be lost.\
+"""
+issues = [492]
+
+[[sources.vector.sections]]
+title = "TCP Protocol"
+body = """\
+Upstream Vector instances forward data to downstream Vector instances \
+via the TCP protocol.\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.add_fields
+# ------------------------------------------------------------------------------
+[transforms.add_fields]
+allow_you_to_description = "add one or more fields"
+function_categories = ["change_fields"]
+guides = []
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
+resources = []
+
+[[transforms.add_fields.outputs]]
+type = "*"
+body = """\
+Given the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6": ["item1", "item2"],
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted \
+[types][config_value_types]. A few tgh
+"""
+
+[transforms.add_fields.options.fields]
+type = "table"
+description = """\
+A table of key/value pairs representing the keys to be added to the \
+event.\
+"""
+
+[transforms.add_fields.options.fields.options."*"]
+type = "string"
+example_key = "new_field"
+example = "new field value"
+description = """\
+A key/value pair representing the new field to be added. Accepts all \
+[supported types][config_value_types]. Use `.` for adding nested fields.\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Complex Transforming"
+body = """\
+The `add_fields` transform is designed for simple key additions. If \
+you need more complex transforming then we recommend using a more \
+versatile transform like the [`lua` transform][lua_transform].\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Environment Variables"
+body = """\
+As described in the [Configuration document][configuration], Vector \
+will interpolate environment variables in your configuration file. \
+This can be helpful when adding fields, such as adding a `"host"` field \
+as shown in the example.\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Special Characters"
+body = """\
+Aside from the [special characters][event_key_special_characters] listed \
+in the [Data Model][data_model] doc, Vector does not restrict the \
+characters allowed in keys. You can wrap key names in `" "` quote to \
+preserve spaces and use `\\` to escape quotes.\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Key Conflicts"
+body = "Keys specified in this transform will replace existing keys."
+
+[[transforms.add_fields.sections]]
+title = "Nested Fields"
+body = """
+As described in the [Data Model][data_model] document, Vector \
+represents events as flat maps, and nested fields are denoted by a `.` \
+character in the key name. Therefore, adding nested fields is as \
+simple as adding a `.` to your key name:
+
+```
+[transforms.<transform-id>]
+  # ...
+  
+  [transforms.<transform-id>.fields]
+    "parent.child.grandchild" = "<value>"
+```\
+"""
+
+[[transforms.add_fields.sections]]
+title = "Removing Fields"
+body = "See the [`remove_fields` transform][remove_fields_transform]."
+
+[[transforms.add_fields.sections]]
+title = "Value Types"
+body = """\
+All supported [configuration value types][config_value_types] are \
+accepted.\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.field_filter
+# ------------------------------------------------------------------------------
+[transforms.field_filter]
+allow_you_to_description = "filter events by a field's value"
+beta = true
+function_categories = ["filter"]
+guides = []
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
+resources = []
+
+[transforms.field_filter.options.field]
+type = "string"
+example = "file"
+description = "The target field to compare against the `value`."
+
+[transforms.field_filter.options.value]
+type = "string"
+example = "/var/log/nginx.log"
+description = """\
+If the value of the specified `field` matches this value then the event \
+will be permitted, otherwise it is dropped.\
+"""
+
+[[transforms.field_filter.sections]]
+title = "Complex Comparisons"
+body = """\
+The `field_filter` transform is designed for simple equality filtering, \
+it is not designed for complex comparisons. There are plans to build \
+a `filter` transform that accepts more complex filtering.\
+"""
+issues = [479]
+
+# ------------------------------------------------------------------------------
+# transforms.grok_parser
+# ------------------------------------------------------------------------------
+[transforms.grok_parser]
+allow_you_to_description = "parse a field value with [Grok][grok]"
+function_categories = ["parse"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = [
+  {name = "Grok Debugger", url = "grok_debugger"},
+  {name = "Grok Patterns", url = "grok_patterns"}
+]
+
+[transforms.grok_parser.options.drop_field]
+type = "bool"
+default = true
+description = """\
+If `true` will drop the `field` after parsing.\
+"""
+
+[transforms.grok_parser.options.field]
+type = "string"
+default = "message"
+description = """\
+The field to execute the `pattern` against. Must be a `string` value.\
+"""
+
+[transforms.grok_parser.options.pattern]
+type = "string"
+example = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+description = "The [Grok pattern][grok_patterns]"
+
+[[transforms.grok_parser.sections]]
+title = "Debugging"
+body = """\
+We recommend the [Grok debugger][grok_debugger] for Grok testing.\
+"""
+
+[[transforms.grok_parser.sections]]
+title = "Patterns"
+body = """\
+Vector uses the Rust [`grok` library][rust_grok_library]. All patterns \
+[listed here][grok_patterns] are supported. It is recommended to use \
+any maintained patterns when possible.\
+"""
+
+[[transforms.grok_parser.sections]]
+title = "Performance"
+body = """\
+Grok is approximately 50% slower than it's Regex counterpart. We plan \
+to add a [performance test][performance] for this in the future. While \
+this is still plenty fast for most use cases we recommend using the \
+[`regex_parser` transform][regex_parser_transform] if you are \
+experiencing performance issues.\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.json_parser
+# ------------------------------------------------------------------------------
+[transforms.json_parser]
+allow_you_to_description = "parse a field value as JSON"
+function_categories = ["parse_json"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.json_parser.options.drop_field]
+type = "bool"
+default = true
+description = """\
+If `true` will drop the `field` after parsing.\
+"""
+
+[transforms.json_parser.options.drop_invalid]
+type = "bool"
+example = true
+description = """\
+If `true` events with invalid JSON will be dropped, otherwise the \
+event will be kept and passed through.\
+"""
+
+[transforms.json_parser.options.field]
+type = "string"
+default = "message"
+description = """\
+The field decode as JSON. Must be a `string` value.\
+"""
+
+[[transforms.json_parser.sections]]
+title = "Key Conflicts"
+body = """\
+Any key present in the decoded JSON will override existin keys in the \
+event.\
+"""
+
+[[transforms.json_parser.sections]]
+title = "Invalid JSON"
+body = """\
+If the value for the specified `field` is not valid JSON you can \
+control keep or discard the event with the `drop_invalid` option. \
+Setting it to `true` will discard the event and drop it entirely. \
+Setting it to `false` will keep the event and pass it through. \
+Note that passing through the event could cause problems and violate \
+assumptions about the structure of your event.\
+"""
+
+[[transforms.json_parser.sections]]
+title = "Nested Fields"
+body = """\
+If the decoded JSON includes nested fields it will be _deep_ merged \
+into the event. For example, given the following event:
+
+```javascripton
+{
+  "message": "{\"parent\": {\"child2\": \"value2\"}}",
+  "parent": {
+    "child1": "value1"
+  }
+}
+```
+
+Parsing the `"message"` field would result the following structure:
+
+```javascripton
+{
+  "parent": {
+    "child1": "value1",
+    "child2": "value2"
+  }
+}
+```\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.lua
+# ------------------------------------------------------------------------------
+[transforms.lua]
+allow_you_to_description = "transform events with a full embedded [Lua][lua] engine"
+beta = true
+function_categories = ["parse"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = [
+  {name = "Lua Reference Manual", url = "http://www.lua.org/manual/5.1/manual.html"}
+]
+
+[transforms.lua.options.source]
+type = "string"
+description = "The inline Lua source to evaluate."
+example = """\
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end\
+"""
+
+[transforms.lua.options.search_dirs]
+type = "[string]"
+example = true
+description = """\
+A list of directories search when loading a Lua file via the `require` \
+function.\
+"""
+
+[[transforms.lua.sections]]
+title = "Global Variables"
+body = """\
+When evaluating the provided `source`, Vector will provide a single global \
+variable representing the event:
+
+| Name | Type | Description |
+| :--- | :--: | :---------- |
+| `event` | [`table`][lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][default_schema].
+
+Note, a Lua `table` is an associative array. You can read more about \
+[Lua types][lua_types] in the [Lua docs][lua_docs].\
+"""
+
+[[transforms.lua.sections]]
+title = "Search Directories"
+body = """\
+Vector provides a `search_dirs` option that allows you to specify absolute \
+paths that will searched when using the [Lua `require` function][lua_require].\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.regex_parser
+# ------------------------------------------------------------------------------
+[transforms.regex_parser]
+allow_you_to_description = """\
+parse a field's value with a [Regular Expression][regex]\
+"""
+function_categories = ["parse"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.regex_parser.options.drop_failed]
+type = "bool"
+default = false
+description = "If `true`, events that fail to properly parse will be dropped."
+
+[transforms.regex_parser.options.drop_field]
+type = "bool"
+default = true
+description = "If the `field` should be dropped (removed) after parsing."
+
+[transforms.regex_parser.options.field]
+type = "string"
+default = "message"
+description = "The field to parse."
+
+[transforms.regex_parser.options.regex]
+type = "string"
+description = """\
+The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
+"""
+example = """\
+^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] "(?P<method>[\\w]+) (?P<path>.*)" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$\
+"""
+null = false
+
+[[transforms.regex_parser.sections]]
+title = "Failed Parsing"
+body = """\
+If the `field` value fails to parse against the provided `regex` then an \
+error will be [logged][monitoring_logs] and the event will be kept or discarded \
+depending on the `drop_failed` value.
+
+A failure includes any event that does not successfully parse against the \
+provided `regex`. This includes bad values as well as events missing the \
+specified `field`.\
+"""
+
+[[transforms.regex_parser.sections]]
+title = "Regex Captures"
+body = """\
+You can name Regex captures with the `<name>` syntax. For example:
+
+```
+^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$
+```
+
+Will capture `timestamp`, `level`, and `message`. All values are extracted \
+as `string` values and must be coerced with the `types` table.\
+
+More info can be found in the [Regex grouping and flags \
+documentation][regex_grouping_and_flags].
+"""
+
+[[transforms.regex_parser.sections]]
+title = "Regex Debugger"
+body = """\
+To test the validity of the `regex` option, we recommend the \
+[Golang Regex Tester][golang_regex_tester] as it's Regex syntax closely 
+follows Rust's.\
+"""
+
+[[transforms.regex_parser.sections]]
+title = "Regex Flags"
+body = """\
+Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
+
+| Flag | Descriuption |
+| :--- | :----------- |
+| `i`  | case-insensitive: letters match both upper and lower case |
+| `m`  | multi-line mode: ^ and $ match begin/end of line |
+| `s`  | allow . to match `\\n` |
+| `U`  | swap the meaning of `x*` and `x*?` |
+| `u`  | Unicode support (enabled by default) |
+| `x`  | ignore whitespace and allow line comments (starting with `#`)
+
+For example, to enable the case-insensitive flag you can write:
+
+```
+(?i)Hello world
+```
+
+More info can be found in the [Regex grouping and flags \
+documentation][regex_grouping_and_flags]. 
+"""
+
+[[transforms.regex_parser.sections]]
+title = "Regex Syntax"
+body = """\
+The syntax of the `regex` option should follow [documented Rust \
+Regex syntax][rust_regex_syntax] since Vector is written in Rust. This \
+syntax follows a Perl-style regular expression syntax, but lacks a few \
+features like look around and backreferences.
+
+You can read more in the [Rust Regex docs][rust_regex_syntax].\
+"""
+
+[[transforms.regex_parser.resources]]
+name = "Regex Tester"
+url = "https://regex-golang.appspot.com/assets/html/index.html"
+
+[[transforms.regex_parser.resources]]
+name = "Rust Regex Syntax"
+url = "https://docs.rs/regex/1.1.7/regex/#syntax"
+
+# ------------------------------------------------------------------------------
+# transforms.remove_fields
+# ------------------------------------------------------------------------------
+[transforms.remove_fields]
+allow_you_to_description = "remove one or more event fields"
+function_categories = ["change_fields"]
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
+
+[transforms.remove_fields.options.fields]
+type = "[string]"
+example = ["field1", "field2"]
+description = "The field names to drop."
+
+# ------------------------------------------------------------------------------
+# transforms.sampler
+# ------------------------------------------------------------------------------
+[transforms.sampler]
+allow_you_to_description = "sample events with a configurable rate"
+beta = true
+function_categories = ["sample"]
+input_types = ["log"]
+output_types = ["log"]
+
+[transforms.sampler.options.pass_list]
+type = "[string]"
+example = ["[error]", "field2"]
+description = """\
+A list of regular expression patterns to exclude events from sampling. \
+If an event's `"message"` key matches _any_ of these patterns it will \
+_not_ be sampled.\
+"""
+
+[transforms.sampler.options.rate]
+type = "int"
+example = ["field1", "field2"]
+description = "The maximum number of events allowed per second."
+
+## TODO: Add regex synax docs?
+
+# ------------------------------------------------------------------------------
+# transforms.tokenizer
+# ------------------------------------------------------------------------------
+[transforms.tokenizer]
+allow_you_to_description = """\
+tokenize a field's value by splitting on white space and zipping the tokens \
+with ordered field names\
+"""
+function_categories = ["parse"]
+input_types = ["log"]
+output_types = ["log"]
+
+[transforms.tokenizer.options.field]
+type = "string"
+default = "message"
+description = "The field to tokenize."
+
+[transforms.tokenizer.options.field_names]
+type = "[string]"
+example = ["timestamp", "level", "message"]
+description = "The field names assigned to the resulting tokens, in order."
+
+[transforms.tokenizer.options.drop_field]
+type = "bool"
+default = true
+description = "If `true` the `field` will be dropped after parsing."
+
+[[transforms.tokenizer.sections]]
+title = "Special Characters"
+body = """\
+In order to extract raw values without noise we must treat certain characters \
+as special:
+
+* `"..."` - Is used tp wrap phrases. Spaces are preserved, but the wrapping \
+            quotes will be discarded.
+* `[...]` - Is used to wrap phrases. Spaces are preserved, but the wrapping \
+            brackers will be discarded.
+* `\\` - Can be used to escape the above characters, making them literal.\
+"""
+
+[[transforms.tokenizer.sections]]
+title = "Example"
+body = """\
+The specified `field`'s value is tokenized by splitting on it's white space.
+
+For example, take this config:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.<transform-id>]
+type = "tokenizer"
+field = "message"
+fields = ["timestamp", "level", "message"]
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+And this event:
+
+```javascripton
+{
+  "message": "2019-05-22T23:22:55.256231Z [INFO] \"Hello world\""
+}
+```
+
+This transform will produce the following tokens:
+
+```
+["2019-05-22T23:22:55.256231Z", "INFO", "Hello world"]
+```
+
+You'll notice that the `[`, `]`, and `"` characters are not included, they \
+are [special characters](#special-characters). To proceed, these tokesn will \
+be zipped with the provided `field_names` and merged into the event:
+
+```javascripton
+{
+  "timestamp": "2019-05-22T23:22:55.256231Z",
+  "level": "INFO",
+  "message": "Hello world"
+}
+```\
+"""
+
+# ------------------------------------------------------------------------------
+# sinks.aws_cloudwatch_logs
+# ------------------------------------------------------------------------------
+[sinks.aws_cloudwatch_logs]
+batch_size = 1049000
+batch_timeout = 1
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+service_limits_url = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
+service_provider = "AWS"
+write_style = "batching"
+write_to_description = "[AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
+
+[[sinks.aws_cloudwatch_logs.outputs]]
+type = "*"
+body = """\
+```http
+POST / HTTP/1.1
+Host: logs.<region>.<domain>
+X-Amz-Date: <date>
+Accept: application/json
+Content-Type: application/x-amz-json-1.1
+Content-Length: <byte_size>
+Connection: Keep-Alive
+X-Amz-Target: Logs_20140328.PutLogEvents
+{
+  "logGroupName": "<group_name>",
+  "logStreamName": "<stream_name>",
+  "logEvents": [
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }, 
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }, 
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }
+  ]
+}
+```\
+"""
+
+[sinks.aws_cloudwatch_logs.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["json", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.aws_cloudwatch_logs.options.group_name]
+type = "string"
+example = "/var/log/my-log.log"
+null = false
+description = "The [group name][aws_cw_logs_group_name] of the target CloudWatch Logs stream."
+
+[sinks.aws_cloudwatch_logs.options.region]
+type = "string"
+example = "us-east-1"
+null = false
+description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+
+[sinks.aws_cloudwatch_logs.options.stream_name]
+type = "string"
+example = "my-stream"
+null = false
+description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+
+# ------------------------------------------------------------------------------
+# sinks.aws_kinesis_streams
+# ------------------------------------------------------------------------------
+[sinks.aws_kinesis_streams]
+batch_size = 1049000
+batch_timeout = 1
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+service_limits_url = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+service_provider = "AWS"
+write_style = "batching"
+write_to_description = "[AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
+
+[[sinks.aws_kinesis_streams.outputs]]
+type = "*"
+body = """\
+```http
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive 
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}
+```
+"""
+
+[sinks.aws_kinesis_streams.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["json", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.aws_kinesis_streams.options.region]
+type = "string"
+example = "us-east-1"
+null = false
+description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+
+[sinks.aws_kinesis_streams.options.stream_name]
+type = "string"
+example = "my-stream"
+null = false
+description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+
+# ------------------------------------------------------------------------------
+# sinks.aws_s3
+# ------------------------------------------------------------------------------
+[sinks.aws_s3]
+batch_size = 10490000
+batch_timeout = 300
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+service_limits_url = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+service_provider = "AWS"
+write_style = "batching"
+write_to_description = "[AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
+
+[[sinks.aws_s3.outputs]]
+type = "*"
+body = """\
+```http
+POST / HTTP/1.1
+Host: kinesis.<region>.<domain>
+Content-Length: <byte_size>
+Content-Type: application/x-amz-json-1.1
+Connection: Keep-Alive 
+X-Amz-Target: Kinesis_20131202.PutRecords
+{
+    "Records": [
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+        {
+            "Data": "<base64_encoded_event>",
+            "PartitionKey": "<partition_key>"
+        },
+    ],
+    "StreamName": "<stream_name>"
+}
+```
+"""
+
+[sinks.aws_s3.options.bucket]
+type = "string"
+example = "my-bucket"
+null = false
+description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
+
+[sinks.aws_s3.options.compression]
+type = "string"
+category = "Requests"
+enum = ["gzip"]
+description = "The compression type to use before flushing data."
+
+[sinks.aws_s3.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["ndjson", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.aws_s3.options.key_prefix]
+type = "string"
+example = "us-east-1"
+null = false
+description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+
+[sinks.aws_s3.options.region]
+type = "string"
+example = "us-east-1"
+null = false
+description = "The [AWS region][aws_cw_logs_regions] of the target S3 bucket."
+
+# ------------------------------------------------------------------------------
+# sinks.blachole
+# ------------------------------------------------------------------------------
+[sinks.blackhole]
+delivery_guarantee = "best_effort"
+input_types = ["log", "metric"]
+write_style = "streaming"
+write_to_description = """\
+a blackhole that simply discards data, designed for testing and \
+benchmarking purposes\
+"""
+
+[sinks.blackhole.options.print_amount]
+type = "int"
+example = "1000"
+null = false
+description = "The number of events that must be received in order to print a summary of activity."
+
+# ------------------------------------------------------------------------------
+# sinks.console
+# ------------------------------------------------------------------------------
+[sinks.console]
+delivery_guarantee = "best_effort"
+input_types = ["log", "metric"]
+write_style = "streaming"
+write_to_description = "the console, `STDOUT` or `STDERR`"
+
+[sinks.console.options.encoding]
+type = "string"
+enum = ["json", "text"]
+description = "The encoding format used to serialize the events before writing."
+
+[sinks.console.options.target]
+type = "string"
+defaukt = "stdout"
+enum = ["stdout", "stderr"]
+description = "The [standard stream][standard_streams] to write to."
+
+# ------------------------------------------------------------------------------
+# sinks.elasticsearch
+# ------------------------------------------------------------------------------
+[sinks.elasticsearch]
+batch_size = 10490000
+batch_timeout = 1
+delivery_guarantee = "best_effort"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 60
+service_provider = "Elastic"
+write_style = "batching"
+write_to_description = "[Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
+
+[[sinks.elasticsearch.outputs]]
+type = "*"
+body = """\
+```http
+POST <host>/_bulk HTTP/1.1
+Host: <host>
+Content-Type: application/x-ndjson
+Content-Length: 654
+
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557932537, "message": "GET /roi/evolve/embrace/transparent", "host": "Stracke8362", "process_id": 914, "remote_addr": "30.163.82.140", "response_code": 504, "bytes": 29763} 
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557933548, "message": "PUT /value-added/b2b", "host": "Wiza2458", "process_id": 775, "remote_addr": "30.163.82.140", "response_code": 503, "bytes": 9468}
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557933742, "message": "DELETE /reinvent/interfaces", "host": "Herman3087", "process_id": 775, "remote_addr": "43.246.221.247", "response_code": 503, "bytes": 9700}
+```\
+"""
+
+[sinks.elasticsearch.options.doc_type]
+type = "string"
+default = "_doc"
+null = false
+description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
+
+[sinks.elasticsearch.options.host]
+type = "string"
+example = "10.24.32.122:9000"
+null = false
+description = "The host of your Elasticsearch cluster."
+
+[sinks.elasticsearch.options.index]
+type = "string"
+default = "vector-%F"
+null = false
+description = "Index name to write events to. [`strftime` specifiers][strftime_specifiers] are supported."
+
+[[sinks.elasticsearch.sections]]
+title = "Nested Documents"
+body = """\
+Vector will explode events into nested documents before writing them to Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read more about how Vector handles nested documents in the [Data Model document][data_model].
+"""
+
+[[sinks.elasticsearch.sections]]
+title = "Partitioning"
+body = """\
+Vector supports dynamic index names through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the index name, creating time partitioned indices. This is highly recommended for the logging use case since it allows for easy data pruning by simply deleting old indices.
+
+For example, when the `index` setting is set to `vector-%Y-%m-%d`, vector will create indexes with names like `vector-2019-05-04`, `vector-2019-05-05`, and so on. The date values are derived from the [event's `timestamp`][default_schema].\
+"""
+
+# ------------------------------------------------------------------------------
+# sinks.http
+# ------------------------------------------------------------------------------
+[sinks.http]
+batch_size = 1049000
+batch_timeout = 5
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 10
+retry_attempts = 10
+retry_backoff_secs = 1
+request_in_flight_limit = 10
+request_timeout_secs = 30
+service_provider = "Elastic"
+write_style = "batching"
+write_to_description = "a generic HTTP endpoint"
+
+[[sinks.http.outputs]]
+type = "*"
+body = """\
+```http
+POST <host>/_bulk HTTP/1.1
+Host: <host>
+Content-Type: application/x-ndjson
+Content-Length: 654
+
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557932537, "message": "GET /roi/evolve/embrace/transparent", "host": "Stracke8362", "process_id": 914, "remote_addr": "30.163.82.140", "response_code": 504, "bytes": 29763} 
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557933548, "message": "PUT /value-added/b2b", "host": "Wiza2458", "process_id": 775, "remote_addr": "30.163.82.140", "response_code": 503, "bytes": 9468}
+{ "index" : { "_index" : "<index>" } }
+{"timestamp": 1557933742, "message": "DELETE /reinvent/interfaces", "host": "Herman3087", "process_id": 775, "remote_addr": "43.246.221.247", "response_code": 503, "bytes": 9700}
+```\
+"""
+
+[sinks.http.options.basic_auth]
+type = "table"
+description = "Options for basic authentication."
+
+[sinks.http.options.basic_auth.options.password]
+type = "string"
+example = "password"
+description = "The basic authentication password."
+
+[sinks.http.options.basic_auth.options.user]
+type = "string"
+example = "username"
+description = "The basic authentication user name."
+
+[sinks.http.options.compression]
+type = "string"
+enum = ["gzip"]
+description = "The compression strategy used to compress the payload before sending."
+
+[sinks.http.options.encoding]
+type = "string"
+enum = ["ndjson", "text"]
+null = false
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.http.options.headers]
+type = "table"
+description = "Options for custom headers."
+
+[sinks.http.options.headers.options."*"]
+type = "string"
+example_key = "X-Powered-By"
+example = "Vector"
+description = "A custom header to be added to each outgoing HTTP request."
+
+[sinks.http.options.healthcheck_uri]
+type = "string"
+example = "https://10.22.212.22:9000/_health"
+null = true
+description = "A URI that Vector can request in order to determine the service health."
+
+[sinks.http.options.uri]
+type = "string"
+example = "https://10.22.212.22:9000/endpoint"
+null = false
+description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
+
+[[sinks.http.sections]]
+title = "Authentication"
+body = """\
+HTTP authentication is controlled via the `Authorization` header which you can set with the `headers` option. For convenience, Vector also supports the `basic_auth.username` and `basic_auth.password` options which handle setting the `Authorization` header for the [base access authentication scheme][basic_auth].\
+"""
+
+# ------------------------------------------------------------------------------
+# sinks.kafka
+# ------------------------------------------------------------------------------
+[sinks.kafka]
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+service_provider = "Confluent"
+write_style = "streaming"
+write_to_description = "[Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]"
+
+[sinks.kafka.options.bootstrap_servers]
+type = "string"
+example = "10.14.22.123:9092,10.14.23.332:9092"
+null = false
+description = """\
+A comma-separated list of host and port pairs that are the addresses of the \
+Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
+to initially to bootstrap itself\
+"""
+
+[sinks.kafka.options.encoding]
+type = "string"
+enum = ["json", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.kafka.options.key_field]
+type = "string"
+example = "partition_key"
+description = """\
+The field name to use for the topic key. If unspecified, the key will be \
+randomly generated. If the field does not exist on the event, a blank value \
+will be used.\
+"""
+
+[sinks.kafka.options.topic]
+type = "string"
+example = "topic-1234"
+null = false
+description = "The Kafka topic name to write events to."
+
+[[sinks.http.sections]]
+title = "Partitioning"
+body = """\
+In order to partition data within a Kafka topic, you must specify a \
+`key_field`. This is the name of the field on your event to use as the \
+value for the partition key. Partitioning data in Kafka is generally used to \
+group and maintain order of data sharing the same partition key. You can \
+learn more about partitioning in the [Kakfa docs][kafka_partitioning_docs].
+
+You can use [transforms][transforms] to add a partition key field if your \
+events do not already have one.
+"""
+
+# ------------------------------------------------------------------------------
+# sinks.splunk_hec
+# ------------------------------------------------------------------------------
+[sinks.splunk_hec]
+batch_size = 1049000
+batch_timeout = 1
+delivery_guarantee = "at_least_once"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 10
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 10
+request_timeout_secs = 60
+service_provider = "Splunk"
+write_style = "batching"
+write_to_description = "a [Splunk HTTP Event Collector][splunk_hec]"
+
+[sinks.splunk_hec.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["ndjson", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+[sinks.splunk_hec.options.host]
+type = "string"
+example = "my-splunk-host.com"
+description = "Your Splunk HEC host."
+
+[sinks.splunk_hec.options.token]
+type = "string"
+example = "A94A8FE5CCB19BA61C4C08"
+description = "Your Splunk HEC token."
+
+[[sinks.splunk_hec.sections]]
+title = "Setup"
+body = """\
+In order to supply values for both the `host` and `token` options you must \
+first setup a Splunk HTTP Event Collector. Please refer to the [Splunk \
+setup docs][splunk_hec_setup] for a guide on how to do this. Once you've \
+setup your Spunk HTTP Collectory you'll be provided a `host` and `token`
+that you should supply to the `host` and `token` options.
+"""
+
+# ------------------------------------------------------------------------------
+# sinks.tcp
+# ------------------------------------------------------------------------------
+[sinks.tcp]
+delivery_guarantee = "best_effort"
+input_types = ["log"]
+write_style = "streaming"
+write_to_description = "a TCP connection"
+
+[sinks.tcp.options.address]
+type = "string"
+example = "92.12.333.224:5000"
+description = "The TCP address."
+
+[sinks.tcp.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["json", "text"]
+description = "The encoding format used to serialize the events before flushing."
+
+# ------------------------------------------------------------------------------
+# sinks.vector
+# ------------------------------------------------------------------------------
+[sinks.vector]
+delivery_guarantee = "best_effort"
+input_types = ["log"]
+write_style = "streaming"
+write_to_description = "another downstream Vector instance"
+
+[sinks.vector.options.address]
+type = "string"
+example = "92.12.333.224:5000"
+description = "The downstream Vector address."
+
+# ------------------------------------------------------------------------------
+# links
+# ------------------------------------------------------------------------------
+[links]
+at_least_once_delivery = "/about/guarantees.md#at-least-once-delivery"
+aws_access_keys = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+aws_credentials_file = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"
+aws_credential_process = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html"
+aws_cw_logs = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html"
+aws_cw_logs_group_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
+aws_cw_logs_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region"
+aws_cw_logs_stream_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
+aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
+aws_s3 = "https://aws.amazon.com/s3/"
+basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"
+best_effort_delivery = "/about/guarantees.md#best-effort-delivery"
+community = "https://vectorproject.io/community"
+config_composition = "/usage/configuration/README.md#composition"
+config_value_types = "/usage/configuration/README.md#value-types"
+configuration = "/usage/configuration/README.md"
+correctness = "/correctness.md"
+crc = "https://en.wikipedia.org/wiki/Cyclic_redundancy_check"
+data_model = "/about/data_model.md"
+default_schema = "/about/data_model.md#default-schema"
+elasticsearch = "https://www.elastic.co/products/elasticsearch"
+event_key_special_characters = "/about/data-model.md#special-characters"
+event_proto = "https://github.com/timberio/vector/blob/master/proto/event.proto"
+globbing = "https://en.wikipedia.org/wiki/Glob_(programming)"
+golang_regex_tester = "https://regex-golang.appspot.com/assets/html/index.html"
+grok = "http://grokdebug.herokuapp.com/"
+grok_debugger = "http://grokdebug.herokuapp.com/"
+grok_patterns = "https://github.com/daschl/grok/tree/master/patterns"
+gzip = "https://www.gzip.org/"
+iam_instance_profile = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html"
+kafka = "https://kafka.apache.org/"
+kafka_partitioning_docs = "https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Partitioningandbootstrapping"
+kafka_protocol = "https://kafka.apache.org/protocol"
+lua = "https://www.lua.org/"
+lua_docs = "https://www.lua.org/manual/5.3/"
+lua_require = "http://www.lua.org/manual/5.1/manual.html#pdf-require"
+lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
+lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
+log_event = "/about/data-model.md#log"
+metric_event = "/about/data-model.md#metric"
+monitoring_logs = "/administration/moonitoring.md#logs"
+performance = "/performance.md"
+regex = "https://en.wikipedia.org/wiki/Regular_expression"
+regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
+rust = "https://www.rust-lang.org/"
+rust_grok_library = "https://github.com/daschl/grok"
+rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
+search_forum = "https://forum.vectorproject.io/search?expanded=true"
+sources = "/usage/configuration/sources"
+splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
+splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
+standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
+starting = "/usage/administration/starting.md"
+strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
+syslog_5424 = "https://tools.ietf.org/html/rfc5424"
+toml_table = "https://github.com/toml-lang/toml#user-content-table"
+transforms = "/usage/configuration/transforms"
+troubleshooting = "/usages/guides/troubleshooting.md"
