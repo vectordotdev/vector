@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod buffer;
 pub mod http;
+pub mod partition;
 pub mod retries;
 
 use crate::buffers::Acker;
@@ -13,6 +14,7 @@ use tower::Service;
 
 pub use batch::{Batch, BatchSink};
 pub use buffer::{Buffer, Compression};
+pub use partition::{Partition, PartitionedBatchSink};
 
 pub trait SinkExt<T>
 where
@@ -34,6 +36,18 @@ where
         T: Batch,
     {
         BatchSink::new_min(self, batch, min, Some(delay))
+    }
+
+    fn partitioned_batched_with_min(
+        self,
+        batch: T,
+        min: usize,
+        delay: Duration,
+    ) -> PartitionedBatchSink<T, Self>
+    where
+        T: Batch,
+    {
+        PartitionedBatchSink::with_linger(self, batch, min, min, delay)
     }
 }
 

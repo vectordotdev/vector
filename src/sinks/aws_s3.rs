@@ -1,12 +1,14 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event},
+    event::{self, Event, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, Buffer, SinkExt,
+        Batch, BatchServiceSink, Buffer, Partition, SinkExt,
     },
 };
+use bytes::Bytes;
+use chrono::Utc;
 use futures::{Future, Poll, Sink};
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_s3::{
@@ -19,6 +21,7 @@ use std::time::Duration;
 use tokio_trace::field;
 use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct S3Sink {
@@ -26,13 +29,17 @@ pub struct S3Sink {
     key_prefix: String,
     bucket: String,
     gzip: bool,
+    filename_time_format: String,
+    filename_append_uuid: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     pub bucket: String,
-    pub key_prefix: String,
+    pub key_prefix: Option<String>,
+    pub filename_time_format: Option<String>,
+    pub filename_append_uuid: Option<bool>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: Option<usize>,
@@ -61,6 +68,68 @@ pub enum Encoding {
 pub enum Compression {
     Gzip,
     None,
+}
+
+pub struct S3Buffer {
+    inner: Buffer,
+    key: Option<Bytes>,
+}
+
+#[derive(Clone)]
+pub struct InnerBuffer {
+    pub(self) inner: Vec<u8>,
+    key: Bytes,
+}
+
+impl Partition for InnerBuffer {
+    fn partition(&self) -> Bytes {
+        self.key.clone()
+    }
+}
+
+impl S3Buffer {
+    pub fn new(gzip: bool) -> Self {
+        Self {
+            inner: Buffer::new(gzip),
+            key: None,
+        }
+    }
+}
+
+impl Batch for S3Buffer {
+    type Input = InnerBuffer;
+    type Output = InnerBuffer;
+
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    fn push(&mut self, item: Self::Input) {
+        let partition = item.partition();
+        self.key = Some(partition);
+        self.inner.push(&item.inner[..])
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            key: None,
+        }
+    }
+
+    fn finish(mut self) -> Self::Output {
+        let key = self.key.take().unwrap();
+        let inner = self.inner.finish();
+        InnerBuffer { inner, key }
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
 }
 
 impl Default for Compression {
@@ -101,13 +170,22 @@ impl S3Sink {
             Compression::None => false,
         };
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(10u64) as usize);
+        let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
+        let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
+
+        let key_prefix = config
+            .key_prefix
+            .clone()
+            .unwrap_or_else(|| "date=%F".into());
 
         let region = config.region.clone();
         let s3 = S3Sink {
             client: Self::create_client(region.try_into()?),
-            key_prefix: config.key_prefix.clone(),
+            key_prefix: key_prefix.clone(),
             bucket: config.bucket.clone(),
             gzip: compression,
+            filename_time_format,
+            filename_append_uuid,
         };
 
         let svc = ServiceBuilder::new()
@@ -118,12 +196,12 @@ impl S3Sink {
             .service(s3);
 
         let sink = BatchServiceSink::new(svc, acker)
-            .batched_with_min(
-                Buffer::new(compression),
+            .partitioned_batched_with_min(
+                S3Buffer::new(compression),
                 batch_size,
                 Duration::from_secs(batch_timeout),
             )
-            .with(move |e| encode_event(e, &encoding));
+            .with(move |e| encode_event(e, &key_prefix, &encoding));
 
         Ok(Box::new(sink))
     }
@@ -172,7 +250,7 @@ impl S3Sink {
     }
 }
 
-impl Service<Vec<u8>> for S3Sink {
+impl Service<InnerBuffer> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -181,21 +259,36 @@ impl Service<Vec<u8>> for S3Sink {
         Ok(().into())
     }
 
-    fn call(&mut self, body: Vec<u8>) -> Self::Future {
-        // TODO: make this based on the last event in the file
-        let filename = chrono::Local::now().format("%Y-%m-%d-%H-%M-%S-%f");
-        let extension = if self.gzip { ".log.gz" } else { ".log" };
-        let key = format!("{}{}{}", self.key_prefix, filename, extension);
+    fn call(&mut self, body: InnerBuffer) -> Self::Future {
+        let InnerBuffer { inner, key } = body;
+
+        // TODO: pull the seconds from the last event
+        let filename = {
+            let seconds = Utc::now().format(&self.filename_time_format);
+
+            if self.filename_append_uuid {
+                let uuid = Uuid::new_v4();
+                format!("{}-{}", seconds, uuid.to_hyphenated())
+            } else {
+                seconds.to_string()
+            }
+        };
+
+        let extension = if self.gzip { "log.gz" } else { "log" };
+
+        let key = String::from_utf8_lossy(&key[..]).into_owned();
+
+        let key = format!("{}/{}.{}", key, filename, extension);
 
         debug!(
             message = "sending events.",
-            bytes = &field::debug(body.len()),
+            bytes = &field::debug(inner.len()),
             bucket = &field::debug(&self.bucket),
             key = &field::debug(&key)
         );
 
         let request = PutObjectRequest {
-            body: Some(body.into()),
+            body: Some(inner.into()),
             bucket: self.bucket.clone(),
             key,
             content_encoding: if self.gzip {
@@ -227,14 +320,28 @@ impl RetryLogic for S3RetryLogic {
     }
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
+fn encode_event(
+    event: Event,
+    batch_time_format: &String,
+    encoding: &Option<Encoding>,
+) -> Result<InnerBuffer, ()> {
     let log = event.into_log();
+
+    let key = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
+        ts.format(batch_time_format).to_string()
+    } else {
+        Utc::now().format(batch_time_format).to_string()
+    };
 
     match (encoding, log.is_structured()) {
         (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
             .map(|mut b| {
                 b.push(b'\n');
                 b
+            })
+            .map(|b| InnerBuffer {
+                inner: b,
+                key: key.into(),
             })
             .map_err(|e| panic!("Error encoding: {}", e)),
         (&Some(Encoding::Text), _) | (_, false) => {
@@ -243,7 +350,10 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
             bytes.push(b'\n');
-            Ok(bytes)
+            Ok(InnerBuffer {
+                inner: bytes,
+                key: key.into(),
+            })
         }
     }
 }
@@ -252,15 +362,17 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()
 mod tests {
     use super::*;
     use crate::event::{self, Event};
+
     use std::collections::HashMap;
 
     #[test]
     fn s3_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let bytes = encode_event(message.clone().into(), &None).unwrap();
+        let batch_time_format = "date=%F".to_string();
+        let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
 
         let encoded_message = message + "\n";
-        assert_eq!(&bytes[..], encoded_message.as_bytes());
+        assert_eq!(&bytes.inner[..], encoded_message.as_bytes());
     }
 
     #[test]
@@ -270,9 +382,11 @@ mod tests {
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let bytes = encode_event(event, &None).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let batch_time_format = "date=%F".to_string();
+        let bytes = encode_event(event, &batch_time_format, &None).unwrap();
+
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes.inner[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -292,6 +406,7 @@ mod integration_tests {
     };
     use flate2::read::GzDecoder;
     use futures::{Future, Sink};
+    use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader};
@@ -309,7 +424,7 @@ mod integration_tests {
         let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
-        let keys = get_keys(prefix);
+        let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
@@ -328,6 +443,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
+            filename_time_format: Some("%F%f".into()),
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -338,7 +454,7 @@ mod integration_tests {
         let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
-        let keys = get_keys(prefix);
+        let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 3);
 
         let response_lines = keys
@@ -357,6 +473,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
+            filename_time_format: Some("%F%f".into()),
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -384,7 +501,7 @@ mod integration_tests {
 
         crate::test_util::shutdown_on_idle(rt);
 
-        let keys = get_keys(prefix);
+        let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 3);
 
         let response_lines = keys
@@ -404,6 +521,7 @@ mod integration_tests {
         let config = S3SinkConfig {
             batch_size: Some(1000),
             compression: Compression::Gzip,
+            filename_time_format: Some("%S%f".into()),
             ..config()
         };
         let prefix = config.key_prefix.clone();
@@ -414,7 +532,7 @@ mod integration_tests {
         let pump = sink.send_all(events);
         block_on(pump).unwrap();
 
-        let keys = get_keys(prefix);
+        let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 2);
 
         let response_lines = keys
@@ -466,7 +584,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         S3SinkConfig {
-            key_prefix: random_string(10) + "/",
+            key_prefix: Some(random_string(10) + "/date=%F"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
             batch_timeout: Some(5),
@@ -498,6 +616,8 @@ mod integration_tests {
     }
 
     fn get_keys(prefix: String) -> Vec<String> {
+        let prefix = prefix.split("/").into_iter().next().unwrap().to_string();
+
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
                 bucket: BUCKET.to_string(),
