@@ -48,9 +48,9 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `fields` | `[string]` | The field names to drop.<br />`no default` `example: ["field1", "field2"]` |
 
 ## I/O

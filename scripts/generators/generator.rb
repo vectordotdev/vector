@@ -34,8 +34,10 @@ class Generator
     def beta(component)
       if component.beta?
         content = <<~EOF
-        {% hint style="warn" %}
-        This #{component_type(component)} is in `beta`. Please help improve it's quality by opening issues to [suggest enhancements](#{new_component_issue_url(component, enhancement_label)}) or [report bugs](#{new_component_issue_url(component, bug_label)})
+        {% hint style="warning" %}
+        The #{component_type(component)} is in `beta`.
+
+        Please see the current [enhancements](#{component_issues_link(component, enhancement_label)}) and [bugs](#{component_issues_link(component, bug_label)}) for known issues. We kindly ask that you [add any missing issues](#{new_component_issue_url(component)}) as it will help shape the roadmap of this component.
         {% endhint %}
         EOF
         content.strip

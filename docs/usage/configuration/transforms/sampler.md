@@ -14,8 +14,10 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/sampler-transform.svg)
 
-{% hint style="warn" %}
-This transform is in `beta`. Please help improve it's quality by opening issues to [suggest enhancements](https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler%2CType%3A+Enhancement) or [report bugs](https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler%2CType%3A+Bug)
+{% hint style="warning" %}
+The transform is in `beta`.
+
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler) as it will help shape the roadmap of this component.
 {% endhint %}
 The `sampler` transforms accepts [`log`][log_event] events and allows you to sample events with a configurable rate.
 
@@ -52,9 +54,9 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 | `rate` | `int` | The maximum number of events allowed per second.<br />`no default` `example: ["field1", "field2"]` |
 

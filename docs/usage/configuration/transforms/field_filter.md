@@ -14,8 +14,10 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/field_filter-transform.svg)
 
-{% hint style="warn" %}
-This transform is in `beta`. Please help improve it's quality by opening issues to [suggest enhancements](https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter%2CType%3A+Enhancement) or [report bugs](https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter%2CType%3A+Bug)
+{% hint style="warning" %}
+The transform is in `beta`.
+
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter) as it will help shape the roadmap of this component.
 {% endhint %}
 The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_event] events and allows you to filter events by a field's value.
 
@@ -52,9 +54,9 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `field` | `string` | The target field to compare against the `value`.<br />`no default` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`no default` `example: "/var/log/nginx.log"` |
 

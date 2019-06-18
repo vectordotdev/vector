@@ -48,9 +48,9 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `address` | `string` | The downstream Vector address.<br />`no default` `example: "92.12.333.224:5000"` |
 
 ## I/O

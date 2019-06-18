@@ -14,7 +14,11 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/elasticsearch-sink.svg)
 
+{% hint style="warning" %}
+The sink is in `beta`.
 
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch) as it will help shape the roadmap of this component.
+{% endhint %}
 The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
 ## Example

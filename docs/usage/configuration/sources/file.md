@@ -14,8 +14,12 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/file-source.svg)
 
+{% hint style="warning" %}
+The source is in `beta`.
 
-The `file` source continuously ingests [`log`][log_event] through one or more local files.
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+file) as it will help shape the roadmap of this component.
+{% endhint %}
+The `file` source continuously ingests [`log`][log_event] events through one or more local files.
 
 ## Example
 
@@ -68,7 +72,7 @@ The `file` source continuously ingests [`log`][log_event] through one or more lo
 | **OPTIONAL** - General | | |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [File Rotation](#file-rotation) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
-| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.<br />`default: false` |
+| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
 | **OPTIONAL** - Context | | |
 | `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
@@ -165,7 +169,7 @@ Learn more in the [Performance][performance] sections.
 
 ### Read Position
 
-Vector defaults to reading new data only. Only data added to the file after Vector starts tailing the file will be collected. To read from the beginning of the file set the start_at_beginning option to true.
+Vector defaults to reading new data only. Only data added to the file after Vector starts tailing the file will be collected. To read from the beginning of the file set the `start_at_beginning` option to true.
 
 ## Troubleshooting
 

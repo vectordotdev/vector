@@ -62,6 +62,7 @@ Please make sure the Vector projectt has write permissions to this dir.\
 # sources.file
 # ------------------------------------------------------------------------------
 [sources.file]
+beta = true
 delivery_guarantee = "best_effort"
 guides = []
 resources = []
@@ -242,13 +243,14 @@ title = "Read Position"
 body = """\
 Vector defaults to reading new data only. Only data added to the file \
 after Vector starts tailing the file will be collected. To read from \
-the beginning of the file set the start_at_beginning option to true.\
+the beginning of the file set the `start_at_beginning` option to true.\
 """
 
 # ------------------------------------------------------------------------------
 # sources.statsd
 # ------------------------------------------------------------------------------
 [sources.statsd]
+beta = true
 delivery_guarantee = "best_effort"
 guides = []
 output_types = ["metric"]
@@ -631,6 +633,7 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.\
 # sources.vector
 # ------------------------------------------------------------------------------
 [sources.vector]
+beta = true
 delivery_guarantee = "best_effort"
 guides = []
 resources = []
@@ -1284,6 +1287,7 @@ be zipped with the provided `field_names` and merged into the event:
 [sinks.aws_cloudwatch_logs]
 batch_size = 1049000
 batch_timeout = 1
+beta = true
 delivery_guarantee = "at_least_once"
 input_types = ["log"]
 rate_limit_duration = 1
@@ -1360,6 +1364,7 @@ description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWat
 [sinks.aws_kinesis_streams]
 batch_size = 1049000
 batch_timeout = 1
+beta = true
 delivery_guarantee = "at_least_once"
 input_types = ["log"]
 rate_limit_duration = 1
@@ -1427,6 +1432,7 @@ description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWat
 [sinks.aws_s3]
 batch_size = 10490000
 batch_timeout = 300
+beta = true
 delivery_guarantee = "at_least_once"
 input_types = ["log"]
 rate_limit_duration = 1
@@ -1544,6 +1550,7 @@ description = "The [standard stream][standard_streams] to write to."
 [sinks.elasticsearch]
 batch_size = 10490000
 batch_timeout = 1
+beta = true
 delivery_guarantee = "best_effort"
 input_types = ["log"]
 rate_limit_duration = 1

@@ -52,9 +52,9 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`no default` `example: true` |
 | `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |

@@ -50,9 +50,9 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |
 | `target` | `string` | The [standard stream][standard_streams] to write to.<br />`no default` `enum: "stdout", "stderr"` |
 

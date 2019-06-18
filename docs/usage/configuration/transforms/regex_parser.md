@@ -54,10 +54,10 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing), [Regex Debugger](#regex-debugger), and [Regex Syntax](#regex-syntax) for more info.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `drop_failed` | `bool` | If `true`, events that fail to properly parse will be dropped. See [Failed Parsing](#failed-parsing) for more info.<br />`default: false` |
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |

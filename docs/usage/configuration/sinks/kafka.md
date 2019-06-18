@@ -54,11 +54,11 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |
 | `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`no default` `example: "partition_key"` |
 

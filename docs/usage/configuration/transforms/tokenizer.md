@@ -52,9 +52,9 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize. See [Example](#example) for more info.<br />`default: "message"` |
 | `field_names` | `[string]` | The field names assigned to the resulting tokens, in order. See [Example](#example) for more info.<br />`no default` `example: (see above)` |

@@ -35,7 +35,7 @@ class SourceGenerator < Generator
       ![](#{source.diagram})
 
       #{beta(source)}
-      The `#{source.name}` source continuously ingests #{event_type_links(source.output_types)} through #{source.through_description}.
+      The `#{source.name}` source continuously ingests #{event_type_links(source.output_types)} events through #{source.through_description}.
 
       ## Example
 

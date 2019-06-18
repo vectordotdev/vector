@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/tcp-source.svg)
 
 
-The `tcp` source continuously ingests [`log`][log_event] through the TCP protocol.
+The `tcp` source continuously ingests [`log`][log_event] events through the TCP protocol.
 
 ## Example
 

@@ -14,8 +14,10 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/lua-transform.svg)
 
-{% hint style="warn" %}
-This transform is in `beta`. Please help improve it's quality by opening issues to [suggest enhancements](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua%2CType%3A+Enhancement) or [report bugs](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua%2CType%3A+Bug)
+{% hint style="warning" %}
+The transform is in `beta`.
+
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua) as it will help shape the roadmap of this component.
 {% endhint %}
 The `lua` transforms accepts [`log`][log_event] events and allows you to transform events with a full embedded [Lua][lua] engine.
 
@@ -52,9 +54,9 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: true` |
 | `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`no default` `example: (see above)` |
 

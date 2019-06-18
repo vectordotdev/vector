@@ -1,2 +1,0 @@
-# Migrate From Logstash
-

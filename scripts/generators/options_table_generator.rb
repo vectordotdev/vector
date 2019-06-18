@@ -21,7 +21,7 @@ class OptionsTableGenerator < Generator
       EOF
     end
 
-    categories = options.collect(&:category)
+    categories = options.collect(&:category).uniq
 
     grouped_options =
       options.

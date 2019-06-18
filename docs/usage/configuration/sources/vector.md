@@ -14,8 +14,12 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/vector-source.svg)
 
+{% hint style="warning" %}
+The source is in `beta`.
 
-The `vector` source continuously ingests [`log`][log_event] through another upstream Vector instance.
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+vector) as it will help shape the roadmap of this component.
+{% endhint %}
+The `vector` source continuously ingests [`log`][log_event] events through another upstream Vector instance.
 
 ## Example
 

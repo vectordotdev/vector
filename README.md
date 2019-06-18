@@ -30,13 +30,10 @@ get data from A to B.
 #### About
 
 * [**Use cases**][use_cases]
-* [**Concepts**][concepts]
-* [**Data model**][data_model]
-
-#### Comparisons
-
 * [**Performance**][performance]
 * [**Correctness**][correctness]
+* [**Concepts**][concepts]
+* [**Data model**][data_model]
 
 #### Setup
 
@@ -54,9 +51,32 @@ get data from A to B.
 #### Resources
 
 * [**Community**][community]
+* [**Download**][releases]
 * [**Roadmap**][roadmap]
 
 ---
+
+## Performance
+
+| Test | Vector | Filebeat | FluentBit | FluentD | Logstash | SplunkUF | SplunkHF |
+| ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| [TCP to Blackhole](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**`86mib/s`**_ | `n/a` | `64.4mib/s` | `27.7mib/s` | `40.6mib/s` | `n/a` | `n/a` |
+| [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | **`76.7mib/s`** | `7.8mib/s` | `35mib/s` | `26.1mib/s` | `3.1mib/s` | `40.1mib/s` | `39mib/s` |
+| [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) | `13.2mib/s` | `n/a` | **`20.5mib/s`** | `2.6mib/s` | `4.6mib/s` | `n/a` | `7.8mib/s` |
+| [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | **`26.7mib/s`** | `n/a` | `19.6mib/s` | `<1mib/s` | `2.7mib/s` | `n/a` | `n/a` |
+| [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | `69.9mib/s` | `5mib/s` | `67.1mib/s` | `3.9mib/s` | `10mib/s` | **`70.4mib/s`** | `7.6mib/s` |
+
+## Correctness
+
+| Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
+| ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance) | ✅ | ✅ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
+| [File Rotate \(create\)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [File Rotate \(copytruncate\)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [Process \(SIGHUP\)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
+| TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| [JSON \(wrapped\)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 ## Development
 
@@ -175,6 +195,7 @@ the License.
 [migrating]: https://docs.vectorproject.io/setup/migrating
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/performance
+[releases]: https://github.com/timberio/vector/releases
 [reload]: https://docs.vectorproject.io/usage/administration/reloading
 [roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
 [roles]: https://docs.vectorproject.io/setup/deployment/roles

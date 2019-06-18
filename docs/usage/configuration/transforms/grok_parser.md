@@ -52,9 +52,9 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
 | `pattern` | `string` | The [Grok pattern][grok_patterns]<br />`no default` `example: (see above)` |

@@ -14,7 +14,11 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 ![](../../../.gitbook/assets/aws_kinesis_streams-sink.svg)
 
+{% hint style="warning" %}
+The sink is in `beta`.
 
+Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_kinesis_streams) as it will help shape the roadmap of this component.
+{% endhint %}
 The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
 ## Example

@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/stdin-source.svg)
 
 
-The `stdin` source continuously ingests [`log`][log_event] through standard input (STDIN).
+The `stdin` source continuously ingests [`log`][log_event] events through standard input (STDIN).
 
 ## Example
 
