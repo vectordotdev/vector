@@ -34,6 +34,7 @@ get data from A to B.
 * [**Correctness**][correctness]
 * [**Concepts**][concepts]
 * [**Data model**][data_model]
+* [**Guarantees**][guarantees]
 
 #### Setup
 
@@ -45,12 +46,12 @@ get data from A to B.
 #### Usage
 
 * [**Configuration**][configuration] - [sources], [transforms], [sinks]
-* [**Administration**][administration] - [cli], [start], [stop], [reload], [update]
+* [**Administration**][administration] - [cli], [starting], [stopping], [reloading], [updating]
 * [**Guides**][guides]
 
 #### Resources
 
-* [**Community**][community]
+* [**Community**][community] - [forum], [slack chat][slack]
 * [**Download**][releases]
 * [**Roadmap**][roadmap]
 
@@ -62,6 +63,17 @@ get data from A to B.
 
 ---
 
+## Features
+
+* **Fast** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. It has no runtime or garbage collector, and is designed to handle the most demanding environments.
+* **Correct** - Vector is obsessed with [getting the details right][correctness].
+* **Vendor Neutral** - Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
+* **Agent Or Service** - Vector aims to be the single, and only, tool needed to get data from A to B, deploying as an [agent] or [service].
+* **Logs, Metrics, or Events** - Vector unifies logs, metrics, and events at the source, making it collect and ship all observability data.
+* **Clear Guarantees** - Vector is [clear on it's guarantees][guarantees], helping you to make the appropriate trade offs for your use case.
+* **Easy To Deploy** - Vector compiles to a single static binary with no runtime, making it easy to deploy and manage.
+* **Hot Reload** - Designed to [reload configuration][reloading], on the fly, without restarting or skipping a beat.
+
 ## Comparisons
 
 As part of Vector's development, we invested in a robust [test harness](https://github.com/timberio/vector-test-harness) that provided a data-driven testing environment. Below are the results. To learn more, see [How It Works][test_harness_how_it_works].
@@ -71,10 +83,10 @@ As part of Vector's development, we invested in a robust [test harness](https://
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | SplunkUF | SplunkHF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | [TCP to Blackhole](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance) | _**86mib/s**_ | n/a | 64.4mib/s | 27.7mib/s | 40.6mib/s | n/a | n/a |
-| [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | **76.7mib/s** | 7.8mib/s | 35mib/s | 26.1mib/s | 3.1mib/s | 40.1mib/s | 39mib/s |
-| [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) | 13.2mib/s | n/a | **20.5mib/s** | 2.6mib/s | 4.6mib/s | n/a | 7.8mib/s |
-| [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | **26.7mib/s** | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
-| [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | **70.4mib/s** | 7.6mib/s |
+| [File to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance) | _**76.7mib/s**_ | 7.8mib/s | 35mib/s | 26.1mib/s | 3.1mib/s | 40.1mib/s | 39mib/s |
+| [Regex Parsing](https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance) | 13.2mib/s | n/a | _**20.5mib/s**_ | 2.6mib/s | 4.6mib/s | n/a | 7.8mib/s |
+| [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
+| [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | _**70.4mib/s**_ | 7.6mib/s |
 
 ### Correctness
 
@@ -121,8 +133,10 @@ the License.
 [correctness]: https://docs.vectorproject.io/comparisons
 [data_model]: https://docs.vectorproject.io/about/data_model
 [deployment]: https://docs.vectorproject.io/setup/deployment
+[forum]: https://forum.vectorproject.io
 [getting_started]: https://docs.vectorproject.io/setup/getting_started
 [governance]: https://docs.vectorproject.io/about/use_cases/governance
+[guarantees]: https://docs.vectorproject.io/aboout/guarantees
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
@@ -130,19 +144,20 @@ the License.
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/performance
 [releases]: https://github.com/timberio/vector/releases
-[reload]: https://docs.vectorproject.io/usage/administration/reloading
+[reloading]: https://docs.vectorproject.io/usage/administration/reloading
 [roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
 [roles]: https://docs.vectorproject.io/setup/deployment/roles
 [rust]: https://www.rust-lang.org/
 [security]: https://docs.vectorproject.io/about/use_cases/security-and-compliance
 [service]: https://docs.vectorproject.io/setup/deployment/roles/service
 [sinks]: https://docs.vectorproject.io/usage/configuration/sinks
+[slack]: https://chat.vectorproject.io
 [sources]: https://docs.vectorproject.io/usage/configuration/sources
-[start]: https://docs.vectorproject.io/usage/administration/starting
-[stop]: https://docs.vectorproject.io/usage/administration/stopping
+[starting]: https://docs.vectorproject.io/usage/administration/starting
+[stopping]: https://docs.vectorproject.io/usage/administration/stopping
 [test_harness]: https://github.com/timberio/vector-test-harness
 [test_harness_how_it_works]: https://github.com/timberio/vector-test-harness#how-it-works
 [topologies]: https://docs.vectorproject.io/setup/deployment/topologies
 [transforms]: https://docs.vectorproject.io/usage/configuration/transforms
-[update]: https://docs.vectorproject.io/usage/administration/updating
+[updating]: https://docs.vectorproject.io/usage/administration/updating
 [use_cases]: https://docs.vectorproject.io/use_cases
