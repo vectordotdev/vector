@@ -51,7 +51,7 @@ class Option
       end
     end
 
-    if @example.nil? && @options.nil?
+    if @example.nil? && @options.nil? && !table?
       raise "#{self.class.name}#example is required if a #default is not specified"
     end
 

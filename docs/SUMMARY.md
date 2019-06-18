@@ -8,11 +8,8 @@
   * [Reduce Cost](use-cases/cost.md)
   * [Security & Compliance](use-cases/security-and-compliance.md)
   * [Backups & Archives](use-cases/backups.md)
-
-## Comparisons
-
-* [Performance](comparisons/performance.md)
-* [Correctness](comparisons/correctness.md)
+* [Performance](performance.md)
+* [Correctness](correctness.md)
 
 ## About
 

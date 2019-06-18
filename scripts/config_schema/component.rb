@@ -114,6 +114,29 @@ class Component
       end
     end
 
+    if delivery_guarantee = hash["delivery_guarantee"]
+      body =
+        case delivery_guarantee
+        when "at_least_once"
+          <<~EOF
+          This component offers an **at least once** delivery guarantee if your
+          [pipeline is configured to achieve this][at_least_once_delivery].
+          EOF
+        when "best_effort"
+          <<~EOF
+          Due to the nature of this component, it offers a **best effort**
+          delivery guarantee.
+          EOF
+        else
+          raise("Unknown delievery_guarantee: #{delivery_guarantee.inspect} for #{type} - #{name}")
+        end
+
+      @sections << Section.new({
+          "title" => "Delivery Guarantee",
+          "body" => body
+        })
+    end
+
     @sections = @sections.sort_by(&:title)
 
     section_titles = @sections.collect(&:title)

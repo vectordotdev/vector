@@ -16,7 +16,7 @@ When Vector is deployed as a service it receives data over the network from upst
 
 ### Performance Tuning
 
-Vector is designed, by default, to [take full advantage of all system resources](../../../comparisons/performance.md), which is usually preferred in the service role. As a result, there is nothing special you need to do to improve performance.
+Vector is designed, by default, to [take full advantage of all system resources](../../../performance.md), which is usually preferred in the service role. As a result, there is nothing special you need to do to improve performance.
 
 ### On-Disk Buffering
 
@@ -52,7 +52,7 @@ Vector is designed for easy administration, and currently there are no known spe
 
 ### Hardware
 
-The hardware needed is highly dependent on your configuration and data volume. Typically, Vector is CPU bound and not memory bound, especially if all buffers are [configured to use the disk](service.md#on-disk-buffering). Our [benchmarks](../../../comparisons/performance.md) should give you a general idea of resource usage in relation to specific pipelines and data volume.
+The hardware needed is highly dependent on your configuration and data volume. Typically, Vector is CPU bound and not memory bound, especially if all buffers are [configured to use the disk](service.md#on-disk-buffering). Our [benchmarks](../../../performance.md) should give you a general idea of resource usage in relation to specific pipelines and data volume.
 
 #### CPU
 

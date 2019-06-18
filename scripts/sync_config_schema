@@ -44,6 +44,7 @@ rescue LoadError
 end
 
 require_relative "config_schema/schema"
+require_relative "generators/global_generator"
 require_relative "generators/link_generator"
 require_relative "generators/sink_generator"
 require_relative "generators/source_generator"
@@ -72,6 +73,14 @@ REPO_LABELS_ROOT = "#{REPO_ROOT}/labels"
 REPO_SRC_ROOT = "#{REPO_ROOT}/tree/master/src"
 
 schema = Schema.new(schema_hash)
+
+#
+# Global options
+#
+
+global_generator = GlobalGenerator.new(schema)
+content = global_generator.generate()
+File.write("docs/usage/configuration/README.md", content)
 
 #
 # Sources

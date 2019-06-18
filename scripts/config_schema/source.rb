@@ -1,5 +1,6 @@
 require_relative "component"
 require_relative "field"
+require_relative "output"
 
 class Source < Component
   attr_reader :delivery_guarantee,
@@ -10,9 +11,8 @@ class Source < Component
     super(hash)
 
     # Init
-
     @delivery_guarantee = hash.fetch("delivery_guarantee")
-    outputs_hash = hash.fetch("outputs")
+    outputs_hashes = hash["outputs"] || []
     @through_description = hash.fetch("through_description")
 
     # delivery_guarantee
@@ -26,21 +26,8 @@ class Source < Component
 
     # outputs
 
-    @outputs = OpenStruct.new()
-
-    outputs_hash.each do |type, schema|
-      if !EVENT_TYPES.include?(type)
-        raise("Event type #{type} is not supported, must be one of: #{EVENT_TYPES.inspect}")
-      end
-
-      fields = OpenStruct.new()
-
-      schema.collect do |field_name, field_hash|
-        field = Field.new(field_hash.merge({"name" => field_name}))
-        fields.send("#{field_name}=", field)
-      end
-
-      @outputs.send("#{type}=", fields)
+    @outputs = outputs_hashes.collect do |output_hash|
+      Output.new(output_hash)
     end
 
     # through_description
@@ -51,6 +38,6 @@ class Source < Component
   end
 
   def output_types
-    @outputs.to_h.keys
+    ["log"]
   end
 end

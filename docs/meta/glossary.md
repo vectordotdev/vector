@@ -6,7 +6,7 @@ A batch refers to a [batched payload](../about/data-model.md#batched-payload) wi
 
 ## Benchmark
 
-A benchmark refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks](../comparisons/performance.md) section.
+A benchmark refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks](../performance.md) section.
 
 ## Binary
 
