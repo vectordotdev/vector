@@ -187,7 +187,7 @@ impl S3Sink {
     }
 }
 
-impl Service<PartitionInnerBuffer> for S3Sink {
+impl Service<PartitionInnerBuffer<Vec<u8>>> for S3Sink {
     type Response = PutObjectOutput;
     type Error = PutObjectError;
     type Future = Instrumented<RusotoFuture<PutObjectOutput, PutObjectError>>;
@@ -196,7 +196,7 @@ impl Service<PartitionInnerBuffer> for S3Sink {
         Ok(().into())
     }
 
-    fn call(&mut self, body: PartitionInnerBuffer) -> Self::Future {
+    fn call(&mut self, body: PartitionInnerBuffer<Vec<u8>>) -> Self::Future {
         let (inner, key) = body.into_parts();
 
         // TODO: pull the seconds from the last event
@@ -261,7 +261,7 @@ fn encode_event(
     event: Event,
     batch_time_format: &String,
     encoding: &Option<Encoding>,
-) -> Result<PartitionInnerBuffer, ()> {
+) -> Result<PartitionInnerBuffer<Vec<u8>>, ()> {
     let log = event.into_log();
 
     let key = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {

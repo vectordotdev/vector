@@ -115,8 +115,8 @@ pub struct PartitionBuffer<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct PartitionInnerBuffer {
-    pub(self) inner: Vec<u8>,
+pub struct PartitionInnerBuffer<T> {
+    pub(self) inner: T,
     key: Bytes,
 }
 
@@ -128,10 +128,10 @@ impl<T> PartitionBuffer<T> {
 
 impl<T> Batch for PartitionBuffer<T>
 where
-    T: Batch<Input = Vec<u8>, Output = Vec<u8>>,
+    T: Batch,
 {
-    type Input = PartitionInnerBuffer;
-    type Output = PartitionInnerBuffer;
+    type Input = PartitionInnerBuffer<T::Input>;
+    type Output = PartitionInnerBuffer<T::Output>;
 
     fn len(&self) -> usize {
         self.inner.len()
@@ -165,17 +165,17 @@ where
     }
 }
 
-impl PartitionInnerBuffer {
-    pub fn new(inner: Vec<u8>, key: Bytes) -> Self {
+impl<T> PartitionInnerBuffer<T> {
+    pub fn new(inner: T, key: Bytes) -> Self {
         Self { inner, key }
     }
 
-    pub fn into_parts(self) -> (Vec<u8>, Bytes) {
+    pub fn into_parts(self) -> (T, Bytes) {
         (self.inner, self.key)
     }
 }
 
-impl Partition for PartitionInnerBuffer {
+impl<T> Partition for PartitionInnerBuffer<T> {
     fn partition(&self) -> Bytes {
         self.key.clone()
     }

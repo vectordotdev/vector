@@ -2,7 +2,7 @@ use crate::buffers::Acker;
 use crate::{
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
-    sinks::util::{BatchServiceSink, SinkExt},
+    sinks::util::{BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt},
 };
 use futures::{sync::oneshot, try_ready, Async, Future, Poll};
 use rusoto_core::RusotoFuture;
@@ -82,8 +82,8 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
             .service(cloudwatch);
 
         let sink = {
-            let svc_sink = BatchServiceSink::new(svc, acker).batched_with_min(
-                Vec::new(),
+            let svc_sink = BatchServiceSink::new(svc, acker).partitioned_batched_with_min(
+                PartitionBuffer::new(Vec::new()),
                 batch_size,
                 Duration::from_secs(batch_timeout),
             );
@@ -167,7 +167,7 @@ impl CloudwatchLogsSvc {
     }
 }
 
-impl Service<Vec<Event>> for CloudwatchLogsSvc {
+impl Service<PartitionInnerBuffer<Vec<Event>>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -208,7 +208,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
         }
     }
 
-    fn call(&mut self, req: Vec<Event>) -> Self::Future {
+    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>>) -> Self::Future {
         match &mut self.state {
             State::Token(token) => {
                 let token = token.take();
