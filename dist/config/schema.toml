@@ -1009,6 +1009,34 @@ resources = [
   {name = "Lua Reference Manual", url = "http://www.lua.org/manual/5.1/manual.html"}
 ]
 
+[[transforms.lua.outputs]]
+type = "text"
+body = """\
+Given the following event:
+
+{% code-tabs %}
+{% code-tabs-item title="Add Fields" %}
+```lua
+# Add root level field
+event["new_field"] = "new value"
+
+# Add nested field
+event["parent.child"] = "nested value"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="Remove Field" %}
+```lua
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+"""
+
 [transforms.lua.options.source]
 type = "string"
 description = "The inline Lua source to evaluate."
@@ -1020,7 +1048,7 @@ if event["host"] == nil then
   local f = io.popen ("/bin/hostname")
   local hostname = f:read("*a") or ""
   f:close()
-  hostname = string.gsub(hostname, "\n$", "")
+  hostname = string.gsub(hostname, "\\n$", "")
   event["host"] = hostname
 end\
 """
@@ -1035,6 +1063,18 @@ function.\
 """
 
 [[transforms.lua.sections]]
+title = "Dropping Events"
+body = """\
+To drop events, simply set the `event` variable to `nil`. For example:
+
+```lua
+if event["message"].match(str, "debug") then
+  event = nil
+end
+```
+"""
+
+[[transforms.lua.sections]]
 title = "Global Variables"
 body = """\
 When evaluating the provided `source`, Vector will provide a single global \
@@ -1046,6 +1086,22 @@ variable representing the event:
 
 Note, a Lua `table` is an associative array. You can read more about \
 [Lua types][lua_types] in the [Lua docs][lua_docs].\
+"""
+
+[[transforms.lua.sections]]
+title = "Nested Fields"
+body = """\
+As described in the [Data Model document][data_model], Vector flatten events, \
+representing nested field with a `.` delimiter. Therefore, adding, accessing, \
+or removing nested fields is as simple as added a `.` in your key name:
+
+```lua
+# Add nested field
+event["parent.child"] = "nested value"
+
+# Remove nested field
+event["parent.child"] = nil
+```
 """
 
 [[transforms.lua.sections]]

@@ -38,8 +38,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
     local f = io.popen ("/bin/hostname")
     local hostname = f:read("*a") or ""
     f:close()
-    hostname = string.gsub(hostname, "
-  $", "")
+    hostname = string.gsub(hostname, "\n$", "")
     event["host"] = hostname
   end
   """
@@ -81,8 +80,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
     local f = io.popen ("/bin/hostname")
     local hostname = f:read("*a") or ""
     f:close()
-    hostname = string.gsub(hostname, "
-  $", "")
+    hostname = string.gsub(hostname, "\n$", "")
     event["host"] = hostname
   end
   """
@@ -102,11 +100,21 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 
 ## I/O
 
-The `lua` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The ``lua` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 
 ## How It Works
+
+### Dropping Events
+
+To drop events, simply set the `event` variable to `nil`. For example:
+
+```lua
+if event["message"].match(str, "debug") then
+  event = nil
+end
+```
 
 ### Global Variables
 
@@ -117,6 +125,18 @@ When evaluating the provided `source`, Vector will provide a single global varia
 | `event` | [`table`][lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][default_schema].
 
 Note, a Lua `table` is an associative array. You can read more about [Lua types][lua_types] in the [Lua docs][lua_docs].
+
+### Nested Fields
+
+As described in the [Data Model document][data_model], Vector flatten events, representing nested field with a `.` delimiter. Therefore, adding, accessing, or removing nested fields is as simple as added a `.` in your key name:
+
+```lua
+# Add nested field
+event["parent.child"] = "nested value"
+
+# Remove nested field
+event["parent.child"] = nil
+```
 
 ### Search Directories
 
@@ -160,6 +180,7 @@ Finally, consider the following alternatives:
 [default_schema]: "../../../about/data_model.md#default-schema"
 [lua_types]: "https://www.lua.org/manual/2.2/section3_3.html"
 [lua_docs]: "https://www.lua.org/manual/5.3/"
+[data_model]: "../../../about/data_model.md"
 [lua_require]: "http://www.lua.org/manual/5.1/manual.html#pdf-require"
 [monitoring_logs]: "../../../administration/moonitoring.md#logs"
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"

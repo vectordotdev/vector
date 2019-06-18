@@ -75,7 +75,7 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 
 ## I/O
 
-The `add_fields` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+The ``add_fields` transform` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 

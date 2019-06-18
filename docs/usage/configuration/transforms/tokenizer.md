@@ -84,7 +84,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 
 ## I/O
 
-The `tokenizer` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The ``tokenizer` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

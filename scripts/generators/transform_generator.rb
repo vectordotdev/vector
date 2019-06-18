@@ -63,7 +63,7 @@ class TransformGenerator < Generator
 
       ## I/O
 
-      The `#{transform.name}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types)} events.
+      The `#{component_name(transform)}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types)} events.
 
       #{guides_section(transform)}
 

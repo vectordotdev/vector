@@ -72,7 +72,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 
 ## I/O
 
-The `remove_fields` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+The ``remove_fields` transform` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 
