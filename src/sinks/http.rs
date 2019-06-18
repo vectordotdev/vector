@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn http_happy_path() {
+    fn http_happy_path_post() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -351,6 +351,64 @@ mod tests {
             .map(Result::unwrap)
             .map(|(parts, body)| {
                 assert_eq!(hyper::Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some(Authorization::basic("waldo", "hunter2")),
+                    parts.headers.typed_get()
+                );
+                body
+            })
+            .map(hyper::Chunk::reader)
+            .map(flate2::read::GzDecoder::new)
+            .map(BufReader::new)
+            .flat_map(BufRead::lines)
+            .map(Result::unwrap)
+            .map(|s| {
+                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+                val.get("message").unwrap().as_str().unwrap().to_owned()
+            })
+            .collect::<Vec<_>>();
+
+        shutdown_on_idle(rt);
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[test]
+    fn http_happy_path_put() {
+        let num_lines = 1000;
+
+        let in_addr = next_addr();
+
+        let config = r#"
+        uri = "http://$IN_ADDR/frames"
+        method = "put"
+        user = "waldo"
+        compression = "gzip"
+        password = "hunter2"
+        encoding = "ndjson"
+    "#
+        .replace("$IN_ADDR", &format!("{}", in_addr));
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        let (sink, _healthcheck) = config.build(Acker::Null).unwrap();
+        let (rx, trigger, server) = build_test_server(&in_addr);
+
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(events);
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(server);
+
+        rt.block_on(pump).unwrap();
+        drop(trigger);
+
+        let output_lines = rx
+            .wait()
+            .map(Result::unwrap)
+            .map(|(parts, body)| {
+                assert_eq!(hyper::Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
