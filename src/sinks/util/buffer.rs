@@ -136,7 +136,7 @@ mod test {
             .collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
-        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 50_000);
+        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 51_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];
