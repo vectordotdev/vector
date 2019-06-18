@@ -1517,6 +1517,7 @@ description = "Whether to Gzip the content before writing or not. Please note, e
 
 [sinks.aws_s3.options.key_prefix]
 type = "string"
+category = "Object Names"
 default = "date=%F"
 examples = [
   "date=%F/",

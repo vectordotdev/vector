@@ -31,9 +31,6 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   bucket = "my-bucket"
   region = "us-east-1"
 
-  # OPTIONAL - General
-  key_prefix = "date=%F/" # default
-
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, bytes
@@ -41,6 +38,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
   filename_time_format = "%s" # default
+  key_prefix = "date=%F/" # default
 
   # OPTIONAL - Requests
   compression = "gzip" # no default, one of: gzip
@@ -63,9 +61,6 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   bucket = "<string>"
   region = "<string>"
 
-  # OPTIONAL - General
-  key_prefix = "<string>"
-
   # OPTIONAL - Batching
   batch_size = <int>
   batch_timeout = <int>
@@ -73,6 +68,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # OPTIONAL - Object Names
   filename_append_uuid = <bool>
   filename_time_format = "<string>"
+  key_prefix = "<string>"
 
   # OPTIONAL - Requests
   compression = {gzip}
@@ -103,13 +99,6 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # The AWS region of the target S3 bucket.
   region = "us-east-1"
 
-  # OPTIONAL - General
-
-  # A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". `strftime` specifiers are supported. 
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
@@ -125,6 +114,11 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 
   # The format of the resulting object file name. `strftime` specifiers are supported. 
   filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". `strftime` specifiers are supported. 
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
 
   # OPTIONAL - Requests
 
@@ -167,14 +161,13 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
-| **OPTIONAL** - General | | |
-| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][strftime_specifiers] are supported.  See [Object Naming](#object-naming) and [Partitioning](#partitioning) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 300` `unit: bytes` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][strftime_specifiers] are supported.  See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
+| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][strftime_specifiers] are supported.  See [Object Naming](#object-naming) and [Partitioning](#partitioning) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
 | `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson", "text"` |
