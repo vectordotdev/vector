@@ -20,7 +20,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_kafka_sink]
   # REQUIRED - General
@@ -46,6 +46,33 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # OPTIONAL - General
   encoding = {json | text}
   key_field = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.kafka]
+  # REQUIRED - General
+
+  # The component type
+  type = "kafka"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+
+  # The Kafka topic name to write events to.
+  topic = "topic-1234"
+
+  # OPTIONAL - General
+
+  # The encoding format used to serialize the events before flushing.
+  encoding = "json"
+  encoding = "text"
+
+  # The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.
+  key_field = "partition_key"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -20,7 +20,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sources.my_tcp_source]
   # REQUIRED - General

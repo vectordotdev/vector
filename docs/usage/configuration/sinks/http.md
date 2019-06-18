@@ -20,7 +20,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_http_sink]
   # REQUIRED - General
@@ -52,7 +52,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 
   # OPTIONAL - Headers
   [sinks.my_http_sink.headers]
-    X-Powered-By = "Vector" # no default
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -90,6 +90,76 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
     * = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.http]
+  # REQUIRED - General
+
+  # The component type
+  type = "http"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # The encoding format used to serialize the events before flushing.
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+  uri = "https://10.22.212.22:9000/endpoint"
+
+  # OPTIONAL - General
+
+  # The compression strategy used to compress the payload before sending.
+  compression = "gzip"
+
+  # A URI that Vector can request in order to determine the service health.
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  # OPTIONAL - Batching
+
+  # The maximum size of a batch before it is flushed.
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  batch_timeout = 5
+
+  # OPTIONAL - Requests
+
+  # The window used for the `request_rate_limit_num` option
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration` window.
+  rate_limit_num = 10
+
+  # The maximum number of in-flight requests allowed at any given time.
+  request_in_flight_limit = 10
+
+  # The maximum time a request can take before being aborted.
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  retry_attempts = 10
+
+  # The amount of time to wait before attempting a failed request again.
+  retry_backoff_secs = 10
+
+  # OPTIONAL - Basic auth
+  [sink.http.basic_auth]
+
+    # The basic authentication password.
+    password = "password"
+
+    # The basic authentication user name.
+    user = "username"
+
+  # OPTIONAL - Headers
+  [sink.http.headers]
+
+    # A custom header to be added to each outgoing HTTP request.
+    X-Powered-By = "Vector"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -117,7 +187,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 | `basic_auth.password` | `string` | The basic authentication password.<br />`no default` `example: "password"` |
 | `basic_auth.user` | `string` | The basic authentication user name.<br />`no default` `example: "username"` |
 | **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: X-Powered-By = "Vector"` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: "X-Powered-By = \"Vector\""` |
 
 ## I/O
 
@@ -144,6 +214,10 @@ Content-Length: 654
 ### Authentication
 
 HTTP authentication is controlled via the `Authorization` header which you can set with the `headers` option. For convenience, Vector also supports the `basic_auth.username` and `basic_auth.password` options which handle setting the `Authorization` header for the [base access authentication scheme][basic_auth].
+
+### Batching
+
+By default, the `http` sink flushes every 5 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
 
 ### Compression
 
@@ -175,15 +249,11 @@ In order to partition data within a Kafka topic, you must specify a `key_field`.
 
 You can use [transforms][transforms] to add a partition key field if your events do not already have one.
 
-### Batching
-
-By default, the `http` sink flushes every 5 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
-
 ### Rate Limiting
 
 Vector offers a few levers to control the rate and volume of requests. Start with the `rate_limit_duration` and `rate_limit_num` options to ensure Vector does not exceed the specified number of requests in the specified window. You can further control the pace at which this window is saturated with the `request_in_flight_limit` option, which will guarantee no more than the specified number of requests are in-flight at any given time.
 
-  Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
+Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
 
 ### Retry Policy
 

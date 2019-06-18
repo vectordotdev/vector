@@ -25,7 +25,7 @@ class SinkGenerator < Generator
   def generate
     content = <<~EOF
       ---
-      description: #{plural_write_verb.humanize} #{sink.input_types.to_sentence} events to #{remove_regex_links(sink.write_to_description)}
+      description: #{plural_write_verb.humanize} #{sink.input_types.to_sentence} events to #{remove_markdown_links(sink.write_to_description)}
       ---
 
       #{warning}
@@ -40,7 +40,7 @@ class SinkGenerator < Generator
       ## Example
 
       {% code-tabs %}
-      {% code-tabs-item title="vector.toml (examples)" %}
+      {% code-tabs-item title="vector.toml (example)" %}
       ```coffeescript
       #{options_example_generator.generate("sinks.my_#{sink.name}_sink", :examples)}
       ```
@@ -48,6 +48,11 @@ class SinkGenerator < Generator
       {% code-tabs-item title="vector.toml (schema)" %}
       ```coffeescript
       #{options_example_generator.generate("sink.<sink-id>", :schema)}
+      ```
+      {% endcode-tabs-item %}
+      {% code-tabs-item title="vector.toml (specification)" %}
+      ```coffeescript
+      #{options_example_generator.generate("sink.#{sink.name}", :spec)}
       ```
       {% endcode-tabs-item %}
       {% endcode-tabs %}

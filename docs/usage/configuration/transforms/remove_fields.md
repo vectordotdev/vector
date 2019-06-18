@@ -20,7 +20,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_remove_fields_transform]
   # REQUIRED - General

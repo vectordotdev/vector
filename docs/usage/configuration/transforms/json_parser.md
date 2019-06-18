@@ -20,7 +20,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_json_parser_transform]
   # REQUIRED - General

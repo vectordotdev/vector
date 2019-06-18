@@ -20,7 +20,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_vector_sink]
   # REQUIRED - General
@@ -40,6 +40,23 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # OPTIONAL - General
   address = "<string>"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.vector]
+  # REQUIRED - General
+
+  # The component type
+  type = "vector"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # The downstream Vector address.
+  address = "92.12.333.224:5000"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

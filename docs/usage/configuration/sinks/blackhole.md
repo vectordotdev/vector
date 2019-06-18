@@ -20,7 +20,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_blackhole_sink]
   # REQUIRED - General
@@ -36,6 +36,21 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
   type = "<string>"
   inputs = "<string>"
   print_amount = <int>
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.blackhole]
+  # REQUIRED - General
+
+  # The component type
+  type = "blackhole"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # The number of events that must be received in order to print a summary of activity.
+  print_amount = "1000"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

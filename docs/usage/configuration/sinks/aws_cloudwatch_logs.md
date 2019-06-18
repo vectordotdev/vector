@@ -15,16 +15,14 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/aws_cloudwatch_logs-sink.svg)
 
 {% hint style="warning" %}
-The sink is in `beta`.
-
-Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs) as it will help shape the roadmap of this component.
+The `aws_cloudwatch_logs` sink is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs) as it will help shape the roadmap of this component.
 {% endhint %}
 The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_aws_cloudwatch_logs_sink]
   # REQUIRED - General
@@ -70,6 +68,59 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
   request_timeout_secs = <int>
   retry_attempts = <int>
   retry_backoff_secs = <int>
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.aws_cloudwatch_logs]
+  # REQUIRED - General
+
+  # The component type
+  type = "aws_cloudwatch_logs"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # The group name of the target CloudWatch Logs stream.
+  group_name = "/var/log/my-log.log"
+
+  # The AWS region of the target CloudWatch Logs stream resides.
+  region = "us-east-1"
+
+  # The stream name of the target CloudWatch Logs stream.
+  stream_name = "my-stream"
+
+  # OPTIONAL - Batching
+
+  # The maximum size of a batch before it is flushed.
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  batch_timeout = 1
+
+  # OPTIONAL - Requests
+
+  # The encoding format used to serialize the events before flushing.
+  encoding = "json"
+  encoding = "text"
+
+  # The window used for the `request_rate_limit_num` option
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration` window.
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  retry_backoff_secs = 5
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -147,6 +198,10 @@ If credentials are not found the [healtcheck](#healthchecks) will fail and an er
 
 In general, we recommend using instance profiles/roles whenever possible. In cases where this is not possible you can generate an AWS access key for any user within your AWS account. AWS provides a [detailed guide][aws_access_keys] on how to do this.
 
+### Batching
+
+By default, the `aws_cloudwatch_logs` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.Keep in mind that the underlying service will only accept payloads up to [a maximum size and a maximum frequency](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html).
+
 ### Delivery Guarantee
 
 This component offers an **at least once** delivery guarantee if your
@@ -164,15 +219,11 @@ The `aws_cloudwatch_logs` sink encodes events before flushing. This is controlle
 
 Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
 
-### Batching
-
-By default, the `aws_cloudwatch_logs` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.Keep in mind that the underlying service will only accept payloads up to [a maximum size and a maximum frequency](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html).
-
 ### Rate Limiting
 
 Vector offers a few levers to control the rate and volume of requests. Start with the `rate_limit_duration` and `rate_limit_num` options to ensure Vector does not exceed the specified number of requests in the specified window. You can further control the pace at which this window is saturated with the `request_in_flight_limit` option, which will guarantee no more than the specified number of requests are in-flight at any given time.
 
-  Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
+Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
 
 ### Retry Policy
 

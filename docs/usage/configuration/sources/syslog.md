@@ -20,7 +20,7 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sources.my_syslog_source]
   # REQUIRED - General

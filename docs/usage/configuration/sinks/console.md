@@ -20,7 +20,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_console_sink]
   # REQUIRED - General
@@ -42,6 +42,28 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
   # OPTIONAL - General
   encoding = {json | text}
   target = {stdout | stderr}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.console]
+  # REQUIRED - General
+
+  # The component type
+  type = "console"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # The encoding format used to serialize the events before writing.
+  encoding = "json"
+  encoding = "text"
+
+  # The standard stream to write to.
+  target = "stdout"
+  target = "stderr"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

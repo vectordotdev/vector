@@ -20,7 +20,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sources.my_stdin_source]
   # REQUIRED - General

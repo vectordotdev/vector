@@ -52,7 +52,7 @@ event_types = ["log", "metric"]
 # The global section represents global configuration options.
 [options.data_dir]
 type = "string"
-example = "/var/lib/vector"
+examples = ["/var/lib/vector"]
 description = """\
 The directory used for persisting Vector state, such as on-disk buffers. \
 Please make sure the Vector projectt has write permissions to this dir.\
@@ -104,7 +104,7 @@ context. You can further parse the `"message"` key with a \
 [sources.file.options.include]
 type = "[string]"
 null = false
-example = ["/var/log/nginx*.log"]
+examples = [["/var/log/nginx*.log"]]
 description = """\
 Array of file patterns to include. [Globbing](#globbing) is supported.\
 """
@@ -112,7 +112,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 [sources.file.options.exclude]
 type = "[string]"
 null = false
-example = ["/var/log/nginx*.log"]
+examples = [["/var/log/nginx*.log"]]
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
@@ -122,7 +122,7 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 type = "int"
 unit = "seconds"
 null = true
-example = 86400
+examples = [86400]
 description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
@@ -360,7 +360,7 @@ A [`metric` event][metric_event] will be emitted with the following structure:
 [sources.statsd.options.address]
 type = "string"
 null = false
-example = "127.0.0.1:8126"
+examples = ["127.0.0.1:8126"]
 description = "UDP socket address to bind to."
 
 # ------------------------------------------------------------------------------
@@ -472,7 +472,7 @@ Vector only extracts the `"timestamp"` and `"host"` fields and leaves the \
 
 [sources.syslog.options.address]
 type = "string"
-example = "0.0.0.0:9000"
+examples = ["0.0.0.0:9000"]
 description = """\
 The TCP or UDP address to listen on. Only relevant when `mode` is \
 `tcp` or `udp`.\
@@ -504,7 +504,7 @@ description = "The input mode."
 
 [sources.syslog.options.path]
 type = "string"
-example = "/path/to/socket"
+examples = ["/path/to/socket"]
 description = """\
 The unix socket path. *This should be absolute path.* Only relevant \
 when `mode` is `unix`.
@@ -593,7 +593,7 @@ context. You can further parse the `"message"` key with a \
 
 [sources.tcp.options.address]
 type = "string"
-example = "0.0.0.0:9000"
+examples = ["0.0.0.0:9000"]
 description = "The address to bind the socket to."
 
 [sources.tcp.options.host_key]
@@ -648,7 +648,7 @@ Vector instances, unalterated.
 
 [sources.vector.options.address]
 type = "string"
-example = "0.0.0.0:9000"
+examples = ["0.0.0.0:9000"]
 description = "The TCP address to bind to."
 
 [sources.vector.options.shutdown_timeout_secs]
@@ -747,8 +747,7 @@ event.\
 
 [transforms.add_fields.options.fields.options."*"]
 type = "string"
-example_key = "new_field"
-example = "new field value"
+examples = ["new_field = \"new field value\""]
 description = """\
 A key/value pair representing the new field to be added. Accepts all \
 [supported types][config_value_types]. Use `.` for adding nested fields.\
@@ -826,12 +825,12 @@ resources = []
 
 [transforms.field_filter.options.field]
 type = "string"
-example = "file"
+examples = ["file"]
 description = "The target field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
-example = "/var/log/nginx.log"
+examples = ["/var/log/nginx.log"]
 description = """\
 If the value of the specified `field` matches this value then the event \
 will be permitted, otherwise it is dropped.\
@@ -876,7 +875,7 @@ The field to execute the `pattern` against. Must be a `string` value.\
 
 [transforms.grok_parser.options.pattern]
 type = "string"
-example = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 description = "The [Grok pattern][grok_patterns]"
 
 [[transforms.grok_parser.sections]]
@@ -923,7 +922,7 @@ If `true` will drop the `field` after parsing.\
 
 [transforms.json_parser.options.drop_invalid]
 type = "bool"
-example = true
+examples = [true]
 description = """\
 If `true` events with invalid JSON will be dropped, otherwise the \
 event will be kept and passed through.\
@@ -998,7 +997,8 @@ resources = [
 [transforms.lua.options.source]
 type = "string"
 description = "The inline Lua source to evaluate."
-example = """\
+examples = [
+"""\
 require("script") # a `script.lua` file must be in your `search_dirs`
 
 if event["host"] == nil then
@@ -1009,10 +1009,11 @@ if event["host"] == nil then
   event["host"] = hostname
 end\
 """
+]
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
-example = true
+examples = [true]
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
@@ -1072,9 +1073,11 @@ type = "string"
 description = """\
 The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
 """
-example = """\
+examples = [
+"""\
 ^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] "(?P<method>[\\w]+) (?P<path>.*)" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$\
 """
+]
 null = false
 
 [[transforms.regex_parser.sections]]
@@ -1167,7 +1170,7 @@ output_types = ["log", "metric"]
 
 [transforms.remove_fields.options.fields]
 type = "[string]"
-example = ["field1", "field2"]
+examples = [["field1", "field2"]]
 description = "The field names to drop."
 
 # ------------------------------------------------------------------------------
@@ -1182,7 +1185,7 @@ output_types = ["log"]
 
 [transforms.sampler.options.pass_list]
 type = "[string]"
-example = ["[error]", "field2"]
+examples = [["[error]", "field2"]]
 description = """\
 A list of regular expression patterns to exclude events from sampling. \
 If an event's `"message"` key matches _any_ of these patterns it will \
@@ -1191,7 +1194,7 @@ _not_ be sampled.\
 
 [transforms.sampler.options.rate]
 type = "int"
-example = ["field1", "field2"]
+examples = [["field1", "field2"]]
 description = "The maximum number of events allowed per second."
 
 ## TODO: Add regex synax docs?
@@ -1215,7 +1218,7 @@ description = "The field to tokenize."
 
 [transforms.tokenizer.options.field_names]
 type = "[string]"
-example = ["timestamp", "level", "message"]
+examples = [["timestamp", "level", "message"]]
 description = "The field names assigned to the resulting tokens, in order."
 
 [transforms.tokenizer.options.drop_field]
@@ -1342,19 +1345,19 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
-example = "/var/log/my-log.log"
+examples = ["/var/log/my-log.log"]
 null = false
 description = "The [group name][aws_cw_logs_group_name] of the target CloudWatch Logs stream."
 
 [sinks.aws_cloudwatch_logs.options.region]
 type = "string"
-example = "us-east-1"
+examples = ["us-east-1"]
 null = false
 description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
-example = "my-stream"
+examples = ["my-stream"]
 null = false
 description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
 
@@ -1416,13 +1419,13 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
-example = "us-east-1"
+examples = ["us-east-1"]
 null = false
 description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
-example = "my-stream"
+examples = ["my-stream"]
 null = false
 description = "The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
 
@@ -1478,7 +1481,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 
 [sinks.aws_s3.options.bucket]
 type = "string"
-example = "my-bucket"
+examples = ["my-bucket"]
 null = false
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
@@ -1486,7 +1489,7 @@ description = "The S3 bucket name. Do not include a leading `s3://` or a trailin
 type = "string"
 category = "Requests"
 enum = ["gzip"]
-description = "The compression type to use before flushing data."
+description = "The compression type to use before writing data."
 
 [sinks.aws_s3.options.encoding]
 type = "string"
@@ -1494,17 +1497,137 @@ category = "Requests"
 enum = ["ndjson", "text"]
 description = "The encoding format used to serialize the events before flushing."
 
+[sinks.aws_s3.options.filename_append_uuid]
+type = "bool"
+category = "Object Names"
+default = true
+description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
+
+[sinks.aws_s3.options.filename_time_format]
+type = "string"
+category = "Object Names"
+default = "%s"
+description = "The format of the resulting object file name. [`strftime` specifiers][strftime_specifiers] are supported. "
+
+[sinks.aws_s3.options.gzip]
+type = "bool"
+category = "Requests"
+default = false
+description = "Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth."
+
 [sinks.aws_s3.options.key_prefix]
 type = "string"
-example = "us-east-1"
-null = false
-description = "The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+default = "date=%F"
+examples = [
+  "date=%F/",
+  "date=%F/hour=%H/",
+  "year=%Y/month=%m/day=%d/"
+]
+description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\". [`strftime` specifiers][strftime_specifiers] are supported. "
 
 [sinks.aws_s3.options.region]
 type = "string"
-example = "us-east-1"
+examples = ["us-east-1"]
 null = false
-description = "The [AWS region][aws_cw_logs_regions] of the target S3 bucket."
+description = "The [AWS region][aws_s3_regions] of the target S3 bucket."
+
+[[sinks.aws_s3.sections]]
+title = "Columnar Formats"
+body = """\
+Vector has plans to support column formats, such as ORC and Parquet, in [`v0.6`][roadmap].
+"""
+
+[[sinks.aws_s3.sections]]
+title = "Object Naming"
+body = """\
+By default, Vector will name your S3 objects in the following format:
+
+{% code-tabs %}
+{% code-tabs-item title="non-gzip" %}
+```
+<key_prefix><timestamp>-<uuidv4>.log
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="gzip" %}
+```
+<key_prefix><timestamp>-<uuidv4>.log.gz
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+For example:
+
+{% code-tabs %}
+{% code-tabs-item title="non-gzip" %}
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="gzip" %}
+```
+date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Vector appends a [UUIDV4][uuidv4] token to ensure there are no name \
+conflicts in the unlikely event 2 Vector instances are writing data at \
+the same time.
+
+You can control the resulting name via the `key_prefix`, \
+`filename_time_format`, and `filename_append_uuid` options.
+"""
+
+[[sinks.aws_s3.sections]]
+title = "Partitioning"
+body = """\
+Vector supports dynamic `key_prefix` values through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the object key name, creating time based partitions. This is highly recommended for the logging use case since it allows for clean data segmentation, making it easy to prune and read data efficiently. Please see the [example specification](#example) for examples.
+"""
+
+[[sinks.aws_s3.sections]]
+title = "Searching"
+body = """\
+Storing log data in S3 is a powerful strategy for persisting log data. Mainly \
+because data on S3 is searchable. And [AWS Athena][aws_athena] makes this \
+easier than ever.
+
+#### Athena
+
+1. Head over to the [Athena console][aws_athena_console].
+
+2. Create a new table, replace the `<...>` variables as needed:
+
+    ```sql
+    CREATE EXTERNAL TABLE logs (
+      timestamp string,
+      message string,
+      host string
+    )   
+    PARTITIONED BY (date string)
+    ROW FORMAT  serde 'org.apache.hive.hcatalog.data.JsonSerDe'
+    with serdeproperties ( 'paths'='requestbegintime, adid, impressionid, referrer, useragent, usercookie, ip' )
+    LOCATION 's3://<region>.<key_prefix>';
+    ```
+
+3. Discover your partitions by running the following query:
+
+    ```sql
+    MSCK REPAIR TABLE logs
+    ```
+
+4. Query your data:
+
+    ```sql
+    SELECT host, COUNT(*)
+    FROM logs
+    GROUP BY host
+    ```
+
+Vector has plans to support [columnar formats](#columnar-formats) in \
+[`v0.6`][roadmap] which will allows for very fast and efficient querying \
+on S3.
+"""
+
 
 # ------------------------------------------------------------------------------
 # sinks.blachole
@@ -1520,7 +1643,7 @@ benchmarking purposes\
 
 [sinks.blackhole.options.print_amount]
 type = "int"
-example = "1000"
+examples = ["1000"]
 null = false
 description = "The number of events that must be received in order to print a summary of activity."
 
@@ -1589,7 +1712,7 @@ description = "The `doc_type` for your index data. This is only relevant for Ela
 
 [sinks.elasticsearch.options.host]
 type = "string"
-example = "10.24.32.122:9000"
+examples = ["10.24.32.122:9000"]
 null = false
 description = "The host of your Elasticsearch cluster."
 
@@ -1608,7 +1731,7 @@ Vector will explode events into nested documents before writing them to Elastics
 [[sinks.elasticsearch.sections]]
 title = "Partitioning"
 body = """\
-Vector supports dynamic index names through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the index name, creating time partitioned indices. This is highly recommended for the logging use case since it allows for easy data pruning by simply deleting old indices.
+Vector supports dynamic `index` values through [`strftime` specificiers][strftime_specifiers]. This allows you to use the [event `timestamp`][default_schema] within the index name, creating time partitioned indices. This is highly recommended for the logging use case since it allows for easy data pruning by simply deleting old indices.
 
 For example, when the `index` setting is set to `vector-%Y-%m-%d`, vector will create indexes with names like `vector-2019-05-04`, `vector-2019-05-05`, and so on. The date values are derived from the [event's `timestamp`][default_schema].\
 """
@@ -1655,12 +1778,12 @@ description = "Options for basic authentication."
 
 [sinks.http.options.basic_auth.options.password]
 type = "string"
-example = "password"
+examples = ["password"]
 description = "The basic authentication password."
 
 [sinks.http.options.basic_auth.options.user]
 type = "string"
-example = "username"
+examples = ["username"]
 description = "The basic authentication user name."
 
 [sinks.http.options.compression]
@@ -1680,19 +1803,18 @@ description = "Options for custom headers."
 
 [sinks.http.options.headers.options."*"]
 type = "string"
-example_key = "X-Powered-By"
-example = "Vector"
+examples = ["X-Powered-By = \"Vector\""]
 description = "A custom header to be added to each outgoing HTTP request."
 
 [sinks.http.options.healthcheck_uri]
 type = "string"
-example = "https://10.22.212.22:9000/_health"
+examples = ["https://10.22.212.22:9000/_health"]
 null = true
 description = "A URI that Vector can request in order to determine the service health."
 
 [sinks.http.options.uri]
 type = "string"
-example = "https://10.22.212.22:9000/endpoint"
+examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 
@@ -1714,7 +1836,7 @@ write_to_description = "[Apache Kafka][kafka] via the [Kafka protocol][kafka_pro
 
 [sinks.kafka.options.bootstrap_servers]
 type = "string"
-example = "10.14.22.123:9092,10.14.23.332:9092"
+examples = ["10.14.22.123:9092,10.14.23.332:9092"]
 null = false
 description = """\
 A comma-separated list of host and port pairs that are the addresses of the \
@@ -1729,7 +1851,7 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.kafka.options.key_field]
 type = "string"
-example = "partition_key"
+examples = ["partition_key"]
 description = """\
 The field name to use for the topic key. If unspecified, the key will be \
 randomly generated. If the field does not exist on the event, a blank value \
@@ -1738,7 +1860,7 @@ will be used.\
 
 [sinks.kafka.options.topic]
 type = "string"
-example = "topic-1234"
+examples = ["topic-1234"]
 null = false
 description = "The Kafka topic name to write events to."
 
@@ -1781,12 +1903,12 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.splunk_hec.options.host]
 type = "string"
-example = "my-splunk-host.com"
+examples = ["my-splunk-host.com"]
 description = "Your Splunk HEC host."
 
 [sinks.splunk_hec.options.token]
 type = "string"
-example = "A94A8FE5CCB19BA61C4C08"
+examples = ["A94A8FE5CCB19BA61C4C08"]
 description = "Your Splunk HEC token."
 
 [[sinks.splunk_hec.sections]]
@@ -1810,7 +1932,7 @@ write_to_description = "a TCP connection"
 
 [sinks.tcp.options.address]
 type = "string"
-example = "92.12.333.224:5000"
+examples = ["92.12.333.224:5000"]
 description = "The TCP address."
 
 [sinks.tcp.options.encoding]
@@ -1830,7 +1952,7 @@ write_to_description = "another downstream Vector instance"
 
 [sinks.vector.options.address]
 type = "string"
-example = "92.12.333.224:5000"
+examples = ["92.12.333.224:5000"]
 description = "The downstream Vector address."
 
 # ------------------------------------------------------------------------------
@@ -1838,6 +1960,8 @@ description = "The downstream Vector address."
 # ------------------------------------------------------------------------------
 [links]
 at_least_once_delivery = "/about/guarantees.md#at-least-once-delivery"
+aws_athena = "https://aws.amazon.com/athena/"
+aws_athena_console = "https://console.aws.amazon.com/athena/home"
 aws_access_keys = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
 aws_credentials_file = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"
 aws_credential_process = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html"
@@ -1847,6 +1971,7 @@ aws_cw_logs_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#
 aws_cw_logs_stream_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
 aws_s3 = "https://aws.amazon.com/s3/"
+aws_s3_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
 basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"
 best_effort_delivery = "/about/guarantees.md#best-effort-delivery"
 community = "https://vectorproject.io/community"
@@ -1881,6 +2006,7 @@ monitoring_logs = "/administration/moonitoring.md#logs"
 performance = "/performance.md"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
+roadmap = "https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open"
 rust = "https://www.rust-lang.org/"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
@@ -1895,3 +2021,4 @@ syslog_5424 = "https://tools.ietf.org/html/rfc5424"
 toml_table = "https://github.com/toml-lang/toml#user-content-table"
 transforms = "/usage/configuration/transforms"
 troubleshooting = "/usages/guides/troubleshooting.md"
+uuidv4 = "https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)"

@@ -149,7 +149,7 @@ class BatchingSink < Sink
         <<~EOF
         Vector offers a few levers to control the rate and volume of requests. Start with the `rate_limit_duration` and `rate_limit_num` options to ensure Vector does not exceed the specified number of requests in the specified window. You can further control the pace at which this window is saturated with the `request_in_flight_limit` option, which will guarantee no more than the specified number of requests are in-flight at any given time.
 
-          Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
+        Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
         EOF
     })
 

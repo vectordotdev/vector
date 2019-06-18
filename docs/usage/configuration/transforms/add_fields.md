@@ -20,7 +20,7 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_add_fields_transform]
   # REQUIRED - General
@@ -29,7 +29,7 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 
   # OPTIONAL - Fields
   [transforms.my_add_fields_transform.fields]
-    new_field = "new field value" # no default
+    new_field = "new field value"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -53,7 +53,7 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 | **REQUIRED** - General | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - Fields | | |
-| `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: new_field = "new field value"` |
+| `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
 
 ## I/O
 

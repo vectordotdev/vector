@@ -166,7 +166,7 @@ class Generator
       end
     end
 
-    def remove_regex_links(regex)
+    def remove_markdown_links(regex)
       regex.
         gsub(/\[([^\]]+)\]\(([^)]+)\)/, '\1').
         gsub(/\[([^\]]+)\]\[([^)]+)\]/, '\1')

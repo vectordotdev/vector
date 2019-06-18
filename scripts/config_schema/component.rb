@@ -160,7 +160,7 @@ class Component
     @options.type = Option.new({
         "name" => "type",
         "description" => "The component type",
-        "example" => name,
+        "examples" => [name],
         "null" => false,
         "type" => "string"
       })
@@ -169,7 +169,7 @@ class Component
       @options.inputs = Option.new({
         "name" => "inputs",
         "description" => "A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.",
-        "example" => ["my-source-id"],
+        "examples" => [["my-source-id"]],
         "null" => false,
         "type" => "string"
       })

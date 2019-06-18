@@ -27,17 +27,30 @@ class OptionsExampleGenerator < Generator
         end
 
         category_options.each do |option|
-          option_content =
-            case option.type
-            when "table"
-              sub_generator = self.class.new(option.options)
-              sub_generator.generate("#{path}.#{option.name}", format, titles: false) + "\n"
+          if option.table?
+            sub_generator = self.class.new(option.options)
+            content << sub_generator.generate("#{path}.#{option.name}", format, titles: false) + "\n"
+          elsif format == :examples
+            if option.name == "*"
+              content << option.examples.join("\n")
             else
-              key_name = format == :examples ? (option.example_key || option.name) : option.name
-              "#{key_name} = #{value(option, format)}\n"
+              content << "#{option.name} = #{example_value(option)}\n"
             end
+          elsif format == :schema
+            content << "#{option.name} = #{type_string(option)}\n"
+          elsif format == :spec
+            content << "\n# #{remove_markdown_links(option.description)}\n"
 
-          content << option_content
+            option.examples.each do |example|
+              if option.name == "*"
+                content << "#{example}\n"
+              else
+                content << "#{option.name} = #{example.inspect}\n"
+              end
+            end
+          else
+            raise("Unknown format: #{format.inspect}")
+          end
         end
 
       content << "\n"
@@ -56,46 +69,33 @@ class OptionsExampleGenerator < Generator
       format == :defaults && option.default.nil?
     end
 
-    def value(option, format)
-      case format
-      when :examples
-        if option.example.nil?
-          type_string(option.type)
-        else
-          tags = []
-
-          if !option.default.nil?
-            tags << "default"
-          elsif option.optional?
-            tags << "no default"
-          end
-
-          if option.unit
-            tags << option.unit
-          end
-
-          if option.enum
-            tags << "one of: #{option.enum.join(", ")}"
-          end
-
-          value = option.example.inspect
-
-          if tags.any?
-            value << " # #{tags.join(", ")}"
-          end
-
-          value
-        end
-      when :defaults
-        if option.default.nil?
-          type_string(option.type)
-        else
-          option.example.inspect
-        end
-      when :schema
-        type_string(option)
+    def example_value(option)
+      if option.examples.empty?
+        type_string(option.type)
       else
-        raise("Unsupported options example format: #{format.inspect}")
+        tags = []
+
+        if !option.default.nil?
+          tags << "default"
+        elsif option.optional?
+          tags << "no default"
+        end
+
+        if option.unit
+          tags << option.unit
+        end
+
+        if option.enum
+          tags << "one of: #{option.enum.join(", ")}"
+        end
+
+        value = option.examples.first.inspect
+
+        if tags.any?
+          value << " # #{tags.join(", ")}"
+        end
+
+        value
       end
     end
 

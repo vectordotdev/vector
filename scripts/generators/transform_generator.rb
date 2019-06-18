@@ -40,7 +40,7 @@ class TransformGenerator < Generator
       ## Example
 
       {% code-tabs %}
-      {% code-tabs-item title="vector.toml (examples)" %}
+      {% code-tabs-item title="vector.toml (example)" %}
       ```coffeescript
       #{options_example_generator.generate("transforms.my_#{transform.name}_transform", :examples)}
       ```

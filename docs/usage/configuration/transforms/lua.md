@@ -15,16 +15,14 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/lua-transform.svg)
 
 {% hint style="warning" %}
-The transform is in `beta`.
-
-Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua) as it will help shape the roadmap of this component.
+The `lua` transform is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua) as it will help shape the roadmap of this component.
 {% endhint %}
 The `lua` transforms accepts [`log`][log_event] events and allows you to transform events with a full embedded [Lua][lua] engine.
 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_lua_transform]
   # REQUIRED - General

@@ -68,12 +68,8 @@ class OptionsTableGenerator < Generator
               tags << "`no default`"
             end
 
-            if option.default.nil? && option.enum.nil? && !option.example.nil?
-              value = if option.example_key.nil?
-                option.example.inspect
-              else
-                "#{option.example_key} = #{option.example.inspect}"
-              end
+            if option.default.nil? && option.enum.nil? && option.examples.any?
+              value = option.examples.first.inspect
 
               if value.length > 30
                 tags << "`example: (see above)`"

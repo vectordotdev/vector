@@ -4,7 +4,7 @@ class SectionsGenerator < Generator
   attr_reader :sections
 
   def initialize(sections)
-    @sections = sections
+    @sections = sections.sort
   end
 
   def generate

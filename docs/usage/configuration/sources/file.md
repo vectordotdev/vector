@@ -15,16 +15,14 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/file-source.svg)
 
 {% hint style="warning" %}
-The source is in `beta`.
-
-Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+file) as it will help shape the roadmap of this component.
+The `file` source is in `beta`. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Source%3A+file) as it will help shape the roadmap of this component.
 {% endhint %}
 The `file` source continuously ingests [`log`][log_event] events through one or more local files.
 
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sources.my_file_source]
   # REQUIRED - General

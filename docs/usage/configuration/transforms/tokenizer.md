@@ -20,7 +20,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_tokenizer_transform]
   # REQUIRED - General

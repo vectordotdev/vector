@@ -20,7 +20,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_regex_parser_transform]
   # REQUIRED - General

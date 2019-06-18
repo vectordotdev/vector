@@ -6,8 +6,7 @@ class Option
     :default,
     :description,
     :enum,
-    :example,
-    :example_key,
+    :examples,
     :null,
     :options,
     :type,
@@ -29,34 +28,25 @@ class Option
     @default = hash["default"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
-    @example = hash["example"]
-    @example_key = hash["example_key"]
+    @examples = hash["examples"] || []
     @null = hash["null"].nil? ? true : hash["null"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    if !@default.nil? && !@example.nil?
-      raise "#{self.class.name}#example not required when a #default is specified for #{@name}"
+    if !@enum.nil? && @examples.any?
+      raise "#{self.class.name}#examples not required when a #enum is specified for #{@name}"
     end
 
-    if !@enum.nil? && !@example.nil?
-      raise "#{self.class.name}#example not required when a #enum is specified for #{@name}"
-    end
-
-    if @example.nil?
+    if @examples.empty?
       if !@default.nil?
-        @example = @default
+        @examples = [@default]
       elsif !@enum.nil?
-        @example = @enum.first
+        @examples = @enum
       end
     end
 
-    if @example.nil? && @options.nil? && !table?
-      raise "#{self.class.name}#example is required if a #default is not specified"
-    end
-
-    if @example_key.nil? && @name == "*"
-      raise "#{self.class.name}#example_key is required if the name is `*`"
+    if @examples.empty? && @options.nil? && !table?
+      raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
     end
   end
 

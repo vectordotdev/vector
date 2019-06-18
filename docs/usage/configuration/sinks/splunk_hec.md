@@ -20,7 +20,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_splunk_hec_sink]
   # REQUIRED - General
@@ -70,6 +70,58 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   retry_backoff_secs = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.splunk_hec]
+  # REQUIRED - General
+
+  # The component type
+  type = "splunk_hec"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # Your Splunk HEC host.
+  host = "my-splunk-host.com"
+
+  # Your Splunk HEC token.
+  token = "A94A8FE5CCB19BA61C4C08"
+
+  # OPTIONAL - Batching
+
+  # The maximum size of a batch before it is flushed.
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  batch_timeout = 1
+
+  # OPTIONAL - Requests
+
+  # The encoding format used to serialize the events before flushing.
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The window used for the `request_rate_limit_num` option
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration` window.
+  rate_limit_num = 10
+
+  # The maximum number of in-flight requests allowed at any given time.
+  request_in_flight_limit = 10
+
+  # The maximum time a request can take before being aborted.
+  request_timeout_secs = 60
+
+  # The maximum number of retries to make for failed requests.
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  retry_backoff_secs = 5
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -103,6 +155,10 @@ The `splunk_hec` sink batches and flushes events over an configurable interval. 
 
 ## How It Works
 
+### Batching
+
+By default, the `splunk_hec` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
+
 ### Delivery Guarantee
 
 This component offers an **at least once** delivery guarantee if your
@@ -120,24 +176,20 @@ The `splunk_hec` sink encodes events before flushing. This is controlled via the
 
 Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
 
-### Setup
-
-In order to supply values for both the `host` and `token` options you must first setup a Splunk HTTP Event Collector. Please refer to the [Splunk setup docs][splunk_hec_setup] for a guide on how to do this. Once you've setup your Spunk HTTP Collectory you'll be provided a `host` and `token`
-that you should supply to the `host` and `token` options.
-
-### Batching
-
-By default, the `splunk_hec` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
-
 ### Rate Limiting
 
 Vector offers a few levers to control the rate and volume of requests. Start with the `rate_limit_duration` and `rate_limit_num` options to ensure Vector does not exceed the specified number of requests in the specified window. You can further control the pace at which this window is saturated with the `request_in_flight_limit` option, which will guarantee no more than the specified number of requests are in-flight at any given time.
 
-  Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
+Please note, Vector's defaults are carefully chosen and it should be rare that you need to adjust these.
 
 ### Retry Policy
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`). Other responses will not be retried. You can control the number of retry attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+
+### Setup
+
+In order to supply values for both the `host` and `token` options you must first setup a Splunk HTTP Event Collector. Please refer to the [Splunk setup docs][splunk_hec_setup] for a guide on how to do this. Once you've setup your Spunk HTTP Collectory you'll be provided a `host` and `token`
+that you should supply to the `host` and `token` options.
 
 ### Timeouts
 

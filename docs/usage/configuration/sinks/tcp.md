@@ -20,7 +20,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (examples)" %}
+{% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_tcp_sink]
   # REQUIRED - General
@@ -46,6 +46,29 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 
   # OPTIONAL - Requests
   encoding = {json | text}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sink.tcp]
+  # REQUIRED - General
+
+  # The component type
+  type = "tcp"
+
+  # A list of upstream source for more info.
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+
+  # The TCP address.
+  address = "92.12.333.224:5000"
+
+  # OPTIONAL - Requests
+
+  # The encoding format used to serialize the events before flushing.
+  encoding = "json"
+  encoding = "text"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
