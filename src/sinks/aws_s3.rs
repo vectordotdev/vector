@@ -176,7 +176,7 @@ impl S3Sink {
         let key_prefix = config
             .key_prefix
             .clone()
-            .unwrap_or_else(|| "date=%F".into());
+            .unwrap_or_else(|| "date=%F/".into());
 
         let region = config.region.clone();
         let s3 = S3Sink {
