@@ -33,7 +33,6 @@
   * [Build From Source](setup/installation/build-from-source.md)
 * [Getting Started](setup/getting-started/README.md)
   * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
-  * [Creating Your First Pipeline](setup/getting-started/creating-your-first-pipeline.md)
 * [Deployment](setup/deployment/README.md)
   * [Topologies](setup/deployment/topologies.md)
   * [Roles](setup/deployment/roles/README.md)
