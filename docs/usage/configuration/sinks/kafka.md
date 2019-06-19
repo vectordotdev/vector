@@ -24,7 +24,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 ```coffeescript
 [sinks.my_kafka_sink]
   # REQUIRED - General
-  type = "kafka"
+  type = "kafka" # one of: kafka
   inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   topic = "topic-1234"
@@ -45,7 +45,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {kafka}
   inputs = "<string>"
   bootstrap_servers = "<string>"
   topic = "<string>"
@@ -68,7 +68,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # REQUIRED - General
 
   # The component type
-  type = "kafka"
+  type = "kafka" # one of: kafka
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -111,6 +111,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "kafka"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |

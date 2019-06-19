@@ -26,7 +26,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.my_aws_cloudwatch_logs_sink]
   # REQUIRED - General
-  type = "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs" # one of: aws_cloudwatch_logs
   inputs = ["my-source-id"]
   group_name = "/var/log/my-log.log"
   region = "us-east-1"
@@ -57,7 +57,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {aws_cloudwatch_logs}
   inputs = "<string>"
   group_name = "<string>"
   region = "<string>"
@@ -90,7 +90,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
   # REQUIRED - General
 
   # The component type
-  type = "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs" # one of: aws_cloudwatch_logs
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -159,6 +159,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "aws_cloudwatch_logs"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `group_name` | `string` | The [group name][aws_cw_logs_group_name] of the target CloudWatch Logs stream.<br />`required` `example: "/var/log/my-log.log"` |
 | `region` | `string` | The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |

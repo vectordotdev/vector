@@ -26,7 +26,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 ```coffeescript
 [sinks.my_elasticsearch_sink]
   # REQUIRED - General
-  type = "elasticsearch"
+  type = "elasticsearch" # one of: elasticsearch
   inputs = ["my-source-id"]
   host = "10.24.32.122:9000"
 
@@ -58,7 +58,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {elasticsearch}
   inputs = "<string>"
   host = "<string>"
 
@@ -92,7 +92,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   # REQUIRED - General
 
   # The component type
-  type = "elasticsearch"
+  type = "elasticsearch" # one of: elasticsearch
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -159,6 +159,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "elasticsearch"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `host` | `string` | The host of your Elasticsearch cluster.<br />`required` `example: "10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |

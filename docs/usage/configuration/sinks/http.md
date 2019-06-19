@@ -24,7 +24,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ```coffeescript
 [sinks.my_http_sink]
   # REQUIRED - General
-  type = "http"
+  type = "http" # one of: http
   inputs = ["my-source-id"]
   encoding = "ndjson" # one of: ndjson, text
   uri = "https://10.22.212.22:9000/endpoint"
@@ -66,7 +66,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {http}
   inputs = "<string>"
   encoding = {ndjson | text}
   uri = "<string>"
@@ -110,7 +110,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   # REQUIRED - General
 
   # The component type
-  type = "http"
+  type = "http" # one of: http
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -196,6 +196,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "http"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI. See [Health Checks](#health-checks) for more info.<br />`required` `example: (see above)` |

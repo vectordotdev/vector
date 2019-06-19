@@ -26,7 +26,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 ```coffeescript
 [transforms.my_sampler_transform]
   # REQUIRED - General
-  type = "sampler"
+  type = "sampler" # one of: sampler
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -38,7 +38,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {sampler}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
   # REQUIRED - General
 
   # The component type
-  type = "sampler"
+  type = "sampler" # one of: sampler
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -73,6 +73,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "sampler"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |

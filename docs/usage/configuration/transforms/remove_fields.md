@@ -24,7 +24,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 ```coffeescript
 [transforms.my_remove_fields_transform]
   # REQUIRED - General
-  type = "remove_fields"
+  type = "remove_fields" # one of: remove_fields
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -35,7 +35,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {remove_fields}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -48,7 +48,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
   # REQUIRED - General
 
   # The component type
-  type = "remove_fields"
+  type = "remove_fields" # one of: remove_fields
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -66,6 +66,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "remove_fields"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `fields` | `[string]` | The field names to drop.<br />`no default` `example: ["field1", "field2"]` |

@@ -24,7 +24,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 ```coffeescript
 [sources.my_tcp_source]
   # REQUIRED - General
-  type = "tcp"
+  type = "tcp" # one of: tcp
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -39,7 +39,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {tcp}
 
   # OPTIONAL - General
   address = "<string>"
@@ -56,7 +56,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
   # REQUIRED - General
 
   # The component type
-  type = "tcp"
+  type = "tcp" # one of: tcp
 
   # OPTIONAL - General
 
@@ -81,6 +81,8 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
+| **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "tcp"` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The address to bind the socket to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |

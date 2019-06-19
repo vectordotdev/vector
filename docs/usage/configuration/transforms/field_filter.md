@@ -26,7 +26,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 ```coffeescript
 [transforms.my_field_filter_transform]
   # REQUIRED - General
-  type = "field_filter"
+  type = "field_filter" # one of: field_filter
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -38,7 +38,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {field_filter}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
   # REQUIRED - General
 
   # The component type
-  type = "field_filter"
+  type = "field_filter" # one of: field_filter
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -73,6 +73,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "field_filter"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `field` | `string` | The target field to compare against the `value`.<br />`no default` `example: "file"` |

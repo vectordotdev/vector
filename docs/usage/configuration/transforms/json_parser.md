@@ -24,7 +24,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.my_json_parser_transform]
   # REQUIRED - General
-  type = "json_parser"
+  type = "json_parser" # one of: json_parser
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -37,7 +37,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {json_parser}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   # REQUIRED - General
 
   # The component type
-  type = "json_parser"
+  type = "json_parser" # one of: json_parser
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -76,6 +76,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "json_parser"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |

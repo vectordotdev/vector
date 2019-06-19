@@ -26,7 +26,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
 ```coffeescript
 [sources.my_vector_source]
   # REQUIRED - General
-  type = "vector"
+  type = "vector" # one of: vector
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -37,7 +37,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {vector}
 
   # OPTIONAL - General
   address = "<string>"
@@ -50,7 +50,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
   # REQUIRED - General
 
   # The component type
-  type = "vector"
+  type = "vector" # one of: vector
 
   # OPTIONAL - General
 
@@ -67,6 +67,9 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
+| **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "vector"` |
+| **OPTIONAL** | | |
 | `address` | `string` | The TCP address to bind to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 

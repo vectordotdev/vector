@@ -24,7 +24,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ```coffeescript
 [sinks.my_console_sink]
   # REQUIRED - General
-  type = "console"
+  type = "console" # one of: console
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -43,7 +43,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {console}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -64,7 +64,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
   # REQUIRED - General
 
   # The component type
-  type = "console"
+  type = "console" # one of: console
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -102,6 +102,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "console"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |

@@ -24,7 +24,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 ```coffeescript
 [transforms.my_regex_parser_transform]
   # REQUIRED - General
-  type = "regex_parser"
+  type = "regex_parser" # one of: regex_parser
   inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
@@ -38,7 +38,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {regex_parser}
   inputs = "<string>"
   regex = "<string>"
 
@@ -54,7 +54,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
   # REQUIRED - General
 
   # The component type
-  type = "regex_parser"
+  type = "regex_parser" # one of: regex_parser
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -81,6 +81,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing), [Regex Debugger](#regex-debugger), and [Regex Syntax](#regex-syntax) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |

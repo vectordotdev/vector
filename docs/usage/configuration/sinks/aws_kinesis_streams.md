@@ -26,7 +26,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.my_aws_kinesis_streams_sink]
   # REQUIRED - General
-  type = "aws_kinesis_streams"
+  type = "aws_kinesis_streams" # one of: aws_kinesis_streams
   inputs = ["my-source-id"]
   region = "us-east-1"
   stream_name = "my-stream"
@@ -56,7 +56,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {aws_kinesis_streams}
   inputs = "<string>"
   region = "<string>"
   stream_name = "<string>"
@@ -88,7 +88,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # REQUIRED - General
 
   # The component type
-  type = "aws_kinesis_streams"
+  type = "aws_kinesis_streams" # one of: aws_kinesis_streams
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -154,6 +154,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "aws_kinesis_streams"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `region` | `string` | The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |

@@ -24,7 +24,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 ```coffeescript
 [sinks.my_blackhole_sink]
   # REQUIRED - General
-  type = "blackhole"
+  type = "blackhole" # one of: blackhole
   inputs = ["my-source-id"]
   print_amount = "1000"
 
@@ -40,7 +40,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {blackhole}
   inputs = "<string>"
   print_amount = <int>
 
@@ -58,7 +58,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
   # REQUIRED - General
 
   # The component type
-  type = "blackhole"
+  type = "blackhole" # one of: blackhole
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -89,6 +89,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "blackhole"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `print_amount` | `int` | The number of events that must be received in order to print a summary of activity.<br />`required` `example: "1000"` |
 | **OPTIONAL** - Buffer | | |

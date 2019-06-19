@@ -26,7 +26,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
 ```coffeescript
 [sources.my_file_source]
   # REQUIRED - General
-  type = "file"
+  type = "file" # one of: file
   exclude = ["/var/log/nginx*.log"]
   include = ["/var/log/nginx*.log"]
 
@@ -44,7 +44,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {file}
   exclude = ["<string>", ...]
   include = ["<string>", ...]
 
@@ -64,7 +64,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
   # REQUIRED - General
 
   # The component type
-  type = "file"
+  type = "file" # one of: file
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence over the `include` option.*
   exclude = ["/var/log/nginx*.log"]
@@ -99,6 +99,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "file"` |
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx*.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx*.log"]` |
 | **OPTIONAL** - General | | |

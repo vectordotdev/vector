@@ -26,7 +26,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 ```coffeescript
 [sinks.my_aws_s3_sink]
   # REQUIRED - General
-  type = "aws_s3"
+  type = "aws_s3" # one of: aws_s3
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
@@ -63,7 +63,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {aws_s3}
   inputs = "<string>"
   bucket = "<string>"
   region = "<string>"
@@ -102,7 +102,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # REQUIRED - General
 
   # The component type
-  type = "aws_s3"
+  type = "aws_s3" # one of: aws_s3
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -187,6 +187,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "aws_s3"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |

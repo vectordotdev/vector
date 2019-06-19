@@ -24,7 +24,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ```coffeescript
 [sinks.my_vector_sink]
   # REQUIRED - General
-  type = "vector"
+  type = "vector" # one of: vector
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -42,7 +42,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {vector}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -62,7 +62,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   # REQUIRED - General
 
   # The component type
-  type = "vector"
+  type = "vector" # one of: vector
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -95,6 +95,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "vector"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The downstream Vector address.<br />`no default` `example: "92.12.333.224:5000"` |

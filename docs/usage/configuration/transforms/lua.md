@@ -26,7 +26,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 ```coffeescript
 [transforms.my_lua_transform]
   # REQUIRED - General
-  type = "lua"
+  type = "lua" # one of: lua
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -48,7 +48,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {lua}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -62,7 +62,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   # REQUIRED - General
 
   # The component type
-  type = "lua"
+  type = "lua" # one of: lua
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -93,6 +93,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "lua"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: true` |

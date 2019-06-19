@@ -24,7 +24,7 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.my_syslog_source]
   # REQUIRED - General
-  type = "syslog"
+  type = "syslog" # one of: syslog
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -40,7 +40,7 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {syslog}
 
   # OPTIONAL - General
   address = "<string>"
@@ -58,7 +58,7 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
 
   # The component type
-  type = "syslog"
+  type = "syslog" # one of: syslog
 
   # OPTIONAL - General
 
@@ -89,6 +89,8 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
+| **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "syslog"` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or `udp`.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |

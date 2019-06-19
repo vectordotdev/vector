@@ -24,7 +24,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 ```coffeescript
 [sources.my_stdin_source]
   # REQUIRED - General
-  type = "stdin"
+  type = "stdin" # one of: stdin
 
   # OPTIONAL - General
   max_length = 102400 # default, bytes
@@ -37,7 +37,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {stdin}
 
   # OPTIONAL - General
   max_length = <int>
@@ -52,7 +52,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
   # REQUIRED - General
 
   # The component type
-  type = "stdin"
+  type = "stdin" # one of: stdin
 
   # OPTIONAL - General
 
@@ -71,6 +71,8 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
+| **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "stdin"` |
 | **OPTIONAL** - General | | |
 | `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.<br />`default: 102400` `unit: bytes` |
 | **OPTIONAL** - Context | | |

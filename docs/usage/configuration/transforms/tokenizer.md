@@ -24,7 +24,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 ```coffeescript
 [transforms.my_tokenizer_transform]
   # REQUIRED - General
-  type = "tokenizer"
+  type = "tokenizer" # one of: tokenizer
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -37,7 +37,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {tokenizer}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
   # REQUIRED - General
 
   # The component type
-  type = "tokenizer"
+  type = "tokenizer" # one of: tokenizer
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -76,6 +76,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
+| `type` | `string` | The component type<br />`required` `enum: "tokenizer"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |

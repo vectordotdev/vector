@@ -24,7 +24,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 ```coffeescript
 [sinks.my_tcp_sink]
   # REQUIRED - General
-  type = "tcp"
+  type = "tcp" # one of: tcp
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -45,7 +45,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {tcp}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -68,7 +68,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
   # REQUIRED - General
 
   # The component type
-  type = "tcp"
+  type = "tcp" # one of: tcp
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -107,6 +107,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "tcp"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP address.<br />`no default` `example: "92.12.333.224:5000"` |

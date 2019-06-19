@@ -24,7 +24,7 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
 ```coffeescript
 [transforms.my_add_fields_transform]
   # REQUIRED - General
-  type = "add_fields"
+  type = "add_fields" # one of: add_fields
   inputs = ["my-source-id"]
 
   # OPTIONAL - Fields
@@ -36,7 +36,7 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {add_fields}
   inputs = "<string>"
 
   # OPTIONAL - Fields
@@ -50,7 +50,7 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
   # REQUIRED - General
 
   # The component type
-  type = "add_fields"
+  type = "add_fields" # one of: add_fields
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -69,6 +69,7 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - Fields | | |
 | `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |

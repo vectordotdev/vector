@@ -24,7 +24,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 ```coffeescript
 [sinks.my_splunk_hec_sink]
   # REQUIRED - General
-  type = "splunk_hec"
+  type = "splunk_hec" # one of: splunk_hec
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -56,7 +56,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {splunk_hec}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -90,7 +90,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # REQUIRED - General
 
   # The component type
-  type = "splunk_hec"
+  type = "splunk_hec" # one of: splunk_hec
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -158,6 +158,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
+| `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "splunk_hec"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `host` | `string` | Your Splunk HEC host. See [Setup](#setup) for more info.<br />`no default` `example: "my-splunk-host.com"` |

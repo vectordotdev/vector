@@ -26,7 +26,7 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.my_statsd_source]
   # REQUIRED - General
-  type = "statsd"
+  type = "statsd" # one of: statsd
   address = "127.0.0.1:8126"
 ```
 {% endcode-tabs-item %}
@@ -34,7 +34,7 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "<string>"
+  type = {statsd}
   address = "<string>"
 ```
 {% endcode-tabs-item %}
@@ -44,7 +44,7 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
 
   # The component type
-  type = "statsd"
+  type = "statsd" # one of: statsd
 
   # UDP socket address to bind to.
   address = "127.0.0.1:8126"
@@ -56,6 +56,7 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
+| `type` | `string` | The component type<br />`required` `enum: "statsd"` |
 | `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## I/O
