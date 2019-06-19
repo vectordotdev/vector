@@ -79,6 +79,7 @@ class Schema
       hash.fetch("links"),
       sources,
       transforms,
+      sinks,
       @enums.correctness_tests,
       @enums.performance_tests
     )

@@ -8,12 +8,12 @@ Vector was designed with a strong focus on reliable and performant data delivery
 
 ## At Least Once Delivery
 
-At least once delivery guarantees that an [event](data-model.md#event) received by Vector will be delivered at least once to the configured destination\(s\). While rare, it is possible for an event to be delivered more than once \(see the [Does Vector support exactly once delivery](guarantees.md#does-vector-support-exactly-once-delivery) FAQ below\).
+At least once delivery guarantees that an [event](data-model.md#event) received by Vector will be delivered at least once to the configured destination(s). While rare, it is possible for an event to be delivered more than once (see the [Does Vector support exactly once delivery](guarantees.md#does-vector-support-exactly-once-delivery) FAQ below).
 
 ### Quick Start
 
 1. Enable [on-disk buffers](../usage/configuration/sinks/buffer.md) for each sink that you want to have this guarantee.
-2. Use [sources and sinks that are capable](guarantees.md#support-matrix) of achieving this guarantee \(see table below\)
+2. Use [sources and sinks that are capable](guarantees.md#support-matrix) of achieving this guarantee (see table below)
 
 ### How It Works
 
@@ -21,41 +21,32 @@ At least once delivery is achieved by [configuring on-disk buffers](../usage/con
 
 ## Best Effort Delivery
 
-Best effort delivery has no guarantees and means that Vector will make a best effort to deliver each event. This means it is possible for an event to not be delivered. For most, this is sufficient in the observability use case and will afford you the opportunity to optimize towards performance and reduce operating cost. For example, you can stick with [in-memory buffers](../usage/configuration/sinks/buffer.md#in-memory) \(default\), instead of enabling [on-disk buffers](../usage/configuration/sinks/buffer.md#on-disk), for a roughly [3X throughput increase](../usage/configuration/sinks/buffer.md#performance).
+Best effort delivery has no guarantees and means that Vector will make a best effort to deliver each event. This means it is possible for an event to not be delivered. For most, this is sufficient in the observability use case and will afford you the opportunity to optimize towards performance and reduce operating cost. For example, you can stick with [in-memory buffers](../usage/configuration/sinks/buffer.md#in-memory) (default), instead of enabling [on-disk buffers](../usage/configuration/sinks/buffer.md#on-disk), for a roughly [3X throughput increase](../usage/configuration/sinks/buffer.md#performance).
 
 ## Support Matrix
 
 The following matrix outlines the guarantee support for each [sink](../usage/configuration/sinks/) and [source](../usage/configuration/sources/).
 
-{% hint style="info" %}
-It is possible that a sink or source may not be listed here. For clarity, each sink and source will list document it's guarantee in it's specific documentation page.
-{% endhint %}
 
-| Name | At Least Once | Best Effort |
-| :--- | :---: | :---: |
-| \`\`[`aws_cloudwatch_logs` sink](../usage/configuration/sinks/aws_cloudwatch_logs.md) | ✓ |  |
-| \`\`[`aws_kinesis` sink](../usage/configuration/sinks/aws_kinesis_streams.md) | ✓ |  |
-| \`\`[`aws_s3` sink](../usage/configuration/sinks/aws_s3.md) | ✓ |  |
-| \`\`[`console` sink](../usage/configuration/sinks/console.md) | ✓ |  |
-| \`\`[`elasticsearch` sink](../usage/configuration/sinks/elasticsearch.md) | ✓ |  |
-| \`\`[`file` sink](../usage/configuration/sinks/file.md) | ✓\* |  |
-| \`\`[`file` source](../usage/configuration/sources/file.md) | ✓\* |  |
-| \`\`[`http` sink](../usage/configuration/sinks/http.md) | ✓ |  |
-| \`\`[`kafka` sink](../usage/configuration/sinks/kafka.md) | ✓ |  |
-| \`\`[`stdin` source](../usage/configuration/sources/stdin.md) | ✓ |  |
-| \`\`[`splunk_hec` sink](../usage/configuration/sinks/splunk_hec.md) | ✓ |  |
-| \`\`[`syslog` source via TCP](../usage/configuration/sources/syslog.md) | ✓ |  |
-| \`\`[`syslog` source via UDP](../usage/configuration/sources/syslog.md) |  | ✓ |
-| \`\`[`syslog` source via Unix Socket](../usage/configuration/sources/syslog.md) | ✓ |  |
-| \`\`[`tcp` sink](../usage/configuration/sinks/tcp.md) |  | ✓ |
-| \`\`[`tcp` source](../usage/configuration/sources/tcp.md) | ✓ |  |
-| \`\`[`udp` sink](../usage/configuration/sinks/udp.md) |  | ✓ |
-| \`\`[`udp` source](../usage/configuration/sources/udp.md) |  | ✓ |
-| \`\`[`unix` source](../usage/configuration/sources/unix.md) | ✓ |  |
-| \`\`[`vector` sink](../usage/configuration/sinks/vector.md) | ✓ |  |
-| \`\`[`vector` source](../usage/configuration/sources/vector.md) | ✓ |  |
-
-\* only if configured properly, see the associated documentation
+| Name | Delivery Guarantee |
+| :--- | :----------------: |
+| [`aws_cloudwatch_logs` sink][aws_cloudwatch_logs_sink] | `at_least_once` |
+| [`aws_kinesis_streams` sink][aws_kinesis_streams_sink] | `at_least_once` |
+| [`aws_s3` sink][aws_s3_sink] | `at_least_once` |
+| [`blackhole` sink][blackhole_sink] | `best_effort` |
+| [`console` sink][console_sink] | `best_effort` |
+| [`elasticsearch` sink][elasticsearch_sink] | `best_effort` |
+| [`file` source][file_source] | `best_effort` |
+| [`http` sink][http_sink] | `at_least_once` |
+| [`kafka` sink][kafka_sink] | `at_least_once` |
+| [`splunk_hec` sink][splunk_hec_sink] | `at_least_once` |
+| [`statsd` source][statsd_source] | `best_effort` |
+| [`stdin` source][stdin_source] | `at_least_once` |
+| [`syslog` source][syslog_source] | `best_effort` |
+| [`tcp` sink][tcp_sink] | `best_effort` |
+| [`tcp` source][tcp_source] | `best_effort` |
+| [`vector` sink][vector_sink] | `best_effort` |
+| [`vector` source][vector_source] | `best_effort` |
 
 ## FAQs
 
@@ -65,13 +56,23 @@ One of the unique advantages with the logging use case is that some data loss is
 
 ### Does Vector support exactly once delivery?
 
-No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it \(Kafka, for example\), but it remains unclear if Vector will ever be able to achieve this. We recommend [subscribing to our mailing list](https://vectorproject.io), which will keep you in the loop if this ever changes.
+No, Vector does not support exactly once delivery. There are future plans to partially support this for sources and sinks that support it (Kafka, for example), but it remains unclear if Vector will ever be able to achieve this. We recommend [subscribing to our mailing list](https://vectorproject.io), which will keep you in the loop if this ever changes.
 
-
-
-
-
-
-
-
+[aws_cloudwatch_logs_sink]: "../../../usage/configuration/sinks/aws_cloudwatch_logs.md"
+[aws_kinesis_streams_sink]: "../../../usage/configuration/sinks/aws_kinesis_streams.md"
+[aws_s3_sink]: "../../../usage/configuration/sinks/aws_s3.md"
+[blackhole_sink]: "../../../usage/configuration/sinks/blackhole.md"
+[console_sink]: "../../../usage/configuration/sinks/console.md"
+[elasticsearch_sink]: "../../../usage/configuration/sinks/elasticsearch.md"
+[file_source]: "../../../usage/configuration/sources/file.md"
+[http_sink]: "../../../usage/configuration/sinks/http.md"
+[kafka_sink]: "../../../usage/configuration/sinks/kafka.md"
+[splunk_hec_sink]: "../../../usage/configuration/sinks/splunk_hec.md"
+[statsd_source]: "../../../usage/configuration/sources/statsd.md"
+[stdin_source]: "../../../usage/configuration/sources/stdin.md"
+[syslog_source]: "../../../usage/configuration/sources/syslog.md"
+[tcp_sink]: "../../../usage/configuration/sinks/tcp.md"
+[tcp_source]: "../../../usage/configuration/sources/tcp.md"
+[vector_sink]: "../../../usage/configuration/sinks/vector.md"
+[vector_source]: "../../../usage/configuration/sources/vector.md"
 

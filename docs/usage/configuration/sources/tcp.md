@@ -163,7 +163,7 @@ issue, please:
 
 [log_event]: "../../../about/data-model.md#log"
 [transforms]: "../../../usage/configuration/transforms"
-[regex_parser_transform]: "../../../usage/configuration/transform/regex_parser.md"
+[regex_parser_transform]: "../../../usage/configuration/transforms/regex_parser.md"
 [file_to_tcp_performance_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance"
 [tcp_to_blackhole_performance_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance"
 [tcp_to_tcp_performance_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance"

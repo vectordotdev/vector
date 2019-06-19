@@ -116,7 +116,7 @@ class Sink < Component
 
         | Type | Description |
         | :--- | :---------- |
-        | `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+        | `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a crash. Uses more memory. |
         | `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
 
         #### Buffer Overflow

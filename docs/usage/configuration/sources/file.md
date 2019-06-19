@@ -225,7 +225,7 @@ issue, please:
 
 [log_event]: "../../../about/data-model.md#log"
 [transforms]: "../../../usage/configuration/transforms"
-[regex_parser_transform]: "../../../usage/configuration/transform/regex_parser.md"
+[regex_parser_transform]: "../../../usage/configuration/transforms/regex_parser.md"
 [file_rotate_create_correctness_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness"
 [file_rotate_truncate_correctness_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness"
 [file_truncate_correctness_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness"

@@ -1,7 +1,8 @@
 class Links < OpenStruct
-  def initialize(links, sources, transforms, correctness_tests, performance_tests)
+  def initialize(links, sources, transforms, sinks, correctness_tests, performance_tests)
     super(links)
     
+    @sinks = sinks
     @sources = sources
     @transforms = transforms
     @correctness_tests = correctness_tests
@@ -15,6 +16,18 @@ class Links < OpenStruct
         case method.to_s
         when /^issue_([0-9]+)$/
           "#{REPO_ISSUES_ROOT}/#{$1}"
+
+        when /^(.*)_sink$/
+          sink = $1
+          if @sinks.to_h.key?(sink.to_sym)
+            "/usage/configuration/sinks/#{sink}.md"
+          end
+
+        when /^(.*)_source$/
+          source = $1
+          if @sources.to_h.key?(source.to_sym)
+            "/usage/configuration/sources/#{source}.md"
+          end
 
         when /^(.*_correctness)_test$/
           name = $1
@@ -31,7 +44,7 @@ class Links < OpenStruct
         when /^(.*)_transform$/
           transform = $1
           if @transforms.to_h.key?(transform.to_sym)
-            "/usage/configuration/transform/#{transform}.md"
+            "/usage/configuration/transforms/#{transform}.md"
           end
 
         end

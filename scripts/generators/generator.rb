@@ -56,6 +56,10 @@ class Generator
       label_url(component_label(component), *labels)
     end
 
+    def component_link(component)
+      "[#{component_name(component)}][#{component_short_link(component)}]"
+    end
+
     def component_name(component)
       "`#{component.name}` #{component_type(component)}"
     end

@@ -45,6 +45,7 @@ end
 
 require_relative "config_schema/schema"
 require_relative "generators/global_generator"
+require_relative "generators/guarantees_generator"
 require_relative "generators/link_generator"
 require_relative "generators/sink_generator"
 require_relative "generators/sinks_generator"
@@ -98,6 +99,14 @@ schema = Schema.new(schema_hash)
 global_generator = GlobalGenerator.new(schema)
 content = global_generator.generate()
 write("docs/usage/configuration/README.md", content, schema.links)
+
+#
+# Guarantee
+#
+
+guarantees_generator = GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
+content = guarantees_generator.generate()
+write("docs/about/guarantees.md", content, schema.links)
 
 #
 # Sources

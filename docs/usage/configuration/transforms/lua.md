@@ -186,7 +186,7 @@ Finally, consider the following alternatives:
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"
 [search_forum]: "https://forum.vectorproject.io/search?expanded=true"
 [community]: "https://vectorproject.io/community"
-[grok_parser_transform]: "../../../usage/configuration/transform/grok_parser.md"
-[regex_parser_transform]: "../../../usage/configuration/transform/regex_parser.md"
-[tokenizer_transform]: "../../../usage/configuration/transform/tokenizer.md"
+[grok_parser_transform]: "../../../usage/configuration/transforms/grok_parser.md"
+[regex_parser_transform]: "../../../usage/configuration/transforms/regex_parser.md"
+[tokenizer_transform]: "../../../usage/configuration/transforms/tokenizer.md"
 

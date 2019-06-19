@@ -113,5 +113,5 @@ Finally, consider the following alternatives:
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"
 [search_forum]: "https://forum.vectorproject.io/search?expanded=true"
 [community]: "https://vectorproject.io/community"
-[add_fields_transform]: "../../../usage/configuration/transform/add_fields.md"
+[add_fields_transform]: "../../../usage/configuration/transforms/add_fields.md"
 

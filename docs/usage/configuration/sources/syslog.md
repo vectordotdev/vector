@@ -192,7 +192,7 @@ issue, please:
 
 [log_event]: "../../../about/data-model.md#log"
 [transforms]: "../../../usage/configuration/transforms"
-[regex_parser_transform]: "../../../usage/configuration/transform/regex_parser.md"
+[regex_parser_transform]: "../../../usage/configuration/transforms/regex_parser.md"
 [syslog_5424]: "https://tools.ietf.org/html/rfc5424"
 [monitoring_logs]: "../../../administration/moonitoring.md#logs"
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"
