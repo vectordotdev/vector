@@ -18,7 +18,7 @@ Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipeli
 
 | Name | Input | Output | Description |
 | :--- | :---: | :----: | :---------- |
-| [**`add_fields`**](add_fields.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to add one or more fields. |
+| [**`add_fields`**](add_fields.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to add one or more fields. |
 | [**`field_filter`**](field_filter.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to filter events by a field's value. |
 | [**`grok_parser`**](grok_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value with [Grok][grok]. |
 | [**`json_parser`**](json_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value as JSON. |

@@ -689,8 +689,8 @@ via the TCP protocol.\
 allow_you_to_description = "add one or more fields"
 function_categories = ["change_fields"]
 guides = []
-input_types = ["log", "metric"]
-output_types = ["log", "metric"]
+input_types = ["log"]
+output_types = ["log"]
 resources = []
 
 [[transforms.add_fields.outputs]]
@@ -700,7 +700,7 @@ Given the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="/var/log/rails.log" %}
-```toml
+```coffeescript
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]
@@ -720,6 +720,8 @@ Given the following configuration:
 
 A [`log` event][log_event] will be emitted with the following structure:
 
+{% code-tabs %}
+{% code-tabs-item title="log" %}
 ```javascript
 {
   // ... existing fields
@@ -733,6 +735,8 @@ A [`log` event][log_event] will be emitted with the following structure:
   "field8": "my.hostname.com"
 }
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted \
 [types][config_value_types].
@@ -1012,10 +1016,12 @@ resources = [
 [[transforms.lua.outputs]]
 type = "text"
 body = """\
-Given the following event:
+Here are a few example Lua scripts that demonstrate working with the \
+[`event` variable](#global-variables). You can pass these examples to the \
+`source` option:
 
 {% code-tabs %}
-{% code-tabs-item title="Add Fields" %}
+{% code-tabs-item title="add_fields.lua" %}
 ```lua
 # Add root level field
 event["new_field"] = "new value"
@@ -1024,7 +1030,7 @@ event["new_field"] = "new value"
 event["parent.child"] = "nested value"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="Remove Field" %}
+{% code-tabs-item title="remove_fields.lua" %}
 ```lua
 # Remove root level field
 event["field"] = nil
@@ -1033,8 +1039,13 @@ event["field"] = nil
 event["parent.child"] = nil
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="drop_event.lua" %}
+```lua
+# To drop an event entirely
+event = nil
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
-
 """
 
 [transforms.lua.options.source]

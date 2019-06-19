@@ -103,10 +103,10 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 The `lua` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
-Given the following event:
+Here are a few example Lua scripts that demonstrate working with the [`event` variable](#global-variables). You can pass these examples to the `source` option:
 
 {% code-tabs %}
-{% code-tabs-item title="Add Fields" %}
+{% code-tabs-item title="add_fields.lua" %}
 ```lua
 # Add root level field
 event["new_field"] = "new value"
@@ -115,13 +115,19 @@ event["new_field"] = "new value"
 event["parent.child"] = "nested value"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="Remove Field" %}
+{% code-tabs-item title="remove_fields.lua" %}
 ```lua
 # Remove root level field
 event["field"] = nil
 
 # Remove nested field
 event["parent.child"] = nil
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="drop_event.lua" %}
+```lua
+# To drop an event entirely
+event = nil
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

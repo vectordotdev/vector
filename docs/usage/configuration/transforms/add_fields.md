@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../assets/add_fields-transform.svg)
 
 
-The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_event] events and allows you to add one or more fields.
+The `add_fields` transforms accepts [`log`][log_event] events and allows you to add one or more fields.
 
 ## Example
 
@@ -75,14 +75,14 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 
 ## I/O
 
-The `add_fields` transform accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+The `add_fields` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 Given the following configuration:
 
 {% code-tabs %}
 {% code-tabs-item title="/var/log/rails.log" %}
-```toml
+```coffeescript
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]
@@ -102,6 +102,8 @@ Given the following configuration:
 
 A [`log` event][log_event] will be emitted with the following structure:
 
+{% code-tabs %}
+{% code-tabs-item title="log" %}
 ```javascript
 {
   // ... existing fields
@@ -115,6 +117,8 @@ A [`log` event][log_event] will be emitted with the following structure:
   "field8": "my.hostname.com"
 }
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted [types][config_value_types].
 
@@ -197,7 +201,6 @@ Finally, consider the following alternatives:
 
 
 [log_event]: "../../../about/data-model.md#log"
-[metric_event]: "../../../about/data-model.md#metric"
 [sources]: "../../../usage/configuration/sources"
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
