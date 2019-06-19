@@ -270,7 +270,11 @@ mod test {
                             }
                             Ok(_) => {
                                 sut_reads += 1;
-                                let exp = fwfiles[read_index].read_line().unwrap();
+                                let psv = fwfiles[read_index].read_line();
+                                if psv.is_some() {
+                                    model_reads += 1;
+                                    break;
+                                }
                                 break;
                             }
                         }
