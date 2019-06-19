@@ -1,5 +1,5 @@
 use crate::event::ValueKind;
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use std::convert::TryFrom;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
@@ -11,7 +11,8 @@ pub enum Conversion {
     Integer,
     Float,
     Boolean,
-    Timestamp(String),
+    Timestamp,
+    TimestampFmt(String),
 }
 
 impl TryFrom<&str> for Conversion {
@@ -23,7 +24,7 @@ impl TryFrom<&str> for Conversion {
     ///  * `"int"` or `"integer"` => Signed integer
     ///  * `"float"` => Floating point number
     ///  * `"bool"` or `"boolean"` => Boolean
-    ///  * `"timestamp"` => Timestamp using the default format
+    ///  * `"timestamp"` => Timestamp, guessed using a set of formats
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     ///
     /// Timestamp parsing does not yet support time zones.
@@ -33,8 +34,8 @@ impl TryFrom<&str> for Conversion {
             "integer" | "int" => Ok(Conversion::Integer),
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
-            "timestamp" => Ok(Conversion::Timestamp("%m/%d/%Y:%H:%M:%S".into())),
-            _ if s.starts_with("timestamp|") => Ok(Conversion::Timestamp(s[10..].into())),
+            "timestamp" => Ok(Conversion::Timestamp),
+            _ if s.starts_with("timestamp|") => Ok(Conversion::TimestampFmt(s[10..].into())),
             _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
         }
     }
@@ -62,7 +63,10 @@ impl Conversion {
             Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&value))
                 .map_err(|err| format!("Invalid boolean {:?}: {}", value, err))
                 .map(|value| ValueKind::Boolean(value)),
-            Conversion::Timestamp(format) => Utc
+            Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&value))
+                .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
+                .map(|value| ValueKind::Timestamp(value)),
+            Conversion::TimestampFmt(format) => Utc
                 .datetime_from_str(&String::from_utf8_lossy(&value), &format)
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                 .map(|value| ValueKind::Timestamp(value)),
@@ -102,15 +106,39 @@ fn parse_bool(s: &str) -> Result<bool, &'static str> {
     }
 }
 
+/// The list of allowed "automatic" timestamp formats
+const TIMESTAMP_FORMATS: &[&str] = &[
+    "%s",              // UNIX timestamp
+    "%F %T",           // YYYY-MM-DD HH:MM:SS
+    "%v %T",           // DD-Mmm-YYYY HH:MM:SS
+    "%FT%TZ",          // ISO 8601 / RFC 3339
+    "%FT%T",           // ISO 8601 / RFC 3339 without TZ UTC
+    "%m/%d/%Y:%T",     // ???
+    "%a, %d %b %Y %T", // RFC 822/2822 without TZ
+    "%a %d %b %T %Y",  // `date` command output without TZ
+    "%A %d %B %T %Y",  // `date` command output without TZ, long names
+    "%a %b %e %T %Y",  // ctime format
+];
+
+/// Parse a string into a timestamp using one of a set of formats
+fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, &'static str> {
+    for format in TIMESTAMP_FORMATS {
+        if let Ok(result) = Utc.datetime_from_str(s, format) {
+            return Ok(result);
+        }
+    }
+    Err("No matching timestamp format found")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_bool, Conversion};
+    use super::{parse_bool, parse_timestamp, Conversion};
     use crate::event::ValueKind;
     use chrono::prelude::*;
     use std::convert::TryFrom;
 
-    fn dateref() -> ValueKind {
-        ValueKind::Timestamp(Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0)))
+    fn dateref() -> DateTime<Utc> {
+        Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
     }
 
     fn convert(fmt: &str, value: &str) -> Result<ValueKind, String> {
@@ -121,15 +149,29 @@ mod tests {
 
     #[test]
     fn timestamp_conversion() {
-        assert_eq!(convert("timestamp", "02/03/2001:04:05:06"), Ok(dateref()));
+        assert_eq!(
+            convert("timestamp", "02/03/2001:04:05:06"),
+            Ok(dateref().into())
+        );
     }
 
     #[test]
     fn timestamp_param_conversion() {
         assert_eq!(
             convert("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 04:05:06"),
-            Ok(dateref())
+            Ok(dateref().into())
         );
+    }
+
+    #[test]
+    fn parse_timestamp_auto() {
+        assert_eq!(parse_timestamp("2001-02-03 04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("02/03/2001:04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("2001-02-03T04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("2001-02-03T04:05:06Z"), Ok(dateref()));
+        assert_eq!(parse_timestamp("Sat, 3 Feb 2001 04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("Sat Feb 3 04:05:06 2001"), Ok(dateref()));
+        assert_eq!(parse_timestamp("3-Feb-2001 04:05:06"), Ok(dateref()));
     }
 
     // These should perhaps each go into an individual test function to be
