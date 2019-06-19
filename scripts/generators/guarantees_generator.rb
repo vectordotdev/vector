@@ -14,26 +14,11 @@ class GuaranteesGenerator < Generator
       description: An in-depth look into Vector's delivery guarantees
       ---
 
+      #{warning}
+
       # Guarantees
 
-      Vector was designed with a strong focus on reliable and performant data delivery, providing you with the levers necessary to meet the requirements for your use case. This document will cover the delivery guarantees Vector can make, the caveats, and the various configuration options available to optimize towards performance or reliability.
-
-      ## At Least Once Delivery
-
-      At least once delivery guarantees that an [event](data-model.md#event) received by Vector will be delivered at least once to the configured destination\(s\). While rare, it is possible for an event to be delivered more than once \(see the [Does Vector support exactly once delivery](guarantees.md#does-vector-support-exactly-once-delivery) FAQ below\).
-
-      ### Quick Start
-
-      1. Enable [on-disk buffers](../usage/configuration/sinks/buffer.md) for each sink that you want to have this guarantee.
-      2. Use [sources and sinks that are capable](guarantees.md#support-matrix) of achieving this guarantee \(see table below\)
-
-      ### How It Works
-
-      At least once delivery is achieved by [configuring on-disk buffers](../usage/configuration/sinks/buffer.md) for each of your sinks. The coupling of buffers with sinks allows you to choose guarantees on a per-sink basis. For example, it might make more sense to implement on-disk buffers for an archiving sink, but not for a short-term searching sink used solely for diagnostic purposes. In addition, due to the nature of certain sources and sinks, at least once delivery simply is not possible. We've provided a [support matrix](guarantees.md#support-matrix) below showing the guarantee each sink and source supports.
-
-      ## Best Effort Delivery
-
-      Best effort delivery has no guarantees and means that Vector will make a best effort to deliver each event. This means it is possible for an event to not be delivered. For most, this is sufficient in the observability use case and will afford you the opportunity to optimize towards performance and reduce operating cost. For example, you can stick with [in-memory buffers](../usage/configuration/sinks/buffer.md#in-memory) \(default\), instead of enabling [on-disk buffers](../usage/configuration/sinks/buffer.md#on-disk), for a roughly [3X throughput increase](../usage/configuration/sinks/buffer.md#performance).
+      Vector was designed with a focus on providing clear guarantees, and due to the nature of integrating with a variety of systems this can quickly become confusing. To help with this we've provided a support matrix below so you know exactly what type of guarantee you can expect for your combination of sources and sinks. This helps you make the appropriate tradeoffs or your usecase.
 
       ## Support Matrix
 
@@ -43,6 +28,14 @@ class GuaranteesGenerator < Generator
       | Name | Delivery Guarantee |
       | :--- | :----------------: |
       #{support_matrix}
+
+      ## At Least Once Delivery
+
+      At least once delivery guarantees that an [event](data-model.md#event) received by Vector will be delivered at least once to the configured destination\(s\). While rare, it is possible for an event to be delivered more than once \(see the [Does Vector support exactly once delivery](#does-vector-support-exactly-once-delivery) FAQ below\).
+
+      ## Best Effort Delivery
+
+      Best effort delivery has no guarantees and means that Vector will make a best effort to deliver each event. This means it is possible for an event to not be delivered. For most, this is sufficient in the observability use case and will afford you the opportunity to optimize towards performance and reduce operating cost. For example, you can stick with in-memory buffers \(default\), instead of enabling on-disk buffers to improve performance.
 
       ## FAQs
 

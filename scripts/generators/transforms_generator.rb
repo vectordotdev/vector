@@ -13,6 +13,8 @@ class TransformsGenerator < Generator
       description: Parse, structure, and transform events
       ---
 
+      #{warning}
+
       # Transforms
 
       ![](../../../.gitbook/assets/transforms.svg)

@@ -13,6 +13,8 @@ class SourcesGenerator < Generator
       description: Receive and pull log and metric events into Vector
       ---
 
+      #{warning}
+
       # Sources
 
       ![](../../../.gitbook/assets/sources.svg)

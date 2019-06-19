@@ -47,6 +47,7 @@ require_relative "config_schema/schema"
 require_relative "generators/global_generator"
 require_relative "generators/guarantees_generator"
 require_relative "generators/link_generator"
+require_relative "generators/readme_generator"
 require_relative "generators/sink_generator"
 require_relative "generators/sinks_generator"
 require_relative "generators/source_generator"
@@ -93,12 +94,14 @@ end
 schema = Schema.new(schema_hash)
 
 #
-# Global options
+# README
 #
 
-global_generator = GlobalGenerator.new(schema)
-content = global_generator.generate()
-write("docs/usage/configuration/README.md", content, schema.links)
+guarantees_generator = ReadmeGenerator.new(schema.sources.to_h.values, schema.transforms.to_h.values, schema.sinks.to_h.values)
+content = guarantees_generator.generate()
+# We purposefully do not use #write here since we do not want to parse links.
+File.write("README.md", content)
+
 
 #
 # Guarantee
@@ -107,6 +110,15 @@ write("docs/usage/configuration/README.md", content, schema.links)
 guarantees_generator = GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
 content = guarantees_generator.generate()
 write("docs/about/guarantees.md", content, schema.links)
+
+#
+# Configuration global options
+#
+
+global_generator = GlobalGenerator.new(schema)
+content = global_generator.generate()
+write("docs/usage/configuration/README.md", content, schema.links)
+
 
 #
 # Sources
