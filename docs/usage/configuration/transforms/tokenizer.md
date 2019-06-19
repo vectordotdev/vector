@@ -1,5 +1,5 @@
 ---
-description: tokenize a field's value by splitting on white space and zipping the tokens with ordered field names
+description: tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names
 ---
 
 <!---
@@ -15,7 +15,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 ![](../../../.gitbook/assets/tokenizer-transform.svg)
 
 
-The `tokenizer` transforms accepts [`log`][log_event] events and allows you to tokenize a field's value by splitting on white space and zipping the tokens with ordered field names.
+The `tokenizer` transforms accepts [`log`][log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
 
 ## Example
 
@@ -133,7 +133,7 @@ You'll notice that the `[`, `]`, and `"` characters are not included, they are [
 
 ### Special Characters
 
-In order to extract raw values without noise we must treat certain characters as special:
+In order to extract raw values and remove wrapping characters, we must treat certain characters as special. These characters will be discarded:
 
 * `"..."` - Is used tp wrap phrases. Spaces are preserved, but the wrapping quotes will be discarded.
 * `[...]` - Is used to wrap phrases. Spaces are preserved, but the wrapping brackers will be discarded.

@@ -4,7 +4,8 @@ class Transform < Component
   attr_reader :allow_you_to_description,
     :function_categories,
     :input_types,
-    :output_types
+    :output_types,
+    :outputs
 
   def initialize(hash)
     super(hash)

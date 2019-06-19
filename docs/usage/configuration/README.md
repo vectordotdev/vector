@@ -128,3 +128,6 @@ All TOML values types are supported. For convenience this includes:
 
 The location of your Vector configuration file depends on your [platform](../../setup/installation/platforms/) or [operating system](../../setup/installation/operating-systems/). For most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 
+
+
+
