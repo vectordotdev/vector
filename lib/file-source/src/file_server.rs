@@ -4,7 +4,7 @@ use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
@@ -26,24 +26,11 @@ pub struct FileServer {
     pub start_at_beginning: bool,
     pub ignore_before: Option<time::SystemTime>,
     pub max_line_bytes: usize,
+    pub fingerprint_bytes: usize,
+    pub ignored_header_bytes: usize,
 }
 
 type FileFingerprint = u64;
-
-#[inline]
-fn file_id(path: &PathBuf) -> Option<FileFingerprint> {
-    if let Ok(mut f) = fs::File::open(path) {
-        let mut header = [0; 256];
-        if let Ok(_) = f.read_exact(&mut header) {
-            let fingerprint = crc::crc64::checksum_ecma(&header[..]);
-            Some(fingerprint)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
 
 /// `FileServer` as Source
 ///
@@ -70,6 +57,7 @@ impl FileServer {
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
+        let mut start_of_run = true;
         // Alright friends, how does this work?
         //
         // We want to avoid burning up users' CPUs. To do this we sleep after
@@ -86,7 +74,7 @@ impl FileServer {
                 .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
                 .collect::<Vec<_>>();
             for (_file_id, watcher) in fp_map.iter_mut() {
-                watcher.listed = false;
+                watcher.set_file_findable(false); // assume not findable until found
             }
             for include_pattern in &self.include {
                 for entry in glob(include_pattern.to_str().expect("no ability to glob"))
@@ -100,31 +88,58 @@ impl FileServer {
                             continue;
                         }
 
-                        if let Some(file_id) = file_id(&path) {
-                            if fp_map.contains_key(&file_id) {
-                                let watcher = fp_map.get_mut(&file_id).unwrap();
-                                watcher.listed = true;
-                                if watcher.path != path {
-                                    info!(
-                                        message = "Watched file has been renamed.",
-                                        path = field::debug(&path),
-                                        old_path = field::debug(&watcher.path)
-                                    );
-                                    watcher.path = path.clone();
-                                }
-                            } else {
-                                if let Ok(watcher) = FileWatcher::new(
+                        if let Some(file_id) = self.get_fingerprint_of_file(&path) {
+                            if !fp_map.contains_key(&file_id) {
+                                // unknown (new) file fingerprint
+                                if let Ok(mut watcher) = FileWatcher::new(
                                     &path,
-                                    self.start_at_beginning,
+                                    self.start_at_beginning || !start_of_run,
                                     self.ignore_before,
                                 ) {
                                     info!(
                                         message = "Found file to watch.",
                                         path = field::debug(&path),
-                                        start_at_beginning = field::debug(&self.start_at_beginning)
+                                        start_at_beginning = field::debug(&self.start_at_beginning),
+                                        start_of_run = field::debug(&start_of_run),
                                     );
+                                    watcher.set_file_findable(true);
                                     fp_map.insert(file_id, watcher);
                                 };
+                            } else {
+                                // known file fingerprint
+                                let watcher = fp_map.get_mut(&file_id).unwrap();
+                                let already_findable = watcher.file_findable();
+                                watcher.set_file_findable(true);
+                                if watcher.path == path {
+                                    trace!(
+                                        message = "Continue watching file.",
+                                        path = field::debug(&path),
+                                    );
+                                } else {
+                                    // if file has known fingerprint but different path
+                                    if !already_findable {
+                                        info!(
+                                            message = "Watched file has been renamed.",
+                                            path = field::debug(&path),
+                                            old_path = field::debug(&watcher.path)
+                                        );
+                                        watcher.update_path(&path);
+                                    } else {
+                                        info!(
+                                            message = "More than one file has same fingerprint!",
+                                            path = field::debug(&path),
+                                            old_path = field::debug(&watcher.path)
+                                        );
+                                        let (old_path, new_path) = (&watcher.path, &path);
+                                        let (old_modified_time, new_modified_time) = (
+                                            fs::metadata(&old_path).unwrap().modified().unwrap(),
+                                            fs::metadata(&new_path).unwrap().modified().unwrap(),
+                                        );
+                                        if old_modified_time < new_modified_time {
+                                            watcher.update_path(&path);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -159,6 +174,7 @@ impl FileServer {
                 }
                 global_bytes_read = global_bytes_read.saturating_add(bytes_read);
             }
+
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|_file_id, watcher| !watcher.dead());
@@ -191,6 +207,26 @@ impl FileServer {
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return,
             }
+
+            start_of_run = false;
+        }
+    }
+
+    fn get_fingerprint_of_file(&self, path: &PathBuf) -> Option<FileFingerprint> {
+        const MAX_BYTES: usize = 256;
+        let i = self.ignored_header_bytes as u64;
+        let b = self.fingerprint_bytes;
+        assert!(b <= MAX_BYTES);
+        if let Ok(mut fp) = fs::File::open(path) {
+            let mut bytes = [0; MAX_BYTES];
+            if fp.seek(SeekFrom::Start(i)).is_ok() && fp.read_exact(&mut bytes[..b]).is_ok() {
+                let fingerprint = crc::crc64::checksum_ecma(&bytes[..b]);
+                Some(fingerprint)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 }

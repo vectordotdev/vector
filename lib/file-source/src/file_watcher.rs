@@ -1,7 +1,5 @@
 use std::fs;
-use std::io;
-use std::io::BufRead;
-use std::io::Seek;
+use std::io::{self, BufRead, Seek, Write};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time;
@@ -15,9 +13,11 @@ use std::time;
 /// longer exist.
 pub struct FileWatcher {
     pub path: PathBuf,
-    pub listed: bool,
+    findable: bool,
     reader: Option<io::BufReader<fs::File>>,
     previous_size: u64,
+    devno: u64,
+    inode: u64,
 }
 
 impl FileWatcher {
@@ -47,11 +47,14 @@ impl FileWatcher {
                 if !start_at_beginning || too_old {
                     assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());
                 }
+
                 Ok(FileWatcher {
                     path: path.clone(),
-                    listed: true,
+                    findable: true,
                     reader: Some(rdr),
                     previous_size: 0,
+                    devno: metadata.dev(),
+                    inode: metadata.ino(),
                 })
             }
             Err(e) => match e.kind() {
@@ -59,9 +62,11 @@ impl FileWatcher {
                     let fw = {
                         FileWatcher {
                             path: path.clone(),
-                            listed: true,
+                            findable: true,
                             reader: None,
                             previous_size: 0,
+                            devno: 0,
+                            inode: 0,
                         }
                     };
                     Ok(fw)
@@ -71,7 +76,35 @@ impl FileWatcher {
         }
     }
 
-    pub fn set_dead(&mut self) -> () {
+    pub fn update_path(&mut self, path: &PathBuf) {
+        if let Ok(metadata) = fs::metadata(path) {
+            self.path = path.clone();
+            let (devno, inode) = (metadata.dev(), metadata.ino());
+            if (devno, inode) != (self.devno, self.inode) {
+                if let Ok(f) = fs::File::open(&path) {
+                    let ref mut old_reader = self.reader.as_mut().unwrap();
+                    if let Ok(position) = old_reader.seek(io::SeekFrom::Current(0)) {
+                        let mut new_reader = io::BufReader::new(f);
+                        if new_reader.seek(io::SeekFrom::Start(position)).is_ok() {
+                            self.reader = Some(new_reader);
+                            self.devno = devno;
+                            self.inode = inode;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn set_file_findable(&mut self, f: bool) {
+        self.findable = f;
+    }
+
+    pub fn file_findable(&self) -> bool {
+        self.findable
+    }
+
+    pub fn set_dead(&mut self) {
         self.reader = None;
     }
 
@@ -116,7 +149,7 @@ impl FileWatcher {
                 // new reader and let it catch on the next looparound
                 match read_until_with_max_size(reader, b'\n', &mut buffer, max_size) {
                     Ok(0) => {
-                        if self.listed == false {
+                        if !self.file_findable() {
                             self.set_dead();
                         }
                         Ok(0)
