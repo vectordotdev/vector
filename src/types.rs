@@ -38,6 +38,10 @@ impl TryFrom<&str> for Conversion {
             "timestamp" => Ok(Conversion::Timestamp),
             _ if s.starts_with("timestamp|") => {
                 let fmt = &s[10..];
+                // DateTime<Utc> can only convert timestamps without
+                // time zones, and DateTime<FixedOffset> can only
+                // convert with tone zones, so this has to distinguish
+                // between the two types of formats.
                 if format_has_zone(fmt) {
                     Ok(Conversion::TimestampTZFmt(fmt.into()))
                 } else {
@@ -81,11 +85,7 @@ impl Conversion {
             Conversion::TimestampTZFmt(format) => {
                 DateTime::parse_from_str(&String::from_utf8_lossy(&value), &format)
                     .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
-                    .map(|value| {
-                        ValueKind::Timestamp(
-                            Utc.timestamp(value.timestamp(), value.timestamp_subsec_nanos()),
-                        )
-                    })
+                    .map(|value| ValueKind::Timestamp(datetime_to_utc(value)))
             }
         }
     }
@@ -132,6 +132,11 @@ fn format_has_zone(fmt: &str) -> bool {
         || fmt.find("%+").is_some()
 }
 
+/// Convert a timestamp with a non-UTC time zone into UTC
+fn datetime_to_utc<TZ: TimeZone>(ts: DateTime<TZ>) -> DateTime<Utc> {
+    Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
+}
+
 /// The list of allowed "automatic" timestamp formats
 const TIMESTAMP_FORMATS: &[&str] = &[
     "%s",              // UNIX timestamp
@@ -161,9 +166,15 @@ fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, &'static str> {
             return Ok(result);
         }
     }
+    if let Ok(result) = DateTime::parse_from_rfc3339(s) {
+        return Ok(datetime_to_utc(result));
+    }
+    if let Ok(result) = DateTime::parse_from_rfc2822(s) {
+        return Ok(datetime_to_utc(result));
+    }
     for format in TIMESTAMP_TZ_FORMATS {
         if let Ok(result) = DateTime::parse_from_str(s, format) {
-            return Ok(Utc.timestamp(result.timestamp(), result.timestamp_subsec_nanos()));
+            return Ok(datetime_to_utc(result));
         }
     }
     Err("No matching timestamp format found")
@@ -211,6 +222,11 @@ mod tests {
         assert_eq!(parse_timestamp("Sat, 3 Feb 2001 04:05:06"), Ok(dateref()));
         assert_eq!(parse_timestamp("Sat Feb 3 04:05:06 2001"), Ok(dateref()));
         assert_eq!(parse_timestamp("3-Feb-2001 04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("2001-02-02T22:05:06-06:00"), Ok(dateref()));
+        assert_eq!(
+            parse_timestamp("Sat, 03 Feb 2001 07:05:06 +0300"),
+            Ok(dateref())
+        );
     }
 
     // These should perhaps each go into an individual test function to be
