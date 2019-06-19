@@ -77,30 +77,9 @@ class Sink < Component
 
     # outputs
 
-    @outputs =
-      if outputs_hashes.nil? || outputs_hashes.length == 0
-        output = if streaming?
-          if @options.respond_to?("encoding")
-            Output.build("The `#{name}` sink streams events in a real-time fashion. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info.")
-          else
-            Output.build("The `#{name}` sink streams events in a real-time fashion.")
-          end
-        elsif batching?
-          if @options.respond_to?("encoding")
-            Output.build("The `#{name}` sink batches and flushes events over an configurable interval. Each event is encoded as dictated by the `encoding` option. See [Encoding](#encoding) for more info.")
-          else
-            Output.build("The `#{name}` sink batches and flushes events over an configurable interval.")
-          end
-        else
-          raise("Unknown write_style: #{@write_style.inspect}")
-        end
-
-        [output]
-      else
-        @outputs = outputs_hashes.collect do |output_hash|
-          Output.new(output_hash)
-        end
-      end
+    @outputs = outputs_hashes.collect do |output_hash|
+      Output.new(output_hash)
+    end
 
     # sections
 

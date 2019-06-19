@@ -152,7 +152,7 @@ class Generator
           EOF
 
         content.strip
-      else
+      elsif component.outputs.length > 0
         content = 
           <<~EOF
           ## I/O
@@ -160,6 +160,15 @@ class Generator
           #{prefix}
 
           #{component.outputs.fetch(0).body}
+          EOF
+
+        content.strip
+      else
+        content = 
+          <<~EOF
+          ## I/O
+
+          #{prefix}
           EOF
 
         content.strip

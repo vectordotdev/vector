@@ -99,9 +99,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 
 ## I/O
 
-The `blackhole` sink streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. The encoding of each event is dictated by the `encoding` option. For example:
-
-The `blackhole` sink streams events in a real-time fashion.
+The `blackhole` sink streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. The encoding of each event is dictated by the `encoding` option.
 
 
 
