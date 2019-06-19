@@ -177,7 +177,7 @@ the License.
 [forum]: https://forum.vectorproject.io
 [getting_started]: https://docs.vectorproject.io/setup/getting_started
 [governance]: https://docs.vectorproject.io/about/use_cases/governance
-[guarantees]: https://docs.vectorproject.io/aboout/guarantees
+[guarantees]: https://docs.vectorproject.io/about/guarantees
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
