@@ -100,7 +100,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 
 ## I/O
 
-The ``lua` transform` accepts ["[`log`][log_event]"] events and outputs [`log`][log_event] events.
+The ``lua` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

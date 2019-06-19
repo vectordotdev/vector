@@ -390,7 +390,7 @@ Storing log data in S3 is a powerful strategy for persisting log data. Mainly be
     )   
     PARTITIONED BY (date string)
     ROW FORMAT  serde 'org.apache.hive.hcatalog.data.JsonSerDe'
-    with serdeproperties ( 'paths'='requestbegintime, adid, impressionid, referrer, useragent, usercookie, ip' )
+    with serdeproperties ( 'paths'='timestamp, message, host' )
     LOCATION 's3://<region>.<key_prefix>';
     ```
 
