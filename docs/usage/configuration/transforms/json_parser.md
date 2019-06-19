@@ -84,7 +84,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 
 ## I/O
 
-The ``json_parser` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The `json_parser` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
 

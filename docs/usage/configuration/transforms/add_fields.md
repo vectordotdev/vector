@@ -75,7 +75,48 @@ The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_eve
 
 ## I/O
 
-The ``add_fields` transform` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+The `add_fields` transform accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+
+
+Given the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```toml
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6": ["item1", "item2"],
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+
+While unrealistic, this example demonstrates the various accepted [types][config_value_types]. A few tgh
 
 
 

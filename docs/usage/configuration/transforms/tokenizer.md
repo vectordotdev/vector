@@ -79,57 +79,63 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
-| `field` | `string` | The field to tokenize. See [Example](#example) for more info.<br />`default: "message"` |
-| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order. See [Example](#example) for more info.<br />`no default` `example: (see above)` |
+| `field` | `string` | The field to tokenize.<br />`default: "message"` |
+| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`no default` `example: (see above)` |
 
 ## I/O
 
-The ``tokenizer` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The `tokenizer` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
-
-## How It Works
-
-### Example
-
-The specified `field`'s value is tokenized by splitting on it's white space.
-
-For example, take this config:
+Given the following log line:
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml" %}
-```coffeescript
-[transforms.<transform-id>]
-type = "tokenizer"
-field = "message"
-fields = ["timestamp", "level", "message"]
+{% code-tabs-item title="log" %}
+```json
+{
+  "message": "5.86.210.12 - zieme4647 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574"
+}
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And this event:
+And the following configuration:
 
-```javascripton
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```coffeescript
+[transforms.<transform-id>]
+type = "tokenizer"
+field = "message"
+fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "bytes"]
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][log_event] will be emitted with the following structure:
+
+```javascript
 {
-  "message": "2019-05-22T23:22:55.256231Z [INFO] "Hello world""
+  // ... existing fields
+  "remote_addr": "5.86.210.12",
+  "user_id": "zieme4647",
+  "timestamp": "19/06/2019:17:20:49 -0400",
+  "message": "GET /embrace/supply-chains/dynamic/vertical",
+  "status": "201",
+  "bytes": "20574"
 }
 ```
 
-This transform will produce the following tokens:
+A few things to note about the output:
 
-```
-["2019-05-22T23:22:55.256231Z", "INFO", "Hello world"]
-```
+1. The `message` field was overwritten.
+2. The `ident` field was dropped since it contained a `"-"` value.
+3. All values are strings, we have plans to add type coercion.
+4. [Special wrapper characters](#special-characters) were dropped, such as wrapping `[...]` and `"..."` characters.
 
-You'll notice that the `[`, `]`, and `"` characters are not included, they are [special characters](#special-characters). To proceed, these tokesn will be zipped with the provided `field_names` and merged into the event:
 
-```javascripton
-{
-  "timestamp": "2019-05-22T23:22:55.256231Z",
-  "level": "INFO",
-  "message": "Hello world"
-}
-```
+
+## How It Works
 
 ### Special Characters
 

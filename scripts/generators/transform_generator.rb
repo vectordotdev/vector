@@ -61,9 +61,7 @@ class TransformGenerator < Generator
 
       #{options_table_generator.generate}
 
-      ## I/O
-
-      The `#{component_name(transform)}` accepts #{event_type_links(transform.input_types).to_sentence} events and outputs #{event_type_links(transform.output_types).to_sentence} events.
+      #{outputs_section(transform, output_prefix)}
 
       #{guides_section(transform)}
 
@@ -92,5 +90,11 @@ class TransformGenerator < Generator
 
         content.strip
       end
+    end
+
+    def output_prefix
+      <<~EOF
+      The #{component_name(transform)} accepts #{event_type_links(transform.input_types).to_sentence} events and outputs #{event_type_links(transform.output_types).to_sentence} events.
+      EOF
     end
 end

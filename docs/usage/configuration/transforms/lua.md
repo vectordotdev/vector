@@ -100,7 +100,31 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 
 ## I/O
 
-The ``lua` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The `lua` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+
+
+Given the following event:
+
+{% code-tabs %}
+{% code-tabs-item title="Add Fields" %}
+```lua
+# Add root level field
+event["new_field"] = "new value"
+
+# Add nested field
+event["parent.child"] = "nested value"
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="Remove Field" %}
+```lua
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 
 
