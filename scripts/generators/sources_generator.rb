@@ -17,7 +17,7 @@ class SourcesGenerator < Generator
 
       # Sources
 
-      ![](../../../.gitbook/assets/sources.svg)
+      ![](../../../assets/sources.svg)
 
       Sources are responsible for ingesting [events](../../../about/data-model.md#event) into Vector, they can both receive and pull in data. If you're deploying Vector in an [agent role](../../../setup/deployment/roles/agent.md), you'll want to look at local data sources like a [`file`](file.md) and [`stdin`](stdin.md). If you're deploying Vector in a [service role](../../../setup/deployment/roles/service.md), you'll want to look at sources that receive data over the network, like the [`vector`](vector.md), [`tcp`](tcp.md), and [`syslog`](syslog.md) sources.
 

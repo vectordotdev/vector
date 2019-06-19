@@ -67,7 +67,7 @@ schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 #
 
 DOCS_ROOT = "../../.."
-ASSETS_PATH = "#{DOCS_ROOT}/.gitbook/assets/"
+ASSETS_PATH = "#{DOCS_ROOT}/assets/"
 CORRECTNESS_TESTS = schema_hash.fetch("enums").fetch("correctness_tests")
 DELIVERY_GUARANTEES = schema_hash.fetch("enums").fetch("delivery_guarantees")
 EVENT_TYPES = schema_hash.fetch("enums").fetch("event_types")

@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # tcp source
 
-![](../../../.gitbook/assets/tcp-source.svg)
+![](../../../assets/tcp-source.svg)
 
 
 The `tcp` source continuously ingests [`log`][log_event] events through the TCP protocol.

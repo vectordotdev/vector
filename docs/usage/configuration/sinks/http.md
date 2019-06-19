@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # http sink
 
-![](../../../.gitbook/assets/http-sink.svg)
+![](../../../assets/http-sink.svg)
 
 
 The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP endpoint.

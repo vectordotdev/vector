@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # blackhole sink
 
-![](../../../.gitbook/assets/blackhole-sink.svg)
+![](../../../assets/blackhole-sink.svg)
 
 
 The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.

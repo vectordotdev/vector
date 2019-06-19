@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # vector sink
 
-![](../../../.gitbook/assets/vector-sink.svg)
+![](../../../assets/vector-sink.svg)
 
 
 The `vector` sink streams [`log`][log_event] events to another downstream Vector instance.

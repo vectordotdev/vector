@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # Transforms
 
-![](../../../.gitbook/assets/transforms.svg)
+![](../../../assets/transforms.svg)
 
 Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipelines), sitting in-between [sources](../sources/) and [sinks](../sinks/). They transform [events](../../../about/data-model.md#event) or the stream as a whole.
 

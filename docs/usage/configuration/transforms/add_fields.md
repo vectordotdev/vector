@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # add_fields transform
 
-![](../../../.gitbook/assets/add_fields-transform.svg)
+![](../../../assets/add_fields-transform.svg)
 
 
 The `add_fields` transforms accepts [`log`][log_event] and [`metric`][metric_event] events and allows you to add one or more fields.

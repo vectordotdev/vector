@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # Sources
 
-![](../../../.gitbook/assets/sinks.svg)
+![](../../../assets/sinks.svg)
 
 Sinks are last in the [pipeline](../../../about/concepts.md#pipelines), responsible for sending [events](../../../about/data-model.md#event) downstream. These can be service specific sinks, such as [`vector`](vector.md), [`elasticsearch`](elasticsearch.md), and [`s3`](aws_s3.md), or generic protocol sinks like [`http`](http.md), [`tcp`](tcp.md), or [`udp`](udp.md).
 

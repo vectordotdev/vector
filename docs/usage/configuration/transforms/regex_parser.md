@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # regex_parser transform
 
-![](../../../.gitbook/assets/regex_parser-transform.svg)
+![](../../../assets/regex_parser-transform.svg)
 
 
 The `regex_parser` transforms accepts [`log`][log_event] events and allows you to parse a field's value with a [Regular Expression][regex].

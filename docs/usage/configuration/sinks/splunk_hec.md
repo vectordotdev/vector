@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # splunk_hec sink
 
-![](../../../.gitbook/assets/splunk_hec-sink.svg)
+![](../../../assets/splunk_hec-sink.svg)
 
 
 The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk HTTP Event Collector][splunk_hec].

@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # kafka sink
 
-![](../../../.gitbook/assets/kafka-sink.svg)
+![](../../../assets/kafka-sink.svg)
 
 
 The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].

@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # grok_parser transform
 
-![](../../../.gitbook/assets/grok_parser-transform.svg)
+![](../../../assets/grok_parser-transform.svg)
 
 
 The `grok_parser` transforms accepts [`log`][log_event] events and allows you to parse a field value with [Grok][grok].

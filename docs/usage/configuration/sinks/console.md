@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # console sink
 
-![](../../../.gitbook/assets/console-sink.svg)
+![](../../../assets/console-sink.svg)
 
 
 The `console` sink streams [`log`][log_event] and [`metric`][metric_event] events to the console, `STDOUT` or `STDERR`.

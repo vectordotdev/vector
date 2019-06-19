@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # syslog source
 
-![](../../../.gitbook/assets/syslog-source.svg)
+![](../../../assets/syslog-source.svg)
 
 
 The `syslog` source continuously ingests [`log`][log_event] events through the Syslog 5424 protocol.

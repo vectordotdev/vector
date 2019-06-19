@@ -10,7 +10,7 @@ This guide assumes you've already [installed](../installation/) Vector. If you h
 
 This is a "Hello World" style guide that walks through sending your first [event](../../about/data-model.md#event) through Vector. It designed to be followed locally, making it quick and easy. We'll start with the simplest of examples: accepting an event via the [`stdin` source](../../usage/configuration/sources/stdin.md), and then printing it out via the [`console` sink](../../usage/configuration/sinks/console.md).
 
-![](../../.gitbook/assets/getting-started-guide.svg)
+![](../../assets/getting-started-guide.svg)
 
 ## 1. Send Your Event
 

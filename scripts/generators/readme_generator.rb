@@ -16,7 +16,7 @@ class ReadmeGenerator < Generator
       </p>
 
       <p align="center">
-        <img src="./docs/.gitbook/assets/readme_diagram.svg" alt="Vector">
+        <img src="./docs/assets/readme_diagram.svg" alt="Vector">
       </p>
 
       <p align="center">

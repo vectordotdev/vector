@@ -18,7 +18,7 @@ This document covers how to properly update Vector.
 
 ### Working Upstream
 
-![Where To Start Example](../../.gitbook/assets/updating-upstream.svg)
+![Where To Start Example](../../assets/updating-upstream.svg)
 
 Depending on your [topology](../../setup/deployment/topologies.md), you'll want update your Vector instances in a specific order. You should _always_ start downstream and work your way upstream. This allows for incremental updating across your topology, ensuring downstream Vector instances do not receive data formats that are unrecognized. Vector always makes a best effort to successfully process data, but there is no guarantee of this if a Vector instance is handling a data format defined by a future unknown version.
 

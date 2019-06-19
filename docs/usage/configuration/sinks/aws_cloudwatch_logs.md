@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # aws_cloudwatch_logs sink
 
-![](../../../.gitbook/assets/aws_cloudwatch_logs-sink.svg)
+![](../../../assets/aws_cloudwatch_logs-sink.svg)
 
 {% hint style="warning" %}
 The `aws_cloudwatch_logs` sink is in beta. Please see the current [enhancements](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22) and [bugs](https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22) for known issues. We kindly ask that you [add any missing issues](https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs) as it will help shape the roadmap of this component.

@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # json_parser transform
 
-![](../../../.gitbook/assets/json_parser-transform.svg)
+![](../../../assets/json_parser-transform.svg)
 
 
 The `json_parser` transforms accepts [`log`][log_event] events and allows you to parse a field value as JSON.

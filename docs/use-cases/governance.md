@@ -1,6 +1,6 @@
 # Governance & Control
 
-![](../.gitbook/assets/governance.svg)
+![](../assets/governance.svg)
 
 
 

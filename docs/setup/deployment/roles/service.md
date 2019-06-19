@@ -4,7 +4,7 @@ description: Deploying and running Vector as a service
 
 # Service Role
 
-![](../../../.gitbook/assets/centralized-service.svg)
+![](../../../assets/centralized-service.svg)
 
 When Vector serves as a service, its purpose is to efficiently receive, aggregate, and route data downstream. In this scenario, Vector is the primary service on the host and should take full advantage of all resources.
 

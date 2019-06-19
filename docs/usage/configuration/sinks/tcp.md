@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # tcp sink
 
-![](../../../.gitbook/assets/tcp-sink.svg)
+![](../../../assets/tcp-sink.svg)
 
 
 The `tcp` sink streams [`log`][log_event] events to a TCP connection.

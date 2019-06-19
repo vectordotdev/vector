@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # tokenizer transform
 
-![](../../../.gitbook/assets/tokenizer-transform.svg)
+![](../../../assets/tokenizer-transform.svg)
 
 
 The `tokenizer` transforms accepts [`log`][log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.

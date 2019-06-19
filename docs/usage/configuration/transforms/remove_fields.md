@@ -12,7 +12,7 @@ Instead, please modify the contents of `dist/config/schema.toml`.
 
 # remove_fields transform
 
-![](../../../.gitbook/assets/remove_fields-transform.svg)
+![](../../../assets/remove_fields-transform.svg)
 
 
 The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_event] events and allows you to remove one or more event fields.

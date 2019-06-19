@@ -4,7 +4,7 @@ description: Expose metrics data via a Prometheus scrapable endpoint
 
 # prometheus sink
 
-![](../../../.gitbook/assets/prometheus-sink.svg)
+![](../../../assets/prometheus-sink.svg)
 
 The `prometheus` sink exposes [`metric`](../../../about/data-model.md#metric) events via a Prometheus [scrapable endpoint](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config).
 
