@@ -67,7 +67,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     let host_field = config.host_field;
 
     let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
-    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+    let gzip = match config.compression.unwrap_or(Compression::None) {
         Compression::None => false,
         Compression::Gzip => true,
     };

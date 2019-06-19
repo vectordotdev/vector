@@ -45,7 +45,7 @@ pub struct GrokParser {
 }
 
 impl Transform for GrokParser {
-    fn transform(&self, event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
 
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn grok_parser_adds_parsed_fields_to_event() {
         let event = Event::from(r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#);
-        let parser = GrokParserConfig {
+        let mut parser = GrokParserConfig {
             pattern: String::from("%{HTTPD_COMMONLOG}"),
             ..Default::default()
         }
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn grok_parser_does_nothing_on_no_match() {
         let event = Event::from(r#"help i'm stuck in an http server"#);
-        let parser = GrokParserConfig {
+        let mut parser = GrokParserConfig {
             pattern: String::from("%{HTTPD_COMMONLOG}"),
             ..Default::default()
         }
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn grok_parser_can_not_drop_parsed_field() {
         let event = Event::from(r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#);
-        let parser = GrokParserConfig {
+        let mut parser = GrokParserConfig {
             pattern: String::from("%{HTTPD_COMMONLOG}"),
             drop_field: false,
             ..Default::default()
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn grok_parser_does_nothing_on_missing_field() {
         let event = Event::from("i am the only field");
-        let parser = GrokParserConfig {
+        let mut parser = GrokParserConfig {
             pattern: String::from("^(?<foo>.*)"),
             field: Some("bar".into()),
             ..Default::default()

@@ -9,13 +9,16 @@ license = "apache-2.0"
 readme = "README.md"
 publish = false
 
+[profile.bench]
+debug = true
+
 [package.metadata.deb]
-maintainer-scripts = "distribution/debian/scripts/"
+maintainer-scripts = "dist/debian/scripts/"
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
+  ["dist/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
 
 [workspace]
@@ -101,6 +104,8 @@ rlua = "0.16.3"
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
 grok = "1.0.0"
+nom = "5.0.0-beta2"
+uuid = { version = "0.7", features = ["serde", "v4"] }
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -116,6 +121,7 @@ walkdir = "2.2.7"
 elastic = { git = "https://github.com/elastic-rs/elastic" }
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
+tokio-test = { git = "https://github.com/tokio-rs/tokio", branch = "v0.1.x" }
 
 [features]
 default = ["rdkafka", "leveldb"]

@@ -68,7 +68,7 @@ impl Lua {
 }
 
 impl Transform for Lua {
-    fn transform(&self, event: Event) -> Option<Event> {
+    fn transform(&mut self, event: Event) -> Option<Event> {
         match self.process(event) {
             Ok(event) => event,
             Err(err) => {
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn lua_add_field() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event["hello"] = "goodbye"
             "#,
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn lua_read_field() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
               event["name"] = name
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn lua_remove_field() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event["name"] = nil
             "#,
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn lua_drop_event() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event = nil
             "#,
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn lua_read_empty_field() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               if event["non-existant"] == nil then
                 event["result"] = "empty"
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn lua_numeric_value() {
-        let transform = Lua::new(
+        let mut transform = Lua::new(
             r#"
               event["number"] = 3
             "#,
@@ -330,7 +330,8 @@ mod tests {
           script2.modify(event)
         "#;
 
-        let transform = Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
+        let mut transform =
+            Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap();
 

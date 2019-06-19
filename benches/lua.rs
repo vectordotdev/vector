@@ -26,7 +26,7 @@ fn add_fields(c: &mut Criterion) {
                     map.insert(key.into(), value.to_owned());
                     transforms::add_fields::AddFields::new(map)
                 },
-                |transform| {
+                |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
@@ -41,7 +41,7 @@ fn add_fields(c: &mut Criterion) {
                     let source = format!("event['{}'] = '{}'", key, value);
                     transforms::lua::Lua::new(&source, vec![]).unwrap()
                 },
-                |transform| {
+                |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
@@ -69,7 +69,7 @@ fn field_filter(c: &mut Criterion) {
                     .build()
                     .unwrap()
                 },
-                |transform| {
+                |mut transform| {
                     let num = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
@@ -94,7 +94,7 @@ fn field_filter(c: &mut Criterion) {
                     "#;
                     transforms::lua::Lua::new(&source, vec![]).unwrap()
                 },
-                |transform| {
+                |mut transform| {
                     let num = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();

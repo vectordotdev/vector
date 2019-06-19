@@ -1,12 +1,14 @@
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{self, Event},
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
 };
+use chrono::format::strftime::StrftimeItems;
+use chrono::Utc;
 use futures::{Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -20,7 +22,7 @@ use tower::ServiceBuilder;
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
     pub host: String,
-    pub index: String,
+    pub index: Option<String>,
     pub doc_type: String,
     pub id_key: Option<String>,
     pub batch_size: Option<usize>,
@@ -64,6 +66,10 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
+    let index = config.index.clone().unwrap_or("vector-%Y.%m.%d".into());
+
+    let dynamic_date = detect_dynamic_date(&index);
+
     let policy = FixedRetryPolicy::new(
         retry_attempts,
         Duration::from_secs(retry_backoff_secs),
@@ -101,9 +107,11 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             Duration::from_secs(batch_timeout),
         )
         .with(move |event: Event| {
+            let index = build_index_name(&index, &event, dynamic_date);
+
             let mut action = json!({
                 "index": {
-                    "_index": config.index,
+                    "_index": index,
                     "_type": config.doc_type,
                 }
             });
@@ -154,10 +162,32 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
     }
 }
 
+pub fn build_index_name(index: &str, event: &Event, dynamic_date: bool) -> String {
+    if dynamic_date {
+        if let Some(ts) = event
+            .as_log()
+            .get(&event::TIMESTAMP)
+            .and_then(|e| e.as_timestamp())
+        {
+            ts.format(index).to_string()
+        } else {
+            Utc::now().format(index).to_string()
+        }
+    } else {
+        index.to_owned()
+    }
+}
+
+fn detect_dynamic_date(index: &str) -> bool {
+    let parsed_items = StrftimeItems::new(&index);
+    parsed_items.count() > 0
+}
+
 #[cfg(test)]
 mod tests {
-    use super::maybe_set_id;
-    use crate::Event;
+    use super::*;
+    use crate::event::{self, Event};
+    use chrono::{Datelike, Utc};
     use serde_json::json;
 
     #[test]
@@ -201,6 +231,39 @@ mod tests {
 
         assert_eq!(json!({}), action);
     }
+
+    #[test]
+    fn dynamic_date_builds_date_index() {
+        let mut event = Event::from("hello world");
+        let date = Utc::now();
+        event
+            .as_mut_log()
+            .insert_implicit(event::TIMESTAMP.clone(), date.clone().into());
+
+        let index_name = build_index_name("index-%Y.%m.%d", &event, true);
+        assert_eq!(
+            index_name,
+            format!(
+                "index-{}.{:02}.{:02}",
+                date.year(),
+                date.month(),
+                date.day()
+            )
+        );
+    }
+
+    #[test]
+    fn dynamic_date_builds_non_date_index() {
+        let event = Event::from("hello world");
+        let index_name = build_index_name("index", &event, false);
+        assert_eq!(&index_name, "index");
+    }
+
+    #[test]
+    fn dynamic_date_detect() {
+        assert!(detect_dynamic_date("%Y"));
+        assert!(!detect_dynamic_date(""));
+    }
 }
 
 #[cfg(test)]
@@ -225,7 +288,7 @@ mod integration_tests {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
-            index: index.clone(),
+            index: Some(index.clone()),
             doc_type: "log_lines".into(),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
@@ -279,7 +342,7 @@ mod integration_tests {
         let index = gen_index();
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
-            index: index.clone(),
+            index: Some(index.clone()),
             doc_type: "log_lines".into(),
             compression: Some(Compression::None),
             batch_size: Some(1),

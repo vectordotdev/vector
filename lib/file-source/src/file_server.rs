@@ -4,7 +4,7 @@ use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;

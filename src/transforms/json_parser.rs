@@ -45,7 +45,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl Transform for JsonParser {
-    fn transform(&self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, mut event: Event) -> Option<Event> {
         let to_parse = event.as_log().get(&self.field).map(|s| s.as_bytes());
 
         let parsed = to_parse
@@ -130,7 +130,7 @@ mod test {
 
     #[test]
     fn json_parser_drop_field() {
-        let parser = JsonParser::from(JsonParserConfig::default());
+        let mut parser = JsonParser::from(JsonParserConfig::default());
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
 
@@ -141,7 +141,7 @@ mod test {
 
     #[test]
     fn json_parser_doesnt_drop_field() {
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_raw() {
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -174,7 +174,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_field() {
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_field: false,
             ..Default::default()
@@ -207,11 +207,11 @@ mod test {
 
     #[test]
     fn json_parser_parse_inner_json() {
-        let parser_outter = JsonParser::from(JsonParserConfig {
+        let mut parser_outter = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
 
-        let parser_inner = JsonParser::from(JsonParserConfig {
+        let mut parser_inner = JsonParser::from(JsonParserConfig {
             field: Some("log".into()),
             ..Default::default()
         });
@@ -237,7 +237,7 @@ mod test {
         let invalid = r#"{"greeting": "hello","#;
 
         // Raw
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -250,7 +250,7 @@ mod test {
         assert_eq!(event.as_log()[&event::MESSAGE], invalid.into());
 
         // Field
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_field: false,
             ..Default::default()
@@ -274,7 +274,7 @@ mod test {
         let not_object = r#""hello""#;
 
         // Raw
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             drop_invalid: true,
             ..Default::default()
         });
@@ -289,7 +289,7 @@ mod test {
         assert!(parser.transform(event).is_none());
 
         // Field
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_invalid: true,
             ..Default::default()
@@ -320,10 +320,10 @@ mod test {
 
     #[test]
     fn json_parser_chained() {
-        let parser1 = JsonParser::from(JsonParserConfig {
+        let mut parser1 = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
-        let parser2 = JsonParser::from(JsonParserConfig {
+        let mut parser2 = JsonParser::from(JsonParserConfig {
             field: Some("nested".into()),
             ..Default::default()
         });
@@ -342,7 +342,7 @@ mod test {
 
     #[test]
     fn json_parser_types() {
-        let parser = JsonParser::from(JsonParserConfig {
+        let mut parser = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
 

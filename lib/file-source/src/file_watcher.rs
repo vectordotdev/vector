@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, BufRead, Seek, Write};
+use std::io::{self, BufRead, Seek};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time;
