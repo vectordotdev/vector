@@ -181,7 +181,7 @@ the License.
 [guides]: https://docs.vectorproject.io/usage/guides
 [installation]: https://docs.vectorproject.io/setup/installation
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
-[mailling_list]: https://vectorproject.io/mailling_list
+[mailing_list]: https://vectorproject.io/mailing_list
 [migrating]: https://docs.vectorproject.io/setup/migrating
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/performance
