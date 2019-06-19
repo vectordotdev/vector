@@ -15,7 +15,7 @@ class Section
     @issues = hash["issues"] || []
     @title = hash.fetch("title")
     @slug = @title.parameterize
-    @referenced_options = @body.scan(/`(\w*)`/).flatten
+    @referenced_options = @body.scan(/`([a-zA-Z0-9_.]*)`/).flatten
   end
 
   def <=>(other)

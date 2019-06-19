@@ -10,12 +10,12 @@ Sources are responsible for ingesting [events](../../../about/data-model.md#even
 
 | Name | Output | Guarantee | Description |
 | :--- | :----: | :-------: | :---------- |
-| [**`file`**](file.md) | [`log`][log_event] | `best_effort` | Ingests data through one or more local files |
-| [**`statsd`**](statsd.md) | [`log`][log_event] | `best_effort` | Ingests data through the StatsD UDP protocol |
-| [**`stdin`**](stdin.md) | [`log`][log_event] | `at_least_once` | Ingests data through standard input (STDIN) |
-| [**`syslog`**](syslog.md) | [`log`][log_event] | `best_effort` | Ingests data through the Syslog 5424 protocol |
-| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Ingests data through the TCP protocol |
-| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Ingests data through another upstream Vector instance |
+| [**`file`**](file.md) | [`log`][log_event] | `best_effort` | Ingests data through one or more local files. |
+| [**`statsd`**](statsd.md) | [`log`][log_event] | `best_effort` | Ingests data through the StatsD UDP protocol. |
+| [**`stdin`**](stdin.md) | [`log`][log_event] | `at_least_once` | Ingests data through standard input (STDIN). |
+| [**`syslog`**](syslog.md) | [`log`][log_event] | `best_effort` | Ingests data through the Syslog 5424 protocol. |
+| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Ingests data through the TCP protocol. |
+| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Ingests data through another upstream Vector instance. |
 
 [log_event]: "../../../about/data-model.md#log"
 

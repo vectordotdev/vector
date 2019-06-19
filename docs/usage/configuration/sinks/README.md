@@ -10,17 +10,17 @@ Sinks are last in the [pipeline](../../../about/concepts.md#pipelines), responsi
 
 | Name | Input | Guarantee | Description |
 | :--- | :----: | :-------: | :---------- |
-| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html) |
-| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html) |
-| [**`aws_s3`**](aws_s3.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html) |
-| [**`blackhole`**](blackhole.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes |
-| [**`console`**](console.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to the console, `STDOUT` or `STDERR` |
-| [**`elasticsearch`**](elasticsearch.md) | [`log`][log_event] | `best_effort` | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html) |
-| [**`http`**](http.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a generic HTTP endpoint |
-| [**`kafka`**](kafka.md) | [`log`][log_event] | `at_least_once` | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol] |
-| [**`splunk_hec`**](splunk_hec.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec] |
-| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Streams events to a TCP connection |
-| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Streams events to another downstream Vector instance |
+| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
+| [**`aws_s3`**](aws_s3.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
+| [**`blackhole`**](blackhole.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`console`**](console.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**](elasticsearch.md) | [`log`][log_event] | `best_effort` | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`http`**](http.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a generic HTTP endpoint. |
+| [**`kafka`**](kafka.md) | [`log`][log_event] | `at_least_once` | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. |
+| [**`splunk_hec`**](splunk_hec.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec]. |
+| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Streams events to a TCP connection. |
+| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Streams events to another downstream Vector instance. |
 
 ## How It Works
 
@@ -29,10 +29,6 @@ Sinks are responsible for forwarding [events](../../../about/data-model.md#event
 ### Buffers vs. Batches
 
 For sinks that batch and flush it's helpful to understand the difference between buffers and batches within Vector. Batches represent the batched payload being sent to the downstream service while [buffers](buffer.md) represent the internal data buffer Vector uses for each sink. More detailed descriptions are as follows.
-
-#### Buffers
-
-Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the batch size (if your sink has a batch). This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
 
 #### Batches
 

@@ -31,10 +31,6 @@ class SinksGenerator < Generator
 
       For sinks that batch and flush it's helpful to understand the difference between buffers and batches within Vector. Batches represent the batched payload being sent to the downstream service while [buffers](buffer.md) represent the internal data buffer Vector uses for each sink. More detailed descriptions are as follows.
 
-      #### Buffers
-
-      Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the batch size \(if your sink has a batch\). This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
-
       #### Batches
 
       Batches represent the batched payload being sent to the downstream service. Sinks will provide 2 options to control the size and age before being sent, the `batch_size` and `batch_timeout` options. They will be documented in a "Batching" section within any sink that supports them.
@@ -67,7 +63,7 @@ class SinksGenerator < Generator
   private
     def sink_rows
       links = sinks.collect do |sink|
-        "| [**`#{sink.name}`**](#{sink.name}.md) | #{event_type_links(sink.input_types).join(" ")} | `#{sink.delivery_guarantee}` | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description} |"
+        "| [**`#{sink.name}`**](#{sink.name}.md) | #{event_type_links(sink.input_types).join(" ")} | `#{sink.delivery_guarantee}` | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
       end
 
       links.join("\n")

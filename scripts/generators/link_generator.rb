@@ -18,15 +18,15 @@ class LinkGenerator < Generator
       value = begin
         links.send(link_name)
       rescue RuntimeError
-        raise link_names.inspect
         raise "The link #{link_name.inspect} is not defined, please add it to the [links] table"
       end
 
-      value = if value.start_with?("/")
-        "#{root_path}#{value}"
-      else
-        value
-      end 
+      value =
+        if value.start_with?("/")
+          "#{root_path}#{value}"
+        else
+          value
+        end 
 
       links_footer << "[#{link_name}]: #{value.inspect}\n"
     end

@@ -43,6 +43,13 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   request_timeout_secs = 30 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.my_aws_kinesis_streams_sink.buffer]
+    type = "memory" # default, one of: memory, disk
+    when_full = "block" # default, one of: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -66,6 +73,13 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   request_timeout_secs = <int>
   retry_attempts = <int>
   retry_backoff_secs = <int>
+
+  # OPTIONAL - Buffer
+  [sinks.<sink-id>.buffer]
+    type = {memory | disk}
+    when_full = {block | drop_newest}
+    max_size = <int>
+    num_items = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -116,6 +130,21 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 
   # The amount of time to wait before attempting a failed request again.
   retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.aws_kinesis_streams.buffer]
+
+    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+    type = "memory" # default, one of: memory, disk
+
+    # The behavior when the buffer becomes full.
+    when_full = "block" # default, one of: block, drop_newest
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
+    max_size = 104900000 # no default
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -129,7 +158,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 | `region` | `string` | The [AWS region][aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers](#buffers) and [Batching](#batching) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 1` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |
@@ -139,6 +168,11 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 | `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
+| **OPTIONAL** - Buffer | | |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full. See [Buffers](#buffers) for more info.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.<br />`default: 500` |
 
 ## I/O
 
@@ -192,6 +226,28 @@ In general, we recommend using instance profiles/roles whenever possible. In cas
 ### Batching
 
 By default, the `aws_kinesis_streams` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.Keep in mind that the underlying service will only accept payloads up to [a maximum size and a maximum frequency](https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html).
+
+### Buffers
+
+Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+#### Buffer Types
+
+The `buffer.type` option allows you to control buffer resource usage:
+
+| Type | Description |
+| :--- | :---------- |
+| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+| `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+#### Buffer Overflow
+
+The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+| Type | Description |
+| :--- | :---------- |
+| `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
 ### Delivery Guarantee
 
@@ -257,6 +313,7 @@ issue, please:
 [config_composition]: "../../../usage/configuration/README.md#composition"
 [aws_cw_logs_regions]: "https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region"
 [aws_cw_logs_stream_name]: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
+[event]: "../../../about/data-model.md#event"
 [aws_credential_process]: "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html"
 [aws_credentials_file]: "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"
 [iam_instance_profile]: "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html"

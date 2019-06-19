@@ -32,6 +32,13 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 
   # OPTIONAL - Requests
   encoding = "json" # no default, one of: json, text
+
+  # OPTIONAL - Buffer
+  [sinks.my_tcp_sink.buffer]
+    type = "memory" # default, one of: memory, disk
+    when_full = "block" # default, one of: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -46,6 +53,13 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 
   # OPTIONAL - Requests
   encoding = {json | text}
+
+  # OPTIONAL - Buffer
+  [sinks.<sink-id>.buffer]
+    type = {memory | disk}
+    when_full = {block | drop_newest}
+    max_size = <int>
+    num_items = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -69,6 +83,21 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
   # The encoding format used to serialize the events before flushing.
   encoding = "json" # no default, one of: json, text
   encoding = "json" # no default, one of: json, text
+
+  # OPTIONAL - Buffer
+  [sinks.tcp.buffer]
+
+    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+    type = "memory" # default, one of: memory, disk
+
+    # The behavior when the buffer becomes full.
+    when_full = "block" # default, one of: block, drop_newest
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
+    max_size = 104900000 # no default
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -83,6 +112,11 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 | `address` | `string` | The TCP address.<br />`no default` `example: "92.12.333.224:5000"` |
 | **OPTIONAL** - Requests | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |
+| **OPTIONAL** - Buffer | | |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full. See [Buffers](#buffers) for more info.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.<br />`default: 500` |
 
 ## I/O
 
@@ -93,6 +127,28 @@ The `tcp` sink streams events in a real-time fashion. Each event is encoded as d
 
 
 ## How It Works
+
+### Buffers
+
+Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+#### Buffer Types
+
+The `buffer.type` option allows you to control buffer resource usage:
+
+| Type | Description |
+| :--- | :---------- |
+| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+| `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+#### Buffer Overflow
+
+The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+| Type | Description |
+| :--- | :---------- |
+| `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
 ### Delivery Guarantee
 
@@ -155,6 +211,7 @@ issue, please:
 [sources]: "../../../usage/configuration/sources"
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
+[event]: "../../../about/data-model.md#event"
 [starting]: "../../../usage/administration/starting.md"
 [file_to_tcp_performance_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance"
 [tcp_to_blackhole_performance_test]: "https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance"

@@ -45,6 +45,13 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   request_timeout_secs = 60 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.my_elasticsearch_sink.buffer]
+    type = "memory" # default, one of: memory, disk
+    when_full = "block" # default, one of: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -70,6 +77,13 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   request_timeout_secs = <int>
   retry_attempts = <int>
   retry_backoff_secs = <int>
+
+  # OPTIONAL - Buffer
+  [sinks.<sink-id>.buffer]
+    type = {memory | disk}
+    when_full = {block | drop_newest}
+    max_size = <int>
+    num_items = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -121,6 +135,21 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 
   # The amount of time to wait before attempting a failed request again.
   retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.elasticsearch.buffer]
+
+    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+    type = "memory" # default, one of: memory, disk
+
+    # The behavior when the buffer becomes full.
+    when_full = "block" # default, one of: block, drop_newest
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
+    max_size = 104900000 # no default
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -136,7 +165,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
 | `index` | `string` | Index name to write events to. [`strftime` specifiers][strftime_specifiers] are supported. See [Partitioning](#partitioning) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers](#buffers) and [Batching](#batching) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 1` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limiting](#rate-limiting) for more info.<br />`default: 1` `unit: seconds` |
@@ -145,6 +174,11 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 | `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
+| **OPTIONAL** - Buffer | | |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full. See [Buffers](#buffers) for more info.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.<br />`default: 500` |
 
 ## I/O
 
@@ -171,6 +205,28 @@ Content-Length: 654
 ### Batching
 
 By default, the `elasticsearch` sink flushes every 1 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
+
+### Buffers
+
+Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+#### Buffer Types
+
+The `buffer.type` option allows you to control buffer resource usage:
+
+| Type | Description |
+| :--- | :---------- |
+| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+| `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+#### Buffer Overflow
+
+The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+| Type | Description |
+| :--- | :---------- |
+| `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
 ### Delivery Guarantee
 
@@ -235,6 +291,7 @@ issue, please:
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
 [strftime_specifiers]: "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
+[event]: "../../../about/data-model.md#event"
 [starting]: "../../../usage/administration/starting.md"
 [data_model]: "../../../about/data_model.md"
 [default_schema]: "../../../about/data_model.md#default-schema"

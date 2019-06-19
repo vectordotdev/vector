@@ -56,7 +56,8 @@ class Option
 
   def get_relevant_sections(sections)
     sections.select do |section|
-      section.referenced_options.include?(name)
+      section.referenced_options.include?(name) ||
+        section.referenced_options.any? { |o| o.end_with?(name) }
     end
   end
 

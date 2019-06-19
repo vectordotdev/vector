@@ -36,6 +36,45 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
+    # options
+
+    buffer_options = {}
+
+    buffer_options["type"] = {
+      "description" => "The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.",
+      "enum" => ["memory", "disk"],
+      "default" => "memory",
+      "type" => "string"
+    }
+
+    buffer_options["when_full"] = {
+      "description" => "The behavior when the buffer becomes full.",
+      "enum" => ["block", "drop_newest"],
+      "default" => "block",
+      "type" => "string"
+    }
+
+    buffer_options["max_size"] = {
+      "description" => "Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.",
+      "examples" => [104900000],
+      "type" => "int"
+    }
+
+    buffer_options["num_items"] = {
+      "description" => "Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.",
+      "default" => 500,
+      "type" => "int"
+    }
+
+    buffer_option = Option.new({
+      "name" => "buffer",
+      "description" => "Configures the sink specific buffer.",
+      "options" => buffer_options,
+      "type" => "table"
+    })
+
+    @options.buffer = buffer_option
+
     # outputs
 
     @outputs =
@@ -63,7 +102,7 @@ class Sink < Component
         end
       end
 
-    # Common sections
+    # sections
 
     if @service_provider == "AWS"
       @sections << Section.new({
@@ -85,6 +124,32 @@ class Sink < Component
           EOF
       })
     end
+
+    @sections << Section.new({
+      "title" => "Buffers",
+      "body" =>
+        <<~EOF
+        Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+        #### Buffer Types
+
+        The `buffer.type` option allows you to control buffer resource usage:
+
+        | Type | Description |
+        | :--- | :---------- |
+        | `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+        | `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+        #### Buffer Overflow
+
+        The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+        | Type | Description |
+        | :--- | :---------- |
+        | `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+        | `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
+        EOF
+      })
 
     if @options.respond_to?("compression")
       rows = @options.compression.enum.collect do |compression|
@@ -143,6 +208,8 @@ class Sink < Component
     })
 
     @sections.sort!
+
+    # resources
 
     if @service_limits_url
       @resources << OpenStruct.new({"name" => "Service Limits", "url" => @service_limits_url})

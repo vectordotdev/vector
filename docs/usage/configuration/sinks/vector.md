@@ -29,6 +29,13 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
+
+  # OPTIONAL - Buffer
+  [sinks.my_vector_sink.buffer]
+    type = "memory" # default, one of: memory, disk
+    when_full = "block" # default, one of: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -40,6 +47,13 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # OPTIONAL - General
   address = "<string>"
+
+  # OPTIONAL - Buffer
+  [sinks.<sink-id>.buffer]
+    type = {memory | disk}
+    when_full = {block | drop_newest}
+    max_size = <int>
+    num_items = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -57,6 +71,21 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # The downstream Vector address.
   address = "92.12.333.224:5000" # no default
+
+  # OPTIONAL - Buffer
+  [sinks.vector.buffer]
+
+    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+    type = "memory" # default, one of: memory, disk
+
+    # The behavior when the buffer becomes full.
+    when_full = "block" # default, one of: block, drop_newest
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
+    max_size = 104900000 # no default
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
+    num_items = 500 # default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -65,10 +94,15 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** | | |
+| **REQUIRED** - General | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** | | |
+| **OPTIONAL** - General | | |
 | `address` | `string` | The downstream Vector address.<br />`no default` `example: "92.12.333.224:5000"` |
+| **OPTIONAL** - Buffer | | |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full. See [Buffers](#buffers) for more info.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.<br />`default: 500` |
 
 ## I/O
 
@@ -81,6 +115,28 @@ The `vector` sink streams events in a real-time fashion.
 * [**Vector To Vector Guide Guide**](/usage/guides/vector-to-vector-guide.md)
 
 ## How It Works
+
+### Buffers
+
+Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+#### Buffer Types
+
+The `buffer.type` option allows you to control buffer resource usage:
+
+| Type | Description |
+| :--- | :---------- |
+| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+| `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+#### Buffer Overflow
+
+The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+| Type | Description |
+| :--- | :---------- |
+| `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
 ### Delivery Guarantee
 
@@ -124,6 +180,7 @@ issue, please:
 [sources]: "../../../usage/configuration/sources"
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
+[event]: "../../../about/data-model.md#event"
 [starting]: "../../../usage/administration/starting.md"
 [monitoring_logs]: "../../../administration/moonitoring.md#logs"
 [troubleshooting]: "../../../usages/guides/troubleshooting.md"

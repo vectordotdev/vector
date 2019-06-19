@@ -10,15 +10,15 @@ Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipeli
 
 | Name | Input | Output | Description |
 | :--- | :---: | :----: | :---------- |
-| [**`add_fields`**](add_fields.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to add one or more fields |
-| [**`field_filter`**](field_filter.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to filter events by a field's value |
-| [**`grok_parser`**](grok_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value with [Grok][grok] |
-| [**`json_parser`**](json_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value as JSON |
-| [**`lua`**](lua.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to transform events with a full embedded [Lua][lua] engine |
-| [**`regex_parser`**](regex_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field's value with a [Regular Expression][regex] |
-| [**`remove_fields`**](remove_fields.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to remove one or more event fields |
-| [**`sampler`**](sampler.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to sample events with a configurable rate |
-| [**`tokenizer`**](tokenizer.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names |
+| [**`add_fields`**](add_fields.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to add one or more fields. |
+| [**`field_filter`**](field_filter.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to filter events by a field's value. |
+| [**`grok_parser`**](grok_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value with [Grok][grok]. |
+| [**`json_parser`**](json_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field value as JSON. |
+| [**`lua`**](lua.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to transform events with a full embedded [Lua][lua] engine. |
+| [**`regex_parser`**](regex_parser.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to parse a field's value with a [Regular Expression][regex]. |
+| [**`remove_fields`**](remove_fields.md) | [`log`][log_event] [`metric`][metric_event] | [`log`][log_event] [`metric`][metric_event]  | Allows you to remove one or more event fields. |
+| [**`sampler`**](sampler.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to sample events with a configurable rate. |
+| [**`tokenizer`**](tokenizer.md) | [`log`][log_event] | [`log`][log_event]  | Allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
 [log_event]: "../../../about/data-model.md#log"
 [metric_event]: "../../../about/data-model.md#metric"

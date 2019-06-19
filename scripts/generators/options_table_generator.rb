@@ -25,7 +25,7 @@ class OptionsTableGenerator < Generator
 
     grouped_options =
       options.
-        select { |option| option.name != "type" }.
+        select { |option| option.name != "type" || !option.enum.nil? }.
         group_by do |option|
           title = "**#{option.required? ? "REQUIRED" : "OPTIONAL"}**"
 

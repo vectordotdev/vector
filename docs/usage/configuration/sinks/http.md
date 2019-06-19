@@ -50,6 +50,13 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
     password = "password" # no default
     user = "username" # no default
 
+  # OPTIONAL - Buffer
+  [sinks.my_http_sink.buffer]
+    type = "memory" # default, one of: memory, disk
+    when_full = "block" # default, one of: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default
+
   # OPTIONAL - Headers
   [sinks.my_http_sink.headers]
     X-Powered-By = "Vector"
@@ -84,6 +91,13 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   [sinks.<sink-id>.basic_auth]
     password = "<string>"
     user = "<string>"
+
+  # OPTIONAL - Buffer
+  [sinks.<sink-id>.buffer]
+    type = {memory | disk}
+    when_full = {block | drop_newest}
+    max_size = <int>
+    num_items = <int>
 
   # OPTIONAL - Headers
   [sinks.<sink-id>.headers]
@@ -153,6 +167,21 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
     # The basic authentication user name.
     user = "username" # no default
 
+  # OPTIONAL - Buffer
+  [sinks.http.buffer]
+
+    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+    type = "memory" # default, one of: memory, disk
+
+    # The behavior when the buffer becomes full.
+    when_full = "block" # default, one of: block, drop_newest
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
+    max_size = 104900000 # no default
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
+    num_items = 500 # default
+
   # OPTIONAL - Headers
   [sinks.http.headers]
 
@@ -169,12 +198,12 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 | **REQUIRED** - General | | |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
-| `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
+| `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI. See [Health Checks](#health-checks) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers](#buffers) and [Batching](#batching) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 5` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limiting](#rate-limiting) for more info.<br />`default: 1` `unit: seconds` |
@@ -184,8 +213,13 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` `unit: seconds` |
 | **OPTIONAL** - Basic auth | | |
-| `basic_auth.password` | `string` | The basic authentication password.<br />`no default` `example: "password"` |
+| `basic_auth.password` | `string` | The basic authentication password. See [Authentication](#authentication) for more info.<br />`no default` `example: "password"` |
 | `basic_auth.user` | `string` | The basic authentication user name.<br />`no default` `example: "username"` |
+| **OPTIONAL** - Buffer | | |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full. See [Buffers](#buffers) for more info.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.<br />`default: 500` |
 | **OPTIONAL** - Headers | | |
 | `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: "X-Powered-By = \"Vector\""` |
 
@@ -218,6 +252,28 @@ HTTP authentication is controlled via the `Authorization` header which you can s
 ### Batching
 
 By default, the `http` sink flushes every 5 seconds to ensure data is available quickly. This can be changed by adjusting the `batch_timeout` and `batch_size` options.
+
+### Buffers
+
+Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+
+#### Buffer Types
+
+The `buffer.type` option allows you to control buffer resource usage:
+
+| Type | Description |
+| :--- | :---------- |
+| `memory` | Pros: Fast. Cons: Not persisted across restarts. Possible data loss in the event of a cross. Uses more memory. |
+| `disk` | Pros: Persisted across restarts, durable. Uses much less memory. Cons: Slower, see below. |
+
+#### Buffer Overflow
+
+The `buffer.when_full` option allows you to control the behavior when the buffer overflows:
+
+| Type | Description |
+| :--- | :---------- |
+| `block` | Applies back pressure until the buffer makes room. This will help to prevent data loss but will cause data to pile up on the edge. |
+| `drop_newest` | Drops new data as it's received. This data is lost. This should be used when performance is the highest priority. |
 
 ### Compression
 
@@ -289,6 +345,7 @@ issue, please:
 [sources]: "../../../usage/configuration/sources"
 [transforms]: "../../../usage/configuration/transforms"
 [config_composition]: "../../../usage/configuration/README.md#composition"
+[event]: "../../../about/data-model.md#event"
 [basic_auth]: "https://en.wikipedia.org/wiki/Basic_access_authentication"
 [gzip]: "https://www.gzip.org/"
 [at_least_once_delivery]: "../../../about/guarantees.md#at-least-once-delivery"

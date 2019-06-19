@@ -73,7 +73,6 @@
     * [splunk\_hec sink](usage/configuration/sinks/splunk_hec.md)
     * [tcp sink](usage/configuration/sinks/tcp.md)
     * [vector sink](usage/configuration/sinks/vector.md)
-    * [\*.buffer](usage/configuration/sinks/buffer.md)
 * [Administration](usage/administration/README.md)
   * [CLI](usage/administration/cli.md)
   * [Monitoring](usage/administration/monitoring.md)
