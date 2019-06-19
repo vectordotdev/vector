@@ -3,7 +3,7 @@ use crate::event::{self, Event, ValueKind};
 use crate::types::Conversion;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::str;
 use string_cache::DefaultAtom as Atom;
@@ -70,6 +70,23 @@ impl RegexParser {
         // Build a buffer of the regex capture locations to avoid
         // repeated allocations.
         let capture_locs = regex.capture_locations();
+
+        // Check if any named type references a nonexistent capture
+        let capture_names: HashSet<String> = regex
+            .capture_names()
+            .filter_map(|s| s.map(|s| s.into()))
+            .collect();
+        for (name, _) in &types {
+            if !capture_names.contains(name) {
+                warn!(
+                    message = format!(
+                        "Field {:?} is specified in the types but not captured by the pattern",
+                        name
+                    )
+                    .as_str()
+                );
+            }
+        }
 
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
