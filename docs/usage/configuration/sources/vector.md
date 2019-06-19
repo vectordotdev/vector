@@ -26,7 +26,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
 ```coffeescript
 [sources.my_vector_source]
   # REQUIRED - General
-  type = "vector" # one of: vector
+  type = "vector" # must be: vector
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -50,7 +50,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
   # REQUIRED - General
 
   # The component type
-  type = "vector" # one of: vector
+  type = "vector" # must be: vector
 
   # OPTIONAL - General
 

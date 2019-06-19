@@ -26,7 +26,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 ```coffeescript
 [transforms.my_field_filter_transform]
   # REQUIRED - General
-  type = "field_filter" # one of: field_filter
+  type = "field_filter" # must be: field_filter
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
   # REQUIRED - General
 
   # The component type
-  type = "field_filter" # one of: field_filter
+  type = "field_filter" # must be: field_filter
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

@@ -24,7 +24,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.my_json_parser_transform]
   # REQUIRED - General
-  type = "json_parser" # one of: json_parser
+  type = "json_parser" # must be: json_parser
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   # REQUIRED - General
 
   # The component type
-  type = "json_parser" # one of: json_parser
+  type = "json_parser" # must be: json_parser
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

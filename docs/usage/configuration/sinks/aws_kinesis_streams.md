@@ -26,7 +26,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.my_aws_kinesis_streams_sink]
   # REQUIRED - General
-  type = "aws_kinesis_streams" # one of: aws_kinesis_streams
+  type = "aws_kinesis_streams" # must be: aws_kinesis_streams
   inputs = ["my-source-id"]
   region = "us-east-1"
   stream_name = "my-stream"
@@ -36,7 +36,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   batch_timeout = 1 # default, bytes
 
   # OPTIONAL - Requests
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
@@ -46,8 +46,8 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
 
   # OPTIONAL - Buffer
   [sinks.my_aws_kinesis_streams_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -88,7 +88,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # REQUIRED - General
 
   # The component type
-  type = "aws_kinesis_streams" # one of: aws_kinesis_streams
+  type = "aws_kinesis_streams" # must be: aws_kinesis_streams
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -110,8 +110,8 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json" # no default, one of: json, text
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
+  encoding = "json" # no default, enum: json, text
 
   # The window used for the `request_rate_limit_num` option
   rate_limit_duration = 1 # default, seconds
@@ -135,10 +135,10 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   [sinks.aws_kinesis_streams.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

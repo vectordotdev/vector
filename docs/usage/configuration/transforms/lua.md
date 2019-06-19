@@ -26,7 +26,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 ```coffeescript
 [transforms.my_lua_transform]
   # REQUIRED - General
-  type = "lua" # one of: lua
+  type = "lua" # must be: lua
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -62,7 +62,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   # REQUIRED - General
 
   # The component type
-  type = "lua" # one of: lua
+  type = "lua" # must be: lua
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

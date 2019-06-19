@@ -24,7 +24,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ```coffeescript
 [sinks.my_vector_sink]
   # REQUIRED - General
-  type = "vector" # one of: vector
+  type = "vector" # must be: vector
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -32,8 +32,8 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # OPTIONAL - Buffer
   [sinks.my_vector_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -62,7 +62,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   # REQUIRED - General
 
   # The component type
-  type = "vector" # one of: vector
+  type = "vector" # must be: vector
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -76,10 +76,10 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   [sinks.vector.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

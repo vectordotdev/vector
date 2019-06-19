@@ -24,7 +24,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 ```coffeescript
 [transforms.my_tokenizer_transform]
   # REQUIRED - General
-  type = "tokenizer" # one of: tokenizer
+  type = "tokenizer" # must be: tokenizer
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
   # REQUIRED - General
 
   # The component type
-  type = "tokenizer" # one of: tokenizer
+  type = "tokenizer" # must be: tokenizer
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

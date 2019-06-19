@@ -26,7 +26,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 ```coffeescript
 [sinks.my_aws_s3_sink]
   # REQUIRED - General
-  type = "aws_s3" # one of: aws_s3
+  type = "aws_s3" # must be: aws_s3
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
@@ -41,8 +41,8 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   key_prefix = "date=%F/" # default
 
   # OPTIONAL - Requests
-  compression = "gzip" # no default, one of: gzip
-  encoding = "ndjson" # no default, one of: ndjson, text
+  compression = "gzip" # no default, must be: gzip
+  encoding = "ndjson" # no default, enum: ndjson, text
   gzip = false # default
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -53,8 +53,8 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 
   # OPTIONAL - Buffer
   [sinks.my_aws_s3_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -102,7 +102,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # REQUIRED - General
 
   # The component type
-  type = "aws_s3" # one of: aws_s3
+  type = "aws_s3" # must be: aws_s3
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -137,11 +137,11 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # OPTIONAL - Requests
 
   # The compression type to use before writing data.
-  compression = "gzip" # no default, one of: gzip
+  compression = "gzip" # no default, must be: gzip
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # no default, one of: ndjson, text
-  encoding = "ndjson" # no default, one of: ndjson, text
+  encoding = "ndjson" # no default, enum: ndjson, text
+  encoding = "ndjson" # no default, enum: ndjson, text
 
   # Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth.
   gzip = false # default
@@ -168,10 +168,10 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   [sinks.aws_s3.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

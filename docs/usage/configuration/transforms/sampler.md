@@ -26,7 +26,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 ```coffeescript
 [transforms.my_sampler_transform]
   # REQUIRED - General
-  type = "sampler" # one of: sampler
+  type = "sampler" # must be: sampler
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
   # REQUIRED - General
 
   # The component type
-  type = "sampler" # one of: sampler
+  type = "sampler" # must be: sampler
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

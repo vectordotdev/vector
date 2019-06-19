@@ -24,19 +24,19 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 ```coffeescript
 [sinks.my_tcp_sink]
   # REQUIRED - General
-  type = "tcp" # one of: tcp
+  type = "tcp" # must be: tcp
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
 
   # OPTIONAL - Requests
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
 
   # OPTIONAL - Buffer
   [sinks.my_tcp_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -68,7 +68,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
   # REQUIRED - General
 
   # The component type
-  type = "tcp" # one of: tcp
+  type = "tcp" # must be: tcp
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -81,17 +81,17 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json" # no default, one of: json, text
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
+  encoding = "json" # no default, enum: json, text
 
   # OPTIONAL - Buffer
   [sinks.tcp.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

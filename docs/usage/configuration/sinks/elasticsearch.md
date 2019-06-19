@@ -26,7 +26,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 ```coffeescript
 [sinks.my_elasticsearch_sink]
   # REQUIRED - General
-  type = "elasticsearch" # one of: elasticsearch
+  type = "elasticsearch" # must be: elasticsearch
   inputs = ["my-source-id"]
   host = "10.24.32.122:9000"
 
@@ -48,8 +48,8 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 
   # OPTIONAL - Buffer
   [sinks.my_elasticsearch_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -92,7 +92,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   # REQUIRED - General
 
   # The component type
-  type = "elasticsearch" # one of: elasticsearch
+  type = "elasticsearch" # must be: elasticsearch
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -140,10 +140,10 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   [sinks.elasticsearch.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

@@ -86,7 +86,11 @@ class OptionsExampleGenerator < Generator
         end
 
         if option.enum
-          tags << "one of: #{option.enum.join(", ")}"
+          if option.enum.length > 1
+            tags << "enum: #{option.enum.join(", ")}"
+          else
+            tags << "must be: #{option.enum.join(", ")}"
+          end
         end
 
         example = option.examples.first

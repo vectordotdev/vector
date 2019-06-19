@@ -24,19 +24,19 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 ```coffeescript
 [sinks.my_kafka_sink]
   # REQUIRED - General
-  type = "kafka" # one of: kafka
+  type = "kafka" # must be: kafka
   inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   topic = "topic-1234"
 
   # OPTIONAL - General
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
   key_field = "partition_key" # no default
 
   # OPTIONAL - Buffer
   [sinks.my_kafka_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -68,7 +68,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # REQUIRED - General
 
   # The component type
-  type = "kafka" # one of: kafka
+  type = "kafka" # must be: kafka
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -82,8 +82,8 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # OPTIONAL - General
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json" # no default, one of: json, text
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
+  encoding = "json" # no default, enum: json, text
 
   # The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.
   key_field = "partition_key" # no default
@@ -92,10 +92,10 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   [sinks.kafka.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

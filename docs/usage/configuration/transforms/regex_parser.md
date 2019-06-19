@@ -24,7 +24,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 ```coffeescript
 [transforms.my_regex_parser_transform]
   # REQUIRED - General
-  type = "regex_parser" # one of: regex_parser
+  type = "regex_parser" # must be: regex_parser
   inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
@@ -54,7 +54,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
   # REQUIRED - General
 
   # The component type
-  type = "regex_parser" # one of: regex_parser
+  type = "regex_parser" # must be: regex_parser
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

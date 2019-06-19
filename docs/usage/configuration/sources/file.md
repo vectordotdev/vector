@@ -26,7 +26,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
 ```coffeescript
 [sources.my_file_source]
   # REQUIRED - General
-  type = "file" # one of: file
+  type = "file" # must be: file
   exclude = ["/var/log/nginx*.log"]
   include = ["/var/log/nginx*.log"]
 
@@ -64,7 +64,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
   # REQUIRED - General
 
   # The component type
-  type = "file" # one of: file
+  type = "file" # must be: file
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence over the `include` option.*
   exclude = ["/var/log/nginx*.log"]

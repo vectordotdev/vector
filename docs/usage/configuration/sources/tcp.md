@@ -24,7 +24,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 ```coffeescript
 [sources.my_tcp_source]
   # REQUIRED - General
-  type = "tcp" # one of: tcp
+  type = "tcp" # must be: tcp
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -56,7 +56,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
   # REQUIRED - General
 
   # The component type
-  type = "tcp" # one of: tcp
+  type = "tcp" # must be: tcp
 
   # OPTIONAL - General
 

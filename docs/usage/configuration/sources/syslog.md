@@ -24,12 +24,12 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.my_syslog_source]
   # REQUIRED - General
-  type = "syslog" # one of: syslog
+  type = "syslog" # must be: syslog
 
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
   max_length = 102400 # default, bytes
-  mode = "tcp" # no default, one of: tcp, udp, unix
+  mode = "tcp" # no default, enum: tcp, udp, unix
   path = "/path/to/socket" # no default
 
   # OPTIONAL - Context
@@ -58,7 +58,7 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
 
   # The component type
-  type = "syslog" # one of: syslog
+  type = "syslog" # must be: syslog
 
   # OPTIONAL - General
 
@@ -69,9 +69,9 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
   max_length = 102400 # default, bytes
 
   # The input mode.
-  mode = "tcp" # no default, one of: tcp, udp, unix
-  mode = "tcp" # no default, one of: tcp, udp, unix
-  mode = "tcp" # no default, one of: tcp, udp, unix
+  mode = "tcp" # no default, enum: tcp, udp, unix
+  mode = "tcp" # no default, enum: tcp, udp, unix
+  mode = "tcp" # no default, enum: tcp, udp, unix
 
   # The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.
 

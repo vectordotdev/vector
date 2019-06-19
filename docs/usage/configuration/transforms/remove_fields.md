@@ -24,7 +24,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 ```coffeescript
 [transforms.my_remove_fields_transform]
   # REQUIRED - General
-  type = "remove_fields" # one of: remove_fields
+  type = "remove_fields" # must be: remove_fields
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -48,7 +48,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
   # REQUIRED - General
 
   # The component type
-  type = "remove_fields" # one of: remove_fields
+  type = "remove_fields" # must be: remove_fields
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

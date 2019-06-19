@@ -24,7 +24,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 ```coffeescript
 [sinks.my_splunk_hec_sink]
   # REQUIRED - General
-  type = "splunk_hec" # one of: splunk_hec
+  type = "splunk_hec" # must be: splunk_hec
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -36,7 +36,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   batch_timeout = 1 # default, bytes
 
   # OPTIONAL - Requests
-  encoding = "ndjson" # no default, one of: ndjson, text
+  encoding = "ndjson" # no default, enum: ndjson, text
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
   request_in_flight_limit = 10 # default
@@ -46,8 +46,8 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 
   # OPTIONAL - Buffer
   [sinks.my_splunk_hec_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -90,7 +90,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # REQUIRED - General
 
   # The component type
-  type = "splunk_hec" # one of: splunk_hec
+  type = "splunk_hec" # must be: splunk_hec
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -114,8 +114,8 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # no default, one of: ndjson, text
-  encoding = "ndjson" # no default, one of: ndjson, text
+  encoding = "ndjson" # no default, enum: ndjson, text
+  encoding = "ndjson" # no default, enum: ndjson, text
 
   # The window used for the `request_rate_limit_num` option
   rate_limit_duration = 1 # default, seconds
@@ -139,10 +139,10 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   [sinks.splunk_hec.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

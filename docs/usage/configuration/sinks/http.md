@@ -24,13 +24,13 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ```coffeescript
 [sinks.my_http_sink]
   # REQUIRED - General
-  type = "http" # one of: http
+  type = "http" # must be: http
   inputs = ["my-source-id"]
-  encoding = "ndjson" # one of: ndjson, text
+  encoding = "ndjson" # enum: ndjson, text
   uri = "https://10.22.212.22:9000/endpoint"
 
   # OPTIONAL - General
-  compression = "gzip" # no default, one of: gzip
+  compression = "gzip" # no default, must be: gzip
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
 
   # OPTIONAL - Batching
@@ -52,8 +52,8 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 
   # OPTIONAL - Buffer
   [sinks.my_http_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 
@@ -110,14 +110,14 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   # REQUIRED - General
 
   # The component type
-  type = "http" # one of: http
+  type = "http" # must be: http
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # one of: ndjson, text
-  encoding = "ndjson" # one of: ndjson, text
+  encoding = "ndjson" # enum: ndjson, text
+  encoding = "ndjson" # enum: ndjson, text
 
   # The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
   uri = "https://10.22.212.22:9000/endpoint"
@@ -125,7 +125,7 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   # OPTIONAL - General
 
   # The compression strategy used to compress the payload before sending.
-  compression = "gzip" # no default, one of: gzip
+  compression = "gzip" # no default, must be: gzip
 
   # A URI that Vector can request in order to determine the service health.
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
@@ -171,10 +171,10 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   [sinks.http.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

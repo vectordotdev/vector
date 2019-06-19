@@ -24,7 +24,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 ```coffeescript
 [sources.my_stdin_source]
   # REQUIRED - General
-  type = "stdin" # one of: stdin
+  type = "stdin" # must be: stdin
 
   # OPTIONAL - General
   max_length = 102400 # default, bytes
@@ -52,7 +52,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
   # REQUIRED - General
 
   # The component type
-  type = "stdin" # one of: stdin
+  type = "stdin" # must be: stdin
 
   # OPTIONAL - General
 

@@ -24,14 +24,14 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 ```coffeescript
 [sinks.my_blackhole_sink]
   # REQUIRED - General
-  type = "blackhole" # one of: blackhole
+  type = "blackhole" # must be: blackhole
   inputs = ["my-source-id"]
   print_amount = "1000"
 
   # OPTIONAL - Buffer
   [sinks.my_blackhole_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -58,7 +58,7 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
   # REQUIRED - General
 
   # The component type
-  type = "blackhole" # one of: blackhole
+  type = "blackhole" # must be: blackhole
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -70,10 +70,10 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
   [sinks.blackhole.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default

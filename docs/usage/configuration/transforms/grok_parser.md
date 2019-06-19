@@ -24,7 +24,7 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.my_grok_parser_transform]
   # REQUIRED - General
-  type = "grok_parser" # one of: grok_parser
+  type = "grok_parser" # must be: grok_parser
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
@@ -52,7 +52,7 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
   # REQUIRED - General
 
   # The component type
-  type = "grok_parser" # one of: grok_parser
+  type = "grok_parser" # must be: grok_parser
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]

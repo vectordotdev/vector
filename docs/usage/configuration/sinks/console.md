@@ -24,17 +24,17 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ```coffeescript
 [sinks.my_console_sink]
   # REQUIRED - General
-  type = "console" # one of: console
+  type = "console" # must be: console
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
-  encoding = "json" # no default, one of: json, text
-  target = "stdout" # no default, one of: stdout, stderr
+  encoding = "json" # no default, enum: json, text
+  target = "stdout" # no default, enum: stdout, stderr
 
   # OPTIONAL - Buffer
   [sinks.my_console_sink.buffer]
-    type = "memory" # default, one of: memory, disk
-    when_full = "block" # default, one of: block, drop_newest
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 ```
@@ -64,7 +64,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
   # REQUIRED - General
 
   # The component type
-  type = "console" # one of: console
+  type = "console" # must be: console
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -72,21 +72,21 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
   # OPTIONAL - General
 
   # The encoding format used to serialize the events before writing.
-  encoding = "json" # no default, one of: json, text
-  encoding = "json" # no default, one of: json, text
+  encoding = "json" # no default, enum: json, text
+  encoding = "json" # no default, enum: json, text
 
   # The standard stream to write to.
-  target = "stdout" # no default, one of: stdout, stderr
-  target = "stdout" # no default, one of: stdout, stderr
+  target = "stdout" # no default, enum: stdout, stderr
+  target = "stdout" # no default, enum: stdout, stderr
 
   # OPTIONAL - Buffer
   [sinks.console.buffer]
 
     # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, one of: memory, disk
+    type = "memory" # default, enum: memory, disk
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, one of: block, drop_newest
+    when_full = "block" # default, enum: block, drop_newest
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
     max_size = 104900000 # no default
