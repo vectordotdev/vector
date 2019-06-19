@@ -176,6 +176,32 @@ fn bad_regex() {
 }
 
 #[test]
+fn good_regex_parser() {
+    let result = load(
+        r#"
+        [sources.in]
+        type = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.parser]
+        type = "regex_parser"
+        inputs = ["in"]
+        regex = "(?P<out>.+)"
+
+        [transforms.parser.types]
+        out = "integer"
+
+        [sinks.out]
+        type = "tcp"
+        inputs = ["parser"]
+        address = "127.0.0.1:9999"
+      "#,
+    );
+
+    assert!(result.is_ok());
+}
+
+#[test]
 fn bad_s3_region() {
     let err = load(
         r#"
