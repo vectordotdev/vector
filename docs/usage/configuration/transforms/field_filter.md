@@ -80,7 +80,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 
 ## I/O
 
-The ``field_filter` transform` accepts [`log`][log_event] and [`metric`][metric_event] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
+The ``field_filter` transform` accepts ["[`log`][log_event]", "[`metric`][metric_event]"] events and outputs [`log`][log_event] and [`metric`][metric_event] events.
 
 
 

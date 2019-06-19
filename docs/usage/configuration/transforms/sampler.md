@@ -80,7 +80,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 
 ## I/O
 
-The ``sampler` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The ``sampler` transform` accepts ["[`log`][log_event]"] events and outputs [`log`][log_event] events.
 
 
 

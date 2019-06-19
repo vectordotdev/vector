@@ -29,7 +29,7 @@ class TransformsGenerator < Generator
   private
     def transform_rows
       links = transforms.collect do |transform|
-        "| [**`#{transform.name}`**](#{transform.name}.md) | #{event_type_links(transform.input_types)} | #{event_type_links(transform.output_types)}  | Allows you to #{transform.allow_you_to_description} |"
+        "| [**`#{transform.name}`**](#{transform.name}.md) | #{event_type_links(transform.input_types).join(" ")} | #{event_type_links(transform.output_types).join(" ")}  | Allows you to #{transform.allow_you_to_description} |"
       end
 
       links.join("\n")

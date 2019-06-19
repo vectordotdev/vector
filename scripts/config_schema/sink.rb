@@ -179,7 +179,29 @@ class Sink < Component
     end
   end
 
+  def plural_write_verb
+    case write_style
+    when "batching"
+      "batches and flushes"
+    when "streaming"
+      "streams"
+    else
+      raise("Unknown write_style: #{write_style.inspect}")
+    end
+  end
+
   def streaming?
     write_style == "streaming"
+  end
+
+  def write_verb
+    case write_style
+    when "batching"
+      "batch and flush"
+    when "streaming"
+      "stream"
+    else
+      raise("Unknown write_style: #{write_style.inspect}")
+    end
   end
 end

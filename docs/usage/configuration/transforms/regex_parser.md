@@ -90,7 +90,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 
 ## I/O
 
-The ``regex_parser` transform` accepts [`log`][log_event] events and outputs [`log`][log_event] events.
+The ``regex_parser` transform` accepts ["[`log`][log_event]"] events and outputs [`log`][log_event] events.
 
 
 

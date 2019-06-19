@@ -29,7 +29,7 @@ class SourcesGenerator < Generator
   private
     def source_rows
       links = sources.collect do |source|
-        "| [**`#{source.name}`**](#{source.name}.md) | #{event_type_links(source.output_types)} | `#{source.delivery_guarantee}` | Ingests data through #{source.through_description} |"
+        "| [**`#{source.name}`**](#{source.name}.md) | #{event_type_links(source.output_types).join(" ")} | `#{source.delivery_guarantee}` | Ingests data through #{source.through_description} |"
       end
 
       links.join("\n")

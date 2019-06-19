@@ -67,7 +67,7 @@ class SinksGenerator < Generator
   private
     def sink_rows
       links = sinks.collect do |sink|
-        "| [**`#{sink.name}`**](#{sink.name}.md) | #{event_type_links(sink.input_types)} | `#{sink.delivery_guarantee}` | #{sink.write_style.pluralize.humanize} events to #{sink.write_to_description} |"
+        "| [**`#{sink.name}`**](#{sink.name}.md) | #{event_type_links(sink.input_types).join(" ")} | `#{sink.delivery_guarantee}` | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description} |"
       end
 
       links.join("\n")

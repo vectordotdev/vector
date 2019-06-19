@@ -87,7 +87,7 @@ class Generator
     def event_type_links(types)
       types.collect do |type|
         "[`#{type}`][#{type}_event]"
-      end.to_sentence
+      end
     end
 
     def guides_section(component)

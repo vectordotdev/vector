@@ -35,7 +35,7 @@ class TransformGenerator < Generator
       ![](#{transform.diagram})
 
       #{beta(transform)}
-      The `#{transform.name}` transforms accepts #{event_type_links(transform.input_types)} events and allows you to #{transform.allow_you_to_description}.
+      The `#{transform.name}` transforms accepts #{event_type_links(transform.input_types).to_sentence} events and allows you to #{transform.allow_you_to_description}.
 
       ## Example
 
@@ -63,7 +63,7 @@ class TransformGenerator < Generator
 
       ## I/O
 
-      The `#{component_name(transform)}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types)} events.
+      The `#{component_name(transform)}` accepts #{event_type_links(transform.input_types)} events and outputs #{event_type_links(transform.output_types).to_sentence} events.
 
       #{guides_section(transform)}
 
