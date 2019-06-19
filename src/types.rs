@@ -13,6 +13,7 @@ pub enum Conversion {
     Boolean,
     Timestamp,
     TimestampFmt(String),
+    TimestampTZFmt(String),
 }
 
 impl TryFrom<&str> for Conversion {
@@ -35,7 +36,14 @@ impl TryFrom<&str> for Conversion {
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
             "timestamp" => Ok(Conversion::Timestamp),
-            _ if s.starts_with("timestamp|") => Ok(Conversion::TimestampFmt(s[10..].into())),
+            _ if s.starts_with("timestamp|") => {
+                let fmt = &s[10..];
+                if format_has_zone(fmt) {
+                    Ok(Conversion::TimestampTZFmt(fmt.into()))
+                } else {
+                    Ok(Conversion::TimestampFmt(fmt.into()))
+                }
+            }
             _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
         }
     }
@@ -70,6 +78,15 @@ impl Conversion {
                 .datetime_from_str(&String::from_utf8_lossy(&value), &format)
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                 .map(|value| ValueKind::Timestamp(value)),
+            Conversion::TimestampTZFmt(format) => {
+                DateTime::parse_from_str(&String::from_utf8_lossy(&value), &format)
+                    .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
+                    .map(|value| {
+                        ValueKind::Timestamp(
+                            Utc.timestamp(value.timestamp(), value.timestamp_subsec_nanos()),
+                        )
+                    })
+            }
         }
     }
 }
@@ -106,6 +123,15 @@ fn parse_bool(s: &str) -> Result<bool, &'static str> {
     }
 }
 
+/// Does the format specifier have a time zone option?
+fn format_has_zone(fmt: &str) -> bool {
+    fmt.find("%Z").is_some()
+        || fmt.find("%z").is_some()
+        || fmt.find("%:z").is_some()
+        || fmt.find("%#z").is_some()
+        || fmt.find("%+").is_some()
+}
+
 /// The list of allowed "automatic" timestamp formats
 const TIMESTAMP_FORMATS: &[&str] = &[
     "%s",              // UNIX timestamp
@@ -120,11 +146,24 @@ const TIMESTAMP_FORMATS: &[&str] = &[
     "%a %b %e %T %Y",  // ctime format
 ];
 
+/// The list of allowed "automatic" timestamp formats with time zones
+const TIMESTAMP_TZ_FORMATS: &[&str] = &[
+    "%+",                 // ISO 8601 / RFC 3339
+    "%a %d %b %T %Z %Y",  // `date` command output
+    "%a %d %b %T %z %Y",  // `date` command output, numeric TZ
+    "%a %d %b %T %#z %Y", // `date` command output, numeric TZ
+];
+
 /// Parse a string into a timestamp using one of a set of formats
 fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, &'static str> {
     for format in TIMESTAMP_FORMATS {
         if let Ok(result) = Utc.datetime_from_str(s, format) {
             return Ok(result);
+        }
+    }
+    for format in TIMESTAMP_TZ_FORMATS {
+        if let Ok(result) = DateTime::parse_from_str(s, format) {
+            return Ok(Utc.timestamp(result.timestamp(), result.timestamp_subsec_nanos()));
         }
     }
     Err("No matching timestamp format found")
