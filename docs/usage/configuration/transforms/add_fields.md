@@ -116,7 +116,7 @@ A [`log` event][log_event] will be emitted with the following structure:
 }
 ```
 
-While unrealistic, this example demonstrates the various accepted [types][config_value_types]. A few tgh
+While unrealistic, this example demonstrates the various accepted [types][config_value_types].
 
 
 
