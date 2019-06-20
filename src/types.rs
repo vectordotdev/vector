@@ -1,6 +1,6 @@
 use crate::event::ValueKind;
 use chrono::{DateTime, TimeZone, Utc};
-use std::convert::TryFrom;
+use std::str::FromStr;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`String`) `ValueKind` into another type. Every
@@ -16,8 +16,8 @@ pub enum Conversion {
     TimestampTZFmt(String),
 }
 
-impl TryFrom<&str> for Conversion {
-    type Error = String;
+impl FromStr for Conversion {
+    type Err = String;
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
@@ -29,7 +29,7 @@ impl TryFrom<&str> for Conversion {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     ///
     /// Timestamp parsing does not yet support time zones.
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "string" => Ok(Conversion::String),
             "integer" | "int" => Ok(Conversion::Integer),
@@ -185,14 +185,13 @@ mod tests {
     use super::{parse_bool, parse_timestamp, Conversion};
     use crate::event::ValueKind;
     use chrono::prelude::*;
-    use std::convert::TryFrom;
 
     fn dateref() -> DateTime<Utc> {
         Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
     }
 
     fn convert(fmt: &str, value: &str) -> Result<ValueKind, String> {
-        Conversion::try_from(fmt)
+        fmt.parse::<Conversion>()
             .expect(&format!("Invalid conversion {:?}", fmt))
             .convert(value.into())
     }

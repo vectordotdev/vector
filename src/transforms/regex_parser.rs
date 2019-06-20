@@ -4,7 +4,6 @@ use crate::types::Conversion;
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -30,9 +29,7 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
         let types = self
             .types
             .iter()
-            .map(|(field, typename)| {
-                Conversion::try_from(typename.as_ref()).map(|ct| (field.clone(), ct))
-            })
+            .map(|(field, typename)| typename.parse::<Conversion>().map(|ct| (field.clone(), ct)))
             .collect::<Result<HashMap<String, Conversion>, _>>()
             .map_err(|err| format!("Invalid conversion type: {}", err))?;
 
