@@ -98,11 +98,7 @@ impl RegexParser {
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        for (_, name, _) in &capture_names {
-            if *name == field {
-                drop_field = false;
-            }
-        }
+        drop_field = drop_field && !capture_names.iter().any(|(_, f, _)| *f == field);
 
         Self {
             regex,
