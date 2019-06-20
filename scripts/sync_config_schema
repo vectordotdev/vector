@@ -2,8 +2,8 @@
 
 # Sync Config Schema
 #
-# This script syncs the configuration schema defined in `/dist/config/schema.toml` to the
-# following files:
+# This script syncs the configuration schema defined in `/scripts/schema.toml`
+# to the following files:
 #
 # * /config/spec.toml
 # * /docs/usage/configuration/sources/*
@@ -16,37 +16,24 @@
 
 require "ostruct"
 require "rubygems"
+require "bundler/setup"
 
 begin
   require "active_support"
   require "active_support/core_ext/array/conversions"
   require "active_support/core_ext/string/indent"
-rescue LoadError
-  abort "`active_support` library not found, please install it via `sudo gem install active_support`"
-end
-
-begin
   require "front_matter_parser"
-rescue LoadError
-  abort "`front_matter_parser` library not found, please install it via `sudo gem install front_matter_parser`"
-end
-
-begin
   require "toml-rb"
-rescue LoadError
-  abort "`toml-rb` library not found, please install it via `sudo gem install toml-rb`"
-end
-
-begin
   require "unindent"
-rescue LoadError
-  abort "`unindent` library not found, please install it via `sudo gem install unindent`"
-end
-
-begin
   require "word_wrap"
 rescue LoadError
-  abort "`word_wrap` library not found, please install it via `sudo gem install word_wrap`"
+  abort <<~EOF
+  Please install the required Ruby gems:
+
+  sudo gem install bundler
+  cd scripts
+  bundle install
+  EOF
 end
 
 require_relative "config_schema/schema"
@@ -176,4 +163,4 @@ end
 sinks_generator = ConfigSpecificationGenerator.new(schema)
 content = sinks_generator.generate
 # We purposefully do not use #write here since we do not want to parse links.
-File.write("dist/config/vector.spec.toml", content)
+File.write("config/vector.spec.toml", content)
