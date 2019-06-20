@@ -53,15 +53,6 @@ impl FromStr for Conversion {
     }
 }
 
-macro_rules! parse_simple {
-    ($value:expr, $ty:ty, $tyname:literal, $vtype:ident) => {
-        String::from_utf8_lossy(&$value)
-            .parse::<$ty>()
-            .map_err(|err| format!("Invalid {} {:?}: {}", $tyname, $value, err))
-            .map(|value| ValueKind::$vtype(value))
-    };
-}
-
 impl Conversion {
     /// Use this `Conversion` variant to turn the given `value` into a
     /// new `ValueKind`. This will fail in unexpected ways if the
@@ -70,8 +61,14 @@ impl Conversion {
         let value = value.into_bytes();
         match self {
             Conversion::String => Ok(value.into()),
-            Conversion::Integer => parse_simple!(value, i64, "integer", Integer),
-            Conversion::Float => parse_simple!(value, f64, "floating point number", Float),
+            Conversion::Integer => String::from_utf8_lossy(&value)
+                .parse::<i64>()
+                .map_err(|err| format!("Invalid integer {:?}: {}", value, err))
+                .map(|value| ValueKind::Integer(value)),
+            Conversion::Float => String::from_utf8_lossy(&value)
+                .parse::<f64>()
+                .map_err(|err| format!("Invalid floating point number {:?}: {}", value, err))
+                .map(|value| ValueKind::Float(value)),
             Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&value))
                 .map_err(|err| format!("Invalid boolean {:?}: {}", value, err))
                 .map(|value| ValueKind::Boolean(value)),
