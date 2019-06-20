@@ -126,18 +126,16 @@ impl Transform for RegexParser {
                 for (idx, name, conversion) in &self.capture_names {
                     if let Some((start, end)) = self.capture_locs.get(*idx) {
                         let capture: ValueKind = value[start..end].into();
-                        let capture = match conversion.convert(capture) {
-                            Ok(value) => value,
+                        match conversion.convert(capture) {
+                            Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
                             Err(err) => {
                                 debug!(
                                     message = "Could not convert types.",
                                     name = &name[..],
                                     error = &field::display(err)
                                 );
-                                continue;
                             }
-                        };
-                        event.as_mut_log().insert_explicit(name.clone(), capture);
+                        }
                     }
                 }
                 if self.drop_field {
