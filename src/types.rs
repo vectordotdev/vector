@@ -65,7 +65,7 @@ macro_rules! parse_simple {
 impl Conversion {
     /// Use this `Conversion` variant to turn the given `value` into a
     /// new `ValueKind`. This will fail in unexpected ways if the
-    /// `value` is not currently a `ValueKind::String`.
+    /// `value` is not currently a `ValueKind::Bytes`.
     pub fn convert(&self, value: ValueKind) -> Result<ValueKind, String> {
         let value = value.into_bytes();
         match self {
