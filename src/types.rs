@@ -58,29 +58,29 @@ impl Conversion {
     /// new `ValueKind`. This will fail in unexpected ways if the
     /// `value` is not currently a `ValueKind::Bytes`.
     pub fn convert(&self, value: ValueKind) -> Result<ValueKind, String> {
-        let value = value.into_bytes();
+        let bytes = value.as_bytes();
         match self {
-            Conversion::Bytes => Ok(value.into()),
-            Conversion::Integer => String::from_utf8_lossy(&value)
+            Conversion::Bytes => Ok(value),
+            Conversion::Integer => String::from_utf8_lossy(&bytes)
                 .parse::<i64>()
                 .map_err(|err| format!("Invalid integer {:?}: {}", value, err))
                 .map(|value| ValueKind::Integer(value)),
-            Conversion::Float => String::from_utf8_lossy(&value)
+            Conversion::Float => String::from_utf8_lossy(&bytes)
                 .parse::<f64>()
                 .map_err(|err| format!("Invalid floating point number {:?}: {}", value, err))
                 .map(|value| ValueKind::Float(value)),
-            Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&value))
+            Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))
                 .map_err(|err| format!("Invalid boolean {:?}: {}", value, err))
                 .map(|value| ValueKind::Boolean(value)),
-            Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&value))
+            Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&bytes))
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                 .map(|value| ValueKind::Timestamp(value)),
             Conversion::TimestampFmt(format) => Utc
-                .datetime_from_str(&String::from_utf8_lossy(&value), &format)
+                .datetime_from_str(&String::from_utf8_lossy(&bytes), &format)
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                 .map(|value| ValueKind::Timestamp(value)),
             Conversion::TimestampTZFmt(format) => {
-                DateTime::parse_from_str(&String::from_utf8_lossy(&value), &format)
+                DateTime::parse_from_str(&String::from_utf8_lossy(&bytes), &format)
                     .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                     .map(|value| ValueKind::Timestamp(datetime_to_utc(value)))
             }
