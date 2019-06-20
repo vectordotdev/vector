@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str;
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
@@ -76,11 +77,8 @@ impl RegexParser {
         for (name, _) in &types {
             if !capture_names.contains(name) {
                 warn!(
-                    message = format!(
-                        "Field {:?} is specified in the types but not captured by the pattern",
-                        name
-                    )
-                    .as_str()
+                    message = "Field was specified in the types but not captured by the pattern.",
+                    field = &name[..]
                 );
             }
         }
@@ -132,8 +130,9 @@ impl Transform for RegexParser {
                             Ok(value) => value,
                             Err(err) => {
                                 debug!(
-                                    message =
-                                        format!("Could not convert {}: {}", name, err).as_str()
+                                    message = "Could not convert types.",
+                                    name = &name[..],
+                                    error = &field::display(err)
                                 );
                                 continue;
                             }
