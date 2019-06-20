@@ -324,6 +324,32 @@ jobs:
           paths:
             - "*.deb"
 
+  compile-rpm:
+    resource_class: xlarge
+    docker:
+      - image: timberio/vector-centos-builder:latest
+    environment:
+      BUILDER: "cargo"
+      TARGET: "x86_64-unknown-linux-gnu"
+    steps:
+      - *restore-git-cache
+      #- *restore-cargo-cache
+      #- *restore-build-cache
+      - checkout
+      - run:
+          name: Set VERSION
+          command: |
+            export VERSION=$(./.circleci/version.sh)
+            export VERSION=$(echo $VERSION | sed 's/^v//g')
+            export VERSION=$(echo $VERSION | sed 's/-/\./g')
+            echo 'export VERSION=$VERSION' >> $BASH_ENV
+      - *build
+      - run:
+          name: Build .rpm package
+          command: |
+            mv dist/$TAR_NAME /root/rpmbuild/SOURCES/vector-$VERSION.tar.gz
+            rpmbuild -ba distribution/rpm/vector.spec
+
   release-docker:
     machine: true
     steps:
