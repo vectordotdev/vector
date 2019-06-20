@@ -52,10 +52,11 @@ fn flatten_field(key: Atom, value: Value, new_fields: &mut IndexMap<Atom, ValueK
         Value::Float(f) => new_fields.insert(key, f.into()),
         Value::Boolean(b) => new_fields.insert(key, b.into()),
         Value::Datetime(dt) => {
-            if let Ok(ts) = dt.to_string().parse::<DateTime<Utc>>() {
+            let dt = dt.to_string();
+            if let Ok(ts) = dt.parse::<DateTime<Utc>>() {
                 new_fields.insert(key, ts.into())
             } else {
-                new_fields.insert(key, dt.to_string().into())
+                new_fields.insert(key, dt.into())
             }
         }
         Value::Array(vals) => {

@@ -94,9 +94,7 @@ fn insert(event: &mut Event, name: String, value: Value) {
                 .insert_explicit(name.into(), string.into());
         }
         Value::Number(number) => {
-            let val = if let Some(val) = number.as_u64() {
-                ValueKind::from(val as i64)
-            } else if let Some(val) = number.as_i64() {
+            let val = if let Some(val) = number.as_i64() {
                 ValueKind::from(val)
             } else if let Some(val) = number.as_f64() {
                 ValueKind::from(val)
