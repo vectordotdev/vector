@@ -93,7 +93,7 @@ impl RegexParser {
                     (
                         idx,
                         cn.into(),
-                        types.get(cn).unwrap_or(&Conversion::String).clone(),
+                        types.get(cn).unwrap_or(&Conversion::Bytes).clone(),
                     )
                 })
             })
