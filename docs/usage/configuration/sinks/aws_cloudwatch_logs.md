@@ -57,7 +57,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {aws_cloudwatch_logs}
+  type = {"aws_cloudwatch_logs"}
   inputs = "<string>"
   group_name = "<string>"
   region = "<string>"
@@ -68,7 +68,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
   batch_timeout = <int>
 
   # OPTIONAL - Requests
-  encoding = {json | text}
+  encoding = {"json" | "text"}
   rate_limit_duration = <int>
   rate_limit_num = <int>
   request_in_flight_limit = <int>
@@ -78,8 +78,8 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][log_event] events to [A
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

@@ -48,7 +48,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {lua}
+  type = {"lua"}
   inputs = "<string>"
 
   # OPTIONAL - General

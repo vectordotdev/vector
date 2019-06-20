@@ -37,7 +37,7 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {tokenizer}
+  type = {"tokenizer"}
   inputs = "<string>"
 
   # OPTIONAL - General

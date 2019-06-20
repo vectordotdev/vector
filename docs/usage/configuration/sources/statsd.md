@@ -34,7 +34,7 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {statsd}
+  type = {"statsd"}
   address = "<string>"
 ```
 {% endcode-tabs-item %}

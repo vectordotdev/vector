@@ -66,13 +66,13 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {http}
+  type = {"http"}
   inputs = "<string>"
-  encoding = {ndjson | text}
+  encoding = {"ndjson" | "text"}
   uri = "<string>"
 
   # OPTIONAL - General
-  compression = {gzip}
+  compression = {"gzip"}
   healthcheck_uri = "<string>"
 
   # OPTIONAL - Batching
@@ -94,8 +94,8 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 

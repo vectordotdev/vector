@@ -37,7 +37,7 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {vector}
+  type = {"vector"}
 
   # OPTIONAL - General
   address = "<string>"

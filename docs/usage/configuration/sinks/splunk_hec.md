@@ -56,7 +56,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {splunk_hec}
+  type = {"splunk_hec"}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -68,7 +68,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   batch_timeout = <int>
 
   # OPTIONAL - Requests
-  encoding = {ndjson | text}
+  encoding = {"ndjson" | "text"}
   rate_limit_duration = <int>
   rate_limit_num = <int>
   request_in_flight_limit = <int>
@@ -78,8 +78,8 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

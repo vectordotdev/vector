@@ -38,7 +38,7 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {sampler}
+  type = {"sampler"}
   inputs = "<string>"
 
   # OPTIONAL - General

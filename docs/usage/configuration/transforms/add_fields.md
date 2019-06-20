@@ -36,7 +36,7 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {add_fields}
+  type = {"add_fields"}
   inputs = "<string>"
 
   # OPTIONAL - Fields

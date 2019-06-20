@@ -63,7 +63,7 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {aws_s3}
+  type = {"aws_s3"}
   inputs = "<string>"
   bucket = "<string>"
   region = "<string>"
@@ -78,8 +78,8 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   key_prefix = "<string>"
 
   # OPTIONAL - Requests
-  compression = {gzip}
-  encoding = {ndjson | text}
+  compression = {"gzip"}
+  encoding = {"ndjson" | "text"}
   gzip = <bool>
   rate_limit_duration = <int>
   rate_limit_num = <int>
@@ -90,8 +90,8 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

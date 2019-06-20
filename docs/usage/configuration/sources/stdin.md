@@ -37,7 +37,7 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {stdin}
+  type = {"stdin"}
 
   # OPTIONAL - General
   max_length = <int>

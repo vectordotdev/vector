@@ -43,17 +43,17 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {console}
+  type = {"console"}
   inputs = "<string>"
 
   # OPTIONAL - General
-  encoding = {json | text}
-  target = {stdout | stderr}
+  encoding = {"json" | "text"}
+  target = {"stdout" | "stderr"}
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

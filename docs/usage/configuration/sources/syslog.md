@@ -40,12 +40,12 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {syslog}
+  type = {"syslog"}
 
   # OPTIONAL - General
   address = "<string>"
   max_length = <int>
-  mode = {tcp | udp | unix}
+  mode = {"tcp" | "udp" | "unix"}
   path = "<string>"
 
   # OPTIONAL - Context

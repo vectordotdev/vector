@@ -42,7 +42,7 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {vector}
+  type = {"vector"}
   inputs = "<string>"
 
   # OPTIONAL - General
@@ -50,8 +50,8 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

@@ -45,19 +45,19 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {kafka}
+  type = {"kafka"}
   inputs = "<string>"
   bootstrap_servers = "<string>"
   topic = "<string>"
 
   # OPTIONAL - General
-  encoding = {json | text}
+  encoding = {"json" | "text"}
   key_field = "<string>"
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

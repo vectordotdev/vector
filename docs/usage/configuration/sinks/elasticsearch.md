@@ -58,7 +58,7 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {elasticsearch}
+  type = {"elasticsearch"}
   inputs = "<string>"
   host = "<string>"
 
@@ -80,8 +80,8 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

@@ -38,7 +38,7 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {regex_parser}
+  type = {"regex_parser"}
   inputs = "<string>"
   regex = "<string>"
 

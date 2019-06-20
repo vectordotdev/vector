@@ -116,7 +116,7 @@ class OptionsExampleGenerator < Generator
 
     def type_string(option)
       if option.enum
-        "{#{option.enum.join(" | ")}}"
+        "{#{option.enum.collect(&:inspect).join(" | ")}}"
       else
         case option.type
         when "[string]"

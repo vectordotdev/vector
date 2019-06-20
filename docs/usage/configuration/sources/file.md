@@ -44,7 +44,7 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {file}
+  type = {"file"}
   exclude = ["<string>", ...]
   include = ["<string>", ...]
 

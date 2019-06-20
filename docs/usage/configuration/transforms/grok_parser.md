@@ -37,7 +37,7 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {grok_parser}
+  type = {"grok_parser"}
   inputs = "<string>"
 
   # OPTIONAL - General

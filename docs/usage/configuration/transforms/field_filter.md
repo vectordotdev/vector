@@ -38,7 +38,7 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {field_filter}
+  type = {"field_filter"}
   inputs = "<string>"
 
   # OPTIONAL - General

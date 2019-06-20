@@ -37,7 +37,7 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {json_parser}
+  type = {"json_parser"}
   inputs = "<string>"
 
   # OPTIONAL - General

@@ -40,14 +40,14 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {blackhole}
+  type = {"blackhole"}
   inputs = "<string>"
   print_amount = <int>
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```

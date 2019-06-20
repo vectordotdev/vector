@@ -35,7 +35,7 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {remove_fields}
+  type = {"remove_fields"}
   inputs = "<string>"
 
   # OPTIONAL - General

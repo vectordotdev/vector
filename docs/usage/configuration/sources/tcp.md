@@ -39,7 +39,7 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {tcp}
+  type = {"tcp"}
 
   # OPTIONAL - General
   address = "<string>"

@@ -45,19 +45,19 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {tcp}
+  type = {"tcp"}
   inputs = "<string>"
 
   # OPTIONAL - General
   address = "<string>"
 
   # OPTIONAL - Requests
-  encoding = {json | text}
+  encoding = {"json" | "text"}
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
-    type = {memory | disk}
-    when_full = {block | drop_newest}
+    type = {"memory" | "disk"}
+    when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
 ```
