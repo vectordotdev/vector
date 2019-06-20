@@ -52,17 +52,24 @@ The `stdin` source continuously ingests [`log`][log_event] events through standa
   # REQUIRED - General
 
   # The component type
-  type = "stdin" # must be: stdin
+  #
+  # * must be: stdin
+  type = "stdin"
 
   # OPTIONAL - General
 
   # The maxiumum bytes size of a message before it is discarded.
-  max_length = 102400 # default, bytes
+  #
+  # * default: 102400
+  # * bytes
+  max_length = 102400
 
   # OPTIONAL - Context
 
   # The key name added to each event representing the current host.
-  host_key = "host" # default
+  #
+  # * default: host
+  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

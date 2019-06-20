@@ -110,82 +110,135 @@ The `http` sink batch and flushes [`log`][log_event] events to a generic HTTP en
   # REQUIRED - General
 
   # The component type
-  type = "http" # must be: http
+  #
+  # * must be: http
+  type = "http"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # enum: ndjson, text
-  encoding = "ndjson" # enum: ndjson, text
+  #
+  # * enum: ndjson, text
+  encoding = "ndjson"
+  encoding = "text"
 
-  # The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+  # The full URI to make HTTP requests to. This should include the protocol and
+  # host, but can also include the port, path, and any other valid part of a URI.
   uri = "https://10.22.212.22:9000/endpoint"
 
   # OPTIONAL - General
 
   # The compression strategy used to compress the payload before sending.
-  compression = "gzip" # no default, must be: gzip
+  #
+  # * no default
+  # * must be: gzip
+  compression = "gzip"
 
   # A URI that Vector can request in order to determine the service health.
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
+  #
+  # * no default
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000 # default, bytes
+  #
+  # * default: 1049000
+  # * bytes
+  batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 5 # default, bytes
+  #
+  # * default: 5
+  # * bytes
+  batch_timeout = 5
 
   # OPTIONAL - Requests
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1 # default, seconds
+  #
+  # * default: 1
+  # * seconds
+  rate_limit_duration = 1
 
-  # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 10 # default
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  #
+  # * default: 10
+  rate_limit_num = 10
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 10 # default
+  #
+  # * default: 10
+  request_in_flight_limit = 10
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30 # default, seconds
+  #
+  # * default: 30
+  # * seconds
+  request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 10 # default
+  #
+  # * default: 10
+  retry_attempts = 10
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 10 # default, seconds
+  #
+  # * default: 10
+  # * seconds
+  retry_backoff_secs = 10
 
   # OPTIONAL - Basic auth
   [sinks.http.basic_auth]
 
     # The basic authentication password.
-    password = "password" # no default
+    #
+    # * no default
+    password = "password"
 
     # The basic authentication user name.
-    user = "username" # no default
+    #
+    # * no default
+    user = "username"
 
   # OPTIONAL - Buffer
   [sinks.http.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 
   # OPTIONAL - Headers
   [sinks.http.headers]
 
     # A custom header to be added to each outgoing HTTP request.
+    #
+    # * no default
     X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}

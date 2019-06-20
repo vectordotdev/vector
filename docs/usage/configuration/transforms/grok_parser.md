@@ -52,7 +52,9 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
   # REQUIRED - General
 
   # The component type
-  type = "grok_parser" # must be: grok_parser
+  #
+  # * must be: grok_parser
+  type = "grok_parser"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -60,13 +62,19 @@ The `grok_parser` transforms accepts [`log`][log_event] events and allows you to
   # OPTIONAL - General
 
   # If `true` will drop the `field` after parsing.
-  drop_field = true # default
+  #
+  # * default: true
+  drop_field = true
 
   # The field to execute the `pattern` against. Must be a `string` value.
-  field = "message" # default
+  #
+  # * default: message
+  field = "message"
 
   # The Grok pattern
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # no default
+  #
+  # * no default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

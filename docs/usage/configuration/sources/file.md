@@ -64,9 +64,12 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
   # REQUIRED - General
 
   # The component type
-  type = "file" # must be: file
+  #
+  # * must be: file
+  type = "file"
 
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence over the `include` option.*
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
   exclude = ["/var/log/nginx*.log"]
 
   # Array of file patterns to include. Globbing is supported.
@@ -75,21 +78,35 @@ The `file` source continuously ingests [`log`][log_event] events through one or 
   # OPTIONAL - General
 
   # Ignore files with a data modification date that does not exceed this age.
-  ignore_older = 86400 # no default, seconds
+  #
+  # * no default
+  # * seconds
+  ignore_older = 86400
 
-  # The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.
-  max_line_bytes = 102400 # default, bytes
+  # The maximum number of a bytes a line can contain before being discarded. This
+  # protects against malformed lines or tailing incorrect files.
+  #
+  # * default: 102400
+  # * bytes
+  max_line_bytes = 102400
 
-  # When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.
-  start_at_beginning = false # default
+  # When `true` Vector will read from the beginning of new files, when `false`
+  # Vector will only read new data added to the file.
+  #
+  # * default: false
+  start_at_beginning = false
 
   # OPTIONAL - Context
 
   # The key name added to each event with the full path of the file.
-  file_key = "file" # default
+  #
+  # * default: file
+  file_key = "file"
 
   # The key name added to each event representing the current host.
-  host_key = "host" # default
+  #
+  # * default: host
+  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

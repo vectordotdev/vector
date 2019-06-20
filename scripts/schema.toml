@@ -55,7 +55,88 @@ type = "string"
 examples = ["/var/lib/vector"]
 description = """\
 The directory used for persisting Vector state, such as on-disk buffers. \
-Please make sure the Vector projectt has write permissions to this dir.\
+Please make sure the Vector project has write permissions to this dir.\
+"""
+
+[[sections]]
+title = "Composition"
+body = """\
+The primary purpose of the configuration file is to compose pipelines. \
+Pipelines are formed by connecting [sources][sources], \
+[transforms][transforms], and [sinks][sinks] through the `inputs` option.
+
+Notice in the above example each input references the `id` assigned to a \
+previous source or transform.
+"""
+
+[[sections]]
+title = "Data Directory"
+body = """\
+Vector requires a `data_dir` value for on-disk operations. Currently, \
+the only operation using this directory are Vector's on-disk buffers. \
+Buffers, by default, are memory-based, but if you switch them to disk-based \
+you'll need to specify a `data_directory`.
+"""
+
+[[sections]]
+title = "Environment Variables"
+body = """\
+Vector will interpolate environment variables within your configuration \
+file with the following syntax:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.add_host]
+    type = "add_fields"
+    
+    [transforms.add_host.fields]
+        host = "${HOSTNAME}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The entire `${HOSTNAME}` variable will be replaced, hence the requirement \
+of quotes around the definition.
+
+#### Escaping
+
+You can escape environment variable by preceding them with a `$` character. \
+For example `$${HOSTNAME}` will be treated _literally_ in the above \
+environment variable example.
+"""
+
+[[sections]]
+title = "Format"
+body = """\
+The Vector configuration file requires the [TOML][toml] format for it's \
+simplicity, explicitness, and relaxed white-space parsing. For more \
+information, please refer to the excellent [TOML documentation][toml].
+"""
+
+[[sections]]
+title = "Value Types"
+body = """\
+All TOML values types are supported. For convenience this includes:
+
+* [Strings](https://github.com/toml-lang/toml#string)
+* [Integers](https://github.com/toml-lang/toml#integer)
+* [Floats](https://github.com/toml-lang/toml#float)
+* [Booleans](https://github.com/toml-lang/toml#boolean)
+* [Offset Date-Times](https://github.com/toml-lang/toml#offset-date-time)
+* [Local Date-Times](https://github.com/toml-lang/toml#local-date-time)
+* [Local Dates](https://github.com/toml-lang/toml#local-date)
+* [Local Times](https://github.com/toml-lang/toml#local-time)
+* [Arrays](https://github.com/toml-lang/toml#array)
+* [Tables](https://github.com/toml-lang/toml#table)
+"""
+
+[[sections]]
+title = "Config File Location"
+body = """\
+The location of your Vector configuration file depends on your \
+[platform][platform] or [operating system][operating_system]. For most \
+Linux based systems the file can be found at `/etc/vector/vector.toml`.
 """
 
 # ------------------------------------------------------------------------------
@@ -2092,7 +2173,9 @@ lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 log_event = "/about/data-model.md#log"
 metric_event = "/about/data-model.md#metric"
 monitoring_logs = "/administration/moonitoring.md#logs"
+operating_system = "../../setup/installation/operating_systems/"
 performance = "/performance.md"
+platform = "../../setup/installation/platforms/"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
 roadmap = "https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open"
@@ -2100,6 +2183,7 @@ rust = "https://www.rust-lang.org/"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
 search_forum = "https://forum.vectorproject.io/search?expanded=true"
+sinks = "/usage/configuration/sinks"
 sources = "/usage/configuration/sources"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
@@ -2107,6 +2191,7 @@ standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
 starting = "/usage/administration/starting.md"
 strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
+toml = "https://github.com/toml-lang/toml"
 toml_array = "https://github.com/toml-lang/toml#user-content-array"
 toml_table = "https://github.com/toml-lang/toml#user-content-table"
 transforms = "/usage/configuration/transforms"

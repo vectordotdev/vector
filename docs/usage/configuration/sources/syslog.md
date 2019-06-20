@@ -58,29 +58,44 @@ The `syslog` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
 
   # The component type
-  type = "syslog" # must be: syslog
+  #
+  # * must be: syslog
+  type = "syslog"
 
   # OPTIONAL - General
 
-  # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or `udp`.
-  address = "0.0.0.0:9000" # no default
+  # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or
+  # `udp`.
+  #
+  # * no default
+  address = "0.0.0.0:9000"
 
   # The maximum bytes size of incoming messages before they are discarded.
-  max_length = 102400 # default, bytes
+  #
+  # * default: 102400
+  # * bytes
+  max_length = 102400
 
   # The input mode.
-  mode = "tcp" # no default, enum: tcp, udp, unix
-  mode = "tcp" # no default, enum: tcp, udp, unix
-  mode = "tcp" # no default, enum: tcp, udp, unix
+  #
+  # * no default
+  # * enum: tcp, udp, unix
+  mode = "tcp"
+  mode = "udp"
+  mode = "unix"
 
-  # The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.
-
-  path = "/path/to/socket" # no default
+  # The unix socket path. *This should be absolute path.* Only relevant when
+  # `mode` is `unix`.
+  #
+  # * no default
+  path = "/path/to/socket"
 
   # OPTIONAL - Context
 
   # The key name added to each event representing the current host.
-  host_key = "host" # default
+  #
+  # * default: host
+  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -88,7 +88,9 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # REQUIRED - General
 
   # The component type
-  type = "aws_kinesis_streams" # must be: aws_kinesis_streams
+  #
+  # * must be: aws_kinesis_streams
+  type = "aws_kinesis_streams"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -102,49 +104,89 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][log_event] events to [A
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000 # default, bytes
+  #
+  # * default: 1049000
+  # * bytes
+  batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1 # default, bytes
+  #
+  # * default: 1
+  # * bytes
+  batch_timeout = 1
 
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json" # no default, enum: json, text
-  encoding = "json" # no default, enum: json, text
+  #
+  # * no default
+  # * enum: json, text
+  encoding = "json"
+  encoding = "text"
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1 # default, seconds
+  #
+  # * default: 1
+  # * seconds
+  rate_limit_duration = 1
 
-  # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5 # default
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  #
+  # * default: 5
+  rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5 # default
+  #
+  # * default: 5
+  request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30 # default, seconds
+  #
+  # * default: 30
+  # * seconds
+  request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5 # default
+  #
+  # * default: 5
+  retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5 # default, seconds
+  #
+  # * default: 5
+  # * seconds
+  retry_backoff_secs = 5
 
   # OPTIONAL - Buffer
   [sinks.aws_kinesis_streams.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

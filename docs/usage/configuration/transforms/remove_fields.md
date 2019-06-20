@@ -48,7 +48,9 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
   # REQUIRED - General
 
   # The component type
-  type = "remove_fields" # must be: remove_fields
+  #
+  # * must be: remove_fields
+  type = "remove_fields"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -56,7 +58,9 @@ The `remove_fields` transforms accepts [`log`][log_event] and [`metric`][metric_
   # OPTIONAL - General
 
   # The field names to drop.
-  fields = ["field1", "field2"] # no default
+  #
+  # * no default
+  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

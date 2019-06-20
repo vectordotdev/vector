@@ -58,28 +58,46 @@ The `blackhole` sink streams [`log`][log_event] and [`metric`][metric_event] eve
   # REQUIRED - General
 
   # The component type
-  type = "blackhole" # must be: blackhole
+  #
+  # * must be: blackhole
+  type = "blackhole"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # The number of events that must be received in order to print a summary of activity.
+  # The number of events that must be received in order to print a summary of
+  # activity.
   print_amount = "1000"
 
   # OPTIONAL - Buffer
   [sinks.blackhole.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

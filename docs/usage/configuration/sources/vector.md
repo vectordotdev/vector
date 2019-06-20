@@ -50,15 +50,22 @@ The `vector` source continuously ingests [`log`][log_event] events through anoth
   # REQUIRED - General
 
   # The component type
-  type = "vector" # must be: vector
+  #
+  # * must be: vector
+  type = "vector"
 
   # OPTIONAL - General
 
   # The TCP address to bind to.
-  address = "0.0.0.0:9000" # no default
+  #
+  # * no default
+  address = "0.0.0.0:9000"
 
   # The timeout before a connection is forcefully closed during shutdown.
-  shutdown_timeout_secs = 30 # default, seconds
+  #
+  # * default: 30
+  # * seconds
+  shutdown_timeout_secs = 30
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

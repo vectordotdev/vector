@@ -44,7 +44,9 @@ The `statsd` source continuously ingests [`log`][log_event] events through the S
   # REQUIRED - General
 
   # The component type
-  type = "statsd" # must be: statsd
+  #
+  # * must be: statsd
+  type = "statsd"
 
   # UDP socket address to bind to.
   address = "127.0.0.1:8126"

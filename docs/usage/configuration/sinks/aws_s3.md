@@ -102,7 +102,9 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # REQUIRED - General
 
   # The component type
-  type = "aws_s3" # must be: aws_s3
+  #
+  # * must be: aws_s3
+  type = "aws_s3"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -116,68 +118,124 @@ The `aws_s3` sink batch and flushes [`log`][log_event] events to [AWS S3][aws_s3
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 10490000 # default, bytes
+  #
+  # * default: 10490000
+  # * bytes
+  batch_size = 10490000
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 300 # default, bytes
+  #
+  # * default: 300
+  # * bytes
+  batch_timeout = 300
 
   # OPTIONAL - Object Names
 
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.
-  filename_append_uuid = true # default
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  #
+  # * default: true
+  filename_append_uuid = true
 
-  # The format of the resulting object file name. `strftime` specifiers are supported. 
-  filename_time_format = "%s" # default
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  #
+  # * default: %s
+  filename_time_format = "%s"
 
-  # A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". `strftime` specifiers are supported. 
-  key_prefix = "date=%F/" # default
-  key_prefix = "date=%F/" # default
-  key_prefix = "date=%F/" # default
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  #
+  # * default: date=%F
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
 
   # OPTIONAL - Requests
 
   # The compression type to use before writing data.
-  compression = "gzip" # no default, must be: gzip
+  #
+  # * no default
+  # * must be: gzip
+  compression = "gzip"
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # no default, enum: ndjson, text
-  encoding = "ndjson" # no default, enum: ndjson, text
+  #
+  # * no default
+  # * enum: ndjson, text
+  encoding = "ndjson"
+  encoding = "text"
 
-  # Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth.
-  gzip = false # default
+  # Whether to Gzip the content before writing or not. Please note, enabling this
+  # has a slight performance cost but significantly reduces bandwidth.
+  #
+  # * default: false
+  gzip = false
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1 # default, seconds
+  #
+  # * default: 1
+  # * seconds
+  rate_limit_duration = 1
 
-  # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5 # default
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  #
+  # * default: 5
+  rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5 # default
+  #
+  # * default: 5
+  request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 30 # default, seconds
+  #
+  # * default: 30
+  # * seconds
+  request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5 # default
+  #
+  # * default: 5
+  retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5 # default, seconds
+  #
+  # * default: 5
+  # * seconds
+  retry_backoff_secs = 5
 
   # OPTIONAL - Buffer
   [sinks.aws_s3.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

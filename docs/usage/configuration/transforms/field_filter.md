@@ -52,7 +52,9 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
   # REQUIRED - General
 
   # The component type
-  type = "field_filter" # must be: field_filter
+  #
+  # * must be: field_filter
+  type = "field_filter"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -60,10 +62,15 @@ The `field_filter` transforms accepts [`log`][log_event] and [`metric`][metric_e
   # OPTIONAL - General
 
   # The target field to compare against the `value`.
-  field = "file" # no default
+  #
+  # * no default
+  field = "file"
 
-  # If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.
-  value = "/var/log/nginx.log" # no default
+  # If the value of the specified `field` matches this value then the event will
+  # be permitted, otherwise it is dropped.
+  #
+  # * no default
+  value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -43,7 +43,14 @@ rescue LoadError
   abort "`unindent` library not found, please install it via `sudo gem install unindent`"
 end
 
+begin
+  require "word_wrap"
+rescue LoadError
+  abort "`word_wrap` library not found, please install it via `sudo gem install word_wrap`"
+end
+
 require_relative "config_schema/schema"
+require_relative "generators/config_specification_generator"
 require_relative "generators/global_generator"
 require_relative "generators/guarantees_generator"
 require_relative "generators/link_generator"
@@ -59,7 +66,7 @@ require_relative "generators/transforms_generator"
 # Setup
 #
 
-SCHEMA_FILE_PATH = "dist/config/schema.toml"
+SCHEMA_FILE_PATH = "scripts/schema.toml"
 schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 
 #
@@ -161,3 +168,12 @@ schema.sinks.to_h.each do |_sink_name, sink|
   content = sink_generator.generate
   write("docs/usage/configuration/sinks/#{sink.name}.md", content, schema.links)
 end
+
+#
+# Config specification
+#
+
+sinks_generator = ConfigSpecificationGenerator.new(schema)
+content = sinks_generator.generate
+# We purposefully do not use #write here since we do not want to parse links.
+File.write("dist/config/vector.spec.toml", content)

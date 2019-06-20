@@ -62,7 +62,9 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   # REQUIRED - General
 
   # The component type
-  type = "vector" # must be: vector
+  #
+  # * must be: vector
+  type = "vector"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -70,22 +72,39 @@ The `vector` sink streams [`log`][log_event] events to another downstream Vector
   # OPTIONAL - General
 
   # The downstream Vector address.
-  address = "92.12.333.224:5000" # no default
+  #
+  # * no default
+  address = "92.12.333.224:5000"
 
   # OPTIONAL - Buffer
   [sinks.vector.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

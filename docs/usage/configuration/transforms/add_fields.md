@@ -50,7 +50,9 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
   # REQUIRED - General
 
   # The component type
-  type = "add_fields" # must be: add_fields
+  #
+  # * must be: add_fields
+  type = "add_fields"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -58,7 +60,10 @@ The `add_fields` transforms accepts [`log`][log_event] events and allows you to 
   # OPTIONAL - Fields
   [transforms.add_fields.fields]
 
-    # A key/value pair representing the new field to be added. Accepts all supported types. Use `.` for adding nested fields.
+    # A key/value pair representing the new field to be added. Accepts all
+    # supported types. Use `.` for adding nested fields.
+    #
+    # * no default
     new_field = "new field value"
 ```
 {% endcode-tabs-item %}

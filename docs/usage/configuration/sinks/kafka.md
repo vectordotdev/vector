@@ -68,12 +68,16 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # REQUIRED - General
 
   # The component type
-  type = "kafka" # must be: kafka
+  #
+  # * must be: kafka
+  type = "kafka"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The Kafka topic name to write events to.
@@ -82,26 +86,48 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
   # OPTIONAL - General
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "json" # no default, enum: json, text
-  encoding = "json" # no default, enum: json, text
+  #
+  # * no default
+  # * enum: json, text
+  encoding = "json"
+  encoding = "text"
 
-  # The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.
-  key_field = "partition_key" # no default
+  # The field name to use for the topic key. If unspecified, the key will be
+  # randomly generated. If the field does not exist on the event, a blank value
+  # will be used.
+  #
+  # * no default
+  key_field = "partition_key"
 
   # OPTIONAL - Buffer
   [sinks.kafka.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

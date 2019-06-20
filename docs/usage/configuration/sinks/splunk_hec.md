@@ -90,7 +90,9 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # REQUIRED - General
 
   # The component type
-  type = "splunk_hec" # must be: splunk_hec
+  #
+  # * must be: splunk_hec
+  type = "splunk_hec"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -98,57 +100,101 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
   # OPTIONAL - General
 
   # Your Splunk HEC host.
-  host = "my-splunk-host.com" # no default
+  #
+  # * no default
+  host = "my-splunk-host.com"
 
   # Your Splunk HEC token.
-  token = "A94A8FE5CCB19BA61C4C08" # no default
+  #
+  # * no default
+  token = "A94A8FE5CCB19BA61C4C08"
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 1049000 # default, bytes
+  #
+  # * default: 1049000
+  # * bytes
+  batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1 # default, bytes
+  #
+  # * default: 1
+  # * bytes
+  batch_timeout = 1
 
   # OPTIONAL - Requests
 
   # The encoding format used to serialize the events before flushing.
-  encoding = "ndjson" # no default, enum: ndjson, text
-  encoding = "ndjson" # no default, enum: ndjson, text
+  #
+  # * no default
+  # * enum: ndjson, text
+  encoding = "ndjson"
+  encoding = "text"
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1 # default, seconds
+  #
+  # * default: 1
+  # * seconds
+  rate_limit_duration = 1
 
-  # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 10 # default
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  #
+  # * default: 10
+  rate_limit_num = 10
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 10 # default
+  #
+  # * default: 10
+  request_in_flight_limit = 10
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 60 # default, seconds
+  #
+  # * default: 60
+  # * seconds
+  request_timeout_secs = 60
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5 # default
+  #
+  # * default: 5
+  retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5 # default, seconds
+  #
+  # * default: 5
+  # * seconds
+  retry_backoff_secs = 5
 
   # OPTIONAL - Buffer
   [sinks.splunk_hec.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

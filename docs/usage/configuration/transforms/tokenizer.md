@@ -52,7 +52,9 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
   # REQUIRED - General
 
   # The component type
-  type = "tokenizer" # must be: tokenizer
+  #
+  # * must be: tokenizer
+  type = "tokenizer"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -60,13 +62,19 @@ The `tokenizer` transforms accepts [`log`][log_event] events and allows you to t
   # OPTIONAL - General
 
   # If `true` the `field` will be dropped after parsing.
-  drop_field = true # default
+  #
+  # * default: true
+  drop_field = true
 
   # The field to tokenize.
-  field = "message" # default
+  #
+  # * default: message
+  field = "message"
 
   # The field names assigned to the resulting tokens, in order.
-  field_names = ["timestamp", "level", "message"] # no default
+  #
+  # * no default
+  field_names = ["timestamp", "level", "message"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

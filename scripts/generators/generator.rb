@@ -1,3 +1,5 @@
+require 'word_wrap'
+
 class Generator
   attr_reader :guides
 
@@ -179,8 +181,17 @@ class Generator
       end
     end
 
-    def remove_markdown_links(regex)
-      regex.
+    def editorify(content)
+      content = remove_markdown_links(content)
+      no_wider_than(content, 78).strip.gsub("\n", "\n# ")
+    end
+
+    def no_wider_than(content, width = 80)
+      WordWrap.ww(content, width)
+    end
+
+    def remove_markdown_links(content)
+      content.
         gsub(/\[([^\]]+)\]\(([^)]+)\)/, '\1').
         gsub(/\[([^\]]+)\]\[([^)]+)\]/, '\1')
     end

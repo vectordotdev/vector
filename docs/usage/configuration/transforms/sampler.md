@@ -52,18 +52,26 @@ The `sampler` transforms accepts [`log`][log_event] events and allows you to sam
   # REQUIRED - General
 
   # The component type
-  type = "sampler" # must be: sampler
+  #
+  # * must be: sampler
+  type = "sampler"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
 
-  # A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.
-  pass_list = ["[error]", "field2"] # no default
+  # A list of regular expression patterns to exclude events from sampling. If an
+  # event's `"message"` key matches _any_ of these patterns it will _not_ be
+  # sampled.
+  #
+  # * no default
+  pass_list = ["[error]", "field2"]
 
   # The maximum number of events allowed per second.
-  rate = ["field1", "field2"] # no default
+  #
+  # * no default
+  rate = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

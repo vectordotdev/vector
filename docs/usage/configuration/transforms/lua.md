@@ -62,17 +62,24 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   # REQUIRED - General
 
   # The component type
-  type = "lua" # must be: lua
+  #
+  # * must be: lua
+  type = "lua"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
 
-  # A list of directories search when loading a Lua file via the `require` function.
-  search_dirs = true # no default
+  # A list of directories search when loading a Lua file via the `require`
+  # function.
+  #
+  # * no default
+  search_dirs = true
 
   # The inline Lua source to evaluate.
+  #
+  # * no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 

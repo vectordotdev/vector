@@ -38,10 +38,10 @@ class Option
     end
 
     if @examples.empty?
-      if !@default.nil?
-        @examples = [@default]
-      elsif !@enum.nil?
+      if !@enum.nil?
         @examples = @enum
+      elsif !@default.nil?
+        @examples = [@default]
       end
     end
 

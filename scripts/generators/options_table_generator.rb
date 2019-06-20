@@ -86,7 +86,7 @@ class OptionsTableGenerator < Generator
               tags << "`unit: #{option.unit}`"
             end
 
-            description = option.description
+            description = option.description.clone
 
             section_links =
               option.get_relevant_sections(sections).collect do |section|

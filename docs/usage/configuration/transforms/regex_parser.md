@@ -54,7 +54,9 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
   # REQUIRED - General
 
   # The component type
-  type = "regex_parser" # must be: regex_parser
+  #
+  # * must be: regex_parser
+  type = "regex_parser"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -65,13 +67,19 @@ The `regex_parser` transforms accepts [`log`][log_event] events and allows you t
   # OPTIONAL - General
 
   # If `true`, events that fail to properly parse will be dropped.
-  drop_failed = false # default
+  #
+  # * default: false
+  drop_failed = false
 
   # If the `field` should be dropped (removed) after parsing.
-  drop_field = true # default
+  #
+  # * default: true
+  drop_field = true
 
   # The field to parse.
-  field = "message" # default
+  #
+  # * default: message
+  field = "message"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

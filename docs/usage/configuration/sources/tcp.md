@@ -56,23 +56,35 @@ The `tcp` source continuously ingests [`log`][log_event] events through the TCP 
   # REQUIRED - General
 
   # The component type
-  type = "tcp" # must be: tcp
+  #
+  # * must be: tcp
+  type = "tcp"
 
   # OPTIONAL - General
 
   # The address to bind the socket to.
-  address = "0.0.0.0:9000" # no default
+  #
+  # * no default
+  address = "0.0.0.0:9000"
 
   # The maximum bytes size of incoming messages before they are discarded.
-  max_length = 102400 # default, bytes
+  #
+  # * default: 102400
+  # * bytes
+  max_length = 102400
 
   # The timeout before a connection is forcefully closed during shutdown.
-  shutdown_timeout_secs = 30 # default, seconds
+  #
+  # * default: 30
+  # * seconds
+  shutdown_timeout_secs = 30
 
   # OPTIONAL - Context
 
   # The key name added to each event representing the current host.
-  host_key = "host" # default
+  #
+  # * default: host
+  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

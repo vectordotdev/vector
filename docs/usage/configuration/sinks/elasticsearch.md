@@ -92,7 +92,9 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
   # REQUIRED - General
 
   # The component type
-  type = "elasticsearch" # must be: elasticsearch
+  #
+  # * must be: elasticsearch
+  type = "elasticsearch"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -102,54 +104,97 @@ The `elasticsearch` sink batch and flushes [`log`][log_event] events to [Elastic
 
   # OPTIONAL - General
 
-  # The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
-  doc_type = "_doc" # default
+  # The `doc_type` for your index data. This is only relevant for Elasticsearch
+  # <= 6.X. If you are using >= 7.0 you do not need to set this option since
+  # Elasticsearch has removed it.
+  #
+  # * default: _doc
+  doc_type = "_doc"
 
   # Index name to write events to. `strftime` specifiers are supported.
-  index = "vector-%F" # default
+  #
+  # * default: vector-%F
+  index = "vector-%F"
 
   # OPTIONAL - Batching
 
   # The maximum size of a batch before it is flushed.
-  batch_size = 10490000 # default, bytes
+  #
+  # * default: 10490000
+  # * bytes
+  batch_size = 10490000
 
   # The maximum age of a batch before it is flushed.
-  batch_timeout = 1 # default, bytes
+  #
+  # * default: 1
+  # * bytes
+  batch_timeout = 1
 
   # OPTIONAL - Requests
 
   # The window used for the `request_rate_limit_num` option
-  rate_limit_duration = 1 # default, seconds
+  #
+  # * default: 1
+  # * seconds
+  rate_limit_duration = 1
 
-  # The maximum number of requests allowed within the `rate_limit_duration` window.
-  rate_limit_num = 5 # default
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  #
+  # * default: 5
+  rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  request_in_flight_limit = 5 # default
+  #
+  # * default: 5
+  request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  request_timeout_secs = 60 # default, seconds
+  #
+  # * default: 60
+  # * seconds
+  request_timeout_secs = 60
 
   # The maximum number of retries to make for failed requests.
-  retry_attempts = 5 # default
+  #
+  # * default: 5
+  retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  retry_backoff_secs = 5 # default, seconds
+  #
+  # * default: 5
+  # * seconds
+  retry_backoff_secs = 5
 
   # OPTIONAL - Buffer
   [sinks.elasticsearch.buffer]
 
-    # The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
-    type = "memory" # default, enum: memory, disk
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    #
+    # * default: memory
+    # * enum: memory, disk
+    type = "memory"
+    type = "disk"
 
     # The behavior when the buffer becomes full.
-    when_full = "block" # default, enum: block, drop_newest
+    #
+    # * default: block
+    # * enum: block, drop_newest
+    when_full = "block"
+    when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.
-    max_size = 104900000 # no default
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    #
+    # * no default
+    max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed in the buffer.
-    num_items = 500 # default
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    #
+    # * default: 500
+    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -52,7 +52,9 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   # REQUIRED - General
 
   # The component type
-  type = "json_parser" # must be: json_parser
+  #
+  # * must be: json_parser
+  type = "json_parser"
 
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
@@ -60,13 +62,20 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   # OPTIONAL - General
 
   # If `true` will drop the `field` after parsing.
-  drop_field = true # default
+  #
+  # * default: true
+  drop_field = true
 
-  # If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through.
-  drop_invalid = true # no default
+  # If `true` events with invalid JSON will be dropped, otherwise the event will
+  # be kept and passed through.
+  #
+  # * no default
+  drop_invalid = true
 
   # The field decode as JSON. Must be a `string` value.
-  field = "message" # default
+  #
+  # * default: message
+  field = "message"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
