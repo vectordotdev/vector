@@ -27,6 +27,8 @@ get data from A to B.
 
 ---
 
+## [Documentation](https://docs.vectorproject.io/)
+
 #### About
 
 * [**Use cases**][use_cases]
