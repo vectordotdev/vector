@@ -23,6 +23,10 @@ pub struct CloudwatchLogsSvc {
     config: CloudwatchLogsSinkConfig,
 }
 
+pub struct CloudwatchLogsPartitionSvc {
+    config: CloudwatchLogsSinkConfig,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct CloudwatchLogsSinkConfig {
     pub stream_name: String,
