@@ -3,11 +3,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use std::str::FromStr;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
-/// convert from a plain (`String`) `ValueKind` into another type. Every
+/// convert from a plain (`Bytes`) `ValueKind` into another type. Every
 /// variant of `ValueKind` is represented here.
 #[derive(Clone)]
 pub enum Conversion {
-    String,
+    Bytes,
     Integer,
     Float,
     Boolean,
@@ -21,7 +21,7 @@ impl FromStr for Conversion {
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
-    ///  * `"string"` => As-is (null)
+    ///  * `"asis"`, `"bytes"`, or `"string"` => As-is (no conversion)
     ///  * `"int"` or `"integer"` => Signed integer
     ///  * `"float"` => Floating point number
     ///  * `"bool"` or `"boolean"` => Boolean
@@ -31,7 +31,7 @@ impl FromStr for Conversion {
     /// Timestamp parsing does not yet support time zones.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "string" => Ok(Conversion::String),
+            "asis" | "bytes" | "string" => Ok(Conversion::Bytes),
             "integer" | "int" => Ok(Conversion::Integer),
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
@@ -60,7 +60,7 @@ impl Conversion {
     pub fn convert(&self, value: ValueKind) -> Result<ValueKind, String> {
         let value = value.into_bytes();
         match self {
-            Conversion::String => Ok(value.into()),
+            Conversion::Bytes => Ok(value.into()),
             Conversion::Integer => String::from_utf8_lossy(&value)
                 .parse::<i64>()
                 .map_err(|err| format!("Invalid integer {:?}: {}", value, err))
