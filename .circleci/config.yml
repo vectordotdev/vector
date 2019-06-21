@@ -49,8 +49,6 @@ export-version: &export-version
     command: |
       export VERSION=$(./.circleci/version.sh)
       echo 'export VERSION="$VERSION"' >> $BASH_ENV
-      echo $BASH_ENV
-      source $BASH_ENV
 
 install-cross: &install-cross
   run:
@@ -333,6 +331,7 @@ jobs:
       - run:
           name: Build .rpm package
           command: |
+            source $BASH_ENV
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
