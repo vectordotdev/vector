@@ -327,7 +327,7 @@ jobs:
       #- *restore-cargo-cache
       - checkout
       - *export-version
-      - *build
+      - *build-release
       - run:
           name: Build .rpm package
           command: |
