@@ -21,11 +21,7 @@ pub struct RegexParserConfig {
 #[typetag::serde(name = "regex_parser")]
 impl crate::topology::config::TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field = if let Some(field) = &self.field {
-            field
-        } else {
-            &event::MESSAGE
-        };
+        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let types = self
             .types

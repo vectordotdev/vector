@@ -23,11 +23,7 @@ pub struct TokenizerConfig {
 #[typetag::serde(name = "tokenizer")]
 impl crate::topology::config::TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field = if let Some(field) = &self.field {
-            field
-        } else {
-            &event::MESSAGE
-        };
+        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);

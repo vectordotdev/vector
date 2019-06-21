@@ -18,11 +18,7 @@ pub struct GrokParserConfig {
 #[typetag::serde(name = "grok_parser")]
 impl crate::topology::config::TransformConfig for GrokParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field = if let Some(field) = &self.field {
-            field
-        } else {
-            &event::MESSAGE
-        };
+        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let mut grok = grok::Grok::with_patterns();
 
