@@ -32,31 +32,23 @@ save-cargo-cache: &save-cargo-cache
     paths:
       - "~/.cargo"
 
-restore-build-cache: &restore-build-cache
-  restore_cache:
-    name: Restore target cache
-    keys:
-      - vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-      - vector-build-cache-{{ arch }}-{{ .Branch }}
-      - vector-build-cache-{{ arch }}
-
-save-build-cache: &save-build-cache
-  save_cache:
-    name: Save target cache
-    key: vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-    paths:
-      - "target"
-
 #
 # Run macros
 #
 
-cross-compile: &cross-compile
+build-release: &build-release
   run:
-    name: Cross Compile
+    name: Build release
     command: |
       export PATH="$HOME/.cargo/bin:$PATH"
-      ./.circleci/release.sh
+      ./.circleci/build_release.sh
+
+export-version: &export-version
+  run:
+    name: Export version
+    command: |
+      export VERSION=$(./.circleci/version.sh)
+      echo 'export VERSION=$VERSION' >> $BASH_ENV
 
 install-cross: &install-cross
   run:
@@ -109,7 +101,6 @@ release-job-defaults: &release-job-defaults
   steps:
     - *restore-git-cache
     - *restore-cargo-cache
-    - *restore-build-cache
     - *install-rust
     - run:
         name: Install Cross
@@ -124,10 +115,10 @@ release-job-defaults: &release-job-defaults
           pip install --upgrade awscli
     - checkout
     - run:
-        name: Cross Compile
+        name: Build release
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          ./.circleci/release.sh
+          ./.circleci/build_release.sh
 
 #
 # Main document
@@ -204,7 +195,6 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      # - *restore-build-cache
       - checkout
       - *install-make
       - run:
@@ -215,20 +205,19 @@ jobs:
           path: ./test-results
       - *save-git-cache
       - *save-cargo-cache
-      # - *save-build-cache
 
   compile-armv7-unknown-linux-gnueabihf:
     machine: true
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *export-version
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "armv7-unknown-linux-gnueabihf"
@@ -238,13 +227,13 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *export-version
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-freebsd"
@@ -254,11 +243,11 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *export-version
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
@@ -268,13 +257,13 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *export-version
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-netbsd"
@@ -288,14 +277,14 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-rust
       - checkout
       - run:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            ./.circleci/release.sh
+            export VERSION=$(./.circleci/version.sh)
+            ./.circleci/build_release.sh
       - persist_to_workspace:
           root: dist
           paths:
@@ -334,15 +323,8 @@ jobs:
     steps:
       - *restore-git-cache
       #- *restore-cargo-cache
-      #- *restore-build-cache
       - checkout
-      - run:
-          name: Set VERSION
-          command: |
-            export VERSION=$(./.circleci/version.sh)
-            export VERSION=$(echo $VERSION | sed 's/^v//g')
-            export VERSION=$(echo $VERSION | sed 's/-/\./g')
-            echo 'export VERSION=$VERSION' >> $BASH_ENV
+      - *export-version
       - *build
       - run:
           name: Build .rpm package
