@@ -1,13 +1,14 @@
 %define name vector
+%define cleaned_version %{getenv:CLEANED_VERSION}
 %define release 1
 %define url https://vectorproject.io
 %define version %{getenv:VERSION}
 %define source %{name}-%{version}.tar.gz
-%define _buildroot %{name}-%{version}
+%define _buildroot %{name}-%{cleaned_version}
 
 Name: %{name}
 Summary: A High-Performance Logs, Metrics, and Events Routing Layer
-Version: %{version}
+Version: %{cleaned_version}
 Release: %{release}
 License: ASL 2.0
 Group: Applications/System
@@ -19,7 +20,7 @@ BuildRoot: %{_buildroot}
 %{summary}
 
 %prep
-%setup -q -n %{name}-%{version}
+%setup -q -n %{name}-%{cleaned_version}
 
 %install
 rm -rf %{buildroot}

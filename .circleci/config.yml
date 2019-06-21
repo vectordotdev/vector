@@ -320,8 +320,9 @@ jobs:
           name: Build .rpm package
           command: |
             export VERSION=$(./.circleci/version.sh)
-            VERSION=$(echo $VERSION | sed 's/^v//g')
-            VERSION=$(echo $VERSION | sed 's/-/\./g')
+            export CLEANED_VERSION=$VERSION
+            CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/^v//g')
+            CLEANED_VERSION=$(echo $VERSION | sed 's/-/\./g')
             mkdir -p /root/rpmbuild/SOURCES
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
