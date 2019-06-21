@@ -266,22 +266,14 @@ mod test {
                             }
                             Ok(0) => {
                                 attempts -= 1;
-                                read_index = 0;
                                 continue;
                             }
                             Ok(_) => {
                                 sut_reads += 1;
-                                loop {
-                                    let psv = fwfiles[read_index].read_line();
-                                    if psv.is_none() {
-                                        if read_index == 0 {
-                                            break;
-                                        }
-                                        read_index = 0;
-                                    } else {
-                                        model_reads += 1;
-                                        break;
-                                    }
+                                let psv = fwfiles[read_index].read_line();
+                                if psv.is_some() {
+                                    model_reads += 1;
+                                    break;
                                 }
                                 break;
                             }
@@ -349,21 +341,10 @@ mod test {
                             Ok(0) => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
-                                read_index = 0;
                                 continue;
                             }
                             Ok(sz) => {
-                                let exp;
-                                loop {
-                                    let psv = fwfiles[read_index].read_line();
-                                    if psv.is_none() {
-                                        assert!(read_index != 0);
-                                        read_index = 0;
-                                    } else {
-                                        exp = psv.unwrap();
-                                        break;
-                                    }
-                                }
+                                let exp = fwfiles[read_index].read_line().unwrap();
                                 assert_eq!(exp.into_bytes(), buf);
                                 assert_eq!(sz, buf.len() + 1);
                                 buf.clear();

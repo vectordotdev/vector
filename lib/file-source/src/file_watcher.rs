@@ -1,7 +1,5 @@
 use std::fs;
-use std::io;
-use std::io::BufRead;
-use std::io::Seek;
+use std::io::{self, BufRead, Seek};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time;
@@ -15,25 +13,11 @@ use std::time;
 /// longer exist.
 pub struct FileWatcher {
     pub path: PathBuf,
+    findable: bool,
     reader: Option<io::BufReader<fs::File>>,
-    file_id: Option<(u64, u64)>,
     previous_size: u64,
-    reopen: bool,
-}
-
-type Devno = u64;
-type Ino = u64;
-type FileId = (Devno, Ino);
-
-#[inline]
-fn file_id(path: &PathBuf) -> Option<FileId> {
-    if let Ok(metadata) = fs::metadata(path) {
-        let dev = metadata.dev();
-        let ino = metadata.ino();
-        Some((dev, ino))
-    } else {
-        None
-    }
+    devno: u64,
+    inode: u64,
 }
 
 impl FileWatcher {
@@ -50,8 +34,6 @@ impl FileWatcher {
         match fs::File::open(&path) {
             Ok(f) => {
                 let metadata = f.metadata()?;
-                let dev = metadata.dev();
-                let ino = metadata.ino();
                 let mut rdr = io::BufReader::new(f);
 
                 let too_old = if let (Some(ignore_before), Ok(mtime)) =
@@ -65,12 +47,14 @@ impl FileWatcher {
                 if !start_at_beginning || too_old {
                     assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());
                 }
+
                 Ok(FileWatcher {
                     path: path.clone(),
+                    findable: true,
                     reader: Some(rdr),
-                    file_id: Some((dev, ino)),
                     previous_size: 0,
-                    reopen: false,
+                    devno: metadata.dev(),
+                    inode: metadata.ino(),
                 })
             }
             Err(e) => match e.kind() {
@@ -78,10 +62,11 @@ impl FileWatcher {
                     let fw = {
                         FileWatcher {
                             path: path.clone(),
+                            findable: true,
                             reader: None,
-                            file_id: None,
                             previous_size: 0,
-                            reopen: false,
+                            devno: 0,
+                            inode: 0,
                         }
                     };
                     Ok(fw)
@@ -91,29 +76,40 @@ impl FileWatcher {
         }
     }
 
-    fn open_at_start(&mut self) {
-        if let Ok(f) = fs::File::open(&self.path) {
-            let metadata = f.metadata().unwrap(); // we _must_ be able to read the metadata
-            let dev = metadata.dev();
-            let ino = metadata.ino();
-            self.file_id = Some((dev, ino));
-            self.previous_size = metadata.size();
-            self.reader = Some(io::BufReader::new(f));
-            if self.file_id.is_none() {
-                // It's possible that between opening the file and reading its
-                // ID the file will have been deleted. This is that branch.
-                self.file_id = None;
-                self.reader = None;
+    pub fn update_path(&mut self, path: &PathBuf) {
+        if let Ok(metadata) = fs::metadata(path) {
+            self.path = path.clone();
+            let (devno, inode) = (metadata.dev(), metadata.ino());
+            if (devno, inode) != (self.devno, self.inode) {
+                if let Ok(f) = fs::File::open(&path) {
+                    let ref mut old_reader = self.reader.as_mut().unwrap();
+                    if let Ok(position) = old_reader.seek(io::SeekFrom::Current(0)) {
+                        let mut new_reader = io::BufReader::new(f);
+                        if new_reader.seek(io::SeekFrom::Start(position)).is_ok() {
+                            self.reader = Some(new_reader);
+                            self.devno = devno;
+                            self.inode = inode;
+                        }
+                    }
+                }
             }
-        } else {
-            self.reader = None;
-            self.file_id = None;
         }
-        self.reopen = false;
+    }
+
+    pub fn set_file_findable(&mut self, f: bool) {
+        self.findable = f;
+    }
+
+    pub fn file_findable(&self) -> bool {
+        self.findable
+    }
+
+    pub fn set_dead(&mut self) {
+        self.reader = None;
     }
 
     pub fn dead(&self) -> bool {
-        self.reader.is_none() && self.file_id.is_none()
+        self.reader.is_none()
     }
 
     /// Read a single line from the underlying file
@@ -122,9 +118,6 @@ impl FileWatcher {
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler at need, transparently to the caller.
     pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
-        if self.reopen {
-            self.open_at_start();
-        }
         if let Some(ref mut reader) = self.reader {
             // Every read we detect the current_size of the file and compare
             // against the previous_size. There are three cases to consider:
@@ -150,29 +143,30 @@ impl FileWatcher {
             // write and we WILL return a partial write of length
             // absolute_write_idx - previous_size.
             let current_size = reader.get_ref().metadata().unwrap().size();
-            if self.previous_size > current_size {
-                assert!(reader.seek(io::SeekFrom::Start(0)).is_ok());
-            }
-            self.previous_size = current_size;
-            // match here on error, if metadata doesn't match up open_at_start
-            // new reader and let it catch on the next looparound
-            match read_until_with_max_size(reader, b'\n', &mut buffer, max_size) {
-                Ok(0) => {
-                    if file_id(&self.path) != self.file_id {
-                        self.reopen = true;
+            if self.previous_size <= current_size {
+                self.previous_size = current_size;
+                // match here on error, if metadata doesn't match up open_at_start
+                // new reader and let it catch on the next looparound
+                match read_until_with_max_size(reader, b'\n', &mut buffer, max_size) {
+                    Ok(0) => {
+                        if !self.file_findable() {
+                            self.set_dead();
+                        }
+                        Ok(0)
                     }
-                    Ok(0)
-                }
-                Ok(sz) => Ok(sz),
-                Err(e) => {
-                    if let io::ErrorKind::NotFound = e.kind() {
-                        self.reopen = true;
+                    Ok(sz) => Ok(sz),
+                    Err(e) => {
+                        if let io::ErrorKind::NotFound = e.kind() {
+                            self.set_dead();
+                        }
+                        Err(e)
                     }
-                    Err(e)
                 }
+            } else {
+                self.set_dead();
+                Ok(0)
             }
         } else {
-            self.open_at_start();
             Ok(0)
         }
     }

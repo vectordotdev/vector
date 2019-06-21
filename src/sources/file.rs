@@ -18,6 +18,8 @@ pub struct FileConfig {
     pub ignore_older: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
+    pub fingerprint_bytes: usize,
+    pub ignored_header_bytes: usize,
     pub host_key: Option<String>,
 }
 
@@ -34,6 +36,8 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
+            fingerprint_bytes: 256,
+            ignored_header_bytes: 0,
             host_key: None,
         }
     }
@@ -61,6 +65,8 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
+        fingerprint_bytes: config.fingerprint_bytes,
+        ignored_header_bytes: config.ignored_header_bytes,
     };
 
     let file_key = config.file_key.clone();
@@ -140,6 +146,13 @@ mod tests {
     use stream_cancel::Tripwire;
     use tempfile::tempdir;
 
+    fn test_default_file_config() -> file::FileConfig {
+        file::FileConfig {
+            fingerprint_bytes: 8,
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn file_create_event() {
         let line = Bytes::from("hello world");
@@ -164,7 +177,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..Default::default()
+            ..test_default_file_config()
         };
 
         let source = file::file_source(&config, tx);
@@ -223,7 +236,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..Default::default()
+            ..test_default_file_config()
         };
         let source = file::file_source(&config, tx);
 
@@ -289,7 +302,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..Default::default()
+            ..test_default_file_config()
         };
         let source = file::file_source(&config, tx);
 
@@ -357,7 +370,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
             exclude: vec![dir.path().join("a.*.txt")],
-            ..Default::default()
+            ..test_default_file_config()
         };
 
         let source = file::file_source(&config, tx);
@@ -417,7 +430,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
@@ -429,7 +442,7 @@ mod tests {
 
             sleep();
 
-            writeln!(&mut file, "hello").unwrap();
+            writeln!(&mut file, "hello there").unwrap();
 
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
@@ -445,7 +458,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: Some("source".to_string()),
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
@@ -457,7 +470,7 @@ mod tests {
 
             sleep();
 
-            writeln!(&mut file, "hello").unwrap();
+            writeln!(&mut file, "hello there").unwrap();
 
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
@@ -473,7 +486,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: None,
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
@@ -485,7 +498,7 @@ mod tests {
 
             sleep();
 
-            writeln!(&mut file, "hello").unwrap();
+            writeln!(&mut file, "hello there").unwrap();
 
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
@@ -514,7 +527,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
@@ -547,7 +560,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 start_at_beginning: true,
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
@@ -585,20 +598,20 @@ mod tests {
                 include: vec![dir.path().join("*")],
                 start_at_beginning: true,
                 ignore_older: Some(1000),
-                ..Default::default()
+                ..test_default_file_config()
             };
 
             let source = file::file_source(&config, tx);
 
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
-            let after_path = dir.path().join("after");
-            let mut after_file = File::create(&after_path).unwrap();
             let before_path = dir.path().join("before");
             let mut before_file = File::create(&before_path).unwrap();
+            let after_path = dir.path().join("after");
+            let mut after_file = File::create(&after_path).unwrap();
 
-            writeln!(&mut after_file, "first line").unwrap();
-            writeln!(&mut before_file, "first line").unwrap();
+            writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
+            writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
 
             {
                 // Set the modified times
@@ -630,8 +643,8 @@ mod tests {
             }
 
             sleep();
-            writeln!(&mut after_file, "second line").unwrap();
             writeln!(&mut before_file, "second line").unwrap();
+            writeln!(&mut after_file, "_second line").unwrap();
 
             sleep();
 
@@ -656,7 +669,7 @@ mod tests {
                 .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(before_lines, vec!["second line"]);
-            assert_eq!(after_lines, vec!["first line", "second line"]);
+            assert_eq!(after_lines, vec!["_first line", "_second line"]);
         }
     }
 
@@ -669,7 +682,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             max_line_bytes: 10,
-            ..Default::default()
+            ..test_default_file_config()
         };
 
         let source = file::file_source(&config, tx);
