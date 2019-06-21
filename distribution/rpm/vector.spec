@@ -4,7 +4,7 @@
 %define url https://vectorproject.io
 %define version %{getenv:VERSION}
 %define source %{name}-%{version}.tar.gz
-%define _buildroot %{name}-%{cleaned_version}
+%define _buildroot %{name}-%{version}
 
 Name: %{name}
 Summary: A High-Performance Logs, Metrics, and Events Routing Layer
@@ -20,7 +20,7 @@ BuildRoot: %{_buildroot}
 %{summary}
 
 %prep
-%setup -q -n %{name}-%{cleaned_version}
+%setup -q -n %{name}-%{version}
 
 %install
 rm -rf %{buildroot}
