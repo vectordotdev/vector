@@ -27,7 +27,7 @@ impl FileWatcher {
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by cernan.
     pub fn new(
-        path: &PathBuf,
+        path: PathBuf,
         start_at_beginning: bool,
         ignore_before: Option<time::SystemTime>,
     ) -> io::Result<FileWatcher> {
@@ -49,7 +49,7 @@ impl FileWatcher {
                 }
 
                 Ok(FileWatcher {
-                    path: path.clone(),
+                    path: path,
                     findable: true,
                     reader: Some(rdr),
                     previous_size: 0,
@@ -61,7 +61,7 @@ impl FileWatcher {
                 io::ErrorKind::NotFound => {
                     let fw = {
                         FileWatcher {
-                            path: path.clone(),
+                            path: path,
                             findable: true,
                             reader: None,
                             previous_size: 0,
@@ -76,24 +76,22 @@ impl FileWatcher {
         }
     }
 
-    pub fn update_path(&mut self, path: &PathBuf) {
-        if let Ok(metadata) = fs::metadata(path) {
-            self.path = path.clone();
-            let (devno, inode) = (metadata.dev(), metadata.ino());
-            if (devno, inode) != (self.devno, self.inode) {
-                if let Ok(f) = fs::File::open(&path) {
-                    let ref mut old_reader = self.reader.as_mut().unwrap();
-                    if let Ok(position) = old_reader.seek(io::SeekFrom::Current(0)) {
-                        let mut new_reader = io::BufReader::new(f);
-                        if new_reader.seek(io::SeekFrom::Start(position)).is_ok() {
-                            self.reader = Some(new_reader);
-                            self.devno = devno;
-                            self.inode = inode;
-                        }
-                    }
-                }
-            }
+    pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
+        assert!(self.reader.is_some());
+        let metadata = fs::metadata(&path)?;
+        let (devno, inode) = (metadata.dev(), metadata.ino());
+        if (devno, inode) != (self.devno, self.inode) {
+            let old_reader = self.reader.as_mut().unwrap();
+            let position = old_reader.seek(io::SeekFrom::Current(0))?;
+            let f = fs::File::open(&path)?;
+            let mut new_reader = io::BufReader::new(f);
+            new_reader.seek(io::SeekFrom::Start(position))?;
+            self.reader = Some(new_reader);
+            self.devno = devno;
+            self.inode = inode;
         }
+        self.path = path;
+        Ok(())
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
@@ -118,6 +116,8 @@ impl FileWatcher {
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler at need, transparently to the caller.
     pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
+        //ensure buffer is re-initialized
+        buffer.clear();
         if let Some(ref mut reader) = self.reader {
             // Every read we detect the current_size of the file and compare
             // against the previous_size. There are three cases to consider:

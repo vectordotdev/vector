@@ -203,7 +203,7 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut fp_id = file_id(&fp);
-        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -295,7 +295,7 @@ mod test {
         let dir = tempdir::TempDir::new("file_watcher_qc").unwrap();
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
-        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
