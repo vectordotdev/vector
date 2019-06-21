@@ -322,6 +322,7 @@ jobs:
             export VERSION=$(./.circleci/version.sh)
             VERSION=$(echo $VERSION | sed 's/^v//g')
             VERSION=$(echo $VERSION | sed 's/-/\./g')
+            mkdir -p /root/rpmbuild/SOURCES
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it

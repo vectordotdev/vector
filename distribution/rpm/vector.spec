@@ -18,17 +18,17 @@ BuildRoot: %{_buildroot}
 %description
 %{summary}
 
-%prep]
+%prep
 %setup -q -n %{name}-%{version}
 
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}
-mkdir -p %{buildroot}/%{_bindir}
-mkdir -p %{buildroot}/%{_sysconfdir}/%{name}
-mkdir -p %{buildroot}/%{_datadir}/%{name}
-cp -a bin/* %{buildroot}/%{_bindir}
-cp -a config/* %{buildroot}/%{_sysconfdir}/%{name}
+mkdir -p %{buildroot}%{_bindir}
+mkdir -p %{buildroot}%{_sysconfdir}/%{name}
+mkdir -p %{buildroot}%{_datadir}/%{name}
+cp -a bin/* %{buildroot}%{_bindir}
+cp -a config/* %{buildroot}%{_sysconfdir}/%{name}
 
 %clean
 rm -rf %{buildroot}
@@ -44,5 +44,5 @@ rm -rf %{buildroot}
 %config /etc/examples./*
 
 %changelog
-* Fri Jun 21 2018 Vector Devs <vector@timber.io> - 0.3.0
+* Fri Jun 21 2019 Vector Devs <vector@timber.io> - 0.3.0
 - Release v0.3.0
