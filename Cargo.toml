@@ -3,7 +3,7 @@ name = "vector"
 version = "0.3.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
-description = "A High-Performance Log and Metrics Routing Layer"
+description = "A High-Performance Logs, Metrics, and Events Routing Layer"
 homepage = "https://vectorproject.io"
 license = "apache-2.0"
 readme = "README.md"
@@ -146,3 +146,9 @@ splunk-integration-tests = []
 name = "bench"
 harness = false
 
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+vector = { path = "/usr/bin/vector" }

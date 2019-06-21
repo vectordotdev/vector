@@ -3,16 +3,16 @@
 # Usage
 #
 # Release with cross via the default system target
-# ./release.sh
+# ./build_release.sh
 #
 # Release with the specified target
-# TARGET="<my target>" ./release.sh
+# TARGET="<my target>" ./build_release.sh
 #
 # Release with extra cargo flags
-# EXTRA_ARGS="--no-default-features" ./release.sh
+# EXTRA_ARGS="--no-default-features" ./build_release.sh
 #
 # Release using custom builder eg cargo
-# BUILDER=cargo ./release.sh
+# BUILDER=cargo ./build_release.sh
 
 set -eou pipefail
 
@@ -21,38 +21,37 @@ ARGS=${EXTRA_ARGS:-}
 
 APP_NAME=vector
 BUILDER_COMMAND=${BUILDER:-"cross"}
-DIST_DIR="$(pwd)/dist"
-ROOT_DIR="$(pwd)"
 
 if [ -z "$TARGET" ]; then
     echo "TARGET is not passed using $DEFAULT_TARGET"
     TARGET="$DEFAULT_TARGET"
 fi
 
-TAG=$CIRCLE_TAG
-BRANCH=$CIRCLE_BRANCH
-COMMIT_SHA=$CIRCLE_SHA1
-COMMIT_TIMESTAMP=$(git show -s --format=%ct $COMMIT_SHA)
+ROOT_DIR="$(pwd)"
+DIST_DIR="$ROOT_DIR/dist"
+RELEASE_DIR="$DIST_DIR/$APP_NAME-$VERSION"
+BIN_DIR="$RELEASE_DIR/bin"
+CONFIG_DIR="$RELEASE_DIR/config"
+BINARY_PATH="$ROOT_DIR/target/$TARGET/release/$APP_NAME"
 TAR_NAME="$APP_NAME-$VERSION-$TARGET.tar.gz"
-
 
 function build_release() {
   $BUILDER_COMMAND build --target $TARGET --release $ARGS
+  mkdir -p $BIN_DIR
+  cp "$BINARY_PATH" "$BIN_DIR"
+}
+
+function copy_files() {
+  cp -r config $CONFIG_DIR
+  cp README.md $RELEASE_DIR
+  cp LICENSE $RELEASE_DIR
 }
 
 function build_tar() {
-  mkdir -p $DIST_DIR
-  cp "target/$TARGET/release/$APP_NAME" "$DIST_DIR"
-  cd $DIST_DIR
-  tar cvpf $TAR_NAME $APP_NAME
-  rm $APP_NAME
-  cd $ROOT_DIR
-}
-
-function copy_config() {
-  cp -r config $DIST_DIR/config
+  tar cvpf $TAR_NAME $DIST_DIR
+  rm -rf $RELEASE_DIR
 }
 
 build_release
-copy_config
+copy_files
 build_tar

@@ -308,6 +308,8 @@ jobs:
             export VERSION=$(./.circleci/version.sh)
             mkdir dist
             mv $(find target/debian/ -name *.deb) "dist/vector-$VERSION-amd64.deb"
+            # Verify that the deb actually works by installing it
+            dpkg -i dist/vector-$VERSION-amd64.deb
       - persist_to_workspace:
           root: dist
           paths:
@@ -329,9 +331,10 @@ jobs:
       - run:
           name: Build .rpm package
           command: |
-            mv dist/$TAR_NAME /root/rpmbuild/SOURCES/vector-$VERSION.tar.gz
+            mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
-
+            # Verify that the rpm actually works by installing it
+            rpm -i vector.rpm
   release-docker:
     machine: true
     steps:
@@ -413,6 +416,10 @@ edge-release-workflow-filters: &edge-release-workflow-filters
 
 workflows:
   version: 2
+
+  test-release:
+    jobs:
+      - compile-rpm
 
   test:
     jobs:
