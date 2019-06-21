@@ -41,7 +41,8 @@ APP_NAME=vector
 BUILDER_COMMAND=${BUILDER:-"cross"}
 ROOT_DIR="$(pwd)"
 DIST_DIR="$ROOT_DIR/dist"
-RELEASE_DIR="$DIST_DIR/$APP_NAME-$VERSION"
+RELEASE_DIR_NAME="$APP_NAME-$VERSION"
+RELEASE_DIR="$DIST_DIR/$RELEASE_DIR_NAME"
 BIN_DIR="$RELEASE_DIR/bin"
 CONFIG_DIR="$RELEASE_DIR/config"
 BINARY_PATH="$ROOT_DIR/target/$TARGET/release/$APP_NAME"
@@ -69,9 +70,10 @@ function copy_files() {
 
 function build_tar() {
   cd $DIST_DIR
-  tar cvpf $TAR_NAME $RELEASE_DIR
+  rm -rf $TAR_NAME
+  tar cvpf $TAR_NAME $RELEASE_DIR_NAME
   echo "Built tar located at $(pwd)/$TAR_NAME"
-  rm -rf $RELEASE_DIR
+  rm -rf $RELEASE_DIR_NAME
   cd $ROOT_DIR
 }
 

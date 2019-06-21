@@ -1,35 +1,38 @@
-%define name vector
-%define cleaned_version %{getenv:CLEANED_VERSION}
-%define release 1
-%define url https://vectorproject.io
-%define version %{getenv:VERSION}
-%define source %{name}-%{version}.tar.gz
-%define _buildroot %{name}-%{version}
+%define _name vector
+%define _cleaned_version %{getenv:CLEANED_VERSION}
+%define _release 1
+%define _url https://vectorproject.io
+%define _version %{getenv:VERSION}
+%define _source %{name}-%{_version}.tar.gz
+%define _buildroot %{name}-%{)version}
 
-Name: %{name}
+Name: %{_name}
 Summary: A High-Performance Logs, Metrics, and Events Routing Layer
-Version: %{cleaned_version}
-Release: %{release}
+Version: %{_cleaned_version}
+Release: %{_release}
 License: ASL 2.0
 Group: Applications/System
-Source: %{source}
-URL: %{url}
+Source: %{_source}
+URL: %{_url}
 BuildRoot: %{_buildroot}
 
 %description
 %{summary}
 
 %prep
-%setup -q -n %{name}-%{version}
+tar -xvf %{_sourcedir}/%{_source}
+cd %{_name}-%{_version}
+chown -R root.root .
+chmod -R a+rX,g-w,o-w .
 
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
-mkdir -p %{buildroot}%{_sysconfdir}/%{name}
-mkdir -p %{buildroot}%{_datadir}/%{name}
+mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
+mkdir -p %{buildroot}%{_datadir}/%{_name}
 cp -a bin/* %{buildroot}%{_bindir}
-cp -a config/* %{buildroot}%{_sysconfdir}/%{name}
+cp -a config/* %{buildroot}%{_sysconfdir}/%{_name}
 
 %clean
 rm -rf %{buildroot}
