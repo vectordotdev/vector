@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::{event::metric::Metric, Event};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -8,12 +9,31 @@ use string_cache::DefaultAtom as Atom;
 pub struct LogToMetricConfig {
     pub counters: Vec<CounterConfig>,
     pub gauges: Vec<Atom>,
+    pub metrics: Vec<MetricConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CounterConfig {
     field: Atom,
     parse_value: bool,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MetricConfig {
+    Counter {
+        field: Atom,
+        name: Atom,
+        labels: IndexMap<Atom, String>,
+        parse_value: bool,
+        step_by_value: bool,
+    },
+    Gauge {
+        field: Atom,
+        name: Atom,
+        labels: IndexMap<Atom, String>,
+        parse_value: bool,
+    },
 }
 
 pub struct LogToMetric {
@@ -89,23 +109,32 @@ impl Transform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use super::{CounterConfig, LogToMetric, LogToMetricConfig};
+    use super::{LogToMetric, LogToMetricConfig};
     use crate::{event::metric::Metric, transforms::Transform, Event};
 
     fn config() -> LogToMetricConfig {
-        LogToMetricConfig {
-            counters: vec![
-                CounterConfig {
-                    field: "foo".into(),
-                    parse_value: true,
-                },
-                CounterConfig {
-                    field: "bar".into(),
-                    parse_value: false,
-                },
-            ],
-            gauges: vec!["baz".into()],
-        }
+        toml::from_str(
+            r##"
+            counters = [{field = "foo", parse_value = true}, {field = "bar", parse_value = false}]
+            gauges = ["baz"]
+
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            name = "status_total"
+            parse_value = false
+            step_by_value = false
+            labels = {status = "#{event.status}", host = "#{event.host}"}
+
+            [[metrics]]
+            type = "gauge"
+            field = "memory_rss"
+            name = "memory_rss_bytes"
+            parse_value = true
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap()
     }
 
     #[test]
