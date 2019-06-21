@@ -320,11 +320,14 @@ jobs:
           name: Build .rpm package
           command: |
             export VERSION=$(./.circleci/version.sh)
+            # The RPM spec does not like a leading `v` or `-` in the
+            # version name. Therefore we clean the version so that the
+            # `rpmbuild` command does not fail.
             export CLEANED_VERSION=$VERSION
             CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/^v//g')
             CLEANED_VERSION=$(echo $VERSION | sed 's/-/\./g')
             mkdir -p /root/rpmbuild/SOURCES
-            mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
+            mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$CLEANED_VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
             rpm -i vector.rpm
