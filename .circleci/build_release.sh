@@ -14,7 +14,7 @@
 # Release using custom builder eg cargo
 # BUILDER=cargo ./build_release.sh
 
-set -eou pipefail
+set -eo pipefail
 
 # Args
 
@@ -32,6 +32,8 @@ if [ -z "$VERSION" ]; then
     echo "VERSION is not passed using version.sh as the default"
     VERSION=$(./.circleci/version.sh)
 fi
+
+set -u
 
 # Variables
 
