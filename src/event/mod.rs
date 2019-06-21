@@ -160,7 +160,12 @@ impl Serialize for ValueKind {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_string_lossy())
+        match &self {
+            ValueKind::Integer(i) => serializer.serialize_i64(*i),
+            ValueKind::Float(f) => serializer.serialize_f64(*f),
+            ValueKind::Boolean(b) => serializer.serialize_bool(*b),
+            _ => serializer.serialize_str(&self.to_string_lossy()),
+        }
     }
 }
 
@@ -565,6 +570,29 @@ mod test {
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
         assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
+    }
+
+    #[test]
+    fn type_serialization() {
+        use serde_json::json;
+
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert_explicit("int".into(), 4.into());
+        event
+            .as_mut_log()
+            .insert_explicit("float".into(), 5.5.into());
+        event
+            .as_mut_log()
+            .insert_explicit("bool".into(), true.into());
+        event
+            .as_mut_log()
+            .insert_explicit("string".into(), "thisisastring".into());
+
+        let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
+        assert_eq!(map["float"], json!(5.5));
+        assert_eq!(map["int"], json!(4));
+        assert_eq!(map["bool"], json!(true));
+        assert_eq!(map["string"], json!("thisisastring"));
     }
 
     #[test]
