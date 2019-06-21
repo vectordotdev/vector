@@ -53,16 +53,23 @@ function build_release() {
   $BUILDER_COMMAND build --target $TARGET --release $ARGS
   mkdir -p $BIN_DIR
   cp "$BINARY_PATH" "$BIN_DIR"
+  echo "Copied $BINARY_PATH to $BIN_DIR"
 }
 
 function copy_files() {
   cp -r config $CONFIG_DIR
+  echo "Copied config to $CONFIG_DIR"
+
   cp README.md $RELEASE_DIR
+  echo "Copied README.md to $RELEASE_DIR"
+
   cp LICENSE $RELEASE_DIR
+  echo "Copied LICENSE to $RELEASE_DIR"
 }
 
 function build_tar() {
   tar cvpf $TAR_NAME $DIST_DIR
+  echo "Built tar located at $TAR_NAME"
   rm -rf $RELEASE_DIR
 }
 
