@@ -15,7 +15,7 @@ pub struct RegexParserConfig {
     pub field: Option<Atom>,
     pub drop_field: bool,
     pub drop_failed: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<Atom, String>,
 }
 
 #[typetag::serde(name = "regex_parser")]
@@ -31,7 +31,7 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
             .types
             .iter()
             .map(|(field, typename)| typename.parse::<Conversion>().map(|ct| (field.clone(), ct)))
-            .collect::<Result<HashMap<String, Conversion>, _>>()
+            .collect::<Result<HashMap<Atom, Conversion>, _>>()
             .map_err(|err| format!("Invalid conversion type: {}", err))?;
 
         Regex::new(&self.regex)
@@ -63,14 +63,14 @@ impl RegexParser {
         field: Atom,
         mut drop_field: bool,
         drop_failed: bool,
-        types: HashMap<String, Conversion>,
+        types: HashMap<Atom, Conversion>,
     ) -> Self {
         // Build a buffer of the regex capture locations to avoid
         // repeated allocations.
         let capture_locs = regex.capture_locations();
 
         // Check if any named type references a nonexistent capture
-        let capture_names: HashSet<String> = regex
+        let capture_names: HashSet<Atom> = regex
             .capture_names()
             .filter_map(|s| s.map(|s| s.into()))
             .collect();
@@ -90,11 +90,9 @@ impl RegexParser {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    (
-                        idx,
-                        cn.into(),
-                        types.get(cn).unwrap_or(&Conversion::Bytes).clone(),
-                    )
+                    let cn: Atom = cn.into();
+                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
+                    (idx, cn, conv.clone())
                 })
             })
             .collect();
