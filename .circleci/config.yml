@@ -48,7 +48,7 @@ export-version: &export-version
     name: Export version
     command: |
       export VERSION=$(./.circleci/version.sh)
-      echo 'export VERSION=$VERSION' >> $BASH_ENV
+      echo 'export VERSION="$VERSION"' >> $BASH_ENV
 
 install-cross: &install-cross
   run:
