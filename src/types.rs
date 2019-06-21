@@ -1,5 +1,5 @@
 use crate::event::ValueKind;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, TimeZone, Utc};
 use std::str::FromStr;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
@@ -75,10 +75,10 @@ impl Conversion {
             Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&bytes))
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
                 .map(|value| ValueKind::Timestamp(value)),
-            Conversion::TimestampFmt(format) => Utc
+            Conversion::TimestampFmt(format) => Local
                 .datetime_from_str(&String::from_utf8_lossy(&bytes), &format)
                 .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
-                .map(|value| ValueKind::Timestamp(value)),
+                .map(|value| ValueKind::Timestamp(datetime_to_utc(value))),
             Conversion::TimestampTZFmt(format) => {
                 DateTime::parse_from_str(&String::from_utf8_lossy(&bytes), &format)
                     .map_err(|err| format!("Invalid timestamp {:?}: {}", value, err))
@@ -136,16 +136,20 @@ fn datetime_to_utc<TZ: TimeZone>(ts: DateTime<TZ>) -> DateTime<Utc> {
 
 /// The list of allowed "automatic" timestamp formats
 const TIMESTAMP_FORMATS: &[&str] = &[
-    "%s",              // UNIX timestamp
     "%F %T",           // YYYY-MM-DD HH:MM:SS
     "%v %T",           // DD-Mmm-YYYY HH:MM:SS
-    "%FT%TZ",          // ISO 8601 / RFC 3339
-    "%FT%T",           // ISO 8601 / RFC 3339 without TZ UTC
+    "%FT%T",           // ISO 8601 / RFC 3339 without TZ
     "%m/%d/%Y:%T",     // ???
     "%a, %d %b %Y %T", // RFC 822/2822 without TZ
     "%a %d %b %T %Y",  // `date` command output without TZ
     "%A %d %B %T %Y",  // `date` command output without TZ, long names
     "%a %b %e %T %Y",  // ctime format
+];
+
+/// The list of allowed "automatic" timestamp formats for UTC
+const TIMESTAMP_UTC_FORMATS: &[&str] = &[
+    "%s",     // UNIX timestamp
+    "%FT%TZ", // ISO 8601 / RFC 3339 UTC
 ];
 
 /// The list of allowed "automatic" timestamp formats with time zones
@@ -159,6 +163,11 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
 /// Parse a string into a timestamp using one of a set of formats
 fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, &'static str> {
     for format in TIMESTAMP_FORMATS {
+        if let Ok(result) = Local.datetime_from_str(s, format) {
+            return Ok(datetime_to_utc(result));
+        }
+    }
+    for format in TIMESTAMP_UTC_FORMATS {
         if let Ok(result) = Utc.datetime_from_str(s, format) {
             return Ok(result);
         }
@@ -183,11 +192,14 @@ mod tests {
     use crate::event::ValueKind;
     use chrono::prelude::*;
 
+    const TIMEZONE: &str = "Australia/Brisbane";
+
     fn dateref() -> DateTime<Utc> {
         Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
     }
 
     fn convert(fmt: &str, value: &str) -> Result<ValueKind, String> {
+        std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()
             .expect(&format!("Invalid conversion {:?}", fmt))
             .convert(value.into())
@@ -196,7 +208,7 @@ mod tests {
     #[test]
     fn timestamp_conversion() {
         assert_eq!(
-            convert("timestamp", "02/03/2001:04:05:06"),
+            convert("timestamp", "02/03/2001:14:05:06"),
             Ok(dateref().into())
         );
     }
@@ -204,20 +216,21 @@ mod tests {
     #[test]
     fn timestamp_param_conversion() {
         assert_eq!(
-            convert("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 04:05:06"),
+            convert("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 14:05:06"),
             Ok(dateref().into())
         );
     }
 
     #[test]
     fn parse_timestamp_auto() {
-        assert_eq!(parse_timestamp("2001-02-03 04:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("02/03/2001:04:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("2001-02-03T04:05:06"), Ok(dateref()));
+        std::env::set_var("TZ", TIMEZONE);
+        assert_eq!(parse_timestamp("2001-02-03 14:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("02/03/2001:14:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("2001-02-03T14:05:06"), Ok(dateref()));
         assert_eq!(parse_timestamp("2001-02-03T04:05:06Z"), Ok(dateref()));
-        assert_eq!(parse_timestamp("Sat, 3 Feb 2001 04:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("Sat Feb 3 04:05:06 2001"), Ok(dateref()));
-        assert_eq!(parse_timestamp("3-Feb-2001 04:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("Sat, 3 Feb 2001 14:05:06"), Ok(dateref()));
+        assert_eq!(parse_timestamp("Sat Feb 3 14:05:06 2001"), Ok(dateref()));
+        assert_eq!(parse_timestamp("3-Feb-2001 14:05:06"), Ok(dateref()));
         assert_eq!(parse_timestamp("2001-02-02T22:05:06-06:00"), Ok(dateref()));
         assert_eq!(
             parse_timestamp("Sat, 03 Feb 2001 07:05:06 +0300"),
