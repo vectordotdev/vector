@@ -303,7 +303,8 @@ mod tests {
         let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
 
         let encoded_message = message + "\n";
-        assert_eq!(&bytes.inner[..], encoded_message.as_bytes());
+        let (bytes, _) = bytes.into_parts();
+        assert_eq!(&bytes[..], encoded_message.as_bytes());
     }
 
     #[test]
@@ -317,7 +318,8 @@ mod tests {
         let batch_time_format = "date=%F".to_string();
         let bytes = encode_event(event, &batch_time_format, &None).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes.inner[..]).unwrap();
+        let (bytes, _) = bytes.into_parts();
+        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
