@@ -43,13 +43,6 @@ build-release: &build-release
       export PATH="$HOME/.cargo/bin:$PATH"
       ./.circleci/build_release.sh
 
-export-version: &export-version
-  run:
-    name: Export version
-    command: |
-      export VERSION=$(./.circleci/version.sh)
-      echo 'export VERSION="$VERSION"' >> $BASH_ENV
-
 install-cross: &install-cross
   run:
     name: Install Cross
@@ -88,7 +81,7 @@ install-rust: &install-rust
 
 persist-dist-to-workspace: &persist-dist-to-workspace
   persist_to_workspace:
-    root: dist
+    root: distribution
     paths:
       - "*.tar.gz"
 
@@ -216,7 +209,6 @@ jobs:
       - *install-rust
       - *install-cross
       - checkout
-      - *export-version
       - *build-release
       - *persist-dist-to-workspace
     environment:
@@ -232,7 +224,6 @@ jobs:
       - *install-rust
       - *install-cross
       - checkout
-      - *export-version
       - *build-release
       - *persist-dist-to-workspace
     environment:
@@ -246,7 +237,6 @@ jobs:
       - *install-rust
       - *install-cross
       - checkout
-      - *export-version
       - *build-release
       - *persist-dist-to-workspace
     environment:
@@ -262,7 +252,6 @@ jobs:
       - *install-rust
       - *install-cross
       - checkout
-      - *export-version
       - *build-release
       - *persist-dist-to-workspace
     environment:
@@ -326,12 +315,13 @@ jobs:
       - *restore-git-cache
       #- *restore-cargo-cache
       - checkout
-      - *export-version
       - *build-release
       - run:
           name: Build .rpm package
           command: |
-            source $BASH_ENV
+            export VERSION=$(./.circleci/version.sh)
+            VERSION=$(echo $VERSION | sed 's/^v//g')
+            VERSION=$(echo $VERSION | sed 's/-/\./g')
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
