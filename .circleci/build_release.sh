@@ -68,10 +68,11 @@ function copy_files() {
 }
 
 function build_tar() {
-  tar cvpf $TAR_NAME $DIST_DIR
-  mv $TAR_NAME $DIST_DIR
-  echo "Built tar located at $DIST_DIR/$TAR_NAME"
+  cd $DIST_DIR
+  tar cvpf $TAR_NAME $RELEASE_DIR
+  echo "Built tar located at $(pwd)/$TAR_NAME"
   rm -rf $RELEASE_DIR
+  cd $ROOT_DIR
 }
 
 # Execute
