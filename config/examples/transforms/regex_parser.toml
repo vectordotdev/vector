@@ -1,0 +1,15 @@
+# `regex_parser` Transform Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `regex_parser` transform
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/regex_parser
+
+[transforms.my_regex_parser_transform]
+  # REQUIRED - General
+  type = "regex_parser" # must be: regex_parser
+  inputs = ["my-source-id"]
+  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
+
+  # OPTIONAL - General
+  drop_failed = false # default
+  drop_field = true # default
+  field = "message" # default

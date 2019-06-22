@@ -43,6 +43,7 @@ end
 
 require_relative "config_schema/schema"
 require_relative "generators/config_specification_generator"
+require_relative "generators/config_example_generator"
 require_relative "generators/global_generator"
 require_relative "generators/guarantees_generator"
 require_relative "generators/link_generator"
@@ -88,7 +89,12 @@ def write_with_links(file_path, content, links)
 end
 
 def write(file_path, content)
-  existing_content = File.read(file_path)
+  existing_content =
+    begin
+      File.read(file_path)
+    rescue Errno::ENOENT
+      ""
+    end
 
   if existing_content != content
     File.write(file_path, content)
@@ -142,6 +148,10 @@ schema.sources.to_h.each do |_source_name, source|
   source_generator = SourceGenerator.new(source, schema.guides)
   content = source_generator.generate
   write_with_links("docs/usage/configuration/sources/#{source.name}.md", content, schema.links)
+
+  example_generator = ConfigExampleGenerator.new(source)
+  content = example_generator.generate
+  write("config/examples/sources/#{source.name}.toml", content)
 end
 
 #
@@ -156,6 +166,10 @@ schema.transforms.to_h.each do |_transform_name, transform|
   transform_generator = TransformGenerator.new(transform, schema.guides)
   content = transform_generator.generate
   write_with_links("docs/usage/configuration/transforms/#{transform.name}.md", content, schema.links)
+
+  example_generator = ConfigExampleGenerator.new(transform)
+  content = example_generator.generate
+  write("config/examples/transforms/#{transform.name}.toml", content)
 end
 
 #
@@ -170,6 +184,10 @@ schema.sinks.to_h.each do |_sink_name, sink|
   sink_generator = SinkGenerator.new(sink, schema.guides)
   content = sink_generator.generate
   write_with_links("docs/usage/configuration/sinks/#{sink.name}.md", content, schema.links)
+
+  example_generator = ConfigExampleGenerator.new(sink)
+  content = example_generator.generate
+  write("config/examples/sinks/#{sink.name}.toml", content)
 end
 
 #

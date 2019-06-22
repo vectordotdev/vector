@@ -98,7 +98,7 @@ It is possible to chain `json_parser` transforms to effectively "unwrap"
 nested JSON documents. For example, give this raw log line:
 
 ```
-{"message": "{"parent": "{\"child\": \"value2\"}"}"},
+{"message": "{"parent": "{\"child\": \"value2\"}"}"}
 ```
 
 You could unwrap the JSON with the following transforms:

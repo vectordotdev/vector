@@ -1,0 +1,14 @@
+# `grok_parser` Transform Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `grok_parser` transform
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/grok_parser
+
+[transforms.my_grok_parser_transform]
+  # REQUIRED - General
+  type = "grok_parser" # must be: grok_parser
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # no default

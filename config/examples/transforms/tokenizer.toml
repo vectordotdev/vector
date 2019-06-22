@@ -1,0 +1,14 @@
+# `tokenizer` Transform Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `tokenizer` transform
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/tokenizer
+
+[transforms.my_tokenizer_transform]
+  # REQUIRED - General
+  type = "tokenizer" # must be: tokenizer
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  drop_field = true # default
+  field = "message" # default
+  field_names = ["timestamp", "level", "message"] # no default
