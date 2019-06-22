@@ -83,7 +83,7 @@ persist-dist-to-workspace: &persist-dist-to-workspace
   persist_to_workspace:
     root: dist
     paths:
-      - "*.tar.gz"
+      - "*"
 
 #
 # Job macros
@@ -274,10 +274,7 @@ jobs:
             export PATH="$HOME/.cargo/bin:$PATH"
             export VERSION=$(./.circleci/version.sh)
             ./.circleci/build_release.sh
-      - persist_to_workspace:
-          root: dist
-          paths:
-            - "*.tar.gz"
+      - *persist-dist-to-workspace
 
   compile-deb:
     resource_class: xlarge
@@ -299,10 +296,7 @@ jobs:
             mv $(find target/debian/ -name *.deb) "dist/vector-$VERSION-amd64.deb"
             # Verify that the deb actually works by installing it
             dpkg -i dist/vector-$VERSION-amd64.deb
-      - persist_to_workspace:
-          root: dist
-          paths:
-            - "*.deb"
+      - *persist-dist-to-workspace
 
   compile-rpm:
     resource_class: xlarge
@@ -338,10 +332,7 @@ jobs:
             export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm"
             rpm -i $RPM_PATH
             mv $RPM_PATH dist
-      - persist_to_workspace:
-          root: dist
-          paths:
-            - "*.rpm"
+      - *persist-dist-to-workspace
 
   release-docker:
     machine: true
@@ -392,7 +383,7 @@ jobs:
           command: |
             export VERSION=$(./.circleci/version.sh)
             echo "Releasing $VERSION..."
-            aws s3 cp "dist/" "s3://packages.timber.io/vector/" --recursive
+            aws s3 cp "dist/" "s3://packages.timber.io/vector/$VERSION/" --recursive
 
 test-workflow-filters: &test-workflow-filters
   filters:
