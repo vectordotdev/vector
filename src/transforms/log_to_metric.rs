@@ -7,14 +7,7 @@ use string_cache::DefaultAtom as Atom;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
-    pub counters: Vec<CounterConfig>,
     pub metrics: Vec<MetricConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CounterConfig {
-    field: Atom,
-    parse_value: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -23,9 +16,9 @@ pub enum MetricConfig {
     Counter {
         field: Atom,
         name: Atom,
-        labels: IndexMap<Atom, String>,
         #[serde(default = "default_increment_by_value")]
         increment_by_value: bool,
+        labels: IndexMap<Atom, String>,
     },
     Gauge {
         field: Atom,
@@ -69,7 +62,33 @@ impl Transform for LogToMetric {
 
         for metric in self.config.metrics.iter() {
             match metric {
-                MetricConfig::Counter { .. } => {}
+                MetricConfig::Counter {
+                    field,
+                    name,
+                    increment_by_value,
+                    ..
+                } => {
+                    if let Some(val) = event.get(field) {
+                        if *increment_by_value {
+                            if let Ok(val) = val.to_string_lossy().parse() {
+                                return Some(Event::Metric(Metric::Counter {
+                                    name: name.to_string(),
+                                    val,
+                                    sampling: None,
+                                }));
+                            } else {
+                                trace!("failed to parse counter value");
+                                return None;
+                            }
+                        } else {
+                            return Some(Event::Metric(Metric::Counter {
+                                name: name.to_string(),
+                                val: 1,
+                                sampling: None,
+                            }));
+                        };
+                    }
+                }
                 MetricConfig::Gauge { field, name, .. } => {
                     if let Some(val) = event.get(field) {
                         if let Ok(val) = val.to_string_lossy().parse() {
@@ -87,29 +106,6 @@ impl Transform for LogToMetric {
             }
         }
 
-        for counter in self.config.counters.iter() {
-            if let Some(val) = event.get(&counter.field) {
-                if counter.parse_value {
-                    if let Ok(val) = val.to_string_lossy().parse() {
-                        return Some(Event::Metric(Metric::Counter {
-                            name: counter.field.to_string(),
-                            val,
-                            sampling: None,
-                        }));
-                    } else {
-                        trace!("failed to parse counter value");
-                        return None;
-                    }
-                } else {
-                    return Some(Event::Metric(Metric::Counter {
-                        name: counter.field.to_string(),
-                        val: 1,
-                        sampling: None,
-                    }));
-                };
-            }
-        }
-
         None
     }
 }
@@ -119,40 +115,22 @@ mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{event::metric::Metric, transforms::Transform, Event};
 
-    fn config() -> LogToMetricConfig {
-        toml::from_str(
-            r##"
-            counters = [{field = "foo", parse_value = true}, {field = "bar", parse_value = false}]
-
-            [[metrics]]
-            type = "counter"
-            field = "status"
-            name = "status_total"
-            increment_by_value = false
-            labels = {status = "#{event.status}", host = "#{event.host}"}
-            "##,
-        )
-        .unwrap()
-    }
-
     #[test]
     fn count_http_status_codes() {
         let config: LogToMetricConfig = toml::from_str(
             r##"
-            counters = [{field = "foo", parse_value = true}, {field = "bar", parse_value = false}]
-
             [[metrics]]
             type = "counter"
             field = "status"
             name = "status_total"
-            increment_by_value = false
             labels = {status = "#{event.status}", host = "#{event.host}"}
             "##,
         )
         .unwrap();
 
         let mut log = Event::from("i am a log");
-        log.as_mut_log().insert_explicit("foo".into(), "42".into());
+        log.as_mut_log()
+            .insert_explicit("status".into(), "42".into());
 
         let mut transform = LogToMetric::new(config);
 
@@ -160,44 +138,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::Counter {
-                name: "foo".into(),
-                val: 42,
-                sampling: None
-            }
-        );
-    }
-
-    #[test]
-    fn counter_with_parsing() {
-        let mut log = Event::from("i am a log");
-        log.as_mut_log().insert_explicit("foo".into(), "42".into());
-
-        let mut transform = LogToMetric::new(config());
-
-        let metric = transform.transform(log).unwrap();
-        assert_eq!(
-            metric.into_metric(),
-            Metric::Counter {
-                name: "foo".into(),
-                val: 42,
-                sampling: None
-            }
-        );
-    }
-
-    #[test]
-    fn counter_without_parsing() {
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("bar".into(), "nineteen".into());
-
-        let mut transform = LogToMetric::new(config());
-
-        let metric = transform.transform(log).unwrap();
-        assert_eq!(
-            metric.into_metric(),
-            Metric::Counter {
-                name: "bar".into(),
+                name: "status_total".into(),
                 val: 1,
                 sampling: None
             }
@@ -205,22 +146,105 @@ mod tests {
     }
 
     #[test]
-    fn gauge() {
+    fn count_exceptions() {
         let config: LogToMetricConfig = toml::from_str(
             r##"
-            counters = [{field = "foo", parse_value = true}, {field = "bar", parse_value = false}]
-
             [[metrics]]
-            type = "gauge"
-            field = "baz"
-            name = "baz"
+            type = "counter"
+            field = "backtrace"
+            name = "exception_total"
             labels = {host = "#{event.host}"}
             "##,
         )
         .unwrap();
 
         let mut log = Event::from("i am a log");
-        log.as_mut_log().insert_explicit("baz".into(), "666".into());
+        log.as_mut_log()
+            .insert_explicit("backtrace".into(), "message".into());
+
+        let mut transform = LogToMetric::new(config);
+
+        let metric = transform.transform(log).unwrap();
+        assert_eq!(
+            metric.into_metric(),
+            Metric::Counter {
+                name: "exception_total".into(),
+                val: 1,
+                sampling: None
+            }
+        );
+    }
+
+    #[test]
+    fn count_exceptions_no_match() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "counter"
+            field = "backtrace"
+            name = "exception_total"
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("success".into(), "42".into());
+
+        let mut transform = LogToMetric::new(config);
+
+        let metric = transform.transform(log);
+        assert!(metric.is_none());
+    }
+
+    #[test]
+    fn sum_order_amounts() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "counter"
+            field = "amount"
+            name = "amount_total"
+            increment_by_value = true
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("amount".into(), "33".into());
+
+        let mut transform = LogToMetric::new(config);
+
+        let metric = transform.transform(log).unwrap();
+        assert_eq!(
+            metric.into_metric(),
+            Metric::Counter {
+                name: "amount_total".into(),
+                val: 33,
+                sampling: None
+            }
+        );
+    }
+
+    #[test]
+    fn memory_usage_guage() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "gauge"
+            field = "memory_rss"
+            name = "memory_rss_bytes"
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("memory_rss".into(), "123".into());
 
         let mut transform = LogToMetric::new(config);
 
@@ -228,8 +252,8 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::Gauge {
-                name: "baz".into(),
-                val: 666,
+                name: "memory_rss_bytes".into(),
+                val: 123,
                 direction: None,
             }
         );
@@ -237,21 +261,44 @@ mod tests {
 
     #[test]
     fn parse_failure() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            name = "status_total"
+            increment_by_value = true
+            labels = {status = "#{event.status}", host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
         let mut log = Event::from("i am a log");
         log.as_mut_log()
-            .insert_explicit("foo".into(), "not a number".into());
+            .insert_explicit("status".into(), "not a number".into());
 
-        let mut transform = LogToMetric::new(config());
-        assert_eq!(None, transform.transform(log));
+        let mut transform = LogToMetric::new(config);
+        assert!(transform.transform(log).is_none());
     }
 
     #[test]
     fn missing_field() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            name = "status_total"
+            labels = {status = "#{event.status}", host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
         let mut log = Event::from("i am a log");
         log.as_mut_log()
             .insert_explicit("not foo".into(), "not a number".into());
 
-        let mut transform = LogToMetric::new(config());
-        assert_eq!(None, transform.transform(log));
+        let mut transform = LogToMetric::new(config);
+        assert!(transform.transform(log).is_none());
     }
 }
