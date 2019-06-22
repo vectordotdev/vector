@@ -30,7 +30,7 @@ data_dir = "/var/lib/vector"
 # Ingest data by tailing one or more files
 [sources.apache_logs]
     type         = "file"
-    path         = "/var/log/apache2/*.log"
+    include      = ["/var/log/apache2/*.log"]
     ignore_older = 86400 # 1 day
 
 # Structure and parse the data
@@ -51,11 +51,12 @@ data_dir = "/var/lib/vector"
     inputs       = ["apache_sampler"]
     type         = "elasticsearch"
     host         = "79.12.221.222:9200"
+    doc_type     = "_doc"
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
     inputs       = ["apache_parser"] # don't sample
-    type         = "s3"
+    type         = "aws_s3"
     region       = "us-east-1"
     bucket       = "my_log_archives"
     batch_size   = 10000000 # 10mb uncompressed

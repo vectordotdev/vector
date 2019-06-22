@@ -38,8 +38,6 @@ class ReadmeGenerator < Generator
       light-weight [agent] and a highly efficient [service], making it the single tool you need to
       get data from A to B.
 
-      ---
-
       ## [Documentation](https://docs.vectorproject.io/)
 
       #### About
@@ -70,13 +68,13 @@ class ReadmeGenerator < Generator
 
       ## Features
 
-      * **Fast** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. It has no runtime or garbage collector, and is designed to handle the most demanding environments.
+      * **Fast** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector. Its designed to handle the most demanding environments.
       * **Correct** - Vector is obsessed with [getting the details right][correctness].
-      * **Vendor Neutral** - Vector does not favor any specific storage. It fosters a fair, open ecosystem with the user's best interest in mind.
-      * **Agent Or Service** - Vector aims to be the single, and only, tool needed to get data from A to B, deploying as an [agent] or [service].
-      * **Logs, Metrics, or Events** - Vector unifies logs, metrics, and events at the source, making it collect and ship all observability data.
+      * **Vendor Neutral** - Vector does not favor any specific storage, it fosters a fair, open ecosystem with the user's best interest in mind.
+      * **Agent Or Service** - Vector aims to be the single tool needed to route data from A to B, deploying as an [agent] or [service].
+      * **Logs, Metrics, or Events** - Vector unifies logs, metrics, and events, making it easy to collect and ship all observability data.
       * **Clear Guarantees** - Vector is [clear on it's guarantees][guarantees], helping you to make the appropriate trade offs for your use case.
-      * **Easy To Deploy** - Vector compiles to a single static binary with no runtime, making it easy to deploy and manage.
+      * **Easy To Deploy** - Vector compiles to a single static binary with no runtime.
       * **Hot Reload** - Designed to [reload configuration][reloading], on the fly, without restarting or skipping a beat.
 
 

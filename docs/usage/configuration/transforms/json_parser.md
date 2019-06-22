@@ -28,7 +28,6 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
-  drop_field = true # default
   drop_invalid = true # no default
   field = "message" # default
 ```
@@ -41,7 +40,6 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   inputs = "<string>"
 
   # OPTIONAL - General
-  drop_field = <bool>
   drop_invalid = <bool>
   field = "<string>"
 ```
@@ -60,11 +58,6 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
-
-  # If `true` will drop the `field` after parsing.
-  #
-  # * default: true
-  drop_field = true
 
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
@@ -88,7 +81,6 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 | `type` | `string` | The component type<br />`required` `enum: "json_parser"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
-| `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`no default` `example: true` |
 | `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
@@ -97,8 +89,58 @@ The `json_parser` transforms accepts [`log`][log_event] events and allows you to
 The `json_parser` transform accepts [`log`][log_event] events and outputs [`log`][log_event] events.
 
 
+{% tabs %}
+{% tab title="simple" %}
+
+{% endtab %}
+{% tab title="wrapped" %}
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this raw log line:
+
+```
+{"message": "{"parent": "{\"child\": \"value2\"}"}"}
+```
+
+You could unwrap the JSON with the following transforms:
+
+```coffeescript
+[transforms.root_json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+
+[transforms.parent_json]
+  inputs = ["root_json"]
+  type   = "json_parser"
+  field  = "parent"
+
+[transforms.child_json]
+  inputs = ["parent_json"]
+  type   = "json_parser"
+  field  = "child"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "child": "value2"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+{% endtab %}
+{% endtabs %}
+
+
 
 ## How It Works
+
+### Chaining / Unwrapping
+
+Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSON.
 
 ### Correctness
 
@@ -120,7 +162,7 @@ Any key present in the decoded JSON will override existin keys in the event.
 
 If the decoded JSON includes nested fields it will be _deep_ merged into the event. For example, given the following event:
 
-```javascripton
+```javascript
 {
   "message": "{"parent": {"child2": "value2"}}",
   "parent": {
@@ -131,7 +173,7 @@ If the decoded JSON includes nested fields it will be _deep_ merged into the eve
 
 Parsing the `"message"` field would result the following structure:
 
-```javascripton
+```javascript
 {
   "parent": {
     "child1": "value1",

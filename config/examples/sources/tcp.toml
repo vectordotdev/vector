@@ -1,0 +1,16 @@
+# `tcp` Source Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `tcp` source
+# Docs: https://docs.vectorproject.io/usage/configuration/sources/tcp
+
+[sources.my_tcp_source]
+  # REQUIRED - General
+  type = "tcp" # must be: tcp
+
+  # OPTIONAL - General
+  address = "0.0.0.0:9000" # no default
+  max_length = 102400 # default, bytes
+  shutdown_timeout_secs = 30 # default, seconds
+
+  # OPTIONAL - Context
+  host_key = "host" # default

@@ -1,0 +1,13 @@
+# `add_fields` Transform Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `add_fields` transform
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/add_fields
+
+[transforms.my_add_fields_transform]
+  # REQUIRED - General
+  type = "add_fields" # must be: add_fields
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - Fields
+  [transforms.my_add_fields_transform.fields]
+    new_field = "new field value"

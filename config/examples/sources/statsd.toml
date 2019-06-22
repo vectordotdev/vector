@@ -1,0 +1,9 @@
+# `statsd` Source Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `statsd` source
+# Docs: https://docs.vectorproject.io/usage/configuration/sources/statsd
+
+[sources.my_statsd_source]
+  # REQUIRED - General
+  type = "statsd" # must be: statsd
+  address = "127.0.0.1:8126"

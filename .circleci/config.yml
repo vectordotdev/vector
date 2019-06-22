@@ -413,13 +413,6 @@ tag-release-workflow-filters: &tag-release-workflow-filters
     tags:
       only: /v.*/
 
-edge-release-workflow-filters: &edge-release-workflow-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      ignore: /.*/
-
 workflows:
   version: 2
 
@@ -464,12 +457,6 @@ workflows:
             - rustfmt
             - check-stable
             - test-stable
-      - release-s3:
-          <<: *edge-release-workflow-filters
-          requires:
-            - compile-deb
-            - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-apple-darwin
       - release-docker:
           <<: *tag-release-workflow-filters
           requires:
@@ -483,7 +470,7 @@ workflows:
             - compile-x86_64-unknown-linux-gnu
             - compile-x86_64-apple-darwin
       - release-s3:
-          <<: *edge-release-workflow-filters
+          <<: *compile-workflow-filters
           requires:
             - compile-deb
             - compile-x86_64-unknown-linux-gnu

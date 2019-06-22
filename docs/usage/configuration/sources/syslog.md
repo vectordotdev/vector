@@ -175,7 +175,7 @@ Upon successful parsing, Vector will create a structured event. For example, giv
 
 Vector will produce an event with this structure.
 
-```javascripton
+```javascript
 {
   "message": "<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar",
   "timestamp": "2019-02-13T19:48:34+00:00",

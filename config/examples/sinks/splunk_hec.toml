@@ -1,0 +1,33 @@
+# `splunk_hec` Sink Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `splunk_hec` sink
+# Docs: https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec
+
+[sinks.my_splunk_hec_sink]
+  # REQUIRED - General
+  type = "splunk_hec" # must be: splunk_hec
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  host = "my-splunk-host.com" # no default
+  token = "A94A8FE5CCB19BA61C4C08" # no default
+
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 1 # default, bytes
+
+  # OPTIONAL - Requests
+  encoding = "ndjson" # no default, enum: ndjson, text
+  rate_limit_duration = 1 # default, seconds
+  rate_limit_num = 10 # default
+  request_in_flight_limit = 10 # default
+  request_timeout_secs = 60 # default, seconds
+  retry_attempts = 5 # default
+  retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.my_splunk_hec_sink.buffer]
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default

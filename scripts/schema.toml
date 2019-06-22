@@ -613,7 +613,7 @@ example, given this Syslog message:
 
 Vector will produce an event with this structure.
 
-```javascripton
+```javascript
 {
   "message": "<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar",
   "timestamp": "2019-02-13T19:48:34+00:00",
@@ -1013,11 +1013,51 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
-[transforms.json_parser.options.drop_field]
-type = "bool"
-default = true
-description = """\
-If `true` will drop the `field` after parsing.\
+[[transforms.json_parser.outputs]]
+type = "simple"
+body = """\
+
+"""
+
+[[transforms.json_parser.outputs]]
+type = "wrapped"
+body = """\
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this raw log line:
+
+```
+{"message": "{\"parent\": \"{\\\"child\\\": \\\"value2\\\"}\"}"}
+```
+
+You could unwrap the JSON with the following transforms:
+
+```coffeescript
+[transforms.root_json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+
+[transforms.parent_json]
+  inputs = ["root_json"]
+  type   = "json_parser"
+  field  = "parent"
+
+[transforms.child_json]
+  inputs = ["parent_json"]
+  type   = "json_parser"
+  field  = "child"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "child": "value2"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
 """
 
 [transforms.json_parser.options.drop_invalid]
@@ -1033,6 +1073,13 @@ type = "string"
 default = "message"
 description = """\
 The field decode as JSON. Must be a `string` value.\
+"""
+
+[[transforms.json_parser.sections]]
+title = "Chaining / Unwrapping"
+body = """\
+Please see the [I/O section](#i-o) for an example of chaining and unwrapping \
+JSON.
 """
 
 [[transforms.json_parser.sections]]
@@ -1059,7 +1106,7 @@ body = """\
 If the decoded JSON includes nested fields it will be _deep_ merged \
 into the event. For example, given the following event:
 
-```javascripton
+```javascript
 {
   "message": "{\"parent\": {\"child2\": \"value2\"}}",
   "parent": {
@@ -1070,7 +1117,7 @@ into the event. For example, given the following event:
 
 Parsing the `"message"` field would result the following structure:
 
-```javascripton
+```javascript
 {
   "parent": {
     "child1": "value1",
@@ -1148,7 +1195,7 @@ end\
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
-examples = [true]
+examples = [["/etc/vector/lua"]]
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\

@@ -312,11 +312,6 @@ data_dir = "/var/lib/vector"
 
   # OPTIONAL - General
 
-  # If `true` will drop the `field` after parsing.
-  #
-  # * default: true
-  drop_field = true
-
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
   #
@@ -345,7 +340,7 @@ data_dir = "/var/lib/vector"
   # function.
   #
   # * no default
-  search_dirs = true
+  search_dirs = ["/etc/vector/lua"]
 
   # The inline Lua source to evaluate.
   #

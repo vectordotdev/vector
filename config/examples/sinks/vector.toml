@@ -1,0 +1,19 @@
+# `vector` Sink Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `vector` sink
+# Docs: https://docs.vectorproject.io/usage/configuration/sinks/vector
+
+[sinks.my_vector_sink]
+  # REQUIRED - General
+  type = "vector" # must be: vector
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  address = "92.12.333.224:5000" # no default
+
+  # OPTIONAL - Buffer
+  [sinks.my_vector_sink.buffer]
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default

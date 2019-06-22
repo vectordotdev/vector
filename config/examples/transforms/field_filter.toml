@@ -1,0 +1,13 @@
+# `field_filter` Transform Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `field_filter` transform
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/field_filter
+
+[transforms.my_field_filter_transform]
+  # REQUIRED - General
+  type = "field_filter" # must be: field_filter
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  field = "file" # no default
+  value = "/var/log/nginx.log" # no default

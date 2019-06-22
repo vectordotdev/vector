@@ -30,7 +30,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
-  search_dirs = true # no default
+  search_dirs = ["/etc/vector/lua"] # no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -75,7 +75,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
   # function.
   #
   # * no default
-  search_dirs = true
+  search_dirs = ["/etc/vector/lua"]
 
   # The inline Lua source to evaluate.
   #
@@ -103,7 +103,7 @@ The `lua` transforms accepts [`log`][log_event] events and allows you to transfo
 | `type` | `string` | The component type<br />`required` `enum: "lua"` |
 | `inputs` | `string` | A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
-| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: true` |
+| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
 | `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`no default` `example: (see above)` |
 
 ## I/O
