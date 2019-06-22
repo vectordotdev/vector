@@ -54,9 +54,9 @@ rm -rf %{buildroot}
 %license LICENSE
 
 %if 0%{?fedora} || 0%{?rhel} == 7
-%attr(-, root, root) %{_libdir}/systemd/system/vector.service
+%{_libdir}/systemd/system/vector.service
 %else
-%attr(-, root, root) %{_initddir}/vector
+%{_initddir}/vector
 %endif
 
 %changelog
