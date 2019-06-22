@@ -22,8 +22,13 @@ URL: %{_url}
 %prep
 # We are currently in the BUILD dir
 tar -xvf %{_sourcedir}/%{_source} --strip-components=1
-cp -a %{_sourcedir}/init.d/. init.d
+
+%if 0%{?fedora} || 0%{?rhel} == 7
 cp -a %{_sourcedir}/systemd/. systemd
+%else
+cp -a %{_sourcedir}/init.d/. init.d
+%endif
+
 chown -R root.root .
 chmod -R a+rX,g-w,o-w .
 
@@ -40,8 +45,12 @@ cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
-cp -a %{_builddir}/init.d/vector %{buildroot}%{_initddir}/vector
+
+%if 0%{?fedora} || 0%{?rhel} == 7
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_libdir}/systemd/system/vector.service
+%else
+cp -a %{_builddir}/init.d/vector %{buildroot}%{_initddir}/vector
+%endif
 
 %clean
 rm -rf %{buildroot}
