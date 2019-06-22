@@ -297,6 +297,8 @@ jobs:
             # Verify that the deb actually works by installing it
             dpkg -i dist/vector-$VERSION-amd64.deb
             vector --version
+            # Ensure the deb still exists and was not deleted
+            stat dist/vector-$VERSION-amd64.deb
       - *persist-dist-to-workspace
 
   compile-rpm:
@@ -333,6 +335,8 @@ jobs:
             # Verify that the rpm actually works by installing it
             rpm -i dist/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm
             vector --version
+            # Ensure that the rpm still exists and was not deleted
+            stat dist/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm
       - *persist-dist-to-workspace
 
   release-docker:
