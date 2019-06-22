@@ -32,31 +32,16 @@ save-cargo-cache: &save-cargo-cache
     paths:
       - "~/.cargo"
 
-restore-build-cache: &restore-build-cache
-  restore_cache:
-    name: Restore target cache
-    keys:
-      - vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-      - vector-build-cache-{{ arch }}-{{ .Branch }}
-      - vector-build-cache-{{ arch }}
-
-save-build-cache: &save-build-cache
-  save_cache:
-    name: Save target cache
-    key: vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-    paths:
-      - "target"
-
 #
 # Run macros
 #
 
-cross-compile: &cross-compile
+build-release: &build-release
   run:
-    name: Cross Compile
+    name: Build release
     command: |
       export PATH="$HOME/.cargo/bin:$PATH"
-      ./.circleci/release.sh
+      ./.circleci/build_release.sh
 
 install-cross: &install-cross
   run:
@@ -96,7 +81,7 @@ install-rust: &install-rust
 
 persist-dist-to-workspace: &persist-dist-to-workspace
   persist_to_workspace:
-    root: dist
+    root: distribution
     paths:
       - "*.tar.gz"
 
@@ -109,7 +94,6 @@ release-job-defaults: &release-job-defaults
   steps:
     - *restore-git-cache
     - *restore-cargo-cache
-    - *restore-build-cache
     - *install-rust
     - run:
         name: Install Cross
@@ -124,10 +108,10 @@ release-job-defaults: &release-job-defaults
           pip install --upgrade awscli
     - checkout
     - run:
-        name: Cross Compile
+        name: Build release
         command: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          ./.circleci/release.sh
+          ./.circleci/build_release.sh
 
 #
 # Main document
@@ -204,7 +188,6 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      # - *restore-build-cache
       - checkout
       - *install-make
       - run:
@@ -215,20 +198,18 @@ jobs:
           path: ./test-results
       - *save-git-cache
       - *save-cargo-cache
-      # - *save-build-cache
 
   compile-armv7-unknown-linux-gnueabihf:
     machine: true
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "armv7-unknown-linux-gnueabihf"
@@ -238,13 +219,12 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-freebsd"
@@ -254,11 +234,10 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-linux-gnu"
@@ -268,13 +247,12 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-make-sudo
       - *install-gplusplus
       - *install-rust
       - *install-cross
       - checkout
-      - *cross-compile
+      - *build-release
       - *persist-dist-to-workspace
     environment:
       TARGET: "x86_64-unknown-netbsd"
@@ -288,14 +266,14 @@ jobs:
     steps:
       - *restore-git-cache
       - *restore-cargo-cache
-      - *restore-build-cache
       - *install-rust
       - checkout
       - run:
           name: Compile
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            ./.circleci/release.sh
+            export VERSION=$(./.circleci/version.sh)
+            ./.circleci/build_release.sh
       - persist_to_workspace:
           root: dist
           paths:
@@ -319,10 +297,47 @@ jobs:
             export VERSION=$(./.circleci/version.sh)
             mkdir dist
             mv $(find target/debian/ -name *.deb) "dist/vector-$VERSION-amd64.deb"
+            # Verify that the deb actually works by installing it
+            dpkg -i dist/vector-$VERSION-amd64.deb
       - persist_to_workspace:
           root: dist
           paths:
             - "*.deb"
+
+  compile-rpm:
+    resource_class: xlarge
+    docker:
+      - image: timberio/vector-centos-builder:latest
+    environment:
+      BUILDER: "cargo"
+      TARGET: "x86_64-unknown-linux-gnu"
+    steps:
+      - *restore-git-cache
+      #- *restore-cargo-cache
+      - checkout
+      - *build-release
+      - run:
+          name: Build .rpm package
+          command: |
+            export RELEASE=1
+            export VERSION=$(./.circleci/version.sh)
+            # The RPM spec does not like a leading `v` or `-` in the
+            # version name. Therefore we clean the version so that the
+            # `rpmbuild` command does not fail.
+            export CLEANED_VERSION=$VERSION
+            CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/^v//g')
+            CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
+            mkdir -p /root/rpmbuild/SOURCES
+            mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
+            rpmbuild -ba distribution/rpm/vector.spec
+            # Verify that the rpm actually works by installing it
+            export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm"
+            rpm -i $RPM_PATH
+            mv $RPM_PATH dist
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.rpm"
 
   release-docker:
     machine: true

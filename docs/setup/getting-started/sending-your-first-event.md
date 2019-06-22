@@ -84,7 +84,7 @@ Starting Vector ...
 
 Exit `vector` by pressing `ctrl+c`.
 
-You'll notice this time the event is structured. Vector knows when an event is structured or not and defaults to JSON encoding for outputs that support it. You can change the encoding in the [`format_parser` options](../../usage/configuration/transforms/format_parser.md).
+You'll notice this time the event is structured. Vector knows when an event is structured or not and defaults to JSON encoding for outputs that support it. You can change the encoding in the [`console` sink options](../../usage/configuration/sinks/console.md).
 
 That's it! This tutorial demonstrates the _very_ basic [concepts](../../about/concepts.md) of Vector. From here, you can start to think about the various [sources](../../usage/configuration/sources/), [transforms](../../usage/configuration/transforms/), and [sinks](../../usage/configuration/sinks/) you'll need to combine to create your pipelines.
 
