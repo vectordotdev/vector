@@ -328,7 +328,11 @@ jobs:
             CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/^v//g')
             CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
             mkdir -p /root/rpmbuild/SOURCES
+            mkdir -p /root/rpmbuild/SOURCES/init.d
+            mkdir -p /root/rpmbuild/SOURCES/systemd
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
+            cp -a distribution/init.d/. /root/rpmbuild/SOURCES/init.d
+            cp -a distribution/systemd/. /root/rpmbuild/SOURCES/systemd
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
             export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm"

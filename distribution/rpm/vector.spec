@@ -21,8 +21,14 @@ URL: %{_url}
 
 %prep
 # We are currently in the BUILD dir
-rm -rf %{_buildname}
 tar -xvf %{_sourcedir}/%{_source} --strip-components=1
+
+%if 0%{?fedora} || 0%{?rhel} == 7
+cp -a %{_sourcedir}/systemd/. systemd
+%else
+cp -a %{_sourcedir}/init.d/. init.d
+%endif
+
 chown -R root.root .
 chmod -R a+rX,g-w,o-w .
 
@@ -33,10 +39,18 @@ mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_datadir}/%{_name}
+mkdir -p %{buildroot}%{_initddir}/%{_name}
+mkdir -p %{buildroot}%{_libdir}/systemd/system
 cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
+
+%if 0%{?fedora} || 0%{?rhel} == 7
+cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_libdir}/systemd/system/vector.service
+%else
+cp -a %{_builddir}/init.d/vector %{buildroot}%{_initddir}/vector
+%endif
 
 %clean
 rm -rf %{buildroot}
@@ -49,6 +63,12 @@ rm -rf %{buildroot}
 %config %{_sysconfdir}/%{_name}/examples/*
 %doc README.md
 %license LICENSE
+
+%if 0%{?fedora} || 0%{?rhel} == 7
+%{_libdir}/systemd/system/vector.service
+%else
+%{_initddir}/vector
+%endif
 
 %changelog
 * Fri Jun 21 2019 Vector Devs <vector@timber.io> - 0.3.0
