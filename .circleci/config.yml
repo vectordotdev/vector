@@ -81,7 +81,7 @@ install-rust: &install-rust
 
 persist-dist-to-workspace: &persist-dist-to-workspace
   persist_to_workspace:
-    root: distribution
+    root: dist
     paths:
       - "*.tar.gz"
 
