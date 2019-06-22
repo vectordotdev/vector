@@ -1,2 +1,3 @@
 docs/* linguist-documentation
+lib/* linguist-vendored
 scripts/* linguist-detectable=false
