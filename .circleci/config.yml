@@ -330,7 +330,14 @@ jobs:
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
-            rpm -i vector.rpm
+            export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION.x86_64.rpm"
+            rpm -i $RPM_PATH
+            mv $RPM_PATH dist
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*.rpm"
+
   release-docker:
     machine: true
     steps:
