@@ -11,20 +11,23 @@ Vector can be installed on the Ubuntu operating system through the \
 
 1. Head over to the [Vector releases][releases] page to download Vector:
 
-    ```bash
-    curl -o /tmp/vector.deb https://packages.timber.io/vector/X.X.X/vector-vX.X.X-amd64.deb
-    ```
 
-    Replace `X.X.X` with the latest version.
+   ```bash
+   curl -o /tmp/vector.deb https://packages.timber.io/vector/X.X.X/vector-vX.X.X-amd64.deb
+   ```
+
+   Replace `X.X.X` with the latest version.
 
 2. Execute:
 
-    ```bash
-    dpkg -i /tmp/vector.deb
-    ```
+
+   ```bash
+   dpkg -i /tmp/vector.deb
+   ```
 
 3. Update the `/etc/vector/vector.toml` configuration file to suit your use
    use case:
+
 
    ```bash
    vi /etc/vector/vector.toml
@@ -36,9 +39,10 @@ Vector can be installed on the Ubuntu operating system through the \
 
 4. [Start](#starting) Vector:
 
-    ```base
-    sudo systemctl start vector
-    ```
+
+   ```base
+   sudo systemctl start vector
+   ```
 
 ## Administration
 

@@ -11,20 +11,23 @@ Vector RPM package.
 
 1. Head over to the [Vector releases][releases] page to download Vector:
 
-    ```bash
-    curl -o /tmp/vector.rpm https://packages.timber.io/vector/X.X.X/vector-vX.X.X-x86_64.rpm
-    ```
 
-    Replace `X.X.X` with the latest version.
+   ```bash
+   curl -o /tmp/vector.rpm https://packages.timber.io/vector/X.X.X/vector-vX.X.X-x86_64.rpm
+   ```
+
+   Replace `X.X.X` with the latest version.
 
 2. Execute:
 
-    ```bash
-    rpm -i /tmp/vector.rpm
-    ```
+   
+   ```bash
+   rpm -i /tmp/vector.rpm
+   ```
 
 3. Update the `/etc/vector/vector.toml` configuration file to suit your use
    use case:
+
 
    ```bash
    vi /etc/vector/vector.toml
@@ -36,13 +39,13 @@ Vector RPM package.
 
 4. [Start](#starting) Vector:
 
-    ```base
-    # CentOS >= 7
-    sudo systemctl start vector
+   ```bash
+   # CentOS >= 7
+   sudo systemctl start vector
 
-    # CentOS <= 6
-    sudo service vector start
-    ```
+   # CentOS <= 6
+   sudo service vector start
+   ```
 
 ## Administration
 

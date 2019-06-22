@@ -11,37 +11,42 @@ There is no runtime and there are no dependencies.
 
 1. [Install Rust](https://www.rust-lang.org/tools/install):  
 
-    ```bash
-    curl https://sh.rustup.rs -sSf | sh
-    ```
+
+   ```bash
+   curl https://sh.rustup.rs -sSf | sh
+   ```
 
 2. Clone to [Vector repo](https://github.com/timberio/vector):  
 
-    ```bash
-    git clone git@github.com:timberio/vector.git
-    ```
+
+   ```bash
+   git clone git@github.com:timberio/vector.git
+   ```
 
 3. Change into the Vector directory:  
 
-    ```bash
-    cd vector
-    ```
+
+   ```bash
+   cd vector
+   ```
 
 4. Build Vector:  
 
-    ```bash
-    cargo build --release
-    ```
+
+   ```bash
+   cargo build --release
+   ```
 
 5. Start Vector:
 
-    ```bash
-    target/release/vector --config=/path/to/vector.toml
-    ```
 
-    The `vector` binary is placed in the `target/release` sub-directory.
+   ```bash
+   target/release/vector --config=/path/to/vector.toml
+   ```
 
-6. See (How It Works)(#how-it-works) for optional follow up tasks.
+   The `vector` binary is placed in the `target/release` sub-directory.
+
+6. See [How It Works](#how-it-works) for optional follow up tasks.
 
 
 ## How It Works
