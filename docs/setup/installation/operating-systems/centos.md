@@ -2,10 +2,10 @@
 description: Install Vector on the Debian operating system
 ---
 
-# Debian
+# CentOS
 
-Vector can be installed on the Debian operating system through the \
-`vector.deb` package.
+Vector can be installed on the CentOS operating system through the \
+Vector RPM package.
 
 ## Install
 
