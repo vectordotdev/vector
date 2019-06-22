@@ -3,12 +3,13 @@ extern crate tokio_trace;
 
 use futures::{future, Future, Stream};
 use std::{
-    cmp::{max, min},
+    // cmp::{max, min},
     fs::File,
     net::SocketAddr,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
+use tokio_io_pool::Runtime;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use tokio_trace::{field, Dispatch};
 use tokio_trace_futures::Instrument;
@@ -110,14 +111,15 @@ fn main() {
 
         let config = vector::topology::Config::load(file);
 
-        let mut rt = {
-            let mut builder = tokio::runtime::Builder::new();
+        // let mut rt = {
+        //     let mut builder = tokio::runtime::Builder::new();
 
-            let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
-            builder.core_threads(min(4, threads));
+        //     let threads = opts.threads.unwrap_or(max(1, num_cpus::get()));
+        //     builder.core_threads(min(4, threads));
 
-            builder.build().expect("Unable to create async runtime")
-        };
+        //     builder.build().expect("Unable to create async runtime")
+        // };
+        let mut rt = Runtime::new();
 
         let (metrics_trigger, metrics_tripwire) = stream_cancel::Tripwire::new();
 
@@ -130,7 +132,8 @@ fn main() {
                     .select(metrics_tripwire)
                     .map(|_| ())
                     .map_err(|_| ()),
-            );
+            )
+            .unwrap();
         }
 
         info!(
@@ -214,7 +217,7 @@ fn main() {
             unreachable!();
         }
 
-        rt.shutdown_now().wait().unwrap();
+        rt.shutdown();
     });
 }
 

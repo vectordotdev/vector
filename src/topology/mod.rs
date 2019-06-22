@@ -31,7 +31,7 @@ pub struct RunningTopology {
 
 pub fn start(
     config: Result<Config, Vec<String>>,
-    rt: &mut tokio::runtime::Runtime,
+    rt: &mut tokio_io_pool::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
@@ -130,7 +130,7 @@ impl RunningTopology {
     pub fn reload_config(
         &mut self,
         new_config: Result<Config, Vec<String>>,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut tokio_io_pool::Runtime,
         require_healthy: bool,
         initial_load: bool,
     ) -> bool {
@@ -214,7 +214,7 @@ impl RunningTopology {
                 return false;
             }
         } else {
-            rt.spawn(healthchecks);
+            rt.spawn(healthchecks).unwrap();
         }
 
         // Sources
@@ -319,12 +319,12 @@ impl RunningTopology {
         &mut self,
         name: &String,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut tokio_io_pool::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("sink", name = name.as_str()));
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = oneshot::spawn(task, rt.handle());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
         }
@@ -334,12 +334,12 @@ impl RunningTopology {
         &mut self,
         name: &String,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut tokio_io_pool::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("transform", name = name.as_str()));
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = oneshot::spawn(task, rt.handle());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
         }
@@ -349,12 +349,12 @@ impl RunningTopology {
         &mut self,
         name: &String,
         new_pieces: &mut builder::Pieces,
-        rt: &mut tokio::runtime::Runtime,
+        rt: &mut tokio_io_pool::Runtime,
     ) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let task = handle_errors(task, self.abort_tx.clone());
         let task = task.instrument(info_span!("source-pump", name = name.as_str()));
-        let spawned = oneshot::spawn(task, &rt.executor());
+        let spawned = oneshot::spawn(task, rt.handle());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             previous.forget();
         }
@@ -367,7 +367,7 @@ impl RunningTopology {
         let source_task = handle_errors(source_task, self.abort_tx.clone());
         let source_task = source_task.instrument(info_span!("source", name = name.as_str()));
         self.source_tasks
-            .insert(name.clone(), oneshot::spawn(source_task, &rt.executor()));
+            .insert(name.clone(), oneshot::spawn(source_task, rt.handle()));
     }
 
     fn shutdown_source(&mut self, name: &String) {
