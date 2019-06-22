@@ -12,7 +12,7 @@ Vector can be installed on the Debian operating system through the \
 1. Head over to the [Vector releases][releases] page to download Vector:
 
     ```bash
-    curl -o /tmp/vector.deb https://github.com/timberio/vector/releases/download/vX.X.X/vector-vX.X.X-amd64.deb
+    curl -o /tmp/vector.deb https://packages.timber.io/vector/X.X.X/vector-vX.X.X-amd64.deb
     ```
 
     Replace `X.X.X` with the latest version.

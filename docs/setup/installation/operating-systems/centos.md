@@ -12,7 +12,7 @@ Vector RPM package.
 1. Head over to the [Vector releases][releases] page to download Vector:
 
     ```bash
-    curl -o /tmp/vector.rpm https://github.com/timberio/vector/releases/download/vX.X.X/vector-vX.X.X-amd64.rpm
+    curl -o /tmp/vector.rpm https://packages.timber.io/vector/X.X.X/vector-vX.X.X-x86_64.rpm
     ```
 
     Replace `X.X.X` with the latest version.
