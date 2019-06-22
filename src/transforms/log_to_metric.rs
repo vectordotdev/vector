@@ -75,10 +75,10 @@ impl Transform for LogToMetric {
                         };
 
                         if *increment_by_value {
-                            if let Ok(val) = val.to_string_lossy().parse() {
+                            if let Ok(val) = val.to_string_lossy().parse::<f32>() {
                                 return Some(Event::Metric(Metric::Counter {
                                     name,
-                                    val,
+                                    val: val as u32,
                                     sampling: None,
                                 }));
                             } else {
@@ -98,7 +98,7 @@ impl Transform for LogToMetric {
                     if let Some(val) = event.get(field) {
                         let name = match name {
                             Some(s) => s.to_string(),
-                            None => format!("{}", field.to_string()),
+                            None => field.to_string(),
                         };
 
                         if let Ok(val) = val.to_string_lossy().parse() {
@@ -223,7 +223,7 @@ mod tests {
 
         let mut log = Event::from("i am a log");
         log.as_mut_log()
-            .insert_explicit("amount".into(), "33".into());
+            .insert_explicit("amount".into(), "33.95".into());
 
         let mut transform = LogToMetric::new(config);
 
