@@ -9,28 +9,28 @@ There is no runtime and there are no dependencies.
 
 ## Installation
 
-1. [Install Rust](https://www.rust-lang.org/tools/install):  
+1. Install Rust
 
 
    ```bash
    curl https://sh.rustup.rs -sSf | sh
    ```
 
-2. Clone to [Vector repo](https://github.com/timberio/vector):  
+2. Clone to [Vector repo](https://github.com/timberio/vector):
 
 
    ```bash
    git clone git@github.com:timberio/vector.git
    ```
 
-3. Change into the Vector directory:  
+3. Change into the Vector directory:
 
 
    ```bash
    cd vector
    ```
 
-4. Build Vector:  
+4. Build Vector:
 
 
    ```bash

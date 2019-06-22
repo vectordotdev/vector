@@ -25,19 +25,16 @@ Vector can be installed on the Ubuntu operating system through the \
    dpkg -i /tmp/vector.deb
    ```
 
-3. Update the `/etc/vector/vector.toml` configuration file to suit your use
-   use case:
+3. Update the `/etc/vector/vector.toml` configuration file to suit your use use case:
 
 
    ```bash
    vi /etc/vector/vector.toml
    ```
 
-   A full configuration spec is located at `/etc/vector/vector.spec.toml`
-   and the [Configuration Section] documents and explains all available
-   options.
+   A full configuration spec is located at `/etc/vector/vector.spec.toml` and the [Configuration Section] documents and explains all available options.
 
-4. [Start](#starting) Vector:
+4. Start Vector:
 
 
    ```base
