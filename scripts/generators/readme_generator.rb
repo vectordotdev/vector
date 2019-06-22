@@ -45,8 +45,6 @@ class ReadmeGenerator < Generator
       #### About
 
       * [**Use cases**][use_cases]
-      * [**Performance**][performance]
-      * [**Correctness**][correctness]
       * [**Concepts**][concepts]
       * [**Data model**][data_model]
       * [**Guarantees**][guarantees]
@@ -69,12 +67,6 @@ class ReadmeGenerator < Generator
       * [**Community**][community] - [forum], [slack chat][slack], [mailing list][mailing_list]
       * [**Download**][releases]
       * [**Roadmap**][roadmap] - [vote on new features][vote_feature]
-
-      #### Meta
-
-      * [**Changelog**](CHANGELOG.md)
-      * [**Contributing**](CONTRIBUTING.md)
-      * [**Releasing**](RELEASING.md)
 
       ## Features
 
@@ -110,7 +102,6 @@ class ReadmeGenerator < Generator
       | [File Rotate \(copytruncate\)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
       | [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
       | [Process \(SIGHUP\)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
-      | TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
       | [JSON \(wrapped\)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
       To learn more about our performance tests, please see the [Vector test harness][test_harness].

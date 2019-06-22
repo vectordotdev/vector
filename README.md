@@ -32,8 +32,6 @@ get data from A to B.
 #### About
 
 * [**Use cases**][use_cases]
-* [**Performance**][performance]
-* [**Correctness**][correctness]
 * [**Concepts**][concepts]
 * [**Data model**][data_model]
 * [**Guarantees**][guarantees]
@@ -56,12 +54,6 @@ get data from A to B.
 * [**Community**][community] - [forum], [slack chat][slack], [mailing list][mailing_list]
 * [**Download**][releases]
 * [**Roadmap**][roadmap] - [vote on new features][vote_feature]
-
-#### Meta
-
-* [**Changelog**](CHANGELOG.md)
-* [**Contributing**](CONTRIBUTING.md)
-* [**Releasing**](RELEASING.md)
 
 ## Features
 
@@ -97,7 +89,6 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️* | ✅ | ✅ |
-| TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 To learn more about our performance tests, please see the [Vector test harness][test_harness].
@@ -150,7 +141,7 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams events to a TCP connection. |
 | [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams events to another downstream Vector instance. |
 
-[+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
+[+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
 
 ## License
