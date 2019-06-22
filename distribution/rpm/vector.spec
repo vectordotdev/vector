@@ -34,6 +34,8 @@ mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_datadir}/%{_name}
+mkdir -p %{buildroot}%{_initddir}/%{_name}
+mkdir -p %{buildroot}%{_libdir}/systemd/system
 cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
