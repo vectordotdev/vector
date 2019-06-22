@@ -1,0 +1,24 @@
+# JSON Configuration Example
+# ------------------------------------------------------------------------------
+# A simple example that parses incoming data as JSON.
+
+data_dir = "/var/lib/vector"
+
+# Ingest data
+# Docs: https://docs.vectorproject.io/usage/configuration/sources/file
+[sources.logs]
+  type         = "file"
+  include      = ["/var/log/*.log"]
+  ignore_older = 86400 # 1 day
+
+# Parse that data as JSON
+# Docs: https://docs.vectorproject.io/usage/configuration/transforms/json_parser
+[transforms.parse_json]
+  inputs       = ["logs"]
+  type         = "json_parser"
+
+# Print the data to STDOUT for inspection
+# Docs: https://docs.vectorproject.io/usage/configuration/sinks/console
+[sinks.out]
+  inputs       = ["apache_parser"] # don't sample
+  type         = "console"

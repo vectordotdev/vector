@@ -150,7 +150,7 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams events to a TCP connection. |
 | [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams events to another downstream Vector instance. |
 
-[+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
+[+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
 
 ## License

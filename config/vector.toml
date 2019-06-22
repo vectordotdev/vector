@@ -19,7 +19,7 @@ data_dir = "/var/lib/vector"
 # Ingest data by tailing one or more files
 [sources.apache_logs]
   type         = "file"
-  path         = "/var/log/apache2/*.log"
+  include      = ["/var/log/apache2/*.log"]
   ignore_older = 86400 # 1 day
 
 # Structure and parse the data
@@ -28,18 +28,6 @@ data_dir = "/var/lib/vector"
   type         = "regex_parser"
   regex        = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
 
-# Send structured data to a short-term storage
-[sinks.es_cluster]
-  inputs       = ["apache_sampler"]
-  type         = "elasticsearch"
-  host         = "79.12.221.222:9200"
-
-# Send structured data to a cost-effective long-term storage
-[sinks.s3_archives]
-  inputs       = ["apache_parser"] # don't sample
-  type         = "s3"
-  region       = "us-east-1"
-  bucket       = "my_log_archives"
-  batch_size   = 10000000 # 10mb uncompressed
-  gzip         = true
-  encoding     = "ndjson"
+# Output data
+[sinks.print]
+  type         = "console"
