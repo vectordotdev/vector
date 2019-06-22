@@ -331,6 +331,7 @@ jobs:
             cp -a distribution/init.d/. /root/rpmbuild/SOURCES/init.d
             cp -a distribution/systemd/. /root/rpmbuild/SOURCES/systemd
             rpmbuild -ba distribution/rpm/vector.spec
+            cd /root/project
             mv "/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm" "dist/vector-$VERSION-x86_64.rpm"
             # Verify that the rpm actually works by installing it
             rpm -i dist/vector-$VERSION-x86_64.rpm
