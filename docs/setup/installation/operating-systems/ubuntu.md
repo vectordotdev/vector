@@ -78,7 +78,7 @@ sudo systemctl stop vector
 
 ### Uninstalling
 
-```nash
+```bash
 dpkg –-remove vector
 ```
 

@@ -37,7 +37,11 @@ Vector can be installed on the Debian operating system through the \
 4. [Start](#starting) Vector:
 
     ```base
+    # CentOS >= 7
     sudo systemctl start vector
+
+    # CentOS <= 6
+    sudo service vector start
     ```
 
 ## Administration
@@ -61,32 +65,44 @@ Please see the [Metrics section][metrics] in the [Monitoring doc][monitoring].
 Reloading is done on-the-fly and does not stop the Vector service.
 
 ```bash
+# CentOS >= 7
 systemctl kill -s HUP --kill-who=main vector.service
+
+# CentOS <= 6
+sudo service vector reload
 ```
 
 ### Starting
 
 ```bash
+# CentOS >= 7
 sudo systemctl start vector
+
+# CentOS <= 6
+sudo service vector start
 ```
 
 ### Stopping
 
 ```bash
+# CentOS >= 7
 sudo systemctl stop vector
+
+# CentOS <= 6
+sudo service vector stop
 ```
 
 ### Uninstalling
 
-```nash
-dpkg –-remove vector
+```bash
+rpm -e vector
 ```
 
 ### Updating
 
-Simply follow the [install instructions](#install) again with the \
-latest `vector.deb` file. Vector will not overwrite your configuration \
-file.
+```bash
+rpm -Uvh vector.rpm
+```
 
 ## Resources
 

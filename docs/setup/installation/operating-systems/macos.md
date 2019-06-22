@@ -51,7 +51,7 @@ brew services stop vector
 
 ### Uninstalling
 
-```nash
+```bash
 brew uninstall vector
 ```
 
