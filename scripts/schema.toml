@@ -1195,7 +1195,7 @@ end\
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
-examples = ["/etc/vector/lua"]
+examples = [["/etc/vector/lua"]]
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\

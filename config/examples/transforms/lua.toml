@@ -9,7 +9,7 @@
   inputs = ["my-source-id"]
 
   # OPTIONAL - General
-  search_dirs = "/etc/vector/lua" # no default
+  search_dirs = ["/etc/vector/lua"] # no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
