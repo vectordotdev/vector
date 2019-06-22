@@ -4,7 +4,8 @@
 %define _url https://vectorproject.io
 %define _version %{getenv:VERSION}
 %define _source %{_name}-%{_version}.tar.gz
-%define _buildroot %{_name}-%{_version}
+%define _sourceroot %{_name}-%{_version}
+%define _buildname %{name}-%{version}-%{release}.%{_arch}
 
 Name: %{_name}
 Summary: A High-Performance Logs, Metrics, and Events Routing Layer
@@ -14,16 +15,14 @@ License: ASL 2.0
 Group: Applications/System
 Source: %{_source}
 URL: %{_url}
-BuildRoot: %{_buildroot}
 
 %description
 %{summary}
 
 %prep
 # We are currently in the BUILD dir
-rm -rf %{_buildroot}
-tar -xvf %{_sourcedir}/%{_source}
-cd %{_buildroot}
+rm -rf %{_buildname}
+tar -xvf %{_sourcedir}/%{_source} --strip-components=1
 chown -R root.root .
 chmod -R a+rX,g-w,o-w .
 
@@ -34,12 +33,10 @@ mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_datadir}/%{_name}
-echo $(pwd)
-cp -a %{_builddir}/%{_buildroot}/bin/. %{buildroot}%{_bindir}
-rm -rf %{_builddir}/%{_buildroot}/bin
-cp -a %{_builddir}/%{_buildroot}/config/. %{buildroot}%{_sysconfdir}/%{_name}
-rm -rf %{_builddir}/%{_buildroot}/config
-cp -a %{_builddir}/%{_buildroot}/. %{buildroot}
+cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
+cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
+cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
+cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
 
 %clean
 rm -rf %{buildroot}
@@ -51,7 +48,6 @@ rm -rf %{buildroot}
 %config %{_sysconfdir}/%{_name}/vector.spec.toml
 %config %{_sysconfdir}/%{_name}/examples/*
 %doc README.md
-%doc %{_sysconfdir}/%{_name}/vector.spec.toml
 %license LICENSE
 
 %changelog
