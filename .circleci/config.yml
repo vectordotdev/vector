@@ -421,11 +421,6 @@ edge-release-workflow-filters: &edge-release-workflow-filters
 workflows:
   version: 2
 
-  test-release:
-    jobs:
-      - compile-deb
-      - compile-rpm
-
   test:
     jobs:
       - rustfmt:
