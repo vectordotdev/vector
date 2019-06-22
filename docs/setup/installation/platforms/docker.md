@@ -37,18 +37,18 @@ The Vector Docker images ship with [default configuration][default_configuration
 This is meant to serve as an example. To customize the configuration we recommend
 generating a new image that includes your own configuration:
 
-  {% code-tabs %}
-  {% code-tabs-item title="Dockerfile" %}
-  ```
-  FROM timberio/vector:latest
-  COPY vector.toml /vector/config/vector.toml
-  ```
-  {% endcode-tabs-item %}
-  {% endcode-tabs %}
+{% code-tabs %}
+{% code-tabs-item title="Dockerfile" %}
+```
+FROM timberio/vector:latest
+COPY vector.toml /vector/config/vector.toml
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
-  `vector.toml` should be in the same directory as your `Dockerfile`. Information
-  on Vector's configuration can be found in the [Configuration][configuration]
-  section.
+`vector.toml` should be in the same directory as your `Dockerfile`. Information
+on Vector's configuration can be found in the [Configuration][configuration]
+section.
 
 ## Log Parsing
 
@@ -72,7 +72,6 @@ example of this in the [I/O section of the `json_parser` documentation][json_par
 [default_configuration]: default_configuration
 [debian_base_image]: https://hub.docker.com/_/debian/?tab=description
 [docker_hub_vector]: https://hub.docker.com/r/timberio/vector
+[dockerfile]: https://github.com/timberio/vector/blob/master/Dockerfile
 [json_parser_transform]: ../../configuration/transforms/json_parser.md
 [json_parser_transform_io]: ../../configuration/transforms/json_parser.md#i-o
-
-[dockerfile]: https://github.com/timberio/vector/blob/master/Dockerfile
