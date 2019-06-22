@@ -331,12 +331,12 @@ jobs:
             cp -a distribution/init.d/. /root/rpmbuild/SOURCES/init.d
             cp -a distribution/systemd/. /root/rpmbuild/SOURCES/systemd
             rpmbuild -ba distribution/rpm/vector.spec
-            mv "/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm" dist
+            mv "/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm" "dist/vector-$VERSION-x86_64.rpm"
             # Verify that the rpm actually works by installing it
-            rpm -i dist/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm
+            rpm -i dist/vector-$VERSION-x86_64.rpm
             vector --version
             # Ensure that the rpm still exists and was not deleted
-            stat dist/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm
+            stat dist/vector-$VERSION-x86_64.rpm
       - *persist-dist-to-workspace
 
   release-docker:
@@ -387,6 +387,7 @@ jobs:
           name: Upload
           command: |
             export VERSION=$(./.circleci/version.sh)
+            VERSION=$(echo $VERSION | sed 's/^v//g')
             echo "Releasing $VERSION..."
             aws s3 cp "dist/" "s3://packages.timber.io/vector/$VERSION/" --recursive
 
