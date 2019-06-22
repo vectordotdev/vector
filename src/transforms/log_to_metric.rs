@@ -15,14 +15,14 @@ pub struct LogToMetricConfig {
 pub enum MetricConfig {
     Counter {
         field: Atom,
-        name: Atom,
+        name: Option<Atom>,
         #[serde(default = "default_increment_by_value")]
         increment_by_value: bool,
         labels: IndexMap<Atom, String>,
     },
     Gauge {
         field: Atom,
-        name: Atom,
+        name: Option<Atom>,
         labels: IndexMap<Atom, String>,
     },
 }
@@ -69,10 +69,15 @@ impl Transform for LogToMetric {
                     ..
                 } => {
                     if let Some(val) = event.get(field) {
+                        let name = match name {
+                            Some(s) => s.to_string(),
+                            None => format!("{}_total", field.to_string()),
+                        };
+
                         if *increment_by_value {
                             if let Ok(val) = val.to_string_lossy().parse() {
                                 return Some(Event::Metric(Metric::Counter {
-                                    name: name.to_string(),
+                                    name,
                                     val,
                                     sampling: None,
                                 }));
@@ -82,7 +87,7 @@ impl Transform for LogToMetric {
                             }
                         } else {
                             return Some(Event::Metric(Metric::Counter {
-                                name: name.to_string(),
+                                name,
                                 val: 1,
                                 sampling: None,
                             }));
@@ -91,9 +96,14 @@ impl Transform for LogToMetric {
                 }
                 MetricConfig::Gauge { field, name, .. } => {
                     if let Some(val) = event.get(field) {
+                        let name = match name {
+                            Some(s) => s.to_string(),
+                            None => format!("{}", field.to_string()),
+                        };
+
                         if let Ok(val) = val.to_string_lossy().parse() {
                             return Some(Event::Metric(Metric::Gauge {
-                                name: name.to_string(),
+                                name,
                                 val,
                                 direction: None,
                             }));
@@ -122,7 +132,6 @@ mod tests {
             [[metrics]]
             type = "counter"
             field = "status"
-            name = "status_total"
             labels = {status = "#{event.status}", host = "#{event.host}"}
             "##,
         )
