@@ -145,10 +145,3 @@ splunk-integration-tests = []
 [[bench]]
 name = "bench"
 harness = false
-
-
-[package.metadata.rpm.cargo]
-buildflags = ["--release"]
-
-[package.metadata.rpm.targets]
-vector = { path = "/usr/bin/vector" }
