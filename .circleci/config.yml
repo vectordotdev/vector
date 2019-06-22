@@ -319,6 +319,7 @@ jobs:
       - run:
           name: Build .rpm package
           command: |
+            export RELEASE=1
             export VERSION=$(./.circleci/version.sh)
             # The RPM spec does not like a leading `v` or `-` in the
             # version name. Therefore we clean the version so that the
@@ -330,7 +331,7 @@ jobs:
             mv $(find dist/ -name *.tar.gz) "/root/rpmbuild/SOURCES/vector-$VERSION.tar.gz"
             rpmbuild -ba distribution/rpm/vector.spec
             # Verify that the rpm actually works by installing it
-            export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-1.x86_64.rpm"
+            export RPM_PATH="/root/rpmbuild/RPMS/x86_64/vector-$CLEANED_VERSION-$RELEASE.x86_64.rpm"
             rpm -i $RPM_PATH
             mv $RPM_PATH dist
       - persist_to_workspace:
@@ -422,6 +423,7 @@ workflows:
 
   test-release:
     jobs:
+      - compile-deb
       - compile-rpm
 
   test:

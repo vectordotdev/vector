@@ -1,6 +1,6 @@
 %define _name vector
 %define _cleaned_version %{getenv:CLEANED_VERSION}
-%define _release 1
+%define _release %{getenv:RELEASE}
 %define _url https://vectorproject.io
 %define _version %{getenv:VERSION}
 %define _source %{_name}-%{_version}.tar.gz
