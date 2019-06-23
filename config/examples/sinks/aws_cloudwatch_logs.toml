@@ -1,7 +1,7 @@
 # `aws_cloudwatch_logs` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `aws_cloudwatch_logs` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs
+# Docs: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
 
 [sinks.my_aws_cloudwatch_logs_sink]
   # REQUIRED - General

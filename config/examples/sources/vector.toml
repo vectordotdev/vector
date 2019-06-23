@@ -1,7 +1,7 @@
 # `vector` Source Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `vector` source
-# Docs: https://docs.vectorproject.io/usage/configuration/sources/vector
+# Docs: https://docs.vector.dev/usage/configuration/sources/vector
 
 [sources.my_vector_source]
   # REQUIRED - General

@@ -1,7 +1,7 @@
 # `vector` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `vector` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/vector
+# Docs: https://docs.vector.dev/usage/configuration/sinks/vector
 
 [sinks.my_vector_sink]
   # REQUIRED - General

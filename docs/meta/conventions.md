@@ -152,17 +152,26 @@ When displaying options, a table must adhere to the following format:
 
 ### Guides
 
-Within the "Usage" category is a [Guides section](../usage/guides/). Guides are not replacements for documentation on the topic they are covering, they are supplemental tutorials or walkthroughs. For example, monitoring is covered under the [Administration section](../usage/administration/), but we also offer a [Monitoring Guide](../usage/guides/monitoring.md) which provides a full walk through of setting up various monitoring components.
+Within the "Usage" category is a [Guides section][docs.guides]. Guides are not
+replacements for documentation on the topic they are covering, they are
+supplemental tutorials or walkthroughs. For example, monitoring is covered
+under the [Administration section][docs.administration], but we should also
+offer a monitorig guide that provides a full walk through with specific
+integrations.
 
 ### Sources, Transforms, & Sinks
 
 #### Heading
 
-The heading must include the appropriate diagram highlighting the component with a succinct description of what the component does. It should mention the event types that it accepts.
+The heading must include the appropriate diagram highlighting the component
+with a succinct description of what the component does. It should mention the
+event types that it accepts.
 
 #### Section Hierarchy
 
-Source, transform, and sink pages must be structured to include the following section hierarchy. The root level represents an `h1`, children are `h2`, and so on:
+Source, transform, and sink pages must be structured to include the following
+section hierarchy. The root level represents an `h1`, children are `h2`, and
+so on:
 
 * **Example** - A configuration example that includes all options, [formatted appropriately](conventions.md#configuration-examples).
 * **Options** - A table representing the available options, [formatted appropriately](conventions.md#options).
@@ -177,11 +186,13 @@ Source, transform, and sink pages must be structured to include the following se
 
 ### Factual Tone
 
-Vector's documentation tone is factual and academic. Convey subject matter in a clear, concise, and confident manner.
+Vector's documentation tone is factual and academic. Convey subject matter in a
+clear, concise, and confident manner.
 
 Avoid using vague language such as “it seems” or “probably.” Instead of:
 
-> It seems like every SSL reseller packs their certs in a slightly different way with slightly different filenames.
+> It seems like every SSL reseller packs their certs in a slightly different
+way with slightly different filenames.
 
 Use:
 
@@ -234,3 +245,6 @@ Here a few examples to help illustrate this point:
 * Every [source](../usage/configuration/sources/), [transform](../usage/configuration/transforms/), and [sink](../usage/configuration/sinks/) includes _all_ options, even if they are foundational options that are shared and repeated across all components. This avoids the need for a user to have to jump around to separate pages to get the full scope of options available to them.
 * All of the `aws_*` sources and sinks include an "Authentication" section that repeats the same language. This is easier for the user since it is contained in the relevant integration page. The user should not have to jump to a separate "AWS Authentication" page unless this subject deserved it's own entire document. Even then, each `aws_*` source and sink should include a link to that document.
 
+
+[docs.administration]: ..docs/usage/administration
+[docs.guides]: ..docs/usage/guides

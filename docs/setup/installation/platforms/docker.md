@@ -4,8 +4,8 @@ description: Install Vector on the Docker platform
 
 # Docker
 
-Vector maintains Docker images [available on Docker Hub][docker_hub_vector].
-The [`Dockerfile`][docker_file] is available in the root of the Vector repo.
+Vector maintains Docker images [available on Docker Hub][url.docker_hub_vector].
+The [`Dockerfile`][url.dockerfile] is available in the root of the Vector repo.
 
 ## Installation
 
@@ -21,7 +21,7 @@ Run the image:
 docker run -ti timberio/vector:latest /vector/bin/vector --config=/vector/config/vector.toml
 ```
 
-This will boot Vector with the [default configuration][default_configuration],
+This will boot Vector with the [default configuration][url.default_configuration],
 which is likely not what you want. See the [Custom Configuration](#custom-configuration)
 section for more info.
 
@@ -29,11 +29,11 @@ section for more info.
 
 ### Base Image
 
-The Vector Docker images use [`debian:9-slim`][debian_base_image]
+The Vector Docker images use `debian:9-slim`.
 
 ### Custom Configuration
 
-The Vector Docker images ship with [default configuration][default_configuration].
+The Vector Docker images ship with [default configuration][url.default_configuration].
 This is meant to serve as an example. To customize the configuration we recommend
 generating a new image that includes your own configuration:
 
@@ -47,7 +47,7 @@ COPY vector.toml /vector/config/vector.toml
 {% endcode-tabs %}
 
 `vector.toml` should be in the same directory as your `Dockerfile`. Information
-on Vector's configuration can be found in the [Configuration][configuration]
+on Vector's configuration can be found in the [Configuration][docs.configuration]
 section.
 
 ## Log Parsing
@@ -60,18 +60,18 @@ Docker, by default, wraps it's log messages in JSON documents. For example:
 
 When configuring Vector, you'll want to unwrap the JSON, parsing and merging
 the JSON document contained in the `"log"` key. This can be achieved by
-chaining [`json_parser` transforms][json_parser_transform]. You can see an
-example of this in the [I/O section of the `json_parser` documentation][json_parser_transform_io]
+chaining [`json_parser` transforms][docs.json_parser_transform]. You can see an
+example of this in the [I/O section of the `json_parser` documentation][docs.json_parser_transform.io]
 
 ## Resources
 
-* [Vector on Docker Hub][docker_hub_vector]
-* [Dockerfile][dockerfile]
+* [Vector on Docker Hub][url.docker_hub_vector]
+* [Dockerfile][url.dockerfile]
 
 
-[default_configuration]: default_configuration
-[debian_base_image]: https://hub.docker.com/_/debian/?tab=description
-[docker_hub_vector]: https://hub.docker.com/r/timberio/vector
-[dockerfile]: https://github.com/timberio/vector/blob/master/Dockerfile
-[json_parser_transform]: ../../configuration/transforms/json_parser.md
-[json_parser_transform_io]: ../../configuration/transforms/json_parser.md#i-o
+[docs.configuration]: ../../..docs/usage/configuration
+[docs.json_parser_transform.io]: ../../../usage/configuration/transforms/json_parser.md#io
+[docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
+[url.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
+[url.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
+[url.dockerfile]: https://github.com/timberio/vector/blob/master/Dockerfile

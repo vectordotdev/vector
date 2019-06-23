@@ -4,28 +4,54 @@ description: Starting Vector
 
 # Starting
 
-This document covers how to properly start Vector.
-
-## Quick Start
-
 Vector can be started by calling the `vector` binary directly, no command is necessary.
 
+{% tabs %}
+{% tab title="Manual" %}
 ```bash
 vector --config /etc/vector/vector.toml
 ```
+{% endtab %}
+{% tab title="Systemd" %}
+```bash
+sudo systemctl start vector
+```
+{% endtab %}
+{% tab title="Initd" %}
+```bash
+/etc/init.d/vector start
+```
+{% endtab %}
+{% tab title="Homebrew" %}
+```bash
+brew services start vector
+```
+{% endtab %}
+{% endtabs %}
 
-## Options
+## Flags
 
-| Name | Arg | Description |
-| :--- | :---: | :--- |
+| Flag | Description |
+| :--- | :--- |
 | **Required** |  |  |
-| `-c, --config` | `<path>` | Path the Vector [configuration file](../configuration/). |
+| `-c, --config <path>` | Path the Vector [configuration file][docs.configuration]. |
 | **Optional** |  |  |
-| `-r, --require-healthy` | - | Causes vector to immediate exit on startup if any sinks have failing healthchecks. |
+| `-q, --quiet` | Raises the log level to `warn`. |
+| `-qq` | Raises the log level to `error`. |
+| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks. |
+| `-t, --threads` | Limits the number of internal threads Vector can spawn. See the [Limiting Resources][docs.agent_role.limiting-resources] in the [Agent role][docs.agent_role] documentation. |
+| `-v, --verbose` | Drops the log level to `debug`. |
+| `-vv` | Drops the log level to `trace`. |
 
-## How It Works
+## Daemonizing
 
-### Daemonizing
+Vector does not _directly_ offer a way to daemonize the Vector process. We
+highly recommend that you use a utility like [Systemd][url.systemd] to
+daemonize and manage your processes. Vector provides a
+[`vector.service` file][url.vector_systemd_file] for Systemd.
 
-Vector does not _directly_ offer a way to daemonize the Vector process. We highly recommend that you use a utility like [Systemd](https://www.freedesktop.org/wiki/Software/systemd/) to daemonize and manage your processes.
 
+[docs.agent_role]: ../../setup/deployment/roles/agent.md
+[docs.configuration]: ../..docs/usage/configuration
+[url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[url.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service

@@ -1,7 +1,7 @@
 # `aws_kinesis_streams` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `aws_kinesis_streams` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams
+# Docs: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 
 [sinks.my_aws_kinesis_streams_sink]
   # REQUIRED - General

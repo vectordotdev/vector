@@ -1,11 +1,12 @@
 #!/bin/bash
-#
+
 # vector -Startup script for the Vector router
 #
 # description: A High-Performance Logs, Metrics, and Events Router
 # processname: vector
 # config:      /etc/vector/vector.toml
 # pidfile:     /var/run/vector.pid
+
 ### BEGIN INIT INFO
 # Provides:          vector
 # Required-Start:    $network $local_fs
@@ -34,7 +35,7 @@ RETVAL=0
 # Start
 start() {
   echo -n $"Starting $prog: "
-  daemon --pidfile=${pidfile} $vector $OPTIONS
+  daemon --pidfile=${pidfile} --output=/var/log/vector.log $vector $OPTIONS
   RETVAL=$?
   echo
   return $RETVAL

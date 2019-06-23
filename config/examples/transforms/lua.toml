@@ -1,7 +1,7 @@
 # `lua` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `lua` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/lua
+# Docs: https://docs.vector.dev/usage/configuration/transforms/lua
 
 [transforms.my_lua_transform]
   # REQUIRED - General

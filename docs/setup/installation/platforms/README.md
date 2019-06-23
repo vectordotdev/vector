@@ -4,19 +4,19 @@ description: How to install Vector on your operating system
 
 # Platforms
 
-Vector provides high level install instructions for the followig platforms.
-If you do not see your platform listed, please consider
-[installing Vector directly on your operating system][operating_systems] or
-[building Vector from source][build_from_source].
+Vector provides high level install instructions for the followig platforms:
 
 {% page-ref page="docker.md" %}
 
----
+If you do not see your platform you can consider:
 
-{% page-ref page="../operating_systems/README.md" %}
+{% page-ref page="../package-managers/README.md" %}
 
-{% page-ref page="../build-from-source.md" %}
+{% page-ref page="../operating-systems/README.md" %}
+
+{% page-ref page="../from-archives.md" %}
+
+{% page-ref page="../from-source.md" %}
 
 
-[build_from_source]: ../build-from-source.md
-[operating_systems]: ../operating_systems
+

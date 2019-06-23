@@ -4,8 +4,8 @@ version = "0.3.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A High-Performance Logs, Metrics, and Events Router"
-homepage = "https://vectorproject.io"
-license = "apache-2.0"
+homepage = "https://vector.dev"
+license-file = "LICENSE"
 readme = "README.md"
 publish = false
 
@@ -13,6 +13,7 @@ publish = false
 debug = true
 
 [package.metadata.deb]
+section = "utility"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [

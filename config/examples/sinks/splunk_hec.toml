@@ -1,7 +1,7 @@
 # `splunk_hec` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `splunk_hec` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec
+# Docs: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
 
 [sinks.my_splunk_hec_sink]
   # REQUIRED - General

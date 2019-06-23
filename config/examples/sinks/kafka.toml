@@ -1,7 +1,7 @@
 # `kafka` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `kafka` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/kafka
+# Docs: https://docs.vector.dev/usage/configuration/sinks/kafka
 
 [sinks.my_kafka_sink]
   # REQUIRED - General

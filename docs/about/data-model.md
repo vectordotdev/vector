@@ -72,7 +72,7 @@ Vector will represent this data internally as a log event:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And when this event is emitted from a [sink][sinks], it will be exploded back into it's original structure:
+And when this event is emitted from a [sink][docs.sinks], it will be exploded back into it's original structure:
 
 {% code-tabs %}
 {% code-tabs-item title="output" %}
@@ -116,7 +116,7 @@ Vector will represent this data internally as a log event:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And when this event is emitted from a [sink][sinks], it will be exploded back into it's original structure:
+And when this event is emitted from a [sink][docs.sinks], it will be exploded back into it's original structure:
 
 {% code-tabs %}
 {% code-tabs-item title="output" %}
@@ -198,3 +198,6 @@ For example:
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+
+[docs.sinks]: ..docs/usage/configuration/sinks

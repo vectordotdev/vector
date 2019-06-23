@@ -1,6 +1,6 @@
 [Unit]
 Description=Vector
-Documentation=http://vectorproject.io
+Documentation=http://vector.dev
 After=network-online.target
 Requires=network-online.target
 
@@ -8,6 +8,7 @@ Requires=network-online.target
 User=vector
 Group=vector
 ExecStart=/opt/vector/bin/vector --config=/etc/vector/vector.toml
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=no
 StandardOutput=syslog
 StandardError=syslog

@@ -1,7 +1,7 @@
 # `file` Source Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `file` source
-# Docs: https://docs.vectorproject.io/usage/configuration/sources/file
+# Docs: https://docs.vector.dev/usage/configuration/sources/file
 
 [sources.my_file_source]
   # REQUIRED - General

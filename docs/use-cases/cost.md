@@ -14,5 +14,3 @@ The first cost reduction tactic we recommend is sampling transactions at the sou
 
 
 
-
-

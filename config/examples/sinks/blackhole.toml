@@ -1,7 +1,7 @@
 # `blackhole` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `blackhole` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/blackhole
+# Docs: https://docs.vector.dev/usage/configuration/sinks/blackhole
 
 [sinks.my_blackhole_sink]
   # REQUIRED - General

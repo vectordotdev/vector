@@ -1,7 +1,7 @@
 # `http` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `http` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/http
+# Docs: https://docs.vector.dev/usage/configuration/sinks/http
 
 [sinks.my_http_sink]
   # REQUIRED - General

@@ -1,7 +1,7 @@
 # `stdin` Source Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `stdin` source
-# Docs: https://docs.vectorproject.io/usage/configuration/sources/stdin
+# Docs: https://docs.vector.dev/usage/configuration/sources/stdin
 
 [sources.my_stdin_source]
   # REQUIRED - General

@@ -1,7 +1,7 @@
 # `sampler` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `sampler` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/sampler
+# Docs: https://docs.vector.dev/usage/configuration/transforms/sampler
 
 [transforms.my_sampler_transform]
   # REQUIRED - General

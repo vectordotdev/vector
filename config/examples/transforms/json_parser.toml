@@ -1,7 +1,7 @@
 # `json_parser` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `json_parser` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/json_parser
+# Docs: https://docs.vector.dev/usage/configuration/transforms/json_parser
 
 [transforms.my_json_parser_transform]
   # REQUIRED - General
