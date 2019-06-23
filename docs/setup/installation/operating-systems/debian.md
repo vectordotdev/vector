@@ -9,37 +9,34 @@ Vector can be installed on the Debian operating system through the \
 
 ## Install
 
-1. Head over to the [Vector releases][releases] page to download Vector:
+Download the [latest version of Vector][releases]:
+
+```bash
+curl -o /tmp/vector.deb https://packages.timber.io/vector/latest/vector-latest-amd64.deb
+```
+
+Insall the deb:
+
+```bash
+dpkg -i /tmp/vector.deb
+```
+
+Update the `/etc/vector/vector.toml` configuration file to suit your use use case:
 
 
-   ```bash
-   curl -o /tmp/vector.deb https://packages.timber.io/vector/X.X.X/vector-vX.X.X-amd64.deb
-   ```
+```bash
+vi /etc/vector/vector.toml
+```
 
-   Replace `X.X.X` with the latest version.
+A full configuration spec is located at `/etc/vector/vector.spec.toml` and
+the [Configuration Section][configuration] documents and explains all available
+options.
 
-2. Execute:
+Finally, [start](#starting) Vector:
 
-
-   ```bash
-   dpkg -i /tmp/vector.deb
-   ```
-
-3. Update the `/etc/vector/vector.toml` configuration file to suit your use use case:
-
-
-   ```bash
-   vi /etc/vector/vector.toml
-   ```
-
-   A full configuration spec is located at `/etc/vector/vector.spec.toml` and the [Configuration Section] documents and explains all available options.
-
-4. Start Vector:
-
-
-   ```base
-   sudo systemctl start vector
-   ```
+```base
+sudo systemctl start vector
+```
 
 ## Administration
 
@@ -98,6 +95,7 @@ file.
 
 [administration]: /usage/administration/README.md
 [build_from_source]: ../build-from-source.md
+[configuration]: ../build-from-source.md
 [metrics]: /usage/administration/monitoring.md#metrics
 [monitoring]: /usage/administration/monitoring.md
 [releases]: https://github.com/timberio/vector/releases

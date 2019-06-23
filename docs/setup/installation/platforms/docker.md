@@ -9,21 +9,21 @@ The [`Dockerfile`][docker_file] is available in the root of the Vector repo.
 
 ## Installation
 
-1. Pull the image
+Start by pulling the Vector image:
 
-    ```bash
-    docker pull timberio/vector:latest
-    ```
+```bash
+docker pull timberio/vector:latest
+```
 
-2. Run the image:
+Run the image:
 
-    ```bash
-    docker run -ti timberio/vector:latest /vector/bin/vector --config=/vector/config/vector.toml
-    ```
+```bash
+docker run -ti timberio/vector:latest /vector/bin/vector --config=/vector/config/vector.toml
+```
 
-3. This will boot Vector with the [default configuration][default_configuration],
-   which is likely not what you want. See the [Custom Configuration](#custom-configuration)
-   section for more info.
+This will boot Vector with the [default configuration][default_configuration],
+which is likely not what you want. See the [Custom Configuration](#custom-configuration)
+section for more info.
 
 ## How It Works
 
