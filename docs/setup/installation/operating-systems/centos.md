@@ -115,6 +115,7 @@ rpm -Uvh vector.rpm
 
 [administration]: /usage/administration/README.md
 [build_from_source]: ../build-from-source.md
+[configuration]: ../build-from-source.md
 [metrics]: /usage/administration/monitoring.md#metrics
 [monitoring]: /usage/administration/monitoring.md
 [releases]: https://github.com/timberio/vector/releases

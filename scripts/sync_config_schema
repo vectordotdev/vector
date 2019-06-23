@@ -42,18 +42,19 @@ rescue LoadError => e
 end
 
 require_relative "config_schema/schema"
-require_relative "generators/config_specification_generator"
-require_relative "generators/config_example_generator"
-require_relative "generators/global_generator"
-require_relative "generators/guarantees_generator"
+require_relative "generators/config/specification_generator"
+require_relative "generators/config/example_generator"
+require_relative "generators/docs/config_specification_generator"
+require_relative "generators/docs/global_generator"
+require_relative "generators/docs/guarantees_generator"
+require_relative "generators/docs/sink_generator"
+require_relative "generators/docs/sinks_generator"
+require_relative "generators/docs/source_generator"
+require_relative "generators/docs/sources_generator"
+require_relative "generators/docs/transform_generator"
+require_relative "generators/docs/transforms_generator"
 require_relative "generators/link_generator"
 require_relative "generators/readme_generator"
-require_relative "generators/sink_generator"
-require_relative "generators/sinks_generator"
-require_relative "generators/source_generator"
-require_relative "generators/sources_generator"
-require_relative "generators/transform_generator"
-require_relative "generators/transforms_generator"
 
 #
 # Setup
@@ -123,7 +124,7 @@ write("README.md", content)
 # Guarantee
 #
 
-guarantees_generator = GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
+guarantees_generator = Docs::GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
 content = guarantees_generator.generate()
 write_with_links("docs/about/guarantees.md", content, schema.links)
 
@@ -131,7 +132,7 @@ write_with_links("docs/about/guarantees.md", content, schema.links)
 # Configuration global options
 #
 
-global_generator = GlobalGenerator.new(schema)
+global_generator = Docs::GlobalGenerator.new(schema)
 content = global_generator.generate()
 write_with_links("docs/usage/configuration/README.md", content, schema.links)
 
@@ -140,16 +141,16 @@ write_with_links("docs/usage/configuration/README.md", content, schema.links)
 # Sources
 #
 
-sources_generator = SourcesGenerator.new(schema.sources.to_h.values.sort)
+sources_generator = Docs::SourcesGenerator.new(schema.sources.to_h.values.sort)
 content = sources_generator.generate
 write_with_links("docs/usage/configuration/sources/README.md", content, schema.links)
 
 schema.sources.to_h.each do |_source_name, source|
-  source_generator = SourceGenerator.new(source, schema.guides)
+  source_generator = Docs::SourceGenerator.new(source, schema.guides)
   content = source_generator.generate
   write_with_links("docs/usage/configuration/sources/#{source.name}.md", content, schema.links)
 
-  example_generator = ConfigExampleGenerator.new(source)
+  example_generator = Config::ExampleGenerator.new(source)
   content = example_generator.generate
   write("config/examples/sources/#{source.name}.toml", content)
 end
@@ -158,16 +159,16 @@ end
 # Transforms
 #
 
-transforms_generator = TransformsGenerator.new(schema.transforms.to_h.values.sort)
+transforms_generator = Docs::TransformsGenerator.new(schema.transforms.to_h.values.sort)
 content = transforms_generator.generate
 write_with_links("docs/usage/configuration/transforms/README.md", content, schema.links)
 
 schema.transforms.to_h.each do |_transform_name, transform|
-  transform_generator = TransformGenerator.new(transform, schema.guides)
+  transform_generator = Docs::TransformGenerator.new(transform, schema.guides)
   content = transform_generator.generate
   write_with_links("docs/usage/configuration/transforms/#{transform.name}.md", content, schema.links)
 
-  example_generator = ConfigExampleGenerator.new(transform)
+  example_generator = Config::ExampleGenerator.new(transform)
   content = example_generator.generate
   write("config/examples/transforms/#{transform.name}.toml", content)
 end
@@ -176,16 +177,16 @@ end
 # Sinks
 #
 
-sinks_generator = SinksGenerator.new(schema.sinks.to_h.values.sort)
+sinks_generator = Docs::SinksGenerator.new(schema.sinks.to_h.values.sort)
 content = sinks_generator.generate
 write_with_links("docs/usage/configuration/sinks/README.md", content, schema.links)
 
 schema.sinks.to_h.each do |_sink_name, sink|
-  sink_generator = SinkGenerator.new(sink, schema.guides)
+  sink_generator = Docs::SinkGenerator.new(sink, schema.guides)
   content = sink_generator.generate
   write_with_links("docs/usage/configuration/sinks/#{sink.name}.md", content, schema.links)
 
-  example_generator = ConfigExampleGenerator.new(sink)
+  example_generator = Config::ExampleGenerator.new(sink)
   content = example_generator.generate
   write("config/examples/sinks/#{sink.name}.toml", content)
 end
@@ -194,6 +195,10 @@ end
 # Config specification
 #
 
-sinks_generator = ConfigSpecificationGenerator.new(schema)
+sinks_generator = Config::SpecificationGenerator.new(schema)
 content = sinks_generator.generate
 write("config/vector.spec.toml", content)
+
+sinks_generator = Docs::ConfigSpecificationGenerator.new(schema)
+content = sinks_generator.generate
+write("docs/usage/configuration/specification.md", content)
