@@ -2,8 +2,8 @@
 
 # Sync Config Schema
 #
-# This script syncs the configuration schema defined in `/scripts/schema.toml`
-# to the following files:
+# This script syncs the configuration schema defined in
+# `/scripts/config_schema.toml` to the following files:
 #
 # * /config/spec.toml
 # * /docs/usage/configuration/sources/*
@@ -59,7 +59,7 @@ require_relative "generators/transforms_generator"
 # Setup
 #
 
-SCHEMA_FILE_PATH = "scripts/schema.toml"
+SCHEMA_FILE_PATH = "scripts/config_schema.toml"
 puts "-> Reading #{SCHEMA_FILE_PATH}\n"
 schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 

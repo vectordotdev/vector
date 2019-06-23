@@ -13,11 +13,10 @@
   <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
 </p>
 
-Vector is a [high-performance][performance] router for observability data. It makes
+Vector is a [high-performance][performance] observability data router. It makes
 [collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events
-easy. It decouples data collection & routing from your services, [future proofing][lock-in] your
-pipeline, and enabling you to freely adopt best-in-class services over time, among
-[many other benefits][use_cases].
+easy. It decouples data collection & routing from your services, giving you data ownership and
+control, among [many other benefits][use_cases].
 
 Built in [Rust][rust], Vector places high-value on [performance], [correctness], and
 [operator friendliness][administration]. It compiles to a single static binary and is designed
