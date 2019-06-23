@@ -8,40 +8,43 @@ Vector can be installed on the CentOS operating system through the Vector RPM pa
 
 ## Install
 
-1. Head over to the [Vector releases][releases] page to download Vector:
+<!--
+NOTE: We cannot use a list below since Gitbook has a formatting bug. Gitbook
+cannot properly format lists with code examples. It's one of the many
+issues with Gitbook.
+-->
 
+Download the [latest version of Vector][releases]:
 
-   ```bash
-   curl -o /tmp/vector.rpm https://packages.timber.io/vector/X.X.X/vector-vX.X.X-x86_64.rpm
-   ```
+```bash
+curl -o /tmp/vector.rpm https://packages.timber.io/vector/latest/vector-latest-x86_64.rpm
+```
 
-   Replace `X.X.X` with the latest version.
-
-2. Execute:
-
+Insall the RPM:
    
-   ```bash
-   rpm -i /tmp/vector.rpm
-   ```
+```bash
+rpm -i /tmp/vector.rpm
+```
 
-3. Update the `/etc/vector/vector.toml` configuration file to suit your use use case:
+Update the `/etc/vector/vector.toml` configuration file to suit your use use case:
 
+```bash
+vi /etc/vector/vector.toml
+```
 
-   ```bash
-   vi /etc/vector/vector.toml
-   ```
+A full configuration spec is located at `/etc/vector/vector.spec.toml` and
+the [Configuration Section][configuration] documents and explains all available
+options.
 
-   A full configuration spec is located at `/etc/vector/vector.spec.toml` and the [Configuration Section] documents and explains all available options.
+Finally, [start](#starting) Vector:
 
-4. Start Vector:
+```bash
+# CentOS >= 7
+sudo systemctl start vector
 
-   ```bash
-   # CentOS >= 7
-   sudo systemctl start vector
-
-   # CentOS <= 6
-   sudo service vector start
-   ```
+# CentOS <= 6
+sudo service vector start
+```
 
 ## Administration
 

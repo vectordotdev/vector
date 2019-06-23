@@ -392,6 +392,11 @@ jobs:
             echo "Releasing $VERSION..."
             aws s3 cp "dist/" "s3://packages.timber.io/vector/$VERSION/" --recursive
 
+            # Update the "latest" files
+            aws s3 rm --recursive s3://packages.timber.io/vector/latest/
+            rename -v 's/$VERSION/latest/' dist/*
+            aws s3 cp "dist/" "s3://packages.timber.io/vector/latest/" --recursive
+
 test-workflow-filters: &test-workflow-filters
   filters:
     branches:
