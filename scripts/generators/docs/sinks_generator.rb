@@ -22,8 +22,8 @@ module Docs
 
         Sinks are last in the [pipeline](../../../about/concepts.md#pipelines), responsible for sending [events](../../../about/data-model.md#event) downstream. These can be service specific sinks, such as [`vector`](vector.md), [`elasticsearch`](elasticsearch.md), and [`s3`](aws_s3.md), or generic protocol sinks like [`http`](http.md), [`tcp`](tcp.md), or [`udp`](udp.md).
 
-        | Name | Input | Guarantee | Description |
-        | :--- | :----: | :-------: | :---------- |
+        | Name | Description |
+        | :--- | :---------- |
         #{sink_rows}
 
         [+ request a new transform](#{new_sink_url()})
@@ -68,7 +68,7 @@ module Docs
     private
       def sink_rows
         links = sinks.collect do |sink|
-          "| [**`#{sink.name}`**](#{sink.name}.md) | #{event_type_links(sink.input_types).join(" ")} | `#{sink.delivery_guarantee}` | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
+          "| [**`#{sink.name}`**](#{sink.name}.md) | #{sink.plural_write_verb.humanize} #{event_type_links(sink.input_types)} events to #{sink.write_to_description}.<br />`guarantee: #{sink.delivery_guarantee}` |"
         end
 
         links.join("\n")

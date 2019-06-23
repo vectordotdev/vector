@@ -202,7 +202,7 @@ class ReadmeGenerator < Generator
   private
     def source_rows
       links = sources.collect do |source|
-        "| [**`#{source.name}`**](https://docs.vectorproject.io/usage/configuration/sources/#{source.name}) | Ingests data through #{source.through_description}. |"
+        "| [**`#{source.name}`**](https://docs.vectorproject.io/usage/configuration/sources/#{source.name}) | Ingests data through #{source.through_description} and outputs #{source.output_types.to_sentence} events.<br />`guarantee: #{source.delivery_guarantee}` |"
       end
 
       links.join("\n")
@@ -210,7 +210,7 @@ class ReadmeGenerator < Generator
 
     def transform_rows
       links = transforms.collect do |transform|
-        "| [**`#{transform.name}`**](https://docs.vectorproject.io/usage/configuration/transforms/#{transform.name}) | Allows you to #{transform.allow_you_to_description}. |"
+        "| [**`#{transform.name}`**](https://docs.vectorproject.io/usage/configuration/transforms/#{transform.name}) | Accepts #{transform.input_types.to_sentence} events and allows you to #{transform.allow_you_to_description}. |"
       end
 
       links.join("\n")
@@ -218,7 +218,7 @@ class ReadmeGenerator < Generator
 
     def sink_rows
       links = sinks.collect do |sink|
-        "| [**`#{sink.name}`**](https://docs.vectorproject.io/usage/configuration/sinks/#{sink.name}) | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
+        "| [**`#{sink.name}`**](https://docs.vectorproject.io/usage/configuration/sinks/#{sink.name}) | #{sink.plural_write_verb.humanize} #{sink.input_types.to_sentence} events to #{sink.write_to_description}.<br />`guarantee: #{sink.delivery_guarantee}` |"
       end
 
       links.join("\n")

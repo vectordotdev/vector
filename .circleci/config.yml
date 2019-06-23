@@ -86,34 +86,6 @@ persist-dist-to-workspace: &persist-dist-to-workspace
       - "*"
 
 #
-# Job macros
-#
-
-release-job-defaults: &release-job-defaults
-  machine: true
-  steps:
-    - *restore-git-cache
-    - *restore-cargo-cache
-    - *install-rust
-    - run:
-        name: Install Cross
-        command: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cross
-    - run:
-        name: Install AWS CLI
-        command: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip install --upgrade awscli
-    - checkout
-    - run:
-        name: Build release
-        command: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          ./.circleci/build_release.sh
-
-#
 # Main document
 #
 

@@ -16,19 +16,19 @@ Instead, please modify the contents of `scripts/config_schema.toml`.
 
 Sinks are last in the [pipeline](../../../about/concepts.md#pipelines), responsible for sending [events](../../../about/data-model.md#event) downstream. These can be service specific sinks, such as [`vector`](vector.md), [`elasticsearch`](elasticsearch.md), and [`s3`](aws_s3.md), or generic protocol sinks like [`http`](http.md), [`tcp`](tcp.md), or [`udp`](udp.md).
 
-| Name | Input | Guarantee | Description |
-| :--- | :----: | :-------: | :---------- |
-| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
-| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
-| [**`aws_s3`**](aws_s3.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
-| [**`blackhole`**](blackhole.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
-| [**`console`**](console.md) | [`log`][log_event] [`metric`][metric_event] | `best_effort` | Streams events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**](elasticsearch.md) | [`log`][log_event] | `best_effort` | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
-| [**`http`**](http.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a generic HTTP endpoint. |
-| [**`kafka`**](kafka.md) | [`log`][log_event] | `at_least_once` | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. |
-| [**`splunk_hec`**](splunk_hec.md) | [`log`][log_event] | `at_least_once` | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec]. |
-| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Streams events to a TCP connection. |
-| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Streams events to another downstream Vector instance. |
+| Name | Description |
+| :--- | :---------- |
+| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
+| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
+| [**`aws_s3`**](aws_s3.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
+| [**`blackhole`**](blackhole.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.<br />`guarantee: best_effort` |
+| [**`console`**](console.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to the console, `STDOUT` or `STDERR`.<br />`guarantee: best_effort` |
+| [**`elasticsearch`**](elasticsearch.md) | Batches and flushes ["[`log`][log_event]"] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
+| [**`http`**](http.md) | Batches and flushes ["[`log`][log_event]"] events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
+| [**`kafka`**](kafka.md) | Streams ["[`log`][log_event]"] events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].<br />`guarantee: at_least_once` |
+| [**`splunk_hec`**](splunk_hec.md) | Batches and flushes ["[`log`][log_event]"] events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
+| [**`tcp`**](tcp.md) | Streams ["[`log`][log_event]"] events to a TCP connection.<br />`guarantee: best_effort` |
+| [**`vector`**](vector.md) | Streams ["[`log`][log_event]"] events to another downstream Vector instance.<br />`guarantee: best_effort` |
 
 [+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 

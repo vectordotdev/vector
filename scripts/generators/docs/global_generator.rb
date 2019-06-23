@@ -118,7 +118,7 @@ module Docs
     private
       def source_rows
         links = sources.collect do |source|
-          "| [**`#{source.name}`**](sources/#{source.name}.md) | Ingests data through #{source.through_description}. |"
+          "| [**`#{source.name}`**](sources/#{source.name}.md) | Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types)} events.<br />`guarantee: #{source.delivery_guarantee}` |"
         end
 
         links.join("\n")
@@ -126,7 +126,7 @@ module Docs
 
       def transform_rows
         links = transforms.collect do |transform|
-          "| [**`#{transform.name}`**](transforms/#{transform.name}.md) | Allows you to #{transform.allow_you_to_description}. |"
+          "| [**`#{transform.name}`**](transforms/#{transform.name}.md) | Accepts #{event_type_links(transform.input_types)} events and allows you to #{transform.allow_you_to_description}. |"
         end
 
         links.join("\n")
@@ -134,7 +134,7 @@ module Docs
 
       def sink_rows
         links = sinks.collect do |sink|
-          "| [**`#{sink.name}`**](sinks/#{sink.name}.md) | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
+          "| [**`#{sink.name}`**](sinks/#{sink.name}.md) | #{sink.plural_write_verb.humanize} #{event_type_links(sink.input_types)} events to #{sink.write_to_description}.<br />`guarantee: #{sink.delivery_guarantee}` |"
         end
 
         links.join("\n")

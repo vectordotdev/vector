@@ -16,14 +16,14 @@ Instead, please modify the contents of `scripts/config_schema.toml`.
 
 Sources are responsible for ingesting [events](../../../about/data-model.md#event) into Vector, they can both receive and pull in data. If you're deploying Vector in an [agent role](../../../setup/deployment/roles/agent.md), you'll want to look at local data sources like a [`file`](file.md) and [`stdin`](stdin.md). If you're deploying Vector in a [service role](../../../setup/deployment/roles/service.md), you'll want to look at sources that receive data over the network, like the [`vector`](vector.md), [`tcp`](tcp.md), and [`syslog`](syslog.md) sources.
 
-| Name | Output | Guarantee | Description |
-| :--- | :----: | :-------: | :---------- |
-| [**`file`**](file.md) | [`log`][log_event] | `best_effort` | Ingests data through one or more local files. |
-| [**`statsd`**](statsd.md) | [`log`][log_event] | `best_effort` | Ingests data through the StatsD UDP protocol. |
-| [**`stdin`**](stdin.md) | [`log`][log_event] | `at_least_once` | Ingests data through standard input (STDIN). |
-| [**`syslog`**](syslog.md) | [`log`][log_event] | `best_effort` | Ingests data through the Syslog 5424 protocol. |
-| [**`tcp`**](tcp.md) | [`log`][log_event] | `best_effort` | Ingests data through the TCP protocol. |
-| [**`vector`**](vector.md) | [`log`][log_event] | `best_effort` | Ingests data through another upstream Vector instance. |
+| Name | Description |
+| :--- | :---------- |
+| [**`file`**](file.md) | Ingests data through one or more local files and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`statsd`**](statsd.md) | Ingests data through the StatsD UDP protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`stdin`**](stdin.md) | Ingests data through standard input (STDIN) and outputs ["[`log`][log_event]"] events.<br />`guarantee: at_least_once` |
+| [**`syslog`**](syslog.md) | Ingests data through the Syslog 5424 protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`tcp`**](tcp.md) | Ingests data through the TCP protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`vector`**](vector.md) | Ingests data through another upstream Vector instance and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
 
 [+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
 

@@ -22,8 +22,8 @@ module Docs
 
         Transforms are in the middle of the [pipeline](../../../about/concepts.md#pipelines), sitting in-between [sources](../sources/) and [sinks](../sinks/). They transform [events](../../../about/data-model.md#event) or the stream as a whole.
 
-        | Name | Input | Output | Description |
-        | :--- | :---: | :----: | :---------- |
+        | Name | Description |
+        | :--- | :---------- |
         #{transform_rows}
 
         [+ request a new transform](#{new_transform_url()})
@@ -34,7 +34,7 @@ module Docs
     private
       def transform_rows
         links = transforms.collect do |transform|
-          "| [**`#{transform.name}`**](#{transform.name}.md) | #{event_type_links(transform.input_types).join(" ")} | #{event_type_links(transform.output_types).join(" ")}  | Allows you to #{transform.allow_you_to_description}. |"
+          "| [**`#{transform.name}`**](#{transform.name}.md) | Accepts #{event_type_links(transform.input_types)} events and allows you to #{transform.allow_you_to_description}. |"
         end
 
         links.join("\n")

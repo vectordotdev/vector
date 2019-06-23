@@ -24,7 +24,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 #                                      \_/  \/
 #
 #                                    V E C T O R
-#
 #                            Configuration Specification
 #
 # ------------------------------------------------------------------------------

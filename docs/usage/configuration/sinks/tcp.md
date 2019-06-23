@@ -143,7 +143,7 @@ The `tcp` sink streams [`log`][log_event] events to a TCP connection.
 
 ## I/O
 
-The `tcp` sink streams events to a TCP connection. The encoding of each event is dictated by the `encoding` option.
+The `tcp` sink streams ["[`log`][log_event]"] to a TCP connection. The encoding of each event is dictated by the `encoding` option.
 
 
 

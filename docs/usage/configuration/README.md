@@ -76,12 +76,12 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`file`**](sources/file.md) | Ingests data through one or more local files. |
-| [**`statsd`**](sources/statsd.md) | Ingests data through the StatsD UDP protocol. |
-| [**`stdin`**](sources/stdin.md) | Ingests data through standard input (STDIN). |
-| [**`syslog`**](sources/syslog.md) | Ingests data through the Syslog 5424 protocol. |
-| [**`tcp`**](sources/tcp.md) | Ingests data through the TCP protocol. |
-| [**`vector`**](sources/vector.md) | Ingests data through another upstream Vector instance. |
+| [**`file`**](sources/file.md) | Ingests data through one or more local files and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`statsd`**](sources/statsd.md) | Ingests data through the StatsD UDP protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`stdin`**](sources/stdin.md) | Ingests data through standard input (STDIN) and outputs ["[`log`][log_event]"] events.<br />`guarantee: at_least_once` |
+| [**`syslog`**](sources/syslog.md) | Ingests data through the Syslog 5424 protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`tcp`**](sources/tcp.md) | Ingests data through the TCP protocol and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
+| [**`vector`**](sources/vector.md) | Ingests data through another upstream Vector instance and outputs ["[`log`][log_event]"] events.<br />`guarantee: best_effort` |
 
 [+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
 
@@ -89,15 +89,15 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`add_fields`**](transforms/add_fields.md) | Allows you to add one or more fields. |
-| [**`field_filter`**](transforms/field_filter.md) | Allows you to filter events by a field's value. |
-| [**`grok_parser`**](transforms/grok_parser.md) | Allows you to parse a field value with [Grok][grok]. |
-| [**`json_parser`**](transforms/json_parser.md) | Allows you to parse a field value as JSON. |
-| [**`lua`**](transforms/lua.md) | Allows you to transform events with a full embedded [Lua][lua] engine. |
-| [**`regex_parser`**](transforms/regex_parser.md) | Allows you to parse a field's value with a [Regular Expression][regex]. |
-| [**`remove_fields`**](transforms/remove_fields.md) | Allows you to remove one or more event fields. |
-| [**`sampler`**](transforms/sampler.md) | Allows you to sample events with a configurable rate. |
-| [**`tokenizer`**](transforms/tokenizer.md) | Allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`add_fields`**](transforms/add_fields.md) | Accepts ["[`log`][log_event]"] events and allows you to add one or more fields. |
+| [**`field_filter`**](transforms/field_filter.md) | Accepts ["[`log`][log_event]", "[`metric`][metric_event]"] events and allows you to filter events by a field's value. |
+| [**`grok_parser`**](transforms/grok_parser.md) | Accepts ["[`log`][log_event]"] events and allows you to parse a field value with [Grok][grok]. |
+| [**`json_parser`**](transforms/json_parser.md) | Accepts ["[`log`][log_event]"] events and allows you to parse a field value as JSON. |
+| [**`lua`**](transforms/lua.md) | Accepts ["[`log`][log_event]"] events and allows you to transform events with a full embedded [Lua][lua] engine. |
+| [**`regex_parser`**](transforms/regex_parser.md) | Accepts ["[`log`][log_event]"] events and allows you to parse a field's value with a [Regular Expression][regex]. |
+| [**`remove_fields`**](transforms/remove_fields.md) | Accepts ["[`log`][log_event]", "[`metric`][metric_event]"] events and allows you to remove one or more event fields. |
+| [**`sampler`**](transforms/sampler.md) | Accepts ["[`log`][log_event]"] events and allows you to sample events with a configurable rate. |
+| [**`tokenizer`**](transforms/tokenizer.md) | Accepts ["[`log`][log_event]"] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
 [+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+transform%22%7D&title=New+%60%3Cname%3E%60+transform)
 
@@ -105,17 +105,17 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`aws_cloudwatch_logs`**](sinks/aws_cloudwatch_logs.md) | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
-| [**`aws_kinesis_streams`**](sinks/aws_kinesis_streams.md) | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
-| [**`aws_s3`**](sinks/aws_s3.md) | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
-| [**`blackhole`**](sinks/blackhole.md) | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
-| [**`console`**](sinks/console.md) | Streams events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**](sinks/elasticsearch.md) | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
-| [**`http`**](sinks/http.md) | Batches and flushes events to a generic HTTP endpoint. |
-| [**`kafka`**](sinks/kafka.md) | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. |
-| [**`splunk_hec`**](sinks/splunk_hec.md) | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec]. |
-| [**`tcp`**](sinks/tcp.md) | Streams events to a TCP connection. |
-| [**`vector`**](sinks/vector.md) | Streams events to another downstream Vector instance. |
+| [**`aws_cloudwatch_logs`**](sinks/aws_cloudwatch_logs.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
+| [**`aws_kinesis_streams`**](sinks/aws_kinesis_streams.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
+| [**`aws_s3`**](sinks/aws_s3.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
+| [**`blackhole`**](sinks/blackhole.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.<br />`guarantee: best_effort` |
+| [**`console`**](sinks/console.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to the console, `STDOUT` or `STDERR`.<br />`guarantee: best_effort` |
+| [**`elasticsearch`**](sinks/elasticsearch.md) | Batches and flushes ["[`log`][log_event]"] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
+| [**`http`**](sinks/http.md) | Batches and flushes ["[`log`][log_event]"] events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
+| [**`kafka`**](sinks/kafka.md) | Streams ["[`log`][log_event]"] events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].<br />`guarantee: at_least_once` |
+| [**`splunk_hec`**](sinks/splunk_hec.md) | Batches and flushes ["[`log`][log_event]"] events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
+| [**`tcp`**](sinks/tcp.md) | Streams ["[`log`][log_event]"] events to a TCP connection.<br />`guarantee: best_effort` |
+| [**`vector`**](sinks/vector.md) | Streams ["[`log`][log_event]"] events to another downstream Vector instance.<br />`guarantee: best_effort` |
 
 [+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
@@ -177,6 +177,8 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
+[log_event]: "../../../about/data-model.md#log"
+[metric_event]: "../../../about/data-model.md#metric"
 [grok]: "http://grokdebug.herokuapp.com/"
 [lua]: "https://www.lua.org/"
 [regex]: "https://en.wikipedia.org/wiki/Regular_expression"

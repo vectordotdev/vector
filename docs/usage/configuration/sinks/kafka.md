@@ -152,7 +152,7 @@ The `kafka` sink streams [`log`][log_event] events to [Apache Kafka][kafka] via 
 
 ## I/O
 
-The `kafka` sink streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. The encoding of each event is dictated by the `encoding` option.
+The `kafka` sink streams ["[`log`][log_event]"] to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. The encoding of each event is dictated by the `encoding` option.
 
 
 

@@ -82,11 +82,11 @@ module Docs
         content =
           if sink.batching?
             <<~EOF
-            The #{component_name(sink)} batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to #{sink.write_to_description}. The encoding is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
+            The #{component_name(sink)} batches #{event_type_links(sink.input_types)} up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to #{sink.write_to_description}. The encoding is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
             EOF
           else
             <<~EOF
-            The #{component_name(sink)} streams events to #{sink.write_to_description}. The encoding of each event is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
+            The #{component_name(sink)} streams #{event_type_links(sink.input_types)} to #{sink.write_to_description}. The encoding of each event is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
             EOF
           end
 

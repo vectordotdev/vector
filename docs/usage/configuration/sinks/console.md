@@ -138,7 +138,7 @@ The `console` sink streams [`log`][log_event] and [`metric`][metric_event] event
 
 ## I/O
 
-The `console` sink streams events to the console, `STDOUT` or `STDERR`. The encoding of each event is dictated by the `encoding` option.
+The `console` sink streams ["[`log`][log_event]", "[`metric`][metric_event]"] to the console, `STDOUT` or `STDERR`. The encoding of each event is dictated by the `encoding` option.
 
 
 

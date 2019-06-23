@@ -228,7 +228,7 @@ The `splunk_hec` sink batch and flushes [`log`][log_event] events to a [Splunk H
 
 ## I/O
 
-The `splunk_hec` sink batches events up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to a [Splunk HTTP Event Collector][splunk_hec]. The encoding is dictated by the `encoding` option.
+The `splunk_hec` sink batches ["[`log`][log_event]"] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to a [Splunk HTTP Event Collector][splunk_hec]. The encoding is dictated by the `encoding` option.
 
 
 
