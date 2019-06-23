@@ -118,7 +118,7 @@ module Docs
     private
       def source_rows
         links = sources.collect do |source|
-          "| [**`#{source.name}`**][#{component_short_link(source)}] | Ingests data through #{source.through_description}. |"
+          "| [**`#{source.name}`**](sources/#{source.name}.md) | Ingests data through #{source.through_description}. |"
         end
 
         links.join("\n")
@@ -126,7 +126,7 @@ module Docs
 
       def transform_rows
         links = transforms.collect do |transform|
-          "| [**`#{transform.name}`**][#{component_short_link(transform)}] | Allows you to #{transform.allow_you_to_description}. |"
+          "| [**`#{transform.name}`**](transforms/#{transform.name}.md) | Allows you to #{transform.allow_you_to_description}. |"
         end
 
         links.join("\n")
@@ -134,7 +134,7 @@ module Docs
 
       def sink_rows
         links = sinks.collect do |sink|
-          "| [**`#{sink.name}`**][#{component_short_link(sink)}] | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
+          "| [**`#{sink.name}`**](sinks/#{sink.name}.md) | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
         end
 
         links.join("\n")

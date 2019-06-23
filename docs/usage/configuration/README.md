@@ -76,12 +76,12 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`file`**][file_source] | Ingests data through one or more local files. |
-| [**`statsd`**][statsd_source] | Ingests data through the StatsD UDP protocol. |
-| [**`stdin`**][stdin_source] | Ingests data through standard input (STDIN). |
-| [**`syslog`**][syslog_source] | Ingests data through the Syslog 5424 protocol. |
-| [**`tcp`**][tcp_source] | Ingests data through the TCP protocol. |
-| [**`vector`**][vector_source] | Ingests data through another upstream Vector instance. |
+| [**`file`**](sources/file.md) | Ingests data through one or more local files. |
+| [**`statsd`**](sources/statsd.md) | Ingests data through the StatsD UDP protocol. |
+| [**`stdin`**](sources/stdin.md) | Ingests data through standard input (STDIN). |
+| [**`syslog`**](sources/syslog.md) | Ingests data through the Syslog 5424 protocol. |
+| [**`tcp`**](sources/tcp.md) | Ingests data through the TCP protocol. |
+| [**`vector`**](sources/vector.md) | Ingests data through another upstream Vector instance. |
 
 [+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
 
@@ -89,15 +89,15 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`add_fields`**][add_fields_transform] | Allows you to add one or more fields. |
-| [**`field_filter`**][field_filter_transform] | Allows you to filter events by a field's value. |
-| [**`grok_parser`**][grok_parser_transform] | Allows you to parse a field value with [Grok][grok]. |
-| [**`json_parser`**][json_parser_transform] | Allows you to parse a field value as JSON. |
-| [**`lua`**][lua_transform] | Allows you to transform events with a full embedded [Lua][lua] engine. |
-| [**`regex_parser`**][regex_parser_transform] | Allows you to parse a field's value with a [Regular Expression][regex]. |
-| [**`remove_fields`**][remove_fields_transform] | Allows you to remove one or more event fields. |
-| [**`sampler`**][sampler_transform] | Allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][tokenizer_transform] | Allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`add_fields`**](transforms/add_fields.md) | Allows you to add one or more fields. |
+| [**`field_filter`**](transforms/field_filter.md) | Allows you to filter events by a field's value. |
+| [**`grok_parser`**](transforms/grok_parser.md) | Allows you to parse a field value with [Grok][grok]. |
+| [**`json_parser`**](transforms/json_parser.md) | Allows you to parse a field value as JSON. |
+| [**`lua`**](transforms/lua.md) | Allows you to transform events with a full embedded [Lua][lua] engine. |
+| [**`regex_parser`**](transforms/regex_parser.md) | Allows you to parse a field's value with a [Regular Expression][regex]. |
+| [**`remove_fields`**](transforms/remove_fields.md) | Allows you to remove one or more event fields. |
+| [**`sampler`**](transforms/sampler.md) | Allows you to sample events with a configurable rate. |
+| [**`tokenizer`**](transforms/tokenizer.md) | Allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
 [+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+transform%22%7D&title=New+%60%3Cname%3E%60+transform)
 
@@ -105,17 +105,17 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`aws_cloudwatch_logs`**][aws_cloudwatch_logs_sink] | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
-| [**`aws_kinesis_streams`**][aws_kinesis_streams_sink] | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
-| [**`aws_s3`**][aws_s3_sink] | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
-| [**`blackhole`**][blackhole_sink] | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
-| [**`console`**][console_sink] | Streams events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**][elasticsearch_sink] | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
-| [**`http`**][http_sink] | Batches and flushes events to a generic HTTP endpoint. |
-| [**`kafka`**][kafka_sink] | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. |
-| [**`splunk_hec`**][splunk_hec_sink] | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec]. |
-| [**`tcp`**][tcp_sink] | Streams events to a TCP connection. |
-| [**`vector`**][vector_sink] | Streams events to another downstream Vector instance. |
+| [**`aws_cloudwatch_logs`**](sinks/aws_cloudwatch_logs.md) | Batches and flushes events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_kinesis_streams`**](sinks/aws_kinesis_streams.md) | Batches and flushes events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
+| [**`aws_s3`**](sinks/aws_s3.md) | Batches and flushes events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
+| [**`blackhole`**](sinks/blackhole.md) | Streams events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`console`**](sinks/console.md) | Streams events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**](sinks/elasticsearch.md) | Batches and flushes events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`http`**](sinks/http.md) | Batches and flushes events to a generic HTTP endpoint. |
+| [**`kafka`**](sinks/kafka.md) | Streams events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol]. |
+| [**`splunk_hec`**](sinks/splunk_hec.md) | Batches and flushes events to a [Splunk HTTP Event Collector][splunk_hec]. |
+| [**`tcp`**](sinks/tcp.md) | Streams events to a TCP connection. |
+| [**`vector`**](sinks/vector.md) | Streams events to another downstream Vector instance. |
 
 [+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
@@ -177,42 +177,16 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
-[file_source]: "../../../usage/configuration/sources/file.md"
-[statsd_source]: "../../../usage/configuration/sources/statsd.md"
-[stdin_source]: "../../../usage/configuration/sources/stdin.md"
-[syslog_source]: "../../../usage/configuration/sources/syslog.md"
-[tcp_source]: "../../../usage/configuration/sources/tcp.md"
-[vector_source]: "../../../usage/configuration/sources/vector.md"
-[add_fields_transform]: "../../../usage/configuration/transforms/add_fields.md"
-[field_filter_transform]: "../../../usage/configuration/transforms/field_filter.md"
-[grok_parser_transform]: "../../../usage/configuration/transforms/grok_parser.md"
 [grok]: "http://grokdebug.herokuapp.com/"
-[json_parser_transform]: "../../../usage/configuration/transforms/json_parser.md"
-[lua_transform]: "../../../usage/configuration/transforms/lua.md"
 [lua]: "https://www.lua.org/"
-[regex_parser_transform]: "../../../usage/configuration/transforms/regex_parser.md"
 [regex]: "https://en.wikipedia.org/wiki/Regular_expression"
-[remove_fields_transform]: "../../../usage/configuration/transforms/remove_fields.md"
-[sampler_transform]: "../../../usage/configuration/transforms/sampler.md"
-[tokenizer_transform]: "../../../usage/configuration/transforms/tokenizer.md"
-[aws_cloudwatch_logs_sink]: "../../../usage/configuration/sinks/aws_cloudwatch_logs.md"
 [aws_cw_logs]: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html"
-[aws_kinesis_streams_sink]: "../../../usage/configuration/sinks/aws_kinesis_streams.md"
 [aws_kinesis_data_streams]: "https://aws.amazon.com/kinesis/data-streams/"
-[aws_s3_sink]: "../../../usage/configuration/sinks/aws_s3.md"
 [aws_s3]: "https://aws.amazon.com/s3/"
-[blackhole_sink]: "../../../usage/configuration/sinks/blackhole.md"
-[console_sink]: "../../../usage/configuration/sinks/console.md"
-[elasticsearch_sink]: "../../../usage/configuration/sinks/elasticsearch.md"
 [elasticsearch]: "https://www.elastic.co/products/elasticsearch"
-[http_sink]: "../../../usage/configuration/sinks/http.md"
-[kafka_sink]: "../../../usage/configuration/sinks/kafka.md"
 [kafka]: "https://kafka.apache.org/"
 [kafka_protocol]: "https://kafka.apache.org/protocol"
-[splunk_hec_sink]: "../../../usage/configuration/sinks/splunk_hec.md"
 [splunk_hec]: "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
-[tcp_sink]: "../../../usage/configuration/sinks/tcp.md"
-[vector_sink]: "../../../usage/configuration/sinks/vector.md"
 [sources]: "../../../usage/configuration/sources"
 [transforms]: "../../../usage/configuration/transforms"
 [sinks]: "../../../usage/configuration/sinks"
