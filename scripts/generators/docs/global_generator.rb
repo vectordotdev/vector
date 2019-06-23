@@ -3,9 +3,15 @@ require_relative "../generator"
 module Docs
   class GlobalGenerator < Generator
     attr_reader :options_table_generator,
-      :sections_generator
+      :sections_generator,
+      :sources,
+      :transforms,
+      :sinks
 
     def initialize(schema)
+      @sources = schema.sources.to_h.values.sort
+      @transforms = schema.transforms.to_h.values.sort
+      @sinks = schema.sinks.to_h.values.sort
       options = schema.options.to_h.values.sort
       @options_table_generator = OptionsTableGenerator.new(options, schema.sections)
       @sections_generator = SectionsGenerator.new(schema.sections.sort)
@@ -79,10 +85,59 @@ module Docs
 
       #{options_table_generator.generate}
 
+      ## Sources
+
+      | Name  | Description |
+      | :---  | :---------- |
+      #{source_rows}
+
+      [+ request a new source](#{new_source_url()})
+
+      ## Transforms
+
+      | Name  | Description |
+      | :---  | :---------- |
+      #{transform_rows}
+
+      [+ request a new transform](#{new_transform_url()})
+
+      ## Sinks
+
+      | Name  | Description |
+      | :---  | :---------- |
+      #{sink_rows}
+
+      [+ request a new sink](#{new_sink_url()})
+
       ## How It Works
 
       #{sections_generator.generate}
       EOF
     end
+
+    private
+      def source_rows
+        links = sources.collect do |source|
+          "| [**`#{source.name}`**][#{component_short_link(source)}] | Ingests data through #{source.through_description}. |"
+        end
+
+        links.join("\n")
+      end
+
+      def transform_rows
+        links = transforms.collect do |transform|
+          "| [**`#{transform.name}`**][#{component_short_link(transform)}] | Allows you to #{transform.allow_you_to_description}. |"
+        end
+
+        links.join("\n")
+      end
+
+      def sink_rows
+        links = sinks.collect do |sink|
+          "| [**`#{sink.name}`**][#{component_short_link(sink)}] | #{sink.plural_write_verb.humanize} events to #{sink.write_to_description}. |"
+        end
+
+        links.join("\n")
+      end
   end
 end
