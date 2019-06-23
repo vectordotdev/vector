@@ -4,8 +4,7 @@
 #                                      \_/  \/
 #
 #                                    V E C T O R
-#
-#                                Vector Configuration
+#                                   Configuration
 #
 # ------------------------------------------------------------------------------
 # Website: https://vectorproject.io
@@ -13,6 +12,9 @@
 # Community: https://vectorproject.io/community
 # Repo: https://github.com/timberio/vector
 # ------------------------------------------------------------------------------
+
+# Note: A full config spec is located at ./vector.spec.toml and examples
+#       in the ./examples folder.
 
 data_dir = "/var/lib/vector"
 
