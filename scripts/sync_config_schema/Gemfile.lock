@@ -12,6 +12,7 @@ GEM
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
     minitest (5.11.3)
+    paint (2.1.0)
     thread_safe (0.3.6)
     toml-rb (1.1.2)
       citrus (~> 3.0, > 3.0)
@@ -26,6 +27,7 @@ PLATFORMS
 DEPENDENCIES
   activesupport
   front_matter_parser
+  paint
   toml-rb
   unindent
   word_wrap

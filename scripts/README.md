@@ -1,15 +1,17 @@
 # `scripts` folder
 
 The `scripts` folder contains various utility scripts that help to
-maintain the Vector project.
+maintain the Vector project. All of these are exposed through the `Makefile`,
+and it should be rare that you have to call these directly.
 
-* [`sync_config_schema`](sync_config_schema) - Responsible for parsing the
-  `schema.toml` file and generating various documentation.
+## Setup
 
-## Using
+Make sure you have Ruby installed. A simple way to install this is:
 
-In your terminal:
-
+```bash
+brew install rbenv
+rbenv install 2.6.3
+rbenv global 2.6.3
 ```
-scripts/<script_name>
-```
+
+This is currently the only requirement.

@@ -1,0 +1,27 @@
+---
+description: Install Vector through your package manager
+---
+
+# Package Managers
+
+{% hint style="info" %}
+Please make sure your [platform][platforms] is not supported before proceeding
+with package manager installation instructions. We generally recommend
+[platform installation instructions][platforms] first.
+{% endhint %}
+
+Vector offers installation instructions for the following package managers:
+
+{% page-ref page="apt.md" %}
+
+{% page-ref page="homebrew.md" %}
+
+{% page-ref page="yum.md" %}
+
+If you do not see your package manager you can consider:
+
+{% page-ref page="../operating-systems/README.md" %}
+
+{% page-ref page="../package-managers/from-archives.md" %}
+
+{% page-ref page="../package-managers/from-source.md" %}

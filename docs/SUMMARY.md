@@ -20,14 +20,15 @@
 ## Setup
 
 * [Installation](setup/installation/README.md)
+  * [Platforms](setup/installation/platforms/README.md)
+    * [Docker](setup/installation/platforms/docker.md)
   * [Operating Systems](setup/installation/operating-systems/README.md)
     * [CentOS](setup/installation/operating-systems/centos.md)
     * [Debian](setup/installation/operating-systems/debian.md)
     * [MacOS](setup/installation/operating-systems/macos.md)
     * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
-  * [Platforms](setup/installation/platforms/README.md)
-    * [Docker](setup/installation/platforms/docker.md)
-  * [Build From Source](setup/installation/build-from-source.md)
+  * [From Archives](setup/installation/from-archives.md)
+  * [From Source](setup/installation/from-source.md)
 * [Getting Started](setup/getting-started/README.md)
   * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
 * [Deployment](setup/deployment/README.md)

@@ -1,6 +1,68 @@
 # Development
 
-## Sample Logs
+This document covers the basics of developing in Vector. In this document:
+
+1. [Prerequisites](#prerequisites)
+2. [Setup](#setup)
+3. [Directory Structure](#directory-structure)
+4. [Makefile Interface](#makefile-interface)
+5. [Testing](#testing)
+6. [Benchmarking](#benchmarking)
+7. [CI](#ci)
+8. [Documentation](#documentation)
+
+## Prerequisites
+
+1. **You are familiar with the [docs](https://docs.vectorproject.io).**
+2. **You have read the [Contributing](/CONTRIBUTING.md) guide.**
+3. **You know about the [Vector community](https://vectorproject.io/community/),
+   use this help.**
+
+## Setup
+
+1. Install Rust:
+
+   ```bash
+   curl https://sh.rustup.rs -sSf | sh
+   ```
+
+2. [Install Docker](https://docs.docker.com/docker-for-mac/install/). Docker
+   containers are used for mocking Vector's integrations.
+
+## Directory Structure
+
+* [`/benches`](/benches) - Internal benchmarks.
+* [`/config`](/config) - Public facing Vector config, included in releases.
+* [`/distribution`](/distribution) - Distribution artifacts for various targets.
+* [`/docs`](/docs) - https://docs.vectorproject.io source.
+* [`/lib`](/lib) - External libraries.
+* [`/proto`](/proto) - Protobuf definitions.
+* [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
+* [`/tests`](/tests) - Various high-level test cases.
+
+## Makefile
+
+Vector includes a [`Makefile`](/Makefile) that exposes top-level commands. Ex:
+
+- `make test`
+- `make build`
+- `make generate_docs`
+
+The various commands are below within their respective sections.
+
+## Testing
+
+```bash
+make test
+```
+
+### Docker
+
+We use docker to mock out external services for our tests. The `make test`
+command calls `docker-compose up -d` which is defined by the
+`docker-compose.yml` file.
+
+### Sample Logs
 
 We use `flog` to build a sample set of log files to test sending logs from a file. This can
 be done with the following commands on mac with homebrew.
@@ -13,21 +75,16 @@ $ flog --bytes $((100 * 1024 * 1024)) > sample.log
 
 This will create a `100MiB` sample log file in the `sample.log` file.
 
-## Building
-
-Vector compiles with [Rust][rust] 1.34.0 (stable) or newer. In general, Vector tracks the
-latest stable release of the Rust compiler.
-
-Building is very easy, all you need to do is install Rust:
+## Benchmarking
 
 ```bash
-curl https://sh.rustup.rs -sSf | sh
+make bench
 ```
 
-And then use `cargo` to build:
+## Building
 
 ```bash
-cargo build
+make build
 ```
 
 ## Testing
@@ -52,10 +109,12 @@ You can run the internal project benchmarks with
 cargo bench
 ```
 
-## Test Harness
+## CI
 
-In addition, we maintain a separate higher-level [test harness][test_harness] designed
-for more complex environment testing as well as comparisons with other tools.
+Currently Vector uses [CircleCI](https://circleci.com). The build process
+is defined in `/.circleci/config.yml`. This delegates heavily to the
+[`distribution/docker`](/distribution/docker) folder where Docker images are
+defined for all of our testing, building, verifying, and releasing.
 
 ## Code Style
 
@@ -66,9 +125,3 @@ the stable toolchain locally.
 ```bash
 cargo fmt
 ```
-
-Once that's all passing and you're happy with your change, go ahead and commit.
-For small, unobtrusive changes, committing to directly to master is fine. For
-anything that merits more discussion or visibility, committing to a branch and
-opening a pull request is preferred. Just use your best judgement and if you're
-unsure, open a pull request.

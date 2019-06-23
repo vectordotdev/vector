@@ -41,26 +41,26 @@ rescue LoadError => e
   EOF
 end
 
-require_relative "config_schema/schema"
-require_relative "generators/config/specification_generator"
-require_relative "generators/config/example_generator"
-require_relative "generators/docs/config_specification_generator"
-require_relative "generators/docs/global_generator"
-require_relative "generators/docs/guarantees_generator"
-require_relative "generators/docs/sink_generator"
-require_relative "generators/docs/sinks_generator"
-require_relative "generators/docs/source_generator"
-require_relative "generators/docs/sources_generator"
-require_relative "generators/docs/transform_generator"
-require_relative "generators/docs/transforms_generator"
-require_relative "generators/link_generator"
-require_relative "generators/readme_generator"
+require_relative "sync_config_schema/config_schema/schema"
+require_relative "sync_config_schema/generators/config/specification_generator"
+require_relative "sync_config_schema/generators/config/example_generator"
+require_relative "sync_config_schema/generators/docs/config_specification_generator"
+require_relative "sync_config_schema/generators/docs/global_generator"
+require_relative "sync_config_schema/generators/docs/guarantees_generator"
+require_relative "sync_config_schema/generators/docs/sink_generator"
+require_relative "sync_config_schema/generators/docs/sinks_generator"
+require_relative "sync_config_schema/generators/docs/source_generator"
+require_relative "sync_config_schema/generators/docs/sources_generator"
+require_relative "sync_config_schema/generators/docs/transform_generator"
+require_relative "sync_config_schema/generators/docs/transforms_generator"
+require_relative "sync_config_schema/generators/link_generator"
+require_relative "sync_config_schema/generators/readme_generator"
 
 #
 # Setup
 #
 
-SCHEMA_FILE_PATH = "scripts/config_schema.toml"
+SCHEMA_FILE_PATH = "#{File.dirname(__FILE__)}/config_schema.toml"
 puts "-> Reading #{SCHEMA_FILE_PATH}\n"
 schema_hash = TomlRB.load_file(SCHEMA_FILE_PATH)
 
