@@ -102,7 +102,9 @@ pub fn parse(input: &str) -> Vec<&str> {
 mod tests {
     use super::parse;
     use super::TokenizerConfig;
+    use crate::event::LogEvent;
     use crate::{topology::config::TransformConfig, Event};
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn basic() {
@@ -175,38 +177,34 @@ mod tests {
         assert_eq!(parse("x[][x"), &["x", "", "[x"]);
     }
 
-    #[test]
-    fn tokenizer_adds_parsed_field_to_event() {
-        let event = Event::from("1234 5678");
+    fn parse_log(text: &str, fields: &str, field: Option<&str>, drop_field: bool) -> LogEvent {
+        let event = Event::from(text);
+        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
+        let field = field.map(|f| f.into());
         let mut parser = TokenizerConfig {
-            field_names: vec!["status".into(), "time".into()],
-            field: None,
-            ..Default::default()
+            field_names,
+            field,
+            drop_field,
         }
         .build()
         .unwrap();
 
-        let event = parser.transform(event).unwrap();
+        parser.transform(event).unwrap().into_log()
+    }
 
-        assert_eq!(event.as_log()[&"status".into()], "1234".into());
-        assert_eq!(event.as_log()[&"time".into()], "5678".into());
-        assert!(event.as_log().get(&"message".into()).is_some());
+    #[test]
+    fn tokenizer_adds_parsed_field_to_event() {
+        let log = parse_log("1234 5678", "status time", None, false);
+
+        assert_eq!(log[&"status".into()], "1234".into());
+        assert_eq!(log[&"time".into()], "5678".into());
+        assert!(log.get(&"message".into()).is_some());
     }
 
     #[test]
     fn tokenizer_does_drop_parsed_field() {
-        let event = Event::from("1234 5678");
-        let mut parser = TokenizerConfig {
-            field_names: vec!["status".into(), "time".into()],
-            field: Some("message".into()),
-            drop_field: true,
-        }
-        .build()
-        .unwrap();
+        let log = parse_log("1234 5678", "status time", Some("message"), true);
 
-        let event = parser.transform(event).unwrap();
-
-        let log = event.into_log();
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
@@ -214,18 +212,8 @@ mod tests {
 
     #[test]
     fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let event = Event::from("1234 yes");
-        let mut parser = TokenizerConfig {
-            field_names: vec!["status".into(), "message".into()],
-            field: Some("message".into()),
-            drop_field: true,
-        }
-        .build()
-        .unwrap();
+        let log = parse_log("1234 yes", "status message", Some("message"), true);
 
-        let event = parser.transform(event).unwrap();
-
-        let log = event.into_log();
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
