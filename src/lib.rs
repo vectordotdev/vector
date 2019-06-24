@@ -19,6 +19,5 @@ pub mod sources;
 pub mod test_util;
 pub mod topology;
 pub mod transforms;
-pub mod types;
 
 pub use event::Event;

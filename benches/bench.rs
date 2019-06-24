@@ -291,7 +291,8 @@ fn benchmark_transforms(c: &mut Criterion) {
                         transforms::regex_parser::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                             field: None,
-                            ..Default::default()
+                            drop_field: false,
+                            drop_failed: false,
                         },
                     );
                     config.add_transform(
@@ -401,7 +402,8 @@ fn benchmark_complex(c: &mut Criterion) {
                         transforms::regex_parser::RegexParserConfig {
                             regex: r"status=(?P<status>\d+)".to_string(),
                             field: None,
-                            ..Default::default()
+                            drop_field: false,
+                            drop_failed: false,
                         },
                     );
                     config.add_transform(
