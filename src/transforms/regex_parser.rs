@@ -77,7 +77,7 @@ impl RegexParser {
         for (name, _) in &types {
             if !capture_names.contains(name) {
                 warn!(
-                    message = "Field was specified in the types but not captured by the pattern",
+                    message = "Field was specified in the types but not captured by the pattern.",
                     field = &name[..]
                 );
             }
