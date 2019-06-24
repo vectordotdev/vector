@@ -1,5 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event};
+use crate::types::Conversion;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag},
@@ -9,8 +10,10 @@ use nom::{
     sequence::{delimited, terminated},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
@@ -18,12 +21,24 @@ pub struct TokenizerConfig {
     pub field_names: Vec<Atom>,
     pub field: Option<Atom>,
     pub drop_field: bool,
+    pub types: HashMap<Atom, String>,
 }
 
 #[typetag::serde(name = "tokenizer")]
 impl crate::topology::config::TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
+
+        let types = self
+            .types
+            .iter()
+            .map(|(field, typename)| {
+                typename
+                    .parse::<Conversion>()
+                    .map(|conv| (field.clone(), conv))
+            })
+            .collect::<Result<HashMap<Atom, Conversion>, _>>()
+            .map_err(|err| format!("Invalid conversion type: {}", err))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
@@ -32,18 +47,31 @@ impl crate::topology::config::TransformConfig for TokenizerConfig {
             self.field_names.clone(),
             field.clone(),
             drop_field,
+            types,
         )))
     }
 }
 
 pub struct Tokenizer {
-    field_names: Vec<Atom>,
+    field_names: Vec<(Atom, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
 
 impl Tokenizer {
-    pub fn new(field_names: Vec<Atom>, field: Atom, drop_field: bool) -> Self {
+    pub fn new(
+        field_names: Vec<Atom>,
+        field: Atom,
+        drop_field: bool,
+        types: HashMap<Atom, Conversion>,
+    ) -> Self {
+        let field_names = field_names
+            .into_iter()
+            .map(|name| {
+                let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
+                (name, conversion)
+            })
+            .collect();
         Self {
             field_names,
             field,
@@ -57,10 +85,18 @@ impl Transform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for (name, value) in self.field_names.iter().zip(parse(value).into_iter()) {
-                event
-                    .as_mut_log()
-                    .insert_explicit(name.clone(), value.as_bytes().into());
+            for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
+            {
+                match conversion.convert(value.as_bytes().into()) {
+                    Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
+                    Err(err) => {
+                        debug!(
+                            message = "Could not convert types.",
+                            name = &name[..],
+                            error = &field::display(err)
+                        );
+                    }
+                }
             }
             if self.drop_field {
                 event.as_mut_log().remove(&self.field);
@@ -102,7 +138,7 @@ pub fn parse(input: &str) -> Vec<&str> {
 mod tests {
     use super::parse;
     use super::TokenizerConfig;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, ValueKind};
     use crate::{topology::config::TransformConfig, Event};
     use string_cache::DefaultAtom as Atom;
 
@@ -177,7 +213,13 @@ mod tests {
         assert_eq!(parse("x[][x"), &["x", "", "[x"]);
     }
 
-    fn parse_log(text: &str, fields: &str, field: Option<&str>, drop_field: bool) -> LogEvent {
+    fn parse_log(
+        text: &str,
+        fields: &str,
+        field: Option<&str>,
+        drop_field: bool,
+        types: &[(&str, &str)],
+    ) -> LogEvent {
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -185,6 +227,8 @@ mod tests {
             field_names,
             field,
             drop_field,
+            types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            ..Default::default()
         }
         .build()
         .unwrap();
@@ -194,7 +238,7 @@ mod tests {
 
     #[test]
     fn tokenizer_adds_parsed_field_to_event() {
-        let log = parse_log("1234 5678", "status time", None, false);
+        let log = parse_log("1234 5678", "status time", None, false, &[]);
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
@@ -203,7 +247,7 @@ mod tests {
 
     #[test]
     fn tokenizer_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", Some("message"), true);
+        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]);
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
@@ -212,9 +256,25 @@ mod tests {
 
     #[test]
     fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("1234 yes", "status message", Some("message"), true);
+        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]);
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
+    }
+
+    #[test]
+    fn tokenizer_coerces_fields_to_types() {
+        let log = parse_log(
+            "1234 yes 42.3 word",
+            "code flag number rest",
+            None,
+            false,
+            &[("flag", "bool"), ("code", "integer"), ("number", "float")],
+        );
+
+        assert_eq!(log[&"number".into()], ValueKind::Float(42.3));
+        assert_eq!(log[&"flag".into()], ValueKind::Boolean(true));
+        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
+        assert_eq!(log[&"rest".into()], ValueKind::Bytes("word".into()));
     }
 }
