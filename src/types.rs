@@ -21,7 +21,7 @@ impl FromStr for Conversion {
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
-    ///  * `"string"` or `"asis"` => As-is (null)
+    ///  * `"bytes"` or `"string"` or `"asis"` => As-is (null)
     ///  * `"int"` or `"integer"` => Signed integer
     ///  * `"float"` => Floating point number
     ///  * `"bool"` or `"boolean"` => Boolean
@@ -31,7 +31,7 @@ impl FromStr for Conversion {
     /// Timestamp parsing does not yet support time zones.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "asis" | "string" => Ok(Conversion::Bytes),
+            "asis" | "bytes" | "string" => Ok(Conversion::Bytes),
             "integer" | "int" => Ok(Conversion::Integer),
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
