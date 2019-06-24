@@ -203,7 +203,7 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut fp_id = file_id(&fp);
-        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -266,22 +266,14 @@ mod test {
                             }
                             Ok(0) => {
                                 attempts -= 1;
-                                read_index = 0;
                                 continue;
                             }
                             Ok(_) => {
                                 sut_reads += 1;
-                                loop {
-                                    let psv = fwfiles[read_index].read_line();
-                                    if psv.is_none() {
-                                        if read_index == 0 {
-                                            break;
-                                        }
-                                        read_index = 0;
-                                    } else {
-                                        model_reads += 1;
-                                        break;
-                                    }
+                                let psv = fwfiles[read_index].read_line();
+                                if psv.is_some() {
+                                    model_reads += 1;
+                                    break;
                                 }
                                 break;
                             }
@@ -303,7 +295,7 @@ mod test {
         let dir = tempdir::TempDir::new("file_watcher_qc").unwrap();
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
-        let mut fw = FileWatcher::new(&path, false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
@@ -349,21 +341,10 @@ mod test {
                             Ok(0) => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
-                                read_index = 0;
                                 continue;
                             }
                             Ok(sz) => {
-                                let exp;
-                                loop {
-                                    let psv = fwfiles[read_index].read_line();
-                                    if psv.is_none() {
-                                        assert!(read_index != 0);
-                                        read_index = 0;
-                                    } else {
-                                        exp = psv.unwrap();
-                                        break;
-                                    }
-                                }
+                                let exp = fwfiles[read_index].read_line().unwrap();
                                 assert_eq!(exp.into_bytes(), buf);
                                 assert_eq!(sz, buf.len() + 1);
                                 buf.clear();
