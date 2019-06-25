@@ -10,7 +10,7 @@ use nom::{
     sequence::{delimited, terminated},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
@@ -29,7 +29,7 @@ impl crate::topology::config::TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
@@ -56,8 +56,6 @@ impl Tokenizer {
         drop_field: bool,
         types: HashMap<Atom, Conversion>,
     ) -> Self {
-        let field_names_set: HashSet<Atom> = field_names.iter().map(|s| s.into()).collect();
-
         let field_names = field_names
             .into_iter()
             .map(|name| {
@@ -65,15 +63,6 @@ impl Tokenizer {
                 (name, conversion)
             })
             .collect();
-
-        for (name, _) in &types {
-            if !field_names_set.contains(name) {
-                warn!(
-                    message = "Field was specified in the types but is not a valid field.",
-                    field = &name[..]
-                );
-            }
-        }
 
         Self {
             field_names,
