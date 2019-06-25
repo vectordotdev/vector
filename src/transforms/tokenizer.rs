@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event};
-use crate::types::Conversion;
+use crate::types::{parse_conversion_map, Conversion};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag},
@@ -29,16 +29,7 @@ impl crate::topology::config::TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = self
-            .types
-            .iter()
-            .map(|(field, typename)| {
-                typename
-                    .parse::<Conversion>()
-                    .map(|conv| (field.clone(), conv))
-            })
-            .collect::<Result<HashMap<Atom, Conversion>, _>>()
-            .map_err(|err| format!("Invalid conversion type: {}", err))?;
+        let types = parse_conversion_map(&self.types)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);

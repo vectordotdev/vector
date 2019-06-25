@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event, ValueKind};
-use crate::types::Conversion;
+use crate::types::{parse_conversion_map, Conversion};
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -23,12 +23,7 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = self
-            .types
-            .iter()
-            .map(|(field, typename)| typename.parse::<Conversion>().map(|ct| (field.clone(), ct)))
-            .collect::<Result<HashMap<Atom, Conversion>, _>>()
-            .map_err(|err| format!("Invalid conversion type: {}", err))?;
+        let types = parse_conversion_map(&self.types)?;
 
         Regex::new(&self.regex)
             .map_err(|err| err.to_string())

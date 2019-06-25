@@ -1,6 +1,8 @@
 use crate::event::ValueKind;
 use chrono::{DateTime, Local, TimeZone, Utc};
+use std::collections::HashMap;
 use std::str::FromStr;
+use string_cache::DefaultAtom as Atom;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`Bytes`) `ValueKind` into another type. Every
@@ -51,6 +53,20 @@ impl FromStr for Conversion {
             _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
         }
     }
+}
+
+pub fn parse_conversion_map(
+    types: &HashMap<Atom, String>,
+) -> Result<HashMap<Atom, Conversion>, String> {
+    types
+        .into_iter()
+        .map(|(field, typename)| {
+            typename
+                .parse::<Conversion>()
+                .map(|conv| (field.clone(), conv))
+        })
+        .collect::<Result<HashMap<Atom, Conversion>, _>>()
+        .map_err(|err| format!("Invalid conversion type: {}", err))
 }
 
 impl Conversion {
