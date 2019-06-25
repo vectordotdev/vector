@@ -12,19 +12,31 @@ pub struct LogToMetricConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
+pub struct CounterConfig {
+    field: Atom,
+    #[serde(skip)]
+    sanitized_name: Atom,
+    name: Option<Atom>,
+    #[serde(default = "default_increment_by_value")]
+    increment_by_value: bool,
+    labels: IndexMap<Atom, String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub struct GaugeConfig {
+    field: Atom,
+    #[serde(skip)]
+    sanitized_name: Atom,
+    name: Option<Atom>,
+    labels: IndexMap<Atom, String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
-    Counter {
-        field: Atom,
-        name: Option<Atom>,
-        #[serde(default = "default_increment_by_value")]
-        increment_by_value: bool,
-        labels: IndexMap<Atom, String>,
-    },
-    Gauge {
-        field: Atom,
-        name: Option<Atom>,
-        labels: IndexMap<Atom, String>,
-    },
+    Counter(CounterConfig),
+    Gauge(GaugeConfig),
 }
 
 fn default_increment_by_value() -> bool {
@@ -38,7 +50,7 @@ pub struct LogToMetric {
 #[typetag::serde(name = "log_to_metric")]
 impl crate::topology::config::TransformConfig for LogToMetricConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Ok(Box::new(LogToMetric::new(self.clone())))
+        Ok(Box::new(LogToMetric::new(self)))
     }
 
     fn input_type(&self) -> crate::topology::config::DataType {
@@ -51,7 +63,28 @@ impl crate::topology::config::TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: LogToMetricConfig) -> Self {
+    pub fn new(config: &LogToMetricConfig) -> Self {
+        let mut config = config.clone();
+
+        for metric in config.metrics.iter_mut() {
+            match metric {
+                MetricConfig::Counter(ref mut counter) => {
+                    let name = match &counter.name {
+                        Some(s) => s.to_string(),
+                        None => format!("{}_total", counter.field.to_string()),
+                    };
+                    counter.sanitized_name = Atom::from(name);
+                }
+                MetricConfig::Gauge(ref mut gauge) => {
+                    let name = match &gauge.name {
+                        Some(s) => s.to_string(),
+                        None => gauge.field.to_string(),
+                    };
+                    gauge.sanitized_name = Atom::from(name);
+                }
+            }
+        }
+
         LogToMetric { config }
     }
 }
@@ -62,22 +95,12 @@ impl Transform for LogToMetric {
 
         for metric in self.config.metrics.iter() {
             match metric {
-                MetricConfig::Counter {
-                    field,
-                    name,
-                    increment_by_value,
-                    ..
-                } => {
-                    if let Some(val) = event.get(field) {
-                        let name = match name {
-                            Some(s) => s.to_string(),
-                            None => format!("{}_total", field.to_string()),
-                        };
-
-                        if *increment_by_value {
+                MetricConfig::Counter(counter) => {
+                    if let Some(val) = event.get(&counter.field) {
+                        if counter.increment_by_value {
                             if let Ok(val) = val.to_string_lossy().parse::<f32>() {
                                 return Some(Event::Metric(Metric::Counter {
-                                    name,
+                                    name: counter.sanitized_name.to_string(),
                                     val: val as u32,
                                     sampling: None,
                                 }));
@@ -87,23 +110,18 @@ impl Transform for LogToMetric {
                             }
                         } else {
                             return Some(Event::Metric(Metric::Counter {
-                                name,
+                                name: counter.sanitized_name.to_string(),
                                 val: 1,
                                 sampling: None,
                             }));
                         };
                     }
                 }
-                MetricConfig::Gauge { field, name, .. } => {
-                    if let Some(val) = event.get(field) {
-                        let name = match name {
-                            Some(s) => s.to_string(),
-                            None => field.to_string(),
-                        };
-
+                MetricConfig::Gauge(gauge) => {
+                    if let Some(val) = event.get(&gauge.field) {
                         if let Ok(val) = val.to_string_lossy().parse() {
                             return Some(Event::Metric(Metric::Gauge {
-                                name,
+                                name: gauge.sanitized_name.to_string(),
                                 val,
                                 direction: None,
                             }));
@@ -141,7 +159,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("status".into(), "42".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -171,7 +189,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("backtrace".into(), "message".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -201,7 +219,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("success".into(), "42".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
 
         let metric = transform.transform(log);
         assert!(metric.is_none());
@@ -225,7 +243,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("amount".into(), "33.95".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -255,7 +273,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("memory_rss".into(), "123".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
 
         let metric = transform.transform(log).unwrap();
         assert_eq!(
@@ -286,7 +304,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("status".into(), "not a number".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
         assert!(transform.transform(log).is_none());
     }
 
@@ -307,7 +325,7 @@ mod tests {
         log.as_mut_log()
             .insert_explicit("not foo".into(), "not a number".into());
 
-        let mut transform = LogToMetric::new(config);
+        let mut transform = LogToMetric::new(&config);
         assert!(transform.transform(log).is_none());
     }
 }
