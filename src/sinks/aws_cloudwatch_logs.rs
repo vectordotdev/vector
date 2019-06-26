@@ -18,6 +18,7 @@ use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
+use tokio_trace::field;
 use tower::{
     buffer::Buffer,
     limit::{
@@ -45,7 +46,7 @@ type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<E
 
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
-    clients: HashMap<Bytes, Svc>,
+    clients: HashMap<CloudwatchKey, Svc>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -98,40 +99,6 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 
         let log_group = Partition::Static(self.group_name.clone().into());
         let log_stream = Partition::Static(self.stream_name.clone().into());
-
-        fn partition(
-            event: Event,
-            group: &Partition,
-            stream: &Partition,
-        ) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, Bytes>, Error = ()> {
-            let mut group = match group {
-                Partition::Static(g) => g.clone(),
-                Partition::Event(key) => {
-                    if let Some(val) = event.as_log().get(&key) {
-                        val.as_bytes().clone()
-                    } else {
-                        warn!(message = "");
-                        return iter_ok(vec![]);
-                    }
-                }
-            };
-
-            let stream = match stream {
-                Partition::Static(g) => g.clone(),
-                Partition::Event(key) => {
-                    if let Some(val) = event.as_log().get(&key) {
-                        val.as_bytes().clone()
-                    } else {
-                        warn!(message = "");
-                        return iter_ok(vec![]);
-                    }
-                }
-            };
-
-            group.extend_from_slice(&stream[..]);
-
-            iter_ok(vec![PartitionInnerBuffer::new(event, group)])
-        }
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker)
@@ -233,7 +200,7 @@ impl CloudwatchLogsPartitionSvc {
     }
 }
 
-impl Service<PartitionInnerBuffer<Vec<Event>, Bytes>> for CloudwatchLogsPartitionSvc {
+impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogsPartitionSvc {
     type Response = ();
     type Error = Box<std::error::Error + Send + Sync + 'static>;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -242,7 +209,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, Bytes>> for CloudwatchLogsPartitio
         Ok(().into())
     }
 
-    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, Bytes>) -> Self::Future {
+    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
         let (events, key) = req.into_parts();
 
         let timeout = self.config.request_timeout_secs.unwrap_or(60);
@@ -419,6 +386,61 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
     fn from(e: DescribeLogStreamsError) -> Self {
         CloudwatchError::Describe(e)
     }
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct CloudwatchKey {
+    group: Bytes,
+    stream: Bytes,
+}
+
+fn interpolate(s: &str) -> Partition {
+    // use regex::Regex;
+    // let r = Regex::new(r"").unwrap();
+
+    unimplemented!()
+}
+
+fn partition(
+    event: Event,
+    group: &Partition,
+    stream: &Partition,
+) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, CloudwatchKey>, Error = ()> {
+    let group = match group {
+        Partition::Static(g) => g.clone(),
+        Partition::Event(key) => {
+            if let Some(val) = event.as_log().get(&key) {
+                val.as_bytes().clone()
+            } else {
+                warn!(
+                    message =
+                        "Event key does not exist on the event and the event will be dropped.",
+                    key = field::debug(key)
+                );
+                return iter_ok(vec![]);
+            }
+        }
+    };
+
+    let stream = match stream {
+        Partition::Static(g) => g.clone(),
+        Partition::Event(key) => {
+            if let Some(val) = event.as_log().get(&key) {
+                val.as_bytes().clone()
+            } else {
+                warn!(
+                    message =
+                        "Event key does not exist on the event and the event will be dropped.",
+                    key = field::debug(key)
+                );
+                return iter_ok(vec![]);
+            }
+        }
+    };
+
+    let key = CloudwatchKey { stream, group };
+
+    iter_ok(vec![PartitionInnerBuffer::new(event, key)])
 }
 
 #[cfg(test)]
