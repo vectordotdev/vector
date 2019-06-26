@@ -253,6 +253,7 @@ impl<B, S, K> fmt::Debug for PartitionedBatchSink<B, S, K> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use futures::{Future, Sink};
     use std::time::Duration;
     use tokio_test::clock;
@@ -415,31 +416,31 @@ mod tests {
         B,
     }
 
-    impl Partition for Partitions {
+    impl Partition<Bytes> for Partitions {
         fn partition(&self) -> Bytes {
             format!("{:?}", self).into()
         }
     }
 
-    impl Partition for usize {
+    impl Partition<Bytes> for usize {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for u8 {
+    impl Partition<Bytes> for u8 {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for i32 {
+    impl Partition<Bytes> for i32 {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for Vec<i32> {
+    impl Partition<Bytes> for Vec<i32> {
         fn partition(&self) -> Bytes {
             "key".into()
         }
