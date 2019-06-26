@@ -14,6 +14,7 @@ use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
 use tracing_metrics::MetricsSubscriber;
 use vector::{metrics, topology};
+use topology::Stage;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -25,6 +26,14 @@ struct Opts {
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
     require_healthy: bool,
+
+    /// Exit on startup after health-checking sinks
+    #[structopt(short, long)]
+    healthchecks_only: bool,
+
+    /// Exit on startup after config verification
+    #[structopt(short, long)]
+    dry_run: bool,
 
     /// Serve internal metrics from the given address
     #[structopt(short, long)]
@@ -140,9 +149,27 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let (mut topology, mut graceful_crash) =
-            topology::start(config, &mut rt, opts.require_healthy)
-                .unwrap_or_else(|| std::process::exit(1));
+        let (exit_after, require_healthy) = if opts.dry_run {
+            info!("Dry run enabled, exiting after config validation");
+            if opts.healthchecks_only {
+                info!("Ignoring --healthchecks-only due to more strong option --dry-run");
+            }
+
+            (Some(Stage::ConfigValidated), opts.require_healthy)
+        } else if opts.healthchecks_only {
+            info!("Exit after finishing healthchecks configured");
+            (Some(Stage::HealthChecksPassed), true)
+        } else {
+            (None, opts.require_healthy)
+        };
+
+        let result = topology::start_or_validate(config, &mut rt, exit_after, require_healthy);
+        result.as_ref().left().map(|success| {
+            let exit_code = if *success { 0 } else { 1 };
+            std::process::exit(exit_code);
+        });
+
+        let (mut topology, mut graceful_crash) = result.right().unwrap();
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -185,7 +212,7 @@ fn main() {
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
 
-            let success = topology.reload_config(config, &mut rt, opts.require_healthy, false);
+            let success = topology.reload_config_on_hot(config, &mut rt, opts.require_healthy);
             if !success {
                 error!("Reload aborted");
             }

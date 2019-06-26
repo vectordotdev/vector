@@ -130,7 +130,7 @@ impl Acker {
     // This method should be called by a sink to indicate that it has successfully
     // flushed the next `num` events from its input stream. If there are events that
     // have flushed, but events that came before them in the stream have not been flushed,
-    // the later events must _not_ be acked until all preceeding elements are also acked.
+    // the later events must _not_ be acked until all preceding elements are also acked.
     // This is primary used by the on-disk buffer to know which events are okay to
     // delete from disk.
     pub fn ack(&self, num: usize) {

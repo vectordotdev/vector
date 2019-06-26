@@ -4,6 +4,8 @@ mod fanout;
 
 pub use self::config::Config;
 
+use crate::topology::builder::Pieces;
+
 use crate::buffers;
 use futures::{
     future,
@@ -11,6 +13,7 @@ use futures::{
     Future, Stream,
 };
 use indexmap::IndexMap;
+use either::Either::{self, Left, Right};
 use std::collections::{HashMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
@@ -29,11 +32,26 @@ pub struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
+#[derive(PartialEq)]
+pub enum Stage {
+    ConfigValidated,
+    HealthChecksPassed
+}
+
 pub fn start(
     config: Result<Config, Vec<String>>,
     rt: &mut tokio::runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
+    start_or_validate(config, rt, None, require_healthy).right()
+}
+
+pub fn start_or_validate(
+    config: Result<Config, Vec<String>>,
+    rt: &mut tokio::runtime::Runtime,
+    exit_after: Option<Stage>,
+    require_healthy: bool,
+) -> Either<bool, (RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
 
     let mut running_topology = RunningTopology {
@@ -46,12 +64,12 @@ pub fn start(
         abort_tx,
     };
 
-    let success = running_topology.reload_config(config, rt, require_healthy, true);
-
-    if success {
-        Some((running_topology, abort_rx))
+    let exit_after_success = exit_after.is_some();
+    let success = running_topology.reload_config_and_respawn(config, rt, exit_after, require_healthy, true);
+    if success && !exit_after_success {
+        Right((running_topology, abort_rx))
     } else {
-        None
+        Left(exit_after_success)
     }
 }
 
@@ -127,10 +145,30 @@ impl RunningTopology {
         .map_err(|_| ())
     }
 
-    pub fn reload_config(
+    pub fn load_config_and_spawn(
         &mut self,
         new_config: Result<Config, Vec<String>>,
         rt: &mut tokio::runtime::Runtime,
+        exit_after: Option<Stage>,
+        require_healthy: bool
+    ) -> bool {
+        self.reload_config_and_respawn(new_config, rt, exit_after, require_healthy, true)
+    }
+
+    pub fn reload_config_on_hot(
+        &mut self,
+        new_config: Result<Config, Vec<String>>,
+        rt: &mut tokio::runtime::Runtime,
+        require_healthy: bool
+    ) -> bool {
+        self.reload_config_and_respawn(new_config, rt, None, require_healthy, false)
+    }
+
+    fn reload_config_and_respawn(
+        &mut self,
+        new_config: Result<Config, Vec<String>>,
+        rt: &mut tokio::runtime::Runtime,
+        exit_after: Option<Stage>,
         require_healthy: bool,
         initial_load: bool,
     ) -> bool {
@@ -164,33 +202,9 @@ impl RunningTopology {
             }
         };
 
-        fn to_remove_change_add<C>(
-            old: &IndexMap<String, C>,
-            new: &IndexMap<String, C>,
-        ) -> (HashSet<String>, HashSet<String>, HashSet<String>)
-        where
-            C: serde::Serialize + serde::Deserialize<'static>,
-        {
-            let old_names = old.keys().cloned().collect::<HashSet<_>>();
-            let new_names = new.keys().cloned().collect::<HashSet<_>>();
-
-            let to_change = old_names
-                .intersection(&new_names)
-                .filter(|&n| {
-                    // This is a hack around the issue of comparing two
-                    // trait objects. Json is used here over toml since
-                    // toml does not support serializing `None`.
-                    let old_json = serde_json::to_vec(&old[n]).unwrap();
-                    let new_json = serde_json::to_vec(&new[n]).unwrap();
-                    old_json != new_json
-                })
-                .cloned()
-                .collect::<HashSet<_>>();
-
-            let to_remove = &old_names - &new_names;
-            let to_add = &new_names - &old_names;
-
-            (to_remove, to_change, to_add)
+        if exit_after == Some(Stage::ConfigValidated) {
+            info!("Config validated, exiting.");
+            return true;
         }
 
         // Healthchecks
@@ -209,14 +223,28 @@ impl RunningTopology {
 
             if success.is_ok() {
                 info!("All healthchecks passed");
+
+                if exit_after == Some(Stage::HealthChecksPassed) {
+                    return true;
+                }
             } else {
                 error!("Sinks unhealthy");
                 return false;
             }
         } else {
+            debug_assert!(exit_after != Some(Stage::HealthChecksPassed));
             rt.spawn(healthchecks);
         }
 
+        self.spawn_all(new_config, new_pieces, rt)
+    }
+
+    fn spawn_all(
+        &mut self,
+        new_config: Config,
+        mut new_pieces: Pieces,
+        rt: &mut tokio::runtime::Runtime
+    ) -> bool {
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
@@ -476,6 +504,35 @@ impl RunningTopology {
     }
 }
 
+fn to_remove_change_add<C>(
+    old: &IndexMap<String, C>,
+    new: &IndexMap<String, C>,
+) -> (HashSet<String>, HashSet<String>, HashSet<String>)
+    where
+        C: serde::Serialize + serde::Deserialize<'static>,
+{
+    let old_names = old.keys().cloned().collect::<HashSet<_>>();
+    let new_names = new.keys().cloned().collect::<HashSet<_>>();
+
+    let to_change = old_names
+        .intersection(&new_names)
+        .filter(|&n| {
+            // This is a hack around the issue of comparing two
+            // trait objects. Json is used here over toml since
+            // toml does not support serializing `None`.
+            let old_json = serde_json::to_vec(&old[n]).unwrap();
+            let new_json = serde_json::to_vec(&new[n]).unwrap();
+            old_json != new_json
+        })
+        .cloned()
+        .collect::<HashSet<_>>();
+
+    let to_remove = &old_names - &new_names;
+    let to_add = &new_names - &old_names;
+
+    (to_remove, to_change, to_add)
+}
+
 fn handle_errors(
     task: builder::Task,
     abort_tx: mpsc::UnboundedSender<()>,
@@ -542,7 +599,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -594,7 +651,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         // out2 should disconnect after the reload
         let output_lines2 = output_lines2.wait();
@@ -648,7 +705,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -712,7 +769,7 @@ mod tests {
 
             wait_for(|| output_lines1.count() > 0);
 
-            topology.reload_config(Ok(new_config), &mut rt, false, false);
+            topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
             wait_for(|| output_lines2.count() > 0);
 
             // Shut down server
@@ -757,7 +814,7 @@ mod tests {
             .inputs
             .push("in".to_string());
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         wait_for_tcp(in_addr);
 
@@ -801,7 +858,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
 
@@ -844,7 +901,7 @@ mod tests {
         new_config.add_source("in2", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -914,7 +971,7 @@ mod tests {
             shutdown_timeout_secs: 30,
         });
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         wait_for_tcp(in_addr);
@@ -992,7 +1049,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= num_lines);
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1057,7 +1114,7 @@ mod tests {
         wait_for(|| output_lines1.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1127,7 +1184,7 @@ mod tests {
             pass_list: vec![],
         });
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -1177,7 +1234,7 @@ mod tests {
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config(Ok(new_config), &mut rt, false, false);
+        topology.reload_config_on_hot(Ok(new_config), &mut rt, false);
 
         assert_eq!(
             topology.config.data_dir,
@@ -1240,7 +1297,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config(Ok(config.clone()), &mut rt, true, false);
+            topology.reload_config_on_hot(Ok(config.clone()), &mut rt, true);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
@@ -1256,7 +1313,7 @@ mod tests {
 
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config(Ok(config.clone()), &mut rt, true, false);
+            topology.reload_config_on_hot(Ok(config.clone()), &mut rt, true);
             healthcheck_receiver.wait();
 
             let receive = receive_one(&out1_addr, &out2_addr);
@@ -1271,7 +1328,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
 
-            topology.reload_config(Ok(config.clone()), &mut rt, false, false);
+            topology.reload_config_on_hot(Ok(config.clone()), &mut rt, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
