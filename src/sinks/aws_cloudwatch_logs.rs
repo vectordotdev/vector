@@ -37,6 +37,7 @@ pub struct CloudwatchLogsSvc {
     group_name: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 enum Partition {
     Static(Bytes),
     Event(Atom),
@@ -97,8 +98,8 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
 
-        let log_group = Partition::Static(self.group_name.clone().into());
-        let log_stream = Partition::Static(self.stream_name.clone().into());
+        let log_group = interpolate(&self.group_name);
+        let log_stream = interpolate(&self.stream_name);
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker)
@@ -395,10 +396,16 @@ struct CloudwatchKey {
 }
 
 fn interpolate(s: &str) -> Partition {
-    // use regex::Regex;
-    // let r = Regex::new(r"").unwrap();
+    use regex::Regex;
+    let r = Regex::new(r"\{event\.(?P<key>\D+)\}").unwrap();
 
-    unimplemented!()
+    if let Some(cap) = r.captures(s) {
+        if let Some(m) = cap.name("key") {
+            return Partition::Event(m.as_str().into());
+        }
+    }
+
+    Partition::Static(s.into())
 }
 
 fn partition(
@@ -445,13 +452,92 @@ fn partition(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
-        sinks::aws_cloudwatch_logs::{CloudwatchLogsSinkConfig, CloudwatchLogsSvc},
     };
+    use futures::Stream;
     use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn interpolate_event() {
+        let partition = interpolate("{event.some_key}");
+
+        assert_eq!(partition, Partition::Event("some_key".into()));
+    }
+
+    #[test]
+    fn interpolate_static() {
+        let partition = interpolate("static_key");
+
+        assert_eq!(partition, Partition::Static("static_key".into()));
+    }
+
+    #[test]
+    fn partition_static() {
+        let event = Event::from("hello world");
+        let stream = Partition::Static("stream".into());
+        let group = Partition::Static("group".into());
+
+        let (_event, key) = partition(event, &group, &stream)
+            .wait()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_parts();
+
+        let expected = CloudwatchKey {
+            stream: "stream".into(),
+            group: "group".into(),
+        };
+
+        assert_eq!(key, expected)
+    }
+
+    #[test]
+    fn partition_event() {
+        let mut event = Event::from("hello world");
+
+        event
+            .as_mut_log()
+            .insert_implicit("log_stream".into(), "stream".into());
+        event
+            .as_mut_log()
+            .insert_implicit("log_group".into(), "group".into());
+
+        let stream = Partition::Event("log_stream".into());
+        let group = Partition::Event("log_group".into());
+
+        let (_event, key) = partition(event, &group, &stream)
+            .wait()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_parts();
+
+        let expected = CloudwatchKey {
+            stream: "stream".into(),
+            group: "group".into(),
+        };
+
+        assert_eq!(key, expected)
+    }
+
+    #[test]
+    fn partition_no_key_event() {
+        let event = Event::from("hello world");
+
+        let stream = Partition::Event("log_stream".into());
+        let group = Partition::Event("log_group".into());
+
+        let stream_val = partition(event, &group, &stream).wait().into_iter().next();
+
+        assert!(stream_val.is_none());
+    }
 
     #[test]
     fn cloudwatch_encode_log() {
