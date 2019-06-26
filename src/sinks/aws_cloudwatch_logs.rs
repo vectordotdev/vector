@@ -648,15 +648,15 @@ mod integration_tests {
             Err(_) => (),
         };
 
-        let req = CreateLogStreamRequest {
-            log_group_name: GROUP_NAME.into(),
-            log_stream_name: STREAM_NAME.into(),
-        };
+        // let req = CreateLogStreamRequest {
+        //     log_group_name: GROUP_NAME.into(),
+        //     log_stream_name: STREAM_NAME.into(),
+        // };
 
-        match client.create_log_stream(req).sync() {
-            Ok(_) => (),
-            Err(_) => (),
-        };
+        // match client.create_log_stream(req).sync() {
+        //     Ok(_) => (),
+        //     Err(_) => (),
+        // };
     }
 
 }
