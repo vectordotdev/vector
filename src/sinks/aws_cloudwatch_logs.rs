@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt},
 };
 use bytes::Bytes;
-use futures::{sync::oneshot, try_ready, Async, Future, Poll, Sink};
+use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
+use string_cache::DefaultAtom as Atom;
 use tower::{
     buffer::Buffer,
     limit::{
@@ -33,6 +34,11 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
+}
+
+enum Partition {
+    Static(Bytes),
+    Event(Atom),
 }
 
 type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<Event>>;
@@ -90,6 +96,43 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
 
+        let log_group = Partition::Static(self.group_name.clone().into());
+        let log_stream = Partition::Static(self.stream_name.clone().into());
+
+        fn partition(
+            event: Event,
+            group: &Partition,
+            stream: &Partition,
+        ) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, Bytes>, Error = ()> {
+            let mut group = match group {
+                Partition::Static(g) => g.clone(),
+                Partition::Event(key) => {
+                    if let Some(val) = event.as_log().get(&key) {
+                        val.as_bytes().clone()
+                    } else {
+                        warn!(message = "");
+                        return iter_ok(vec![]);
+                    }
+                }
+            };
+
+            let stream = match stream {
+                Partition::Static(g) => g.clone(),
+                Partition::Event(key) => {
+                    if let Some(val) = event.as_log().get(&key) {
+                        val.as_bytes().clone()
+                    } else {
+                        warn!(message = "");
+                        return iter_ok(vec![]);
+                    }
+                }
+            };
+
+            group.extend_from_slice(&stream[..]);
+
+            iter_ok(vec![PartitionInnerBuffer::new(event, group)])
+        }
+
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker)
                 .partitioned_batched_with_min(
@@ -98,7 +141,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
                     Duration::from_secs(batch_timeout),
                 )
                 // TODO: actually partition!
-                .with(|e: Event| Ok(PartitionInnerBuffer::new(e, "key".into())));
+                .with_flat_map(move |event| partition(event, &log_group, &log_stream));
             Box::new(svc_sink)
         };
 
@@ -190,7 +233,7 @@ impl CloudwatchLogsPartitionSvc {
     }
 }
 
-impl Service<PartitionInnerBuffer<Vec<Event>>> for CloudwatchLogsPartitionSvc {
+impl Service<PartitionInnerBuffer<Vec<Event>, Bytes>> for CloudwatchLogsPartitionSvc {
     type Response = ();
     type Error = Box<std::error::Error + Send + Sync + 'static>;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -199,7 +242,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>>> for CloudwatchLogsPartitionSvc {
         Ok(().into())
     }
 
-    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>>) -> Self::Future {
+    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, Bytes>) -> Self::Future {
         let (events, key) = req.into_parts();
 
         let timeout = self.config.request_timeout_secs.unwrap_or(60);

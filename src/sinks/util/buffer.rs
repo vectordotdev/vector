@@ -1,5 +1,4 @@
 use super::{batch::Batch, partition::Partition};
-use bytes::Bytes;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -109,29 +108,30 @@ impl Batch for Buffer {
 }
 
 #[derive(Debug)]
-pub struct PartitionBuffer<T> {
+pub struct PartitionBuffer<T, K> {
     inner: T,
-    key: Option<Bytes>,
+    key: Option<K>,
 }
 
 #[derive(Debug, Clone)]
-pub struct PartitionInnerBuffer<T> {
+pub struct PartitionInnerBuffer<T, K> {
     pub(self) inner: T,
-    key: Bytes,
+    key: K,
 }
 
-impl<T> PartitionBuffer<T> {
+impl<T, K> PartitionBuffer<T, K> {
     pub fn new(inner: T) -> Self {
         Self { inner, key: None }
     }
 }
 
-impl<T> Batch for PartitionBuffer<T>
+impl<T, K> Batch for PartitionBuffer<T, K>
 where
     T: Batch,
+    K: Clone,
 {
-    type Input = PartitionInnerBuffer<T::Input>;
-    type Output = PartitionInnerBuffer<T::Output>;
+    type Input = PartitionInnerBuffer<T::Input, K>;
+    type Output = PartitionInnerBuffer<T::Output, K>;
 
     fn len(&self) -> usize {
         self.inner.len()
@@ -165,18 +165,21 @@ where
     }
 }
 
-impl<T> PartitionInnerBuffer<T> {
-    pub fn new(inner: T, key: Bytes) -> Self {
+impl<T, K> PartitionInnerBuffer<T, K> {
+    pub fn new(inner: T, key: K) -> Self {
         Self { inner, key }
     }
 
-    pub fn into_parts(self) -> (T, Bytes) {
+    pub fn into_parts(self) -> (T, K) {
         (self.inner, self.key)
     }
 }
 
-impl<T> Partition for PartitionInnerBuffer<T> {
-    fn partition(&self) -> Bytes {
+impl<T, K> Partition<K> for PartitionInnerBuffer<T, K>
+where
+    K: Clone,
+{
+    fn partition(&self) -> K {
         self.key.clone()
     }
 }
