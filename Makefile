@@ -29,6 +29,9 @@ package-deb: ## Create a .deb package from artifacts created via `build`
 package-rpm: ## Create a .rpm package from artifacts created via `build`
 	@scripts/package-rpm.sh
 
+release-package-cloud: ## Release packages to packagecloud.io
+	@scripts/release_package_cloud.sh
+
 test: ## Run tests
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4

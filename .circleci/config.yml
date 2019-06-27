@@ -107,7 +107,6 @@ jobs:
       xcode: "9.0"
     environment:
       TARGET: "x86_64-apple-darwin"
-      BUILDER: "cargo"
     steps:
       - checkout
       - *install-rust
@@ -182,18 +181,38 @@ jobs:
   # Verifying
   #
 
-  verify-deb-on-deb-9:
+  verify-amazon-linux-1:
     docker:
-      - image: timberio/vector-verifier-deb-9:latest
+      - image: amazonlinux:1
     steps:
       - *restore-artifacts-from-workspace
       - run:
-          command: apt-get update
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
       - run:
-          command: apt-get install ca-certificates
+          name: Verify installation
+          command: vector --version
+
+  verify-amazon-linux-2:
+    docker:
+      - image: amazonlinux:2
+    steps:
+      - *restore-artifacts-from-workspace
       - run:
-          name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-rpm-on-centos-6:
+    docker:
+      - image: centos:6
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
       - run:
           name: Verify installation
           command: vector --version
@@ -206,6 +225,78 @@ jobs:
       - run:
           name: Install .rpm package
           command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-deb-8:
+    docker:
+      - image: timberio/vector-verifier-deb-8:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-deb-9:
+    docker:
+      - image: timberio/vector-verifier-deb-9:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-unbuntu-16-04:
+    docker:
+      - image: ubuntu:16.04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-unbuntu-17-04:
+    docker:
+      - image: ubuntu:17.04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-unbuntu-18-04:
+    docker:
+      - image: ubuntu:18.04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-on-unbuntu-19-04:
+    docker:
+      - image: ubuntu:19.04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
       - run:
           name: Verify installation
           command: vector --version
@@ -249,12 +340,11 @@ jobs:
     docker:
       - image: timberio/vector-releaser:latest
     steps:
+      - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Upload to Package Cloud
-          command: |
-            package_cloud push timberio/packages target/artifacts/*.deb
-            package_cloud push timberio/packages target/artifacts/*.rpm
+          name: Release to Package Cloud
+          command: make release-package-cloud
 
   release-s3:
     docker:

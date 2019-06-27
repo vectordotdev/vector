@@ -42,6 +42,8 @@ build_image "packager-deb"
 build_image "packager-rpm"
 build_image "releaser"
 build_image "tester"
+build_image "verifier-deb-7"
+build_image "verifier-deb-8"
 build_image "verifier-deb-9"
 
 # The following images extend re-built cross base images. The end result
