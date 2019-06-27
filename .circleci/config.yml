@@ -132,34 +132,34 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            git --version
-            echo $VERSION
             make build
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-x86_64-unknown-linux-gnu.tar.gz"
-
-  #
-  # Packaging
-  #
-
-  package-deb:
-    docker:
-      - image: timberio/vector-packager-deb:latest
-    steps:
-      - checkout
-      - *restore-artifacts-from-workspace
+      # We _must_ build the deb package on the same machine that created
+      # the binary. `cargo deb` performs dependency calculation via `ldd`
+      # and this process must happen on the same machine it was built in
+      # order to be accurate.
       - run:
-          name: Build deb package
+          name: Build .deb package
           command: |
             export VERSION=$(make version)
             make package-deb
       - persist_to_workspace:
           root: target/artifacts
           paths:
-            - "*.deb"
+            - "*-x86_64-unknown-linux-gnu.tar.gz"
+            - "*-amd64.deb"
 
+  #
+  # Packaging
+  #
+
+  # Unlike the .deb package, the .rpm package is best created on a single
+  # CentOS machine. This is because we interface with the rpmbuilder
+  # directly and define a spec (distribution/rpm/vector.spec) that outlines
+  # all of the dependencies. The end result will be the same regardless of
+  # the original target environment that built the binary.
+  #
+  # This is how I'd like the .deb packager to work as well, and I have a
+  # feeling if we ditched `cargo deb` we could achieve this.
   package-rpm:
     docker:
       - image: timberio/vector-packager-rpm:latest
@@ -167,10 +167,12 @@ jobs:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Build deb package
+          name: Build x86_64-unknown-linux-gnu .rpm package
           command: |
             export VERSION=$(make version)
             make package-rpm
+          environment:
+            TARGET: x86_64-unknown-linux-gnu
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -316,11 +318,6 @@ workflows:
           #   - rustfmt
           #   - check-stable
           #   - test-stable
-      - package-deb:
-          <<: *tag-release-workflow-filters
-          requires:
-            - build-x86_64-unknown-linux-gnu
-            - build-x86_64-apple-darwin
       - package-rpm:
           <<: *tag-release-workflow-filters
           requires:
@@ -329,7 +326,7 @@ workflows:
       - verify-deb-on-deb-9:
           <<: *tag-release-workflow-filters
           requires:
-            - package-deb
+            - build-x86_64-unknown-linux-gnu
       - verify-rpm-on-centos-7:
           <<: *tag-release-workflow-filters
           requires:

@@ -17,14 +17,6 @@ bench: ## Run internal benchmarks
 	@cargo bench
 
 build: ## Build Vector for a given $TARGET and $VERSION
-ifndef TARGET
-	$(error TARGET is undefined, it must be a Rust target triple)
-endif
-
-ifndef VERSION
-	$(error VERSION is undefined, it must be set)
-endif
-
 	@scripts/build.sh
 
 generate-docs: ## Generate docs from the scipts/config_schema.toml file

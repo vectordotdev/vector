@@ -25,4 +25,6 @@ RUN apt-get install -y --no-install-recommends \
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
 ENV PATH="$PATH:/root/.cargo/bin"
+RUN cargo install cargo-deb
+
 ENV TARGET=x86_64-unknown-linux-gnu

@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM debian:8
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
