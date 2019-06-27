@@ -205,7 +205,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-rpm-on-centos-6:
+  verify-centos-6:
     docker:
       - image: centos:6
     steps:
@@ -217,7 +217,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-rpm-on-centos-7:
+  verify-centos-7:
     docker:
       - image: centos:7
     steps:
@@ -229,7 +229,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-deb-8:
+  verify-deb-8:
     docker:
       - image: timberio/vector-verifier-deb-8:latest
     steps:
@@ -241,7 +241,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-deb-9:
+  verify-deb-9:
     docker:
       - image: timberio/vector-verifier-deb-9:latest
     steps:
@@ -378,12 +378,29 @@ compile-workflow-filters: &compile-workflow-filters
     tags:
       only: /v.*/
 
+release-requires: &release-requires
+  requires:
+    - verify-amazon-linux-1
+    - verify-amazon-linux-2
+    - verify-centos-6
+    - verify-centos-7
+    - verify-deb-8
+    - verify-deb-9
+    - verify-deb-on-unbuntu-16-04
+    - verify-deb-on-unbuntu-17-04
+    - verify-deb-on-unbuntu-18-04
+    - verify-deb-on-unbuntu-19-04
+
 tag-release-workflow-filters: &tag-release-workflow-filters
   filters:
     branches:
       only: /.*/ #ignore: /.*/
     tags:
       only: /v.*/
+
+verify-requires: &release-requires
+  requires:
+    - package-rpm
 
 workflows:
   version: 2
@@ -415,61 +432,43 @@ workflows:
             - build-x86_64-apple-darwin
       - verify-amazon-linux-1:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - verify-amazon-linux-2:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
-      - verify-rpm-on-centos-6:
+          <<: *verify-requires
+      - verify-centos-6:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
-      - verify-rpm-on-centos-7:
+          <<: *verify-requires
+      - verify-centos-7:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
-      - verify-deb-on-deb-8:
+          <<: *verify-requires
+      - verify-deb-8:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
-      - verify-deb-on-deb-9:
+          <<: *verify-requires
+      - verify-deb-9:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - verify-deb-on-unbuntu-16-04:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - verify-deb-on-unbuntu-17-04:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - verify-deb-on-unbuntu-18-04:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - verify-deb-on-unbuntu-19-04:
           <<: *tag-release-workflow-filters
-          requires:
-            - package-rpm
+          <<: *verify-requires
       - release-docker:
           <<: *tag-release-workflow-filters
-          requires:
-            - verify-deb-on-deb-9
-            - verify-rpm-on-centos-7
+          <<: *release-requires
       - release-github:
           <<: *tag-release-workflow-filters
-          requires:
-            - verify-deb-on-deb-9
-            - verify-rpm-on-centos-7
+          <<: *release-requires
       - release-package-cloud:
           <<: *compile-workflow-filters
-          requires:
-            - verify-deb-on-deb-9
-            - verify-rpm-on-centos-7
+          <<: *release-requires
       - release-s3:
           <<: *compile-workflow-filters
-          requires:
-            - verify-deb-on-deb-9
-            - verify-rpm-on-centos-7
+          <<: *release-requires
