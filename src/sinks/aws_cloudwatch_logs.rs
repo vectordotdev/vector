@@ -108,7 +108,6 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
                     batch_size,
                     Duration::from_secs(batch_timeout),
                 )
-                // TODO: actually partition!
                 .with_flat_map(move |event| partition(event, &log_group, &log_stream));
             Box::new(svc_sink)
         };
@@ -116,6 +115,64 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let healthcheck = healthcheck(self.clone())?;
 
         Ok((sink, healthcheck))
+    }
+}
+
+impl CloudwatchLogsPartitionSvc {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+        Ok(Self {
+            config,
+            clients: HashMap::new(),
+        })
+    }
+}
+
+impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogsPartitionSvc {
+    type Response = ();
+    type Error = Box<std::error::Error + Send + Sync + 'static>;
+    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
+        let (events, key) = req.into_parts();
+
+        let timeout = self.config.request_timeout_secs.unwrap_or(60);
+        let in_flight_limit = self.config.request_in_flight_limit.unwrap_or(5);
+        let rate_limit_duration = self.config.request_rate_limit_duration_secs.unwrap_or(1);
+        let rate_limit_num = self.config.request_rate_limit_num.unwrap_or(5);
+
+        let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
+            svc.clone()
+        } else {
+            let svc = {
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config).unwrap();
+                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout));
+
+                // TODO: add Buffer/Retry here
+
+                let rate = RateLimit::new(
+                    timeout,
+                    Rate::new(rate_limit_num, Duration::from_secs(rate_limit_duration)),
+                );
+                let concurrency = ConcurrencyLimit::new(rate, in_flight_limit);
+
+                Buffer::new(concurrency, 5)
+            };
+
+            self.clients.insert(key, svc.clone());
+            svc
+        };
+
+        let fut = svc
+            .ready()
+            .map_err(Into::into)
+            .and_then(move |mut svc| svc.call(events))
+            .map_err(Into::into);
+
+        Box::new(fut)
     }
 }
 
@@ -189,64 +246,6 @@ impl CloudwatchLogsSvc {
                 InputLogEvent { message, timestamp }
             }
         }
-    }
-}
-
-impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
-        Ok(Self {
-            config,
-            clients: HashMap::new(),
-        })
-    }
-}
-
-impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogsPartitionSvc {
-    type Response = ();
-    type Error = Box<std::error::Error + Send + Sync + 'static>;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
-    }
-
-    fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
-        let (events, key) = req.into_parts();
-
-        let timeout = self.config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = self.config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = self.config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = self.config.request_rate_limit_num.unwrap_or(5);
-
-        let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
-            svc.clone()
-        } else {
-            let svc = {
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config).unwrap();
-                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout));
-
-                // TODO: add Buffer/Retry here
-
-                let rate = RateLimit::new(
-                    timeout,
-                    Rate::new(rate_limit_num, Duration::from_secs(rate_limit_duration)),
-                );
-                let concurrency = ConcurrencyLimit::new(rate, in_flight_limit);
-
-                Buffer::new(concurrency, 5)
-            };
-
-            self.clients.insert(key, svc.clone());
-            svc
-        };
-
-        let fut = svc
-            .ready()
-            .map_err(Into::into)
-            .and_then(move |mut svc| svc.call(events))
-            .map_err(Into::into);
-
-        Box::new(fut)
     }
 }
 
