@@ -398,7 +398,7 @@ tag-release-workflow-filters: &tag-release-workflow-filters
     tags:
       only: /v.*/
 
-verify-requires: &release-requires
+verify-requires: &verify-requires
   requires:
     - package-rpm
 
