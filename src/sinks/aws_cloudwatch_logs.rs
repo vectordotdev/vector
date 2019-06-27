@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamResponse,
+    CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
     DescribeLogStreamsError, DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent,
     PutLogEventsError, PutLogEventsRequest, PutLogEventsResponse,
 };
@@ -77,6 +77,7 @@ pub enum Encoding {
 enum State {
     Idle,
     Token(Option<String>),
+    CreateStream(RusotoFuture<(), CreateLogStreamError>),
     Describe(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
     Put(oneshot::Receiver<PutLogEventsResponse>),
 }
@@ -85,6 +86,7 @@ enum State {
 pub enum CloudwatchError {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
+    CreateStream(CreateLogStreamError),
     NoStreamsFound,
     ServiceDropped,
     MakeService,
@@ -224,8 +226,13 @@ impl CloudwatchLogsSvc {
         self.client.describe_log_streams(request)
     }
 
-    fn create_log_stream(&mut self) -> RusotoFuture<CreateLogStreamResponse, CreateLogStreamError> {
-        unimplemented!()
+    fn create_log_stream(&mut self) -> RusotoFuture<(), CreateLogStreamError> {
+        let request = CreateLogStreamRequest {
+            log_group_name: self.group_name.clone(),
+            log_stream_name: self.stream_name.clone(),
+        };
+
+        self.client.create_log_stream(request)
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
@@ -269,15 +276,26 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 State::Describe(fut) => {
                     let response = try_ready!(fut.poll().map_err(CloudwatchError::Describe));
 
-                    let stream = response
+                    let stream = if let Some(stream) = response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
                         .next()
-                        .ok_or(CloudwatchError::NoStreamsFound)?;
+                    {
+                        stream
+                    } else {
+                        let fut = self.create_log_stream();
+                        self.state = State::CreateStream(fut);
+                        continue;
+                    };
 
                     self.state = State::Token(stream.upload_sequence_token);
                     return Ok(Async::Ready(()));
+                }
+                State::CreateStream(fut) => {
+                    let _ = try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
+                    self.state = State::Idle;
+                    continue;
                 }
                 State::Token(_) => return Ok(Async::Ready(())),
                 State::Put(fut) => {
@@ -365,6 +383,7 @@ impl fmt::Display for CloudwatchError {
         match self {
             CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
             CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
+            CloudwatchError::CreateStream(e) => write!(f, "CloudwatchError::CreateStream: {}", e),
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
@@ -586,8 +605,7 @@ mod integration_tests {
     use futures::Sink;
     use rusoto_core::Region;
     use rusoto_logs::{
-        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, CreateLogStreamRequest,
-        GetLogEventsRequest,
+        CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, GetLogEventsRequest,
     };
 
     const STREAM_NAME: &'static str = "test-1";
