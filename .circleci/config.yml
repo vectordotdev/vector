@@ -413,11 +413,43 @@ workflows:
           requires:
             - build-x86_64-unknown-linux-gnu
             - build-x86_64-apple-darwin
-      - verify-deb-on-deb-9:
+      - verify-amazon-linux-1:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-amazon-linux-2:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-rpm-on-centos-6:
           <<: *tag-release-workflow-filters
           requires:
             - package-rpm
       - verify-rpm-on-centos-7:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-deb-8:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-deb-9:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-unbuntu-16-04:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-unbuntu-17-04:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-unbuntu-18-04:
+          <<: *tag-release-workflow-filters
+          requires:
+            - package-rpm
+      - verify-deb-on-unbuntu-19-04:
           <<: *tag-release-workflow-filters
           requires:
             - package-rpm
