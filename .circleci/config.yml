@@ -253,7 +253,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-unbuntu-16-04:
+  verify-unbuntu-16-04:
     docker:
       - image: ubuntu:16.04
     steps:
@@ -265,7 +265,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-unbuntu-17-04:
+  verify-unbuntu-17-04:
     docker:
       - image: ubuntu:17.04
     steps:
@@ -277,7 +277,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-unbuntu-18-04:
+  verify-unbuntu-18-04:
     docker:
       - image: ubuntu:18.04
     steps:
@@ -289,7 +289,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-on-unbuntu-19-04:
+  verify-unbuntu-19-04:
     docker:
       - image: ubuntu:19.04
     steps:
@@ -386,10 +386,10 @@ release-requires: &release-requires
     - verify-centos-7
     - verify-deb-8
     - verify-deb-9
-    - verify-deb-on-unbuntu-16-04
-    - verify-deb-on-unbuntu-17-04
-    - verify-deb-on-unbuntu-18-04
-    - verify-deb-on-unbuntu-19-04
+    - verify-unbuntu-16-04
+    - verify-unbuntu-17-04
+    - verify-unbuntu-18-04
+    - verify-unbuntu-19-04
 
 tag-release-workflow-filters: &tag-release-workflow-filters
   filters:
@@ -448,16 +448,16 @@ workflows:
       - verify-deb-9:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-deb-on-unbuntu-16-04:
+      - verify-unbuntu-16-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-deb-on-unbuntu-17-04:
+      - verify-unbuntu-17-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-deb-on-unbuntu-18-04:
+      - verify-unbuntu-18-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-deb-on-unbuntu-19-04:
+      - verify-unbuntu-19-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
       - release-docker:
