@@ -8,9 +8,9 @@ use bytes::Bytes;
 use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, DescribeLogStreamsError, DescribeLogStreamsRequest,
-    DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError, PutLogEventsRequest,
-    PutLogEventsResponse,
+    CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamResponse,
+    DescribeLogStreamsError, DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent,
+    PutLogEventsError, PutLogEventsRequest, PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -222,6 +222,10 @@ impl CloudwatchLogsSvc {
         };
 
         self.client.describe_log_streams(request)
+    }
+
+    fn create_log_stream(&mut self) -> RusotoFuture<CreateLogStreamResponse, CreateLogStreamError> {
+        unimplemented!()
     }
 
     pub fn encode_log(&self, mut log: LogEvent) -> InputLogEvent {
