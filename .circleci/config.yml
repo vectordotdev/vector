@@ -326,7 +326,7 @@ workflows:
       - verify-deb-on-deb-9:
           <<: *tag-release-workflow-filters
           requires:
-            - build-x86_64-unknown-linux-gnu
+            - package-rpm
       - verify-rpm-on-centos-7:
           <<: *tag-release-workflow-filters
           requires:

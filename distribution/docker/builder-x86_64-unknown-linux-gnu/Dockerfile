@@ -1,3 +1,6 @@
+# It's important that we keep this and not extend our own base image.
+# When we extend our own base image we get a number of dependency errors
+# on CentOS:9.
 FROM japaric/x86_64-unknown-linux-gnu:latest
 
 # Install the git repository to ensure we get the latest version.

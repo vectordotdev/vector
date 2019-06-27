@@ -4,7 +4,7 @@ set -eou pipefail
 
 # Builds a generic Docker image with a `vector-` prefix. The name
 # maps to the contained folder.
-function build_target_image() {
+function build_image() {
   local tag=$1
 
   docker build \

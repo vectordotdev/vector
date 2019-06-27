@@ -35,4 +35,4 @@ cp -a $archive_path "/root/rpmbuild/SOURCES/vector-$VERSION-$ARCH.tar.gz"
 rpmbuild --target $TARGET -ba distribution/rpm/vector.spec
 
 # Move the RPM into the artifacts dir
-mv -v "/root/rpmbuild/RPMS/$arch/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$VERSION-$ARCH.rpm"
+mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$VERSION-$ARCH.rpm"
