@@ -1,9 +1,7 @@
 use super::fanout::{self, Fanout};
 use crate::buffers;
-use futures::prelude::*;
-use futures::{sync::mpsc, Future};
-use std::collections::HashMap;
-use std::time::Duration;
+use futures::{sync::mpsc, Future, Stream};
+use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::util::FutureExt;
 use tokio_trace_futures::Instrument;
@@ -74,7 +72,12 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let (output, control) = Fanout::new();
 
         let task = input_rx
-            .filter_map(move |event| transform.transform(event))
+            .map(move |event| {
+                let mut output = Vec::with_capacity(1);
+                transform.transform_into(&mut output, event);
+                futures::stream::iter_ok(output.into_iter())
+            })
+            .flatten()
             .forward(output)
             .map(|_| ());
         let task: Task = Box::new(task);

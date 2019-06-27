@@ -13,4 +13,10 @@ pub mod tokenizer;
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
+
+    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+        if let Some(transformed) = self.transform(event) {
+            output.push(transformed);
+        }
+    }
 }
