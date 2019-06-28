@@ -9,7 +9,7 @@ package_cloud push timberio/packages/debian/stretch target/artifacts/*.deb
 # Ubuntu
 package_cloud push timberio/packages/ubuntu/xenial target/artifacts/*.deb
 package_cloud push timberio/packages/ubuntu/zesty target/artifacts/*.deb
-package_cloud push timberio/packages/ubuntu/stretch target/artifacts/*.deb
+package_cloud push timberio/packages/ubuntu/bionic target/artifacts/*.deb
 package_cloud push timberio/packages/ubuntu/disco target/artifacts/*.deb
 
 # Enterprise Linux (CentOS, RedHat, Amazon Linux)

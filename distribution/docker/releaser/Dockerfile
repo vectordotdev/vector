@@ -12,6 +12,7 @@ RUN apt-get install -y \
   build-essential \
   git \
   python3-pip \
+  rename \
   ruby-full \
 	wget
 

@@ -12,6 +12,12 @@ class ReadmeGenerator < Generator
   def generate
     content = <<~EOF
       <p align="center">
+        <strong><a href="https://chat.vectorproject.io">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://forum.vectorproject.io">Forums<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vectorproject.io/mailing_list">Mailing List<a/></strong>
+      </p>
+
+      ---
+
+      <p align="center">
         <img src="./docs/assets/readme_diagram.svg" alt="Vector">
       </p>
 
@@ -20,10 +26,6 @@ class ReadmeGenerator < Generator
         <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
         <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
         <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
-      </p>
-
-      <p align="center">
-        <strong><a href="https://vectorproject.io/mailing_list">Join our mailing list!<a/> Simple monthly updates. No spam, ever.</strong>
       </p>
 
       Vector is a [high-performance][performance] observability data router. It makes
