@@ -9,8 +9,9 @@ use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Si
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
-    DescribeLogStreamsError, DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent,
-    PutLogEventsError, PutLogEventsRequest, PutLogEventsResponse,
+    DescribeLogGroupsRequest, DescribeLogStreamsError, DescribeLogStreamsRequest,
+    DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError, PutLogEventsRequest,
+    PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -98,9 +99,9 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let svc = CloudwatchLogsPartitionSvc::new(self.clone())?;
 
         let batch_timeout = self.batch_timeout.unwrap_or(1);
-        let batch_size = self.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
+        let batch_size = self.batch_size.unwrap_or(1000);
 
-        let log_group = interpolate(&self.group_name);
+        let log_group = self.group_name.clone().into();
         let log_stream = interpolate(&self.stream_name);
 
         let sink = {
@@ -319,6 +320,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 let (tx, rx) = oneshot::channel();
                 self.state = State::Put(rx);
 
+                debug!(message = "Submitting events.", amount_of_events = req.len());
                 let fut = self
                     .put_logs(token, req)
                     .map_err(CloudwatchError::Put)
@@ -331,47 +333,93 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
     }
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct CloudwatchKey {
+    group: Bytes,
+    stream: Bytes,
+}
+
+fn interpolate(s: &str) -> Partition {
+    use regex::Regex;
+    let r = Regex::new(r"\{event\.(?P<key>\D+)\}").unwrap();
+
+    if let Some(cap) = r.captures(s) {
+        if let Some(m) = cap.name("key") {
+            return Partition::Event(m.as_str().into());
+        }
+    }
+
+    Partition::Static(s.into())
+}
+
+fn partition(
+    event: Event,
+    group: &Bytes,
+    stream: &Partition,
+) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, CloudwatchKey>, Error = ()> {
+    let stream = match stream {
+        Partition::Static(g) => g.clone(),
+        Partition::Event(key) => {
+            if let Some(val) = event.as_log().get(&key) {
+                val.as_bytes().clone()
+            } else {
+                warn!(
+                    message =
+                        "Event key does not exist on the event and the event will be dropped.",
+                    key = field::debug(key)
+                );
+                return iter_ok(vec![]);
+            }
+        }
+    };
+
+    let key = CloudwatchKey {
+        stream,
+        group: group.clone(),
+    };
+
+    iter_ok(vec![PartitionInnerBuffer::new(event, key)])
+}
+
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
     let region = config.region.clone();
 
     let client = CloudWatchLogsClient::new(region.try_into()?);
 
-    let request = DescribeLogStreamsRequest {
+    let request = DescribeLogGroupsRequest {
         limit: Some(1),
-        log_group_name: config.group_name.clone(),
-        log_stream_name_prefix: Some(config.stream_name.clone()),
+        log_group_name_prefix: config.group_name.clone().into(),
         ..Default::default()
     };
 
-    let expected_stream = config.stream_name.clone();
+    let expected_group_name = config.group_name.clone();
 
+    // This will attempt to find the group name passed in and verify that
+    // it matches the one that AWS sends back.
     let fut = client
-        .describe_log_streams(request)
+        .describe_log_groups(request)
         .map_err(|e| format!("DescribeLogStreams failed: {}", e))
         .and_then(|response| {
             response
-                .log_streams
-                .ok_or_else(|| "No streams found".to_owned())
+                .log_groups
+                .ok_or_else(|| "No log group found".to_string())
         })
-        .and_then(|streams| {
-            streams
-                .into_iter()
-                .next()
-                .ok_or_else(|| "No streams found".to_owned())
-        })
-        .and_then(|stream| {
-            stream
-                .log_stream_name
-                .ok_or_else(|| "No stream name found but found a stream".to_owned())
-        })
-        .and_then(move |stream_name| {
-            if stream_name == expected_stream {
-                Ok(())
+        .and_then(move |groups| {
+            if let Some(group) = groups.into_iter().next() {
+                if let Some(name) = group.log_group_name {
+                    if name == expected_group_name {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "Group name mismatch: Expected {}, found {}",
+                            expected_group_name, name
+                        ))
+                    }
+                } else {
+                    Err("Unable to extract group name".to_string())
+                }
             } else {
-                Err(format!(
-                    "Stream returned is not the same as the one passed in got: {}, expected: {}",
-                    stream_name, expected_stream
-                ))
+                Err("No log group found".to_string())
             }
         });
 
@@ -411,67 +459,6 @@ impl From<DescribeLogStreamsError> for CloudwatchError {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-struct CloudwatchKey {
-    group: Bytes,
-    stream: Bytes,
-}
-
-fn interpolate(s: &str) -> Partition {
-    use regex::Regex;
-    let r = Regex::new(r"\{event\.(?P<key>\D+)\}").unwrap();
-
-    if let Some(cap) = r.captures(s) {
-        if let Some(m) = cap.name("key") {
-            return Partition::Event(m.as_str().into());
-        }
-    }
-
-    Partition::Static(s.into())
-}
-
-fn partition(
-    event: Event,
-    group: &Partition,
-    stream: &Partition,
-) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, CloudwatchKey>, Error = ()> {
-    let group = match group {
-        Partition::Static(g) => g.clone(),
-        Partition::Event(key) => {
-            if let Some(val) = event.as_log().get(&key) {
-                val.as_bytes().clone()
-            } else {
-                warn!(
-                    message =
-                        "Event key does not exist on the event and the event will be dropped.",
-                    key = field::debug(key)
-                );
-                return iter_ok(vec![]);
-            }
-        }
-    };
-
-    let stream = match stream {
-        Partition::Static(g) => g.clone(),
-        Partition::Event(key) => {
-            if let Some(val) = event.as_log().get(&key) {
-                val.as_bytes().clone()
-            } else {
-                warn!(
-                    message =
-                        "Event key does not exist on the event and the event will be dropped.",
-                    key = field::debug(key)
-                );
-                return iter_ok(vec![]);
-            }
-        }
-    };
-
-    let key = CloudwatchKey { stream, group };
-
-    iter_ok(vec![PartitionInnerBuffer::new(event, key)])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,7 +488,7 @@ mod tests {
     fn partition_static() {
         let event = Event::from("hello world");
         let stream = Partition::Static("stream".into());
-        let group = Partition::Static("group".into());
+        let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream)
             .wait()
@@ -526,12 +513,9 @@ mod tests {
         event
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
-        event
-            .as_mut_log()
-            .insert_implicit("log_group".into(), "group".into());
 
         let stream = Partition::Event("log_stream".into());
-        let group = Partition::Event("log_group".into());
+        let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream)
             .wait()
@@ -554,7 +538,7 @@ mod tests {
         let event = Event::from("hello world");
 
         let stream = Partition::Event("log_stream".into());
-        let group = Partition::Event("log_group".into());
+        let group = "group".into();
 
         let stream_val = partition(event, &group, &stream).wait().into_iter().next();
 
@@ -594,11 +578,10 @@ mod tests {
 #[cfg(feature = "cloudwatch-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-
+    use super::*;
     use crate::buffers::Acker;
     use crate::{
         region::RegionOrEndpoint,
-        sinks::aws_cloudwatch_logs::CloudwatchLogsSinkConfig,
         test_util::{block_on, random_lines_with_stream},
         topology::config::SinkConfig,
     };
@@ -617,7 +600,7 @@ mod integration_tests {
             name: "localstack".into(),
             endpoint: "http://localhost:6000".into(),
         };
-        ensure_stream(region.clone());
+        ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: STREAM_NAME.into(),
@@ -656,7 +639,25 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    fn ensure_stream(region: Region) {
+    #[test]
+    fn cloudwatch_healthcheck() {
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+        ensure_group(region);
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: STREAM_NAME.into(),
+            group_name: GROUP_NAME.into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+
+        block_on(healthcheck(config).unwrap()).unwrap();
+    }
+
+    fn ensure_group(region: Region) {
         let client = CloudWatchLogsClient::new(region);
 
         let req = CreateLogGroupRequest {
@@ -668,16 +669,6 @@ mod integration_tests {
             Ok(_) => (),
             Err(_) => (),
         };
-
-        // let req = CreateLogStreamRequest {
-        //     log_group_name: GROUP_NAME.into(),
-        //     log_stream_name: STREAM_NAME.into(),
-        // };
-
-        // match client.create_log_stream(req).sync() {
-        //     Ok(_) => (),
-        //     Err(_) => (),
-        // };
     }
 
 }
