@@ -94,12 +94,12 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`file`**](https://docs.vectorproject.io/usage/configuration/sources/file) | Ingests data through one or more local files and outputs log events.`guarantee: best_effort` |
-| [**`statsd`**](https://docs.vectorproject.io/usage/configuration/sources/statsd) | Ingests data through the StatsD UDP protocol and outputs log events.`guarantee: best_effort` |
-| [**`stdin`**](https://docs.vectorproject.io/usage/configuration/sources/stdin) | Ingests data through standard input (STDIN) and outputs log events.`guarantee: at_least_once` |
-| [**`syslog`**](https://docs.vectorproject.io/usage/configuration/sources/syslog) | Ingests data through the Syslog 5424 protocol and outputs log events.`guarantee: best_effort` |
-| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sources/tcp) | Ingests data through the TCP protocol and outputs log events.`guarantee: best_effort` |
-| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sources/vector) | Ingests data through another upstream Vector instance and outputs log events.`guarantee: best_effort` |
+| [**`file`**](https://docs.vectorproject.io/usage/configuration/sources/file) | Ingests data through one or more local files and outputs log events. |
+| [**`statsd`**](https://docs.vectorproject.io/usage/configuration/sources/statsd) | Ingests data through the StatsD UDP protocol and outputs log events. |
+| [**`stdin`**](https://docs.vectorproject.io/usage/configuration/sources/stdin) | Ingests data through standard input (STDIN) and outputs log events. |
+| [**`syslog`**](https://docs.vectorproject.io/usage/configuration/sources/syslog) | Ingests data through the Syslog 5424 protocol and outputs log events. |
+| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sources/tcp) | Ingests data through the TCP protocol and outputs log events. |
+| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sources/vector) | Ingests data through another upstream Vector instance and outputs log events. |
 
 [+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
 
@@ -125,17 +125,17 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.`guarantee: at_least_once` |
-| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.`guarantee: at_least_once` |
-| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to AWS S3 via the `PutObject` API endpoint.`guarantee: at_least_once` |
-| [**`blackhole`**](https://docs.vectorproject.io/usage/configuration/sinks/blackhole) | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.`guarantee: best_effort` |
-| [**`console`**](https://docs.vectorproject.io/usage/configuration/sinks/console) | Streams log and metric events to the console, `STDOUT` or `STDERR`.`guarantee: best_effort` |
-| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to Elasticsearch via the `_bulk` API endpoint.`guarantee: best_effort` |
-| [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches and flushes log events to a generic HTTP endpoint.`guarantee: at_least_once` |
-| [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to Apache Kafka.`guarantee: at_least_once` |
-| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a Splunk HTTP Event Collector.`guarantee: at_least_once` |
-| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams log events to a TCP connection.`guarantee: best_effort` |
-| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams log events to another downstream Vector instance.`guarantee: best_effort` |
+| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint. |
+| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint. |
+| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to AWS S3 via the `PutObject` API endpoint. |
+| [**`blackhole`**](https://docs.vectorproject.io/usage/configuration/sinks/blackhole) | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`console`**](https://docs.vectorproject.io/usage/configuration/sinks/console) | Streams log and metric events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to Elasticsearch via the `_bulk` API endpoint. |
+| [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches and flushes log events to a generic HTTP endpoint. |
+| [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to Apache Kafka. |
+| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a Splunk HTTP Event Collector. |
+| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams log events to a TCP connection. |
+| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams log events to another downstream Vector instance. |
 
 [+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
