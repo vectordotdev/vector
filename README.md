@@ -37,7 +37,6 @@ get data from A to B.
 
 * [**Installation**][installation]
 * [**Getting started**][getting_started]
-* [**Migrating**][migrating]
 * [**Deployment**][deployment] - [topologies], [roles]
 
 #### Usage
@@ -49,19 +48,18 @@ get data from A to B.
 #### Resources
 
 * [**Community**][community] - [forum], [slack chat][slack], [mailing list][mailing_list]
-* [**Download**][releases]
 * [**Roadmap**][roadmap] - [vote on new features][vote_feature]
 
 ## Features
 
-* **Fast** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector. Its designed to handle the most demanding environments.
-* **Correct** - Vector is obsessed with [getting the details right][correctness].
-* **Vendor Neutral** - Vector does not favor any specific storage, it fosters a fair, open ecosystem with the user's best interest in mind.
-* **Agent Or Service** - Vector aims to be the single tool needed to route data from A to B, deploying as an [agent] or [service].
-* **Logs, Metrics, or Events** - Vector unifies logs, metrics, and events, making it easy to collect and ship all observability data.
-* **Clear Guarantees** - Vector is [clear on it's guarantees][guarantees], helping you to make the appropriate trade offs for your use case.
-* **Easy To Deploy** - Vector compiles to a single static binary with no runtime.
-* **Hot Reload** - Designed to [reload configuration][reloading], on the fly, without restarting or skipping a beat.
+* ***Fast*** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector.
+* **Correct** - Obsessed with [getting the details right][correctness].
+* **Vendor Neutral** - Does not favor any specific storage. Fosters a fair, open ecosystem with the user's best interest in mind.
+* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent] or [service].
+* **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
+* **Clear Guarantees** - A [guarantee support matrix][guarantees] helps you understand your tradeoffs.
+* **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Hot Reload** - [Reload configuration on the fly][reloading], without skipping a beat.
 
 
 ## Performance
@@ -182,7 +180,6 @@ the License.
 [installation]: https://docs.vectorproject.io/setup/installation
 [lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
 [mailing_list]: https://vectorproject.io/mailing_list
-[migrating]: https://docs.vectorproject.io/setup/migrating
 [multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
 [performance]: https://docs.vectorproject.io/performance
 [releases]: https://github.com/timberio/vector/releases
