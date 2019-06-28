@@ -18,15 +18,15 @@ Sinks are last in the [pipeline](../../../about/concepts.md#pipelines), responsi
 
 | Name | Description |
 | :--- | :---------- |
-| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
-| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
-| [**`aws_s3`**](aws_s3.md) | Batches and flushes ["[`log`][log_event]"] events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
+| [**`aws_cloudwatch_logs`**](aws_cloudwatch_logs.md) | Batches ["[`log`][log_event]"] events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
+| [**`aws_kinesis_streams`**](aws_kinesis_streams.md) | Batches ["[`log`][log_event]"] events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
+| [**`aws_s3`**](aws_s3.md) | Batches ["[`log`][log_event]"] events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
 | [**`blackhole`**](blackhole.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.<br />`guarantee: best_effort` |
 | [**`console`**](console.md) | Streams ["[`log`][log_event]", "[`metric`][metric_event]"] events to the console, `STDOUT` or `STDERR`.<br />`guarantee: best_effort` |
-| [**`elasticsearch`**](elasticsearch.md) | Batches and flushes ["[`log`][log_event]"] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
-| [**`http`**](http.md) | Batches and flushes ["[`log`][log_event]"] events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
+| [**`elasticsearch`**](elasticsearch.md) | Batches ["[`log`][log_event]"] events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
+| [**`http`**](http.md) | Batches ["[`log`][log_event]"] events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
 | [**`kafka`**](kafka.md) | Streams ["[`log`][log_event]"] events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].<br />`guarantee: at_least_once` |
-| [**`splunk_hec`**](splunk_hec.md) | Batches and flushes ["[`log`][log_event]"] events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
+| [**`splunk_hec`**](splunk_hec.md) | Batches ["[`log`][log_event]"] events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
 | [**`tcp`**](tcp.md) | Streams ["[`log`][log_event]"] events to a TCP connection.<br />`guarantee: best_effort` |
 | [**`vector`**](vector.md) | Streams ["[`log`][log_event]"] events to another downstream Vector instance.<br />`guarantee: best_effort` |
 

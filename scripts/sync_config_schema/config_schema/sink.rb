@@ -228,7 +228,7 @@ class Sink < Component
   def plural_write_verb
     case write_style
     when "batching"
-      "batches and flushes"
+      "batches"
     when "streaming"
       "streams"
     else

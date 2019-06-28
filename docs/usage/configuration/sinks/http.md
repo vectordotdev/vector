@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to a generic HTTP endpoint
+description: Batches log events to a generic HTTP endpoint
 ---
 
 <!---

@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint
+description: Batches log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint
 ---
 
 <!---

@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to AWS S3 via the `PutObject` API endpoint
+description: Batches log events to AWS S3 via the `PutObject` API endpoint
 ---
 
 <!---

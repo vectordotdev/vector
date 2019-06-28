@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to Elasticsearch via the `_bulk` API endpoint
+description: Batches log events to Elasticsearch via the `_bulk` API endpoint
 ---
 
 <!---

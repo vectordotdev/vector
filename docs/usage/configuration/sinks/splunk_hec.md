@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to a Splunk HTTP Event Collector
+description: Batches log events to a Splunk HTTP Event Collector
 ---
 
 <!---

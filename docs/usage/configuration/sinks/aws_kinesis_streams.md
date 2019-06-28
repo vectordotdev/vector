@@ -1,5 +1,5 @@
 ---
-description: Batches and flushes log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint
+description: Batches log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint
 ---
 
 <!---

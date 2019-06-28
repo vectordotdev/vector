@@ -125,15 +125,15 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint. |
-| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint. |
-| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to AWS S3 via the `PutObject` API endpoint. |
+| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint. |
+| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint. |
+| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches log events to AWS S3 via the `PutObject` API endpoint. |
 | [**`blackhole`**](https://docs.vectorproject.io/usage/configuration/sinks/blackhole) | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
 | [**`console`**](https://docs.vectorproject.io/usage/configuration/sinks/console) | Streams log and metric events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to Elasticsearch via the `_bulk` API endpoint. |
-| [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches and flushes log events to a generic HTTP endpoint. |
+| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches log events to Elasticsearch via the `_bulk` API endpoint. |
+| [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches log events to a generic HTTP endpoint. |
 | [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to Apache Kafka. |
-| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a Splunk HTTP Event Collector. |
+| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches log events to a Splunk HTTP Event Collector. |
 | [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams log events to a TCP connection. |
 | [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams log events to another downstream Vector instance. |
 
