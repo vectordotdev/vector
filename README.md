@@ -1,8 +1,4 @@
 <p align="center">
-  <strong><a href="https://vectorproject.io/mailing_list">Join our mailing list!<a/> Simple monthly updates. No spam, ever.</strong>
-</p>
-
-<p align="center">
   <img src="./docs/assets/readme_diagram.svg" alt="Vector">
 </p>
 
@@ -11,6 +7,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
   <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
   <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
+</p>
+
+<p align="center">
+  <strong><a href="https://vectorproject.io/mailing_list">Join our mailing list!<a/> Simple monthly updates. No spam, ever.</strong>
 </p>
 
 Vector is a [high-performance][performance] observability data router. It makes
@@ -53,7 +53,7 @@ get data from A to B.
 
 ## Features
 
-* ***Fast*** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector.
+* ***Fast*** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. No runtime. No garbage collector.
 * **Correct** - Obsessed with [getting the details right][correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
 * **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent] or [service].
