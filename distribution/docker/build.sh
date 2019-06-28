@@ -42,9 +42,13 @@ build_image "packager-deb"
 build_image "packager-rpm"
 build_image "releaser"
 build_image "tester"
-build_image "verifier-deb-7"
+build_image "verifier-amazonlinux-1"
+build_image "verifier-amazonlinux-2"
 build_image "verifier-deb-8"
 build_image "verifier-deb-9"
+build_image "verifier-ubuntu-16-04"
+build_image "verifier-ubuntu-18-04"
+build_image "verifier-ubuntu-19-04"
 
 # The following images extend re-built cross base images. The end result
 # is 2 new containers. See the README.md in the docker folder for more info.

@@ -2,7 +2,7 @@
 description: Install Vector on the Ubuntu operating system
 ---
 
-# Unbuntu
+# Ubuntu
 
 Vector can be installed on the Ubuntu operating system through the following
 methods:

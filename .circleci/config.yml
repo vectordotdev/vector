@@ -183,7 +183,7 @@ jobs:
 
   verify-amazon-linux-1:
     docker:
-      - image: amazonlinux:1
+      - image: timberio/vector-verifier-amazonlinux-1
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -195,19 +195,7 @@ jobs:
 
   verify-amazon-linux-2:
     docker:
-      - image: amazonlinux:2
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-centos-6:
-    docker:
-      - image: centos:6
+      - image: timberio/vector-verifier-amazonlinux-2
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -253,9 +241,9 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-unbuntu-16-04:
+  verify-ubuntu-16-04:
     docker:
-      - image: ubuntu:16.04
+      - image: timberio/vector-verifier-ubuntu-16-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -265,9 +253,9 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-unbuntu-17-04:
+  verify-ubuntu-18-04:
     docker:
-      - image: ubuntu:17.04
+      - image: timberio/vector-verifier-ubuntu-18-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -277,21 +265,9 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-unbuntu-18-04:
+  verify-ubuntu-19-04:
     docker:
-      - image: ubuntu:18.04
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-unbuntu-19-04:
-    docker:
-      - image: ubuntu:19.04
+      - image: timberio/vector-verifier-ubuntu-19-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -382,14 +358,12 @@ release-requires: &release-requires
   requires:
     - verify-amazon-linux-1
     - verify-amazon-linux-2
-    - verify-centos-6
     - verify-centos-7
     - verify-deb-8
     - verify-deb-9
-    - verify-unbuntu-16-04
-    - verify-unbuntu-17-04
-    - verify-unbuntu-18-04
-    - verify-unbuntu-19-04
+    - verify-ubuntu-16-04
+    - verify-ubuntu-18-04
+    - verify-ubuntu-19-04
 
 tag-release-workflow-filters: &tag-release-workflow-filters
   filters:
@@ -436,9 +410,6 @@ workflows:
       - verify-amazon-linux-2:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-centos-6:
-          <<: *tag-release-workflow-filters
-          <<: *verify-requires
       - verify-centos-7:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
@@ -448,16 +419,13 @@ workflows:
       - verify-deb-9:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-unbuntu-16-04:
+      - verify-ubuntu-16-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-unbuntu-17-04:
+      - verify-ubuntu-18-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
-      - verify-unbuntu-18-04:
-          <<: *tag-release-workflow-filters
-          <<: *verify-requires
-      - verify-unbuntu-19-04:
+      - verify-ubuntu-19-04:
           <<: *tag-release-workflow-filters
           <<: *verify-requires
       - release-docker:
