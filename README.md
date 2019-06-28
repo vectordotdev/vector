@@ -24,6 +24,7 @@ to be [deployed][deployment] across your entire infrastructure, serving both as 
 light-weight [agent] and a highly efficient [service], making it the single tool you need to
 get data from A to B.
 
+
 ## [Documentation](https://docs.vectorproject.io/)
 
 #### About
@@ -109,10 +110,10 @@ To learn more about our performance tests, please see the [Vector test harness][
 | :---  | :---------- |
 | [**`add_fields`**](https://docs.vectorproject.io/usage/configuration/transforms/add_fields) | Accepts log events and allows you to add one or more fields. |
 | [**`field_filter`**](https://docs.vectorproject.io/usage/configuration/transforms/field_filter) | Accepts log and metric events and allows you to filter events by a field's value. |
-| [**`grok_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/grok_parser) | Accepts log events and allows you to parse a field value with [Grok][grok]. |
+| [**`grok_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/grok_parser) | Accepts log events and allows you to parse a field value with Grok. |
 | [**`json_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/json_parser) | Accepts log events and allows you to parse a field value as JSON. |
-| [**`lua`**](https://docs.vectorproject.io/usage/configuration/transforms/lua) | Accepts log events and allows you to transform events with a full embedded [Lua][lua] engine. |
-| [**`regex_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/regex_parser) | Accepts log events and allows you to parse a field's value with a [Regular Expression][regex]. |
+| [**`lua`**](https://docs.vectorproject.io/usage/configuration/transforms/lua) | Accepts log events and allows you to transform events with a full embedded Lua engine. |
+| [**`regex_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/regex_parser) | Accepts log events and allows you to parse a field's value with a Regular Expression. |
 | [**`remove_fields`**](https://docs.vectorproject.io/usage/configuration/transforms/remove_fields) | Accepts log and metric events and allows you to remove one or more event fields. |
 | [**`sampler`**](https://docs.vectorproject.io/usage/configuration/transforms/sampler) | Accepts log events and allows you to sample events with a configurable rate. |
 | [**`tokenizer`**](https://docs.vectorproject.io/usage/configuration/transforms/tokenizer) | Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
@@ -124,15 +125,15 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 | Name  | Description |
 | :---  | :---------- |
-| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
-| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
-| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
+| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.<br />`guarantee: at_least_once` |
+| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.<br />`guarantee: at_least_once` |
+| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to AWS S3 via the `PutObject` API endpoint.<br />`guarantee: at_least_once` |
 | [**`blackhole`**](https://docs.vectorproject.io/usage/configuration/sinks/blackhole) | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.<br />`guarantee: best_effort` |
 | [**`console`**](https://docs.vectorproject.io/usage/configuration/sinks/console) | Streams log and metric events to the console, `STDOUT` or `STDERR`.<br />`guarantee: best_effort` |
-| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
+| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to Elasticsearch via the `_bulk` API endpoint.<br />`guarantee: best_effort` |
 | [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches and flushes log events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
-| [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].<br />`guarantee: at_least_once` |
-| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
+| [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to Apache Kafka.<br />`guarantee: at_least_once` |
+| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a Splunk HTTP Event Collector.<br />`guarantee: at_least_once` |
 | [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams log events to a TCP connection.<br />`guarantee: best_effort` |
 | [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams log events to another downstream Vector instance.<br />`guarantee: best_effort` |
 
