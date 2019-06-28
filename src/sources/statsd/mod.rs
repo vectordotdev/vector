@@ -85,7 +85,7 @@ mod test {
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-        let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+        let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

@@ -41,7 +41,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -87,7 +87,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -133,7 +133,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -180,7 +180,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -245,7 +245,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let output_lines1 = count_receive(&out_addr1);
                     let output_lines2 = count_receive(&out_addr2);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 
@@ -311,7 +311,7 @@ fn benchmark_transforms(c: &mut Criterion) {
 
                     let output_lines = count_receive(&out_addr);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr);
 
                     (rt, topology, output_lines)
@@ -468,7 +468,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_200 = count_receive(&out_addr_200);
                     let output_lines_404 = count_receive(&out_addr_404);
 
-                    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
                     wait_for_tcp(in_addr1);
                     wait_for_tcp(in_addr2);
 

@@ -3521,6 +3521,7 @@ dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "derivative 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_is_enum_variant 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "elastic 0.21.0-pre.4 (git+https://github.com/elastic-rs/elastic)",
  "file-source 0.1.0",
  "flate2 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",

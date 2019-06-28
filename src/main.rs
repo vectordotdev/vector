@@ -10,11 +10,11 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+use topology::{Config, Stage};
 use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
 use tracing_metrics::MetricsSubscriber;
 use vector::{metrics, topology};
-use topology::Stage;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -117,6 +117,7 @@ fn main() {
         );
 
         let config = vector::topology::Config::load(file);
+        let config = handle_config_errors(config);
 
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
@@ -211,6 +212,7 @@ fn main() {
 
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
+            let config = handle_config_errors(config);
 
             let success = topology.reload_config_on_hot(config, &mut rt, opts.require_healthy);
             if !success {
@@ -242,6 +244,20 @@ fn main() {
 
         rt.shutdown_now().wait().unwrap();
     });
+}
+
+fn handle_config_errors(config: Result<Config, Vec<String>>) -> Config {
+    match config {
+        Err(errors) => {
+            for error in errors {
+                error!("Configuration error: {}", error);
+            }
+            std::process::exit(1);
+        }
+        Ok(config) => {
+            return config;
+        }
+    }
 }
 
 fn open_config(path: &Path) -> Option<File> {

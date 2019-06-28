@@ -30,7 +30,7 @@ fn test_pipe() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -74,7 +74,7 @@ fn test_sample() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -136,7 +136,7 @@ fn test_sample() {
 
 //     let output_lines = receive(&out_addr);
 
-//     let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+//     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 //     // Wait for server to accept traffic
 //     wait_for_tcp(in_addr);
 
@@ -184,7 +184,7 @@ fn test_merge() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -247,7 +247,7 @@ fn test_fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -297,7 +297,7 @@ fn test_merge_and_fork() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -382,7 +382,7 @@ fn test_merge_and_fork_json() {
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr1);
     wait_for_tcp(in_addr2);
@@ -451,7 +451,7 @@ fn test_reconnect() {
         .collect();
     let output_lines = futures::sync::oneshot::spawn(output_lines, &output_rt.executor());
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
