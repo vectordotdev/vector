@@ -8,13 +8,6 @@
   <img src="./docs/assets/readme_diagram.svg" alt="Vector">
 </p>
 
-<p align="center">
-  <a href="https://github.com/timberio/vector/releases"><img src="https://img.shields.io/github/release/timberio/vector.svg"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
-  <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
-  <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
-</p>
-
 Vector is a [high-performance][performance] observability data router. It makes
 [collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events
 easy. It decouples data collection & routing from your services, giving you data ownership and
