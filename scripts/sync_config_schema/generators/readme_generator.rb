@@ -67,7 +67,7 @@ class ReadmeGenerator < Generator
 
       * ***Fast*** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector.
       * **Correct** - Obsessed with [getting the details right][correctness].
-      * **Vendor Neutral** - Does not favor any specific storage. Fosters a fair, open ecosystem with the user's best interest in mind.
+      * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
       * **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent] or [service].
       * **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
       * **Clear Guarantees** - A [guarantee support matrix][guarantees] helps you understand your tradeoffs.
