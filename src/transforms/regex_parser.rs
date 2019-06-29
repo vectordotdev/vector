@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::event::{self, Event, ValueKind};
-use crate::types::Conversion;
+use crate::types::{parse_conversion_map, Conversion};
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 use tokio_trace::field;
@@ -21,30 +21,25 @@ pub struct RegexParserConfig {
 #[typetag::serde(name = "regex_parser")]
 impl crate::topology::config::TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let field = if let Some(field) = &self.field {
-            field
-        } else {
-            &event::MESSAGE
-        };
+        let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = self
-            .types
-            .iter()
-            .map(|(field, typename)| typename.parse::<Conversion>().map(|ct| (field.clone(), ct)))
-            .collect::<Result<HashMap<Atom, Conversion>, _>>()
-            .map_err(|err| format!("Invalid conversion type: {}", err))?;
+        let regex = Regex::new(&self.regex).map_err(|err| err.to_string())?;
 
-        Regex::new(&self.regex)
-            .map_err(|err| err.to_string())
-            .map::<Box<dyn Transform>, _>(|r| {
-                Box::new(RegexParser::new(
-                    r,
-                    field.clone(),
-                    self.drop_field,
-                    self.drop_failed,
-                    types,
-                ))
-            })
+        let types = parse_conversion_map(
+            &self.types,
+            &regex
+                .capture_names()
+                .filter_map(|s| s.map(|s| s.into()))
+                .collect(),
+        )?;
+
+        Ok(Box::new(RegexParser::new(
+            regex,
+            field.clone(),
+            self.drop_field,
+            self.drop_failed,
+            types,
+        )))
     }
 }
 
@@ -69,20 +64,6 @@ impl RegexParser {
         // repeated allocations.
         let capture_locs = regex.capture_locations();
 
-        // Check if any named type references a nonexistent capture
-        let capture_names: HashSet<Atom> = regex
-            .capture_names()
-            .filter_map(|s| s.map(|s| s.into()))
-            .collect();
-        for (name, _) in &types {
-            if !capture_names.contains(name) {
-                warn!(
-                    message = "Field was specified in the types but not captured by the pattern.",
-                    field = &name[..]
-                );
-            }
-        }
-
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
         let capture_names: Vec<(usize, Atom, Conversion)> = regex
@@ -98,11 +79,7 @@ impl RegexParser {
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        for (_, name, _) in &capture_names {
-            if *name == field {
-                drop_field = false;
-            }
-        }
+        drop_field = drop_field && !capture_names.iter().any(|(_, f, _)| *f == field);
 
         Self {
             regex,

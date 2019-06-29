@@ -1,6 +1,8 @@
 use crate::event::ValueKind;
 use chrono::{DateTime, Local, TimeZone, Utc};
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use string_cache::DefaultAtom as Atom;
 
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`Bytes`) `ValueKind` into another type. Every
@@ -51,6 +53,32 @@ impl FromStr for Conversion {
             _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
         }
     }
+}
+
+pub fn parse_conversion_map(
+    types: &HashMap<Atom, String>,
+    names: &Vec<Atom>,
+) -> Result<HashMap<Atom, Conversion>, String> {
+    // Check if any named type references a nonexistent field
+    let names: HashSet<Atom> = names.into_iter().map(|s| s.into()).collect();
+    for (name, _) in types {
+        if !names.contains(name) {
+            warn!(
+                message = "Field was specified in the types but is not a valid field name.",
+                field = &name[..]
+            );
+        }
+    }
+
+    types
+        .into_iter()
+        .map(|(field, typename)| {
+            typename
+                .parse::<Conversion>()
+                .map(|conv| (field.clone(), conv))
+        })
+        .collect::<Result<HashMap<Atom, Conversion>, _>>()
+        .map_err(|err| format!("Invalid conversion type: {}", err))
 }
 
 impl Conversion {
