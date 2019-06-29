@@ -22,9 +22,7 @@ If you do not see your package manager you can consider:
 
 {% page-ref page="../operating-systems/README.md" %}
 
-{% page-ref page="../package-managers/from-archives.md" %}
-
-{% page-ref page="../package-managers/from-source.md" %}
+{% page-ref page="../manual/README.md" %}
 
 
-[docs.platforms]: ../../..docs/setup/installation/platforms
+[docs.platforms]: ../../../setup/installation/platforms

@@ -41,6 +41,7 @@ curl -o vector.zip https://github.com/timberio/vector/archive/master.zip | tar -
 ```bash
 curl -o vector.zip https://github.com/timberio/vector/releases/latest/download/source.zip | tar -xzf
 ```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 Change into the `vector` directory:
@@ -127,10 +128,10 @@ cp -a distribution/systemd/vector /etc/systemd/system
 ```
 
 
-[docs.configuration]: ../..docs/usage/configuration
-[docs.data_directory]: ../../usage/configuration/README.md#data-directory
-[docs.from_archives]: ../..docs/setup/installation/from-archives.md
-[docs.package_managers]: ../..docs/setup/installation/package-managers
-[docs.platforms]: ../..docs/setup/installation/platforms
+[docs.configuration]: ../../../usage/configuration
+[docs.data_directory]: ../../../usage/configuration/README.md#data-directory
+[docs.from_archives]: ../../../setup/installation/manual/from-archives.md
+[docs.package_managers]: ../../../setup/installation/package-managers
+[docs.platforms]: ../../../setup/installation/platforms
 [url.rust]: https://www.rust-lang.org/
 [url.vector_repo]: https://github.com/timberio/vector

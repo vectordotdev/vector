@@ -333,15 +333,15 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.data_model]: ../../..docs/about/data-model.md
+[docs.data_model]: ../../../about/data-model.md
 [docs.default_schema]: ../../../about/data-model.md#default-schema
 [docs.event]: ../../../about/data-model.md#event
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../..docs/usage/configuration/sources
-[docs.starting]: ../../..docs/usage/administration/starting.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

@@ -43,8 +43,8 @@ Transforms are in the middle of the [pipeline][docs.pipelines], sitting in-betwe
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
-[docs.sinks]: ../../..docs/usage/configuration/sinks
-[docs.sources]: ../../..docs/usage/configuration/sources
+[docs.sinks]: ../../../usage/configuration/sinks
+[docs.sources]: ../../../usage/configuration/sources
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.lua]: https://www.lua.org/

@@ -354,10 +354,10 @@ issue, please:
 [docs.event]: ../../../about/data-model.md#event
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../..docs/usage/configuration/sources
-[docs.starting]: ../../..docs/usage/administration/starting.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

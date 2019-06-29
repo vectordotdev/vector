@@ -48,9 +48,7 @@ When Vector is reloaded it proceeds to read the new configuration file from
 disk. If the file has errors it will be logged to `STDOUT` and ignored,
 preserving any previous configuration that was set. If the process exits you
 will not be able to restart the process since it will proceed to use the
-new configuration file. It is _highly_ recommended that you
-[validate your configuration](validating-configuration.md) before deploying
-it to a running instance of Vector.
+new configuration file.
 
 ## Graceful Pipeline Transitioning
 

@@ -32,7 +32,7 @@ You'll notice that some of our `builder-*` images extend `builde-base-*`
 images. Ex:
 
 ```
-FROM timberio/vector-builder-base-x86_64-unknown-linux-musl:latest
+FROM timberiodev/vector-builder-base-x86_64-unknown-linux-musl:latest
 ```
 
 These "base" images are built from the [Cross Docker images][cross_docker].

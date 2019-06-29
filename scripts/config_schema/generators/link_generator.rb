@@ -16,10 +16,10 @@ class LinkGenerator < Generator
   end
 
   def generate
-    parts = content.partition(/\[([a-zA-Z0-9_\. ]*)\]:/)
+    parts = content.partition(/\[([a-zA-Z0-9_\-\. ]*)\]:/)
     content = parts.first.strip
 
-    direct_links = content.scan(/\]\(([a-zA-Z0-9_\. ]*)\)/).flatten.uniq
+    direct_links = content.scan(/\]\(([a-zA-Z0-9_\-\. ]*)\)/).flatten.uniq
 
     if direct_links.any?
       raise <<~EOF
@@ -35,7 +35,7 @@ class LinkGenerator < Generator
       EOF
     end
 
-    link_names = content.scan(/\]\[([a-zA-Z0-9_\. ]*)\]/).flatten.uniq
+    link_names = content.scan(/\]\[([a-zA-Z0-9_\-\. ]*)\]/).flatten.uniq
     footer_links = []
 
     link_names.each do |link_name|

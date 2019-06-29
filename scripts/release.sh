@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# release.sh
+#
+# SUMMARY
+#
+#   Releases Vector to S3, APT, YUM, Homebrew, Docker, and Github
+
 set -eu
 
 #
@@ -38,12 +44,16 @@ package_cloud push timberio/packages/el/7 target/artifacts/*.rpm
 # Docker
 #
 
-docker build -t timberio/vector:$VERSION .
-docker build -t timberio/vector:latest .
+docker build -t timberio/vector:$VERSION distribution/docker
+docker build -t timberio/vector-slim:$VERSION distribution/docker/slim
+docker build -t timberio/vector:latest distribution/docker
+docker build -t timberio/vector-slim:latest distribution/docker/slim
 
 docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 docker push timberio/vector:$VERSION
+docker push timberio/vector-slim:$VERSION
 docker push timberio/vector:latest
+docker push timberio/vector-slim:latest
 
 #
 # Github

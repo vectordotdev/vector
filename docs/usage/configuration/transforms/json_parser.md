@@ -203,12 +203,12 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.correctness]: ../../..docs/correctness.md
+[docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../..docs/usage/configuration/sources
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

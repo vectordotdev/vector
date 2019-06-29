@@ -6,18 +6,22 @@ description: 'A deeper look at Vector''s data model: the event'
 
 ![](../assets/data-model.svg)
 
-This page provides a deeper dive into Vector's data model and how data flows through Vector internally. Understanding this goes a long way in properly [configuring](../usage/configuration/) Vector for your use case.
+This page provides a deeper dive into Vector's data model and how data flows
+through Vector internally. Understanding this goes a long way in properly
+[configuring][docs.configuration] Vector for your use case.
 
 ## Event
 
-An "event" represents an individual unit of data that flows through Vector. An event must be one of two types: a [`log`](data-model.md#log) or a [`metric`](data-model.md#metric). Each are described in more detail below.
+An "event" represents an individual unit of data that flows through Vector. An
+event must be one of two types: a [`log`](data-model.md#log) or a
+[`metric`](data-model.md#metric). Each are described in more detail below.
 
-### Log
+## Log
 
-Vector characterizes a "log" as an arbitrary flat map. For example:
+Vector characterizes a "log" as a _flat_ map. For example:
 
 {% code-tabs %}
-{% code-tabs-item title="log event" %}
+{% code-tabs-item title="log example" %}
 ```javascript
 {
     "timestamp": <timestamp:2019-05-02T00:23:22Z>,
@@ -30,9 +34,11 @@ Vector characterizes a "log" as an arbitrary flat map. For example:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Vector takes a completely unopinionated approach to the structure of your events. This allows Vector to work with any schema. This is described in more detail in the [Default Schema](#default-schema) section.
+Vector takes an unopinionated approach to the structure of your events. This
+allows Vector to work with any schema. This is described in more detail in the
+[Default Schema](#default-schema) section.
 
-#### Types
+### Types
 
 Log events support the following value types:
 
@@ -41,10 +47,14 @@ Log events support the following value types:
 3. `float`
 4. `bool`
 5. `timestamp`
+6. `array` (must be consistent types)
 
-#### Arrays
+### Arrays
 
-For simplicity and performance reasons, Vector represents arrays with indexed keys. This means that when Vector ingests arrays it will flatten the items into keys containing the index. Additionally, when Vector outputs data it will explode the array back into it's original array structure.
+For simplicity and performance reasons, Vector represents arrays with indexed
+keys. This means that when Vector ingests arrays it will flatten the items
+into keys containing the index. Additionally, when Vector outputs data it will
+explode the array back into it's original array structure.
 
 For example, if Vector ingests the following data:
 
@@ -72,7 +82,8 @@ Vector will represent this data internally as a log event:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And when this event is emitted from a [sink][docs.sinks], it will be exploded back into it's original structure:
+And when this event is emitted from a [sink][docs.sinks], it will be exploded
+back into it's original structure:
 
 {% code-tabs %}
 {% code-tabs-item title="output" %}
@@ -84,11 +95,17 @@ And when this event is emitted from a [sink][docs.sinks], it will be exploded ba
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-This normalizes the event structure and simplifies data processing throughoout the Vector pipeline. This not only helps with performance, but it helps to avoid type human error when configuring Vector.
+This normalizes the event structure and simplifies data processing throughout
+the Vector pipeline. This not only helps with performance, but it helps to
+avoid type human error when configuring Vector.
 
-#### Nested Keys
+### Nested Keys
 
-For simplicity and performance reasons, Vector represents nested keys with a `.` delimiter. This means that when Vector ingests nested data, it will flatten the keys and delimit hierarchies with a `.` character. Additionally, when Vector outputs data it will explode the map back into it's original nested structure.
+For simplicity and performance reasons, Vector represents nested keys with a
+`.` delimiter. This means that when Vector ingests nested data, it will
+flatten the keys and delimit hierarchies with a `.` character. Additionally,
+when Vector outputs data it will explode the map back into it's original nested
+structure.
 
 For example, if Vector ingests the following data:
 
@@ -116,7 +133,8 @@ Vector will represent this data internally as a log event:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And when this event is emitted from a [sink][docs.sinks], it will be exploded back into it's original structure:
+And when this event is emitted from a [sink][docs.sinks], it will be exploded
+back into it's original structure:
 
 {% code-tabs %}
 {% code-tabs-item title="output" %}
@@ -130,15 +148,19 @@ And when this event is emitted from a [sink][docs.sinks], it will be exploded ba
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-This makes it _much_ easier and faster to work with nested documents within Vector.
+This makes it _much_ easier and faster to work with nested documents within
+Vector.
 
-#### Special Characters
+### Special Characters
 
-As described above in the [Nested Keys](#nested-keys) section only `.` is trated as a special character to represent nesting.
+As described above in the [Nested Keys](#nested-keys) section only `.` is
+treated as a special character to represent nesting.
 
-#### Default Schema
+### Default Schema
 
-In all cases where a component must operate on a key, the following schema is used as the default. Each component will provide configuration options to override the keys used, if necessary.
+In all cases where a component must operate on a key, the following schema is
+used as the default. Each component will provide configuration options to
+override the keys used, if necessary.
 
 | Name | Type | Description |
 | :--- | :--- | :--- |
@@ -146,13 +168,16 @@ In all cases where a component must operate on a key, the following schema is us
 | `message` | `string` | String representation the log. This is the key used when ingesting data, and it is the default key used when parsing. |
 | `host` | `string` | A string representing the originating host of the log. |
 
-### Metric
+## Metric
 
 {% hint style="warning" %}
-The metric data model is in beta and still under development. We are working to address core issues such as supporting [ histograms](https://github.com/timberio/vector/issues/384) and [labels](https://github.com/timberio/vector/issues/512).
+The metric data model is in beta and still under development. We are working
+to address core issues such as supporting [histograms][url.issue_384] and
+[labels][url.issue_512].
 {% endhint %}
 
-Vector characterizes a "metric" as an individual measurement with any number of labels. The measure must either be a `counter`, `guage`, `set`, or `timer`.
+Vector characterizes a "metric" as an individual measurement with any number
+of labels. The measure must either be a `counter`, `guage`, `set`, or `timer`.
 
 For example:
 
@@ -200,4 +225,7 @@ For example:
 {% endcode-tabs %}
 
 
-[docs.sinks]: ..docs/usage/configuration/sinks
+[docs.configuration]: ../usage/configuration
+[docs.sinks]: ../usage/configuration/sinks
+[url.issue_384]: https://github.com/timberio/vector/issues/384
+[url.issue_512]: https://github.com/timberio/vector/issues/512

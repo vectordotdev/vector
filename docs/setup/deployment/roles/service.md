@@ -82,7 +82,7 @@ they include a fast NVME drive for on-disk buffers.
 
 #### Memory
 
-If you've configured [on-disk buffers][docs.service_role.on-disk-bufering],
+If you've configured [on-disk buffers][docs.service_role.on-disk-buffering],
 then memory should not be your bottleneck. If you opted to keep buffers
 in-memory, then you'll want to make sure you have at least 2X your cumulative
 buffer size. For example, if you have an `elasticsearch` and `s3` sink
@@ -126,12 +126,14 @@ decisions, such as [load balancing][docs.service_role.load-balancing].
 
 
 [docs.http_sink]: ../../../usage/configuration/sinks/http.md
-[docs.performance]: ../../..docs/performance.md
-[docs.reloading]: ../../..docs/usage/administration/reloading.md
+[docs.performance]: ../../../performance.md
+[docs.reloading]: ../../../usage/administration/reloading.md
+[docs.service_role.load-balancing]: ../../../setup/deployment/roles/service.md#load-balancing
+[docs.service_role.on-disk-buffering]: ../../../setup/deployment/roles/service.md#on-disk-buffering
 [docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
 [docs.tcp_sink]: ../../../usage/configuration/sinks/tcp.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.updating]: ../../..docs/usage/administration/updating.md
+[docs.updating]: ../../../usage/administration/updating.md
 [docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../../usage/configuration/sources/vector.md
 [url.aws_elb]: https://aws.amazon.com/elasticloadbalancing/

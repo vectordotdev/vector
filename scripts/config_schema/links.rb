@@ -9,7 +9,7 @@ class Links
     @correctness_tests = correctness_tests
     @performance_tests = performance_tests
     @checked = []
-    @docs_files = Dir.glob('docs/**/*').to_a
+    @docs_files = Dir.glob('docs/**/*').to_a.collect { |f| f.gsub("docs/", "/") }
   end
 
   def fetch(full_name_with_section)
@@ -57,15 +57,11 @@ class Links
 
         when /^url\.(.*_correctness)_test$/
           name = $1
-          if @correctness_tests.include?(name)
-            "https://github.com/timberio/vector-test-harness/tree/master/cases/#{name}"
-          end
+          "https://github.com/timberio/vector-test-harness/tree/master/cases/#{name}"
 
         when /^url\.(.*_performance)_test$/
           name = $1
-          if @performance_tests.include?(name)
-            "https://github.com/timberio/vector-test-harness/tree/master/cases/#{name}"
-          end
+          "https://github.com/timberio/vector-test-harness/tree/master/cases/#{name}"
 
         when /^docs\.(.*)_transform$/
           transform = $1

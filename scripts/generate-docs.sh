@@ -1,14 +1,12 @@
 #!/usr/bin/env ruby
 
-# Sync Config Schema
+# generate-docs.sh
 #
-# This script syncs the configuration schema defined in
-# `/scripts/metadata.toml` to the following files:
+# SUMMARY
 #
-# * /config/spec.toml
-# * /docs/usage/configuration/sources/*
-# * /docs/usage/configuration/transforms/*
-# * /docs/usage/configuration/sinks/*
+#   Generates documentation across the Vector repository from the
+#   metadata.toml file. This is not only used to generate files in the
+#   /docs folder but also the /config, README.md, and more.
 
 #
 # Requirements
@@ -117,8 +115,7 @@ readme_generator._generate_new("README.md")
 #
 
 guarantees_generator = Docs::GuaranteesGenerator.new(schema.sources.to_h.values, schema.sinks.to_h.values)
-content = guarantees_generator.generate()
-write("docs/about/guarantees.md", content)
+guarantees_generator._generate_new("docs/about/guarantees.md")
 
 #
 # Configuration global options

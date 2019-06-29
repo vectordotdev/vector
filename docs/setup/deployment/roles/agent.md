@@ -111,16 +111,17 @@ continue running while Vector restarts. When Vector is restarted, it can resume
 where it left off.
 
 
-[docs.docker]: ../../..docs/setup/installation/platforms/docker.md
+[docs.docker]: ../../../setup/installation/platforms/docker.md
 [docs.file_source]: ../../../usage/configuration/sources/file.md
-[docs.performance]: ../../..docs/performance.md
-[docs.platforms]: ../../..docs/setup/installation/platforms
-[docs.reloading]: ../../..docs/usage/administration/reloading.md
+[docs.performance]: ../../../performance.md
+[docs.platforms]: ../../../setup/installation/platforms
+[docs.reloading]: ../../../usage/administration/reloading.md
 [docs.service_role]: ../../../setup/deployment/roles/service.md
-[docs.sinks]: ../../..docs/usage/configuration/sinks
+[docs.sinks]: ../../../usage/configuration/sinks
 [docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
-[docs.topologies.centralized]: ../../..docs/setup/deployment/topologies.md#centralized
-[docs.updating]: ../../..docs/usage/administration/updating.md
+[docs.topologies.centralized]: ../../../setup/deployment/topologies.md#centralized
+[docs.topologies.stream-based]: ../../../setup/deployment/topologies.md#stream-based
+[docs.updating]: ../../../usage/administration/updating.md
 [docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../../usage/configuration/sources/vector.md
 [url.big_query_streaming]: https://cloud.google.com/bigquery/streaming-data-into-bigquery

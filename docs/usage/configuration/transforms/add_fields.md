@@ -208,16 +208,16 @@ Finally, consider the following alternatives:
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration]: ../../..docs/usage/configuration
-[docs.data_model]: ../../..docs/about/data-model.md
+[docs.configuration]: ../../../usage/configuration
+[docs.data_model]: ../../../about/data-model.md
 [docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sources]: ../../..docs/usage/configuration/sources
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.toml_array]: https://github.com/toml-lang/toml#user-content-array

@@ -210,16 +210,16 @@ Finally, consider the following alternatives:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.data_model]: ../../..docs/about/data-model.md
+[docs.data_model]: ../../../about/data-model.md
 [docs.default_schema]: ../../../about/data-model.md#default-schema
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../..docs/usage/configuration/sources
+[docs.sources]: ../../../usage/configuration/sources
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.lua]: https://www.lua.org/
 [url.lua_docs]: https://www.lua.org/manual/5.3/

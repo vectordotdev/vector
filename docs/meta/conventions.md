@@ -246,5 +246,5 @@ Here a few examples to help illustrate this point:
 * All of the `aws_*` sources and sinks include an "Authentication" section that repeats the same language. This is easier for the user since it is contained in the relevant integration page. The user should not have to jump to a separate "AWS Authentication" page unless this subject deserved it's own entire document. Even then, each `aws_*` source and sink should include a link to that document.
 
 
-[docs.administration]: ..docs/usage/administration
-[docs.guides]: ..docs/usage/guides
+[docs.administration]: ../usage/administration
+[docs.guides]: ../usage/guides

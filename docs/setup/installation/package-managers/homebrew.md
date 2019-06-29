@@ -9,10 +9,16 @@ used on MacOS systems.
 
 ## Install
 
-Add the Timber tap and install `vector` (Timber is the company behind Vector):
+Add the Timber tap and install `vector`:
 
 ```bash
 brew tap timberio/brew && brew install vector
+```
+
+Start Vector:
+
+```bash
+brew services start vector
 ```
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
@@ -34,6 +40,8 @@ configuring Vector in the [Configuration][docs.configuration] section.
 Vector can be managed through the [Homebrew services][url.homebrew_services]
 manager:
 
+{% page-ref page="../../../usage/administration" %}
+
 ## Uninstalling
 
 ```bash
@@ -47,6 +55,6 @@ brew update && brew upgrade vector
 ```
 
 
-[docs.configuration]: ../../..docs/usage/configuration
+[docs.configuration]: ../../../usage/configuration
 [url.homebrew]: https://brew.sh/
 [url.homebrew_services]: https://github.com/Homebrew/homebrew-services

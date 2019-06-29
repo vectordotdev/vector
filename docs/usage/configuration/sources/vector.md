@@ -129,7 +129,7 @@ issue, please:
 
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.issue_492]: https://github.com/timberio/vector/issues/492

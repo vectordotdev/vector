@@ -14,9 +14,7 @@ If you do not see your platform you can consider:
 
 {% page-ref page="../operating-systems/README.md" %}
 
-{% page-ref page="../from-archives.md" %}
-
-{% page-ref page="../from-source.md" %}
+{% page-ref page="../manual/README.md" %}
 
 
 

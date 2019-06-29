@@ -9,7 +9,7 @@ generally used on CentOS.
 
 ## Install
 
-Start by adding the Timber GPG key and repository (Timber is the company behind Vector):
+Start by adding the Timber GPG key and repository:
 
 ```bash
 curl -s https://packagecloud.io/install/repositories/timberio/packages/script.rpm.sh | sudo bash
@@ -43,8 +43,9 @@ Vector in the [Configuration][docs.configuration] section.
 
 ## Administering
 
-Vector installs with a [`vector.service` Systemd file][url.vector_systemd_file].
-See the [Administration guide][docs.administration]] for more info.
+Vector can be managed through the [Systemd][url.systemd] service manager:
+
+{% page-ref page="../../../usage/administration" %}
 
 ## Uninstalling
 
@@ -59,7 +60,6 @@ sudo yum upgrade vector
 ```
 
 
-[docs.administration]: ../../..docs/usage/administration
-[docs.configuration]: ../../..docs/usage/configuration
-[url.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service
+[docs.configuration]: ../../../usage/configuration
+[url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [url.yum]: http://yum.baseurl.org/

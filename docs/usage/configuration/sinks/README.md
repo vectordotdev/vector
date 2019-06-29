@@ -80,7 +80,7 @@ If you're sending data to another downstream [Vector service][docs.service_role]
 [docs.pipelines]: ../../../usage/configuration/README.md#composition
 [docs.service_role]: ../../../setup/deployment/roles/service.md
 [docs.splunk_hec_sink]: ../../../usage/configuration/sinks/splunk_hec.md
-[docs.starting]: ../../..docs/usage/administration/starting.md
+[docs.starting]: ../../../usage/administration/starting.md
 [docs.tcp_sink]: ../../../usage/configuration/sinks/tcp.md
 [docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../../usage/configuration/sources/vector.md

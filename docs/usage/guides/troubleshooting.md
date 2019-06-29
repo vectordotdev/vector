@@ -100,6 +100,7 @@ At this point we recommend reaching out to the community for help.
    2. Join the [Vector slack][url.vector_chat] for real-time chat.
 
 
-[url.new_bug_report]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22
+[docs.monitoring.rate-limiting]: ../../usage/administration/monitoring.md#rate-limiting
+[url.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
 [url.vector_chat]: https://chat.vector.dev
 [url.vector_forum]: https://forum.vector.dev

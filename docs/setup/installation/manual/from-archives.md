@@ -134,9 +134,11 @@ cp -a etc/systemd/vector /etc/systemd/system
 ```
 
 
-[docs.configuration]: ../..docs/usage/configuration
-[docs.data_directory]: ../../usage/configuration/README.md#data-directory
-[docs.from_source]: ../../setup/installation/from-source.md
-[docs.package_managers]: ../..docs/setup/installation/package-managers
-[docs.platforms]: ../..docs/setup/installation/platforms
+[docs.configuration]: ../../../usage/configuration
+[docs.data_directory]: ../../../usage/configuration/README.md#data-directory
+[docs.from_source]: ../../../setup/installation/from-source.md
+[docs.package_managers]: ../../../setup/installation/package-managers
+[docs.platforms]: ../../../setup/installation/platforms
 [url.releases]: https://github.com/timberio/vector/releases
+[url.vector_latest_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
+[url.vector_latest_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz

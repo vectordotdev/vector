@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# package-deb.sh
+#
+# SUMMARY
+#
+#   Packages a .deb file to be distributed in the APT package manager.
+
 set -eu
 
 project_root=$(pwd)

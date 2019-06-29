@@ -4,7 +4,7 @@
 # successfully builds but it does not succeed in compiling Vector. This is
 # due to the fact that leveldb and rdkafka do not compile properly.
 
-FROM timberio/vector-builder-base-x86_64-unknown-netbsd:latest
+FROM timberiodev/vector-builder-base-x86_64-unknown-netbsd:latest
 
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \

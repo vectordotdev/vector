@@ -241,13 +241,13 @@ issue, please:
 * [**Source code**](https://github.com/timberio/vector/tree/master/src/source/file.rs)
 
 
-[docs.correctness]: ../../..docs/correctness.md
+[docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../..docs/performance.md
+[docs.performance]: ../../../performance.md
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [url.file_rotate_create_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness

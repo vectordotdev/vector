@@ -38,7 +38,7 @@ jobs:
 
   rustfmt:
     docker:
-      - image: timberio/vector-tester:latest
+      - image: timberiodev/vector-tester:latest
     steps:
       - checkout
       - run:
@@ -51,7 +51,7 @@ jobs:
   check-stable:
     resource_class: large
     docker:
-      - image: timberio/vector-tester:latest
+      - image: timberiodev/vector-tester:latest
     steps:
       - checkout
       - run:
@@ -64,7 +64,7 @@ jobs:
   test-stable:
     resource_class: xlarge
     docker:
-      - image: timberio/vector-tester:latest
+      - image: timberiodev/vector-tester:latest
         environment:
           RUST_BACKTRACE: full
           AWS_ACCESS_KEY_ID: "fake-aws-key"
@@ -123,7 +123,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu:
     docker:
-      - image: timberio/vector-builder-x86_64-unknown-linux-gnu:latest
+      - image: timberiodev/vector-builder-x86_64-unknown-linux-gnu:latest
     resource_class: xlarge
     steps:
       - checkout
@@ -161,7 +161,7 @@ jobs:
   # feeling if we ditched `cargo deb` we could achieve this.
   package-rpm:
     docker:
-      - image: timberio/vector-packager-rpm:latest
+      - image: timberiodev/vector-packager-rpm:latest
     steps:
       - checkout
       - *restore-artifacts-from-workspace
@@ -183,7 +183,7 @@ jobs:
 
   verify-amazon-linux-1:
     docker:
-      - image: timberio/vector-verifier-amazonlinux-1
+      - image: timberiodev/vector-verifier-amazonlinux-1
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -195,7 +195,7 @@ jobs:
 
   verify-amazon-linux-2:
     docker:
-      - image: timberio/vector-verifier-amazonlinux-2
+      - image: timberiodev/vector-verifier-amazonlinux-2
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -219,7 +219,7 @@ jobs:
 
   verify-deb-8:
     docker:
-      - image: timberio/vector-verifier-deb-8:latest
+      - image: timberiodev/vector-verifier-deb-8:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -231,7 +231,7 @@ jobs:
 
   verify-deb-9:
     docker:
-      - image: timberio/vector-verifier-deb-9:latest
+      - image: timberiodev/vector-verifier-deb-9:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -255,7 +255,7 @@ jobs:
 
   verify-ubuntu-16-04:
     docker:
-      - image: timberio/vector-verifier-ubuntu-16-04
+      - image: timberiodev/vector-verifier-ubuntu-16-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -267,7 +267,7 @@ jobs:
 
   verify-ubuntu-18-04:
     docker:
-      - image: timberio/vector-verifier-ubuntu-18-04
+      - image: timberiodev/vector-verifier-ubuntu-18-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -279,7 +279,7 @@ jobs:
 
   verify-ubuntu-19-04:
     docker:
-      - image: timberio/vector-verifier-ubuntu-19-04
+      - image: timberiodev/vector-verifier-ubuntu-19-04
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -295,7 +295,7 @@ jobs:
 
   release:
     docker:
-      - image: timberio/vector-releaser:latest
+      - image: timberiodev/vector-releaser:latest
     steps:
       - setup_remote_docker:
           docker_layer_caching: true

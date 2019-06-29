@@ -16,12 +16,15 @@ help:
 bench: ## Run internal benchmarks
 	@cargo bench
 
-build: ## Build Vector for a given $TARGET and $VERSION
-	@scripts/build.sh
+build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
+	@scripts/build-archive.sh
+
+build-ci-docker-images: ## Build the various Docker images used for CI
+	@scripts/build-ci-docker-images.sh
 
 generate-docs: ## Generate docs from the scipts/metadata.toml file
 	@bundle install --gemfile=scripts/config_schema/Gemfile
-	@scripts/generate_docs.sh
+	@scripts/generate-docs.sh
 
 package-deb: ## Create a .deb package from artifacts created via `build`
 	@scripts/package-deb.sh

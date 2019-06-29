@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# package-rpm.sh
+#
+# SUMMARY
+#
+#   Packages a .rpm file to be distributed in the YUM package manager.
+
 set -eu
 
 archive_name="vector-$VERSION-$TARGET.tar.gz"

@@ -51,7 +51,8 @@ daemonize and manage your processes. Vector provides a
 [`vector.service` file][url.vector_systemd_file] for Systemd.
 
 
+[docs.agent_role.limiting-resources]: ../../setup/deployment/roles/agent.md#limiting-resources
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
-[docs.configuration]: ../..docs/usage/configuration
+[docs.configuration]: ../../usage/configuration
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [url.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service

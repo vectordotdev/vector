@@ -193,13 +193,13 @@ All TOML values types are supported. For convenience this includes:
 [docs.log_event]: ../../about/data-model.md#log
 [docs.lua_transform]: ../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../about/data-model.md#metric
-[docs.operating_systems]: ../..docs/setup/installation/operating-systems
-[docs.platforms]: ../..docs/setup/installation/platforms
+[docs.operating_systems]: ../../setup/installation/operating-systems
+[docs.platforms]: ../../setup/installation/platforms
 [docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ../../usage/configuration/transforms/remove_fields.md
 [docs.sampler_transform]: ../../usage/configuration/transforms/sampler.md
-[docs.sinks]: ../..docs/usage/configuration/sinks
-[docs.sources]: ../..docs/usage/configuration/sources
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources]: ../../usage/configuration/sources
 [docs.splunk_hec_sink]: ../../usage/configuration/sinks/splunk_hec.md
 [docs.statsd_source]: ../../usage/configuration/sources/statsd.md
 [docs.stdin_source]: ../../usage/configuration/sources/stdin.md
@@ -207,7 +207,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.tcp_sink]: ../../usage/configuration/sinks/tcp.md
 [docs.tcp_source]: ../../usage/configuration/sources/tcp.md
 [docs.tokenizer_transform]: ../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../..docs/usage/configuration/transforms
+[docs.transforms]: ../../usage/configuration/transforms
 [docs.vector_sink]: ../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../usage/configuration/sources/vector.md
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html

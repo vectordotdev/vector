@@ -12,19 +12,23 @@ installations][docs.platforms] first.
 
 Vector offers installation instructions for the following operating systems:
 
+{% page-ref page="amazon-linux.md" %}
+
 {% page-ref page="centos.md" %}
 
 {% page-ref page="debian.md" %}
 
 {% page-ref page="macos.md" %}
 
+{% page-ref page="rhel.md" %}
+
 {% page-ref page="ubuntu.md" %}
 
 If you do not see your operating system you can consider:
 
-{% page-ref page="../package-managers/from-archives.md" %}
+{% page-ref page="../manual/from-archives.md" %}
 
-{% page-ref page="../package-managers/from-source.md" %}
+{% page-ref page="../manual/from-source.md" %}
 
 
-[docs.platforms]: ../../..docs/setup/installation/platforms
+[docs.platforms]: ../../../setup/installation/platforms

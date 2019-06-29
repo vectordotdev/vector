@@ -151,6 +151,7 @@ The `tcp` source has been involved in the following performance tests:
 
 * [`file_to_tcp_performance`][url.file_to_tcp_performance_test]
 * [`tcp_to_blackhole_performance`][url.tcp_to_blackhole_performance_test]
+* [`tcp_to_http_performance`][url.tcp_to_http_performance_test]
 * [`tcp_to_tcp_performance`][url.tcp_to_tcp_performance_test]
 
 Learn more in the [Performance][docs.performance] sections.
@@ -177,12 +178,13 @@ issue, please:
 
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../..docs/performance.md
+[docs.performance]: ../../../performance.md
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.file_to_tcp_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_to_tcp_performance
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.tcp_to_blackhole_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance
+[url.tcp_to_http_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance
 [url.tcp_to_tcp_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance

@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# build.sh
+#
+# SUMMARY
+#
+#   Used to build a tar.gz archive for the specified $TARGET and $VERSION
+#
+# ENV VARS
+#
+#   $TARGET - a target triple. ex: x86_64-apple-darwin
+#   $VERSION - the version of Vector, can be obtained via `make version`
+
 set -eu
 
 echo "Building version $VERSION for target $TARGET"

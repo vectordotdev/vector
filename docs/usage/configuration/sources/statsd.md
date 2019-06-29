@@ -192,6 +192,6 @@ issue, please:
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

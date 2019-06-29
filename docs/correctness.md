@@ -1,24 +1,33 @@
 # Correctness
 
-This page demonstrates behavior correctness. Like our [performance tests][docs.performance], our correct tests use the same Vector [test harness](https://github.com/timberio/vector-test-harness). You can click on the test, if applicable, to access the test's source and learn more about the test itself. This is by no means comprehensive and we plan to expand the tests over time
+Like our [performance tests][docs.performance], our correctness tests use the
+same [test harness][url.test_harness]. To learn more, click on each test, or
+visit the ["How It Works" section][url.test_harness.how-it-works] in the test
+harness README.
 
 ## Tests
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | ✅ | ✅ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
-| [File Rotate \(create\)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [File Rotate \(copytruncate\)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [Process \(SIGHUP\)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️\* | ✅ | ✅ |
+| [Disk Buffer Persistence][url.disk_buffer_persistence_correctness_test] | ✅ | ✅ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
+| [File Rotate \(create\)][url.file_rotate_create_correctness_test] | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [File Rotate \(copytruncate\)][url.file_rotate_truncate_correctness_test] | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| [File Truncation][url.file_truncate_correctness_test] | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [Process \(SIGHUP\)][url.sighup_correctness_test] | ✅ | ❌ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
 | TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| [JSON \(wrapped\)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| [JSON \(wrapped\)][url.wrapped_json_correctness_test] | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-`*` - please click into the test for an explanation of results
-
-## How It Works
-
-You can learn more about how our correctness tests work by clicking on each test or viewing the `README` in the test hardness repo.
+✅ = passed
+❌ = failed
+⚠️ = unknown, please click into the test for an explanation
 
 
-[docs.performance]: docs/performance.md
+[docs.performance]: /performance.md
+[url.disk_buffer_persistence_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness
+[url.file_rotate_create_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness
+[url.file_rotate_truncate_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness
+[url.file_truncate_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness
+[url.sighup_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness
+[url.test_harness.how-it-works]: https://github.com/timberio/vector-test-harness/#how-it-works
+[url.test_harness]: https://github.com/timberio/vector-test-harness/
+[url.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

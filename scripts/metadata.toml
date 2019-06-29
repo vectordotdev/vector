@@ -41,6 +41,7 @@ performance_tests = [
   "file_to_tcp_performance",
   "regex_parsing_performance",
   "tcp_to_blackhole_performance",
+  "tcp_to_http_performance",
   "tcp_to_tcp_performance"
 ]
 
@@ -2243,7 +2244,7 @@ lua_require = "http://www.lua.org/manual/5.1/manual.html#pdf-require"
 lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
-new_bug_report = "https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22"
+new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
 nginx = "https://www.nginx.com/"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
@@ -2267,6 +2268,8 @@ toml_table = "https://github.com/toml-lang/toml#user-content-table"
 uuidv4 = "https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)"
 vector_repo = "https://github.com/timberio/vector"
 vector_initd_service = "https://github.com/timberio/vector/blob/master/distribution/init.d/vector"
+vector_latest_x86_64-apple-darwin = "https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz"
+vector_latest_x86_64-unknown-linux-gnu = "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz"
 vector_systemd_file = "https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service"
 vote_feature = "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 vector_chat = "https://chat.vector.dev"

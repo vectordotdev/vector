@@ -34,9 +34,9 @@ data from A to B simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation]
+* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], and [more][docs.installation]
 * [**Getting started**][docs.getting_started]
-* [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.topologies]
+* [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
 #### Usage
 
@@ -55,7 +55,7 @@ data from A to B simple and unified.
 * ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
 * **Correct** - Obsessed with [getting the details right][docs.correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
-* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent] or [service].
+* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
 * **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
 * **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
@@ -79,11 +79,11 @@ To learn more about our performance tests, please see the [Vector test harness][
 
 | Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 | ---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | ✅ | ✅ | ❌ | ❌ | ⚠️* | ✅ | ✅ |
+| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | ✅ | ✅ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
 | [File Rotate (create)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️* | ✅ | ✅ |
+| [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
 | [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
@@ -185,6 +185,7 @@ the License.
 [docs.add_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/add_fields
 [docs.administration]: https://docs.vector.dev/usage/administration
 [docs.agent_role]: https://docs.vector.dev/setup/deployment/roles/agent
+[docs.apt]: https://docs.vector.dev/setup/installation/package-managers/apt
 [docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
 [docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
@@ -195,6 +196,7 @@ the License.
 [docs.correctness]: https://docs.vector.dev/correctness
 [docs.data_model]: https://docs.vector.dev/about/data-model
 [docs.deployment]: https://docs.vector.dev/setup/deployment
+[docs.docker]: https://docs.vector.dev/setup/installation/platforms/docker
 [docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
 [docs.field_filter_transform]: https://docs.vector.dev/usage/configuration/transforms/field_filter
 [docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
@@ -202,6 +204,7 @@ the License.
 [docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
+[docs.homebrew]: https://docs.vector.dev/setup/installation/package-managers/homebrew
 [docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
@@ -211,6 +214,7 @@ the License.
 [docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
 [docs.reloading]: https://docs.vector.dev/usage/administration/reloading
 [docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
+[docs.roles]: https://docs.vector.dev/setup/deployment/roles
 [docs.sampler_transform]: https://docs.vector.dev/usage/configuration/transforms/sampler
 [docs.service_role]: https://docs.vector.dev/setup/deployment/roles/service
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
@@ -230,6 +234,7 @@ the License.
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
+[docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
 [url.community]: https://vector.dev/community
 [url.mailing_list]: https://vector.dev/mailing_list/
 [url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open

@@ -196,11 +196,11 @@ Finally, consider the following alternatives:
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../..docs/performance.md
-[docs.sources]: ../../..docs/usage/configuration/sources
+[docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.golang_regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression

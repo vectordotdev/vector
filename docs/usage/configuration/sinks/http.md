@@ -361,6 +361,14 @@ In order to partition data within a Kafka topic, you must specify a `key_field`.
 
 You can use [transforms][docs.transforms] to add a partition key field if your events do not already have one.
 
+### Performance
+
+The `http` source has been involved in the following performance tests:
+
+* [`tcp_to_http_performance`][url.tcp_to_http_performance_test]
+
+Learn more in the [Performance][docs.performance] sections.
+
 ### Rate Limiting
 
 Vector offers a few levers to control the rate and volume of requests. Start with the `rate_limit_duration` and `rate_limit_num` options to ensure Vector does not exceed the specified number of requests in the specified window. You can further control the pace at which this window is saturated with the `request_in_flight_limit` option, which will guarantee no more than the specified number of requests are in-flight at any given time.
@@ -400,12 +408,14 @@ issue, please:
 [docs.event]: ../../../about/data-model.md#event
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../..docs/usage/configuration/sources
-[docs.starting]: ../../..docs/usage/administration/starting.md
-[docs.transforms]: ../../..docs/usage/configuration/transforms
-[docs.troubleshooting]: ../../..docs/usage/guides/troubleshooting.md
+[docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [url.community]: https://vector.dev/community
 [url.gzip]: https://www.gzip.org/
 [url.kafka_partitioning_docs]: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Partitioningandbootstrapping
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.tcp_to_http_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance

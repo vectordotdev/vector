@@ -14,5 +14,6 @@ typically want to limit resources. This is covered in detail in the
 [Agent role system configuration][docs.agent_role.system-configuration] section.
 
 
+[docs.agent_role.system-configuration]: ../../setup/deployment/roles/agent.md#system-configuration
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
 [url.rust]: https://www.rust-lang.org/
