@@ -1,7 +1,7 @@
 # `tcp` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `tcp` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/tcp
+# Docs: https://docs.vector.dev/usage/configuration/sinks/tcp
 
 [sinks.my_tcp_sink]
   # REQUIRED - General

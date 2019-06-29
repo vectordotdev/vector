@@ -1,7 +1,7 @@
 # `field_filter` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `field_filter` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/field_filter
+# Docs: https://docs.vector.dev/usage/configuration/transforms/field_filter
 
 [transforms.my_field_filter_transform]
   # REQUIRED - General

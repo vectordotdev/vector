@@ -1,7 +1,7 @@
 # `tokenizer` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `tokenizer` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/tokenizer
+# Docs: https://docs.vector.dev/usage/configuration/transforms/tokenizer
 
 [transforms.my_tokenizer_transform]
   # REQUIRED - General

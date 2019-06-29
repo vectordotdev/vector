@@ -7,9 +7,9 @@
 #                            Configuration Specification
 #
 # ------------------------------------------------------------------------------
-# Website: https://vectorproject.io
-# Docs: https://docs.vectorproject.io
-# Community: https://vectorproject.io/community
+# Website: https://vector.dev
+# Docs: https://docs.vector.dev
+# Community: https://vector.dev/community
 # Repo: https://github.com/timberio/vector
 # ------------------------------------------------------------------------------
 # The file contains a full specification for the `vector.toml` configuration
@@ -17,14 +17,14 @@
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# https://docs.vectorproject.io/usage/configuration
+# https://docs.vector.dev/usage/configuration
 
 # ------------------------------------------------------------------------------
 # Global
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
 #
-# Documentation: https://docs.vectorproject.io/usage/configuration
+# Documentation: https://docs.vector.dev/usage/configuration
 # OPTIONAL - General
 
 # The directory used for persisting Vector state, such as on-disk buffers.
@@ -39,7 +39,7 @@ data_dir = "/var/lib/vector"
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 #
-# Documentation: https://docs.vectorproject.io/usage/configuration/sources
+# Documentation: https://docs.vector.dev/usage/configuration/sources
 [sources.file]
   # REQUIRED - General
 
@@ -225,7 +225,7 @@ data_dir = "/var/lib/vector"
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 #
-# Documentation: https://docs.vectorproject.io/usage/configuration/transforms
+# Documentation: https://docs.vector.dev/usage/configuration/transforms
 [transforms.add_fields]
   # REQUIRED - General
 
@@ -463,7 +463,7 @@ data_dir = "/var/lib/vector"
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
 #
-# Documentation: https://docs.vectorproject.io/usage/configuration/sinks
+# Documentation: https://docs.vector.dev/usage/configuration/sinks
 [sinks.aws_cloudwatch_logs]
   # REQUIRED - General
 
@@ -927,8 +927,9 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # The host of your Elasticsearch cluster.
-  host = "10.24.32.122:9000"
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example.
+  host = "http://10.24.32.122:9000"
 
   # OPTIONAL - General
 

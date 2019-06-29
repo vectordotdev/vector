@@ -1,5 +1,17 @@
 # Code of Conduct
 
+<!-- MarkdownTOC autolink="true" style="ordered" -->
+
+1. [Our Pledge](#our-pledge)
+1. [Our Standards](#our-standards)
+1. [Our Responsibilities](#our-responsibilities)
+1. [Scope](#scope)
+1. [Enforcement](#enforcement)
+1. [Attribution](#attribution)
+
+<!-- /MarkdownTOC -->
+
+
 ## Our Pledge
 
 In the interest of fostering an open and welcoming environment, we as

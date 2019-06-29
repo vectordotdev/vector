@@ -9,3 +9,5 @@ to be progressive, starting with a [simple tutorial](sending-your-first-event.md
 Afterwards, we recommend moving onto [deployments](../deployment/) so you can
 begin to formalize how Vector will fit into your infrastructure.
 
+
+

@@ -1,6 +1,6 @@
 # Performance
 
-This section demonstrates performance across common scenarios. As part of Vector's development, we invested in a robust [test harness](https://github.com/timberio/vector-test-harness) that provided a data-driven testing environment. Below are the results. To learn more, see [How It Works](performance.md#how-it-works).
+This section demonstrates performance across common scenarios. As part of Vector's development, we invested in a robust [test harness](https://github.com/timberio/vector-test-harness) that provided a data-driven testing environment. Below are the results. To learn more, see [How It Works][docs.performance.md.how-it-works].
 
 _Please note_, these are not audited independent benchmarks, they are our own internal performance tests to ensure Vector met our standards. Use these results as a point of reference. [Pull requests](https://github.com/timberio/vector-test-harness/pulls) are welcome to improve the tests.
 
@@ -19,4 +19,6 @@ Higher throughput is better. The winner is in **bold**. Click on the test name f
 ## How It Works
 
 Vector developed a robust test harness to collect this performance data. You can click on each test above to learn more, or view the [test harness readme](https://github.com/timberio/vector-test-harness), which provides a deep dive into the design.
+
+
 

@@ -26,3 +26,5 @@ A sink is a destination for [events](data-model.md#event). Each sink's design an
 
 {% page-ref page="../usage/configuration/sinks/" %}
 
+
+

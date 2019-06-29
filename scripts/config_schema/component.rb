@@ -56,7 +56,7 @@ class Component
       test_list = ""
 
       @correctness_tests.each do |test|
-        test_list << "* [`#{test}`][#{test}_test]\n"
+        test_list << "* [`#{test}`][url.#{test}_test]\n"
       end
 
       test_list.strip!
@@ -66,7 +66,7 @@ class Component
 
         #{test_list}
 
-        Learn more in the [Correctness][correctness] sections.
+        Learn more in the [Correctness][docs.correctness] sections.
         EOF
 
       description.strip!
@@ -87,7 +87,7 @@ class Component
       test_list = ""
 
       @performance_tests.each do |test|
-        test_list << "* [`#{test}`][#{test}_test]\n"
+        test_list << "* [`#{test}`][url.#{test}_test]\n"
       end
 
       test_list.strip!
@@ -97,7 +97,7 @@ class Component
 
         #{test_list}
 
-        Learn more in the [Performance][performance] sections.
+        Learn more in the [Performance][docs.performance] sections.
         EOF
 
       description.strip!
@@ -120,7 +120,7 @@ class Component
         when "at_least_once"
           <<~EOF
           This component offers an **at least once** delivery guarantee if your
-          [pipeline is configured to achieve this][at_least_once_delivery].
+          [pipeline is configured to achieve this][docs.at_least_once_delivery].
           EOF
         when "best_effort"
           <<~EOF
@@ -168,7 +168,7 @@ class Component
     if type != "source"
       @options.inputs = Option.new({
         "name" => "inputs",
-        "description" => "A list of upstream [source][sources] or [transform][transforms] IDs. See [Config Composition][config_composition] for more info.",
+        "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.",
         "examples" => [["my-source-id"]],
         "null" => false,
         "type" => "string"

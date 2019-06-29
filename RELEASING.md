@@ -5,6 +5,15 @@ This document will cover how to properly release Vector.
 Vector adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html) and the release
 process is dependent on the version change.
 
+<!-- MarkdownTOC autolink="true" style="ordered" -->
+
+1. [Quick Start](#quick-start)
+  1. [Patch Releases](#patch-releases)
+  1. [Major/Minor Releases](#majorminor-releases)
+
+<!-- /MarkdownTOC -->
+
+
 ## Quick Start
 
 ### Patch Releases

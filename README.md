@@ -1,67 +1,65 @@
 <p align="center">
-  <strong><a href="https://vectorproject.io/mailing_list">Join our mailing list!<a/> Simple monthly updates. No spam, ever.</strong>
+  <strong>
+    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://forum.vector.dev">Forums<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/mailing_list">Mailing List<a/></strong>
 </p>
+
+---
 
 <p align="center">
   <img src="./docs/assets/readme_diagram.svg" alt="Vector">
 </p>
 
-<p align="center">
-  <a href="https://github.com/timberio/vector/releases"><img src="https://img.shields.io/github/release/timberio/vector.svg"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/timberio/vector.svg"></a>
-  <a href="https://circleci.com/gh/timberio/vector"><img src="https://circleci.com/gh/timberio/vector/tree/master.svg?style=shield"></a>
-  <a href="https://chat.vectorproject.io/badge.svg"><img src="https://chat.vectorproject.io/badge.svg"></a>
-</p>
+Vector is a [high-performance][docs.performance] observability data router. It makes
+[collecting][docs.sources], [transforming][docs.transforms], and [sending][docs.sinks] logs, metrics,
+and events easy. It decouples data collection & routing from your services, giving
+you control and data ownership, among [many other benefits][docs.use_cases].
 
-Vector is a [high-performance][performance] observability data router. It makes
-[collecting][sources], [transforming][transforms], and [sending][sinks] logs, metrics, and events
-easy. It decouples data collection & routing from your services, giving you data ownership and
-control, among [many other benefits][use_cases].
+Built in [Rust][url.rust], Vector places high-value on [performance][docs.performance], [correctness][docs.correctness], and
+[operator friendliness][docs.administration]. It compiles to a single static binary and is designed
+to be [deployed][docs.deployment] across your entire infrastructure, serving both as a
+light-weight [agent][docs.agent_role] and a highly efficient [service][docs.service_role], making the process of getting
+data from A to B simple and unified.
 
-Built in [Rust][rust], Vector places high-value on [performance], [correctness], and
-[operator friendliness][administration]. It compiles to a single static binary and is designed
-to be [deployed][deployment] across your entire infrastructure, serving both as a
-light-weight [agent] and a highly efficient [service], making it the single tool you need to
-get data from A to B.
 
-## [Documentation](https://docs.vectorproject.io/)
+## [Documentation](https://docs.vector.dev/)
 
 #### About
 
-* [**Use cases**][use_cases]
-* [**Concepts**][concepts]
-* [**Data model**][data_model]
-* [**Guarantees**][guarantees]
+* [**Use cases**][docs.use_cases]
+* [**Concepts**][docs.concepts]
+* [**Data model**][docs.data_model]
+* [**Guarantees**][docs.guarantees]
 
 #### Setup
 
-* [**Installation**][installation]
-* [**Getting started**][getting_started]
-* [**Migrating**][migrating]
-* [**Deployment**][deployment] - [topologies], [roles]
+* [**Installation**][docs.installation]
+* [**Getting started**][docs.getting_started]
+* [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.topologies]
 
 #### Usage
 
-* [**Configuration**][configuration] - [sources], [transforms], [sinks]
-* [**Administration**][administration] - [cli], [starting], [stopping], [reloading], [updating]
-* [**Guides**][guides]
+* [**Configuration**][docs.configuration] - [sources][docs.sources], [transforms][docs.transforms], [sinks][docs.sinks]
+* [**Administration**][docs.administration] - [starting][docs.starting], [stopping][docs.stopping], [reloading][docs.reloading], [updating][docs.updating]
+* [**Guides**][docs.guides]
 
 #### Resources
 
-* [**Community**][community] - [forum], [slack chat][slack], [mailing list][mailing_list]
-* [**Download**][releases]
-* [**Roadmap**][roadmap] - [vote on new features][vote_feature]
+* [**Community**][url.community] - [forum][url.vector_forum], [slack chat][url.vector_chat], [mailing list][url.mailing_list]
+* [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
+
 
 ## Features
 
-* **Fast** - Built in [Rust][rust], Vector is [fast and memory efficient][performance]. There is no runtime or garbage collector. Its designed to handle the most demanding environments.
-* **Correct** - Vector is obsessed with [getting the details right][correctness].
-* **Vendor Neutral** - Vector does not favor any specific storage, it fosters a fair, open ecosystem with the user's best interest in mind.
-* **Agent Or Service** - Vector aims to be the single tool needed to route data from A to B, deploying as an [agent] or [service].
-* **Logs, Metrics, or Events** - Vector unifies logs, metrics, and events, making it easy to collect and ship all observability data.
-* **Clear Guarantees** - Vector is [clear on it's guarantees][guarantees], helping you to make the appropriate trade offs for your use case.
-* **Easy To Deploy** - Vector compiles to a single static binary with no runtime.
-* **Hot Reload** - Designed to [reload configuration][reloading], on the fly, without restarting or skipping a beat.
+* ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
+* **Correct** - Obsessed with [getting the details right][docs.correctness].
+* **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
+* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent] or [service].
+* **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
+* **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
+* **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
 
 
 ## Performance
@@ -74,7 +72,7 @@ get data from A to B.
 | [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
 | [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | _**70.4mib/s**_ | 7.6mib/s |
 
-To learn more about our performance tests, please see the [Vector test harness][test_harness].
+To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
 
 
 ## Correctness
@@ -88,55 +86,75 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️* | ✅ | ✅ |
 | [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-To learn more about our performance tests, please see the [Vector test harness][test_harness].
+To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
 
 
 ## Sources
 
-| Name  | Description |
-| :---  | :---------- |
-| [**`file`**](https://docs.vectorproject.io/usage/configuration/sources/file) | Ingests data through one or more local files and outputs log events.<br />`guarantee: best_effort` |
-| [**`statsd`**](https://docs.vectorproject.io/usage/configuration/sources/statsd) | Ingests data through the StatsD UDP protocol and outputs log events.<br />`guarantee: best_effort` |
-| [**`stdin`**](https://docs.vectorproject.io/usage/configuration/sources/stdin) | Ingests data through standard input (STDIN) and outputs log events.<br />`guarantee: at_least_once` |
-| [**`syslog`**](https://docs.vectorproject.io/usage/configuration/sources/syslog) | Ingests data through the Syslog 5424 protocol and outputs log events.<br />`guarantee: best_effort` |
-| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sources/tcp) | Ingests data through the TCP protocol and outputs log events.<br />`guarantee: best_effort` |
-| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sources/vector) | Ingests data through another upstream Vector instance and outputs log events.<br />`guarantee: best_effort` |
+<!-- START: sources_table -->
+<!-- ----------------------------------------------------------------- -->
+<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+
+| Name | Description |
+| :--- | :---------- |
+| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs log events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs log events. |
+| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs log events. |
+| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs log events. |
+| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs log events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs log events. |
+
+<!-- ----------------------------------------------------------------- -->
+<!-- END: sources_table -->
 
 [+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
 
-
 ## Transforms
 
-| Name  | Description |
-| :---  | :---------- |
-| [**`add_fields`**](https://docs.vectorproject.io/usage/configuration/transforms/add_fields) | Accepts log events and allows you to add one or more fields. |
-| [**`field_filter`**](https://docs.vectorproject.io/usage/configuration/transforms/field_filter) | Accepts log and metric events and allows you to filter events by a field's value. |
-| [**`grok_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/grok_parser) | Accepts log events and allows you to parse a field value with [Grok][grok]. |
-| [**`json_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/json_parser) | Accepts log events and allows you to parse a field value as JSON. |
-| [**`lua`**](https://docs.vectorproject.io/usage/configuration/transforms/lua) | Accepts log events and allows you to transform events with a full embedded [Lua][lua] engine. |
-| [**`regex_parser`**](https://docs.vectorproject.io/usage/configuration/transforms/regex_parser) | Accepts log events and allows you to parse a field's value with a [Regular Expression][regex]. |
-| [**`remove_fields`**](https://docs.vectorproject.io/usage/configuration/transforms/remove_fields) | Accepts log and metric events and allows you to remove one or more event fields. |
-| [**`sampler`**](https://docs.vectorproject.io/usage/configuration/transforms/sampler) | Accepts log events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**](https://docs.vectorproject.io/usage/configuration/transforms/tokenizer) | Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+<!-- START: transforms_table -->
+<!-- ----------------------------------------------------------------- -->
+<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+
+| Name | Description |
+| :--- | :---------- |
+| [**`add_fields`**][docs.add_fields_transform] | Accepts log events and allows you to add one or more fields. |
+| [**`field_filter`**][docs.field_filter_transform] | Accepts log and metric events and allows you to filter events by a field's value. |
+| [**`grok_parser`**][docs.grok_parser_transform] | Accepts log events and allows you to parse a field value with Grok. |
+| [**`json_parser`**][docs.json_parser_transform] | Accepts log events and allows you to parse a field value as JSON. |
+| [**`lua`**][docs.lua_transform] | Accepts log events and allows you to transform events with a full embedded Lua engine. |
+| [**`regex_parser`**][docs.regex_parser_transform] | Accepts log events and allows you to parse a field's value with a Regular Expression. |
+| [**`remove_fields`**][docs.remove_fields_transform] | Accepts log and metric events and allows you to remove one or more event fields. |
+| [**`sampler`**][docs.sampler_transform] | Accepts log events and allows you to sample events with a configurable rate. |
+| [**`tokenizer`**][docs.tokenizer_transform] | Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+
+<!-- ----------------------------------------------------------------- -->
+<!-- END: transforms_table -->
 
 [+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+transform%22%7D&title=New+%60%3Cname%3E%60+transform)
 
 
 ## Sinks
 
-| Name  | Description |
-| :---  | :---------- |
-| [**`aws_cloudwatch_logs`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_cloudwatch_logs) | Batches and flushes log events to [AWS CloudWatch Logs][aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).<br />`guarantee: at_least_once` |
-| [**`aws_kinesis_streams`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_kinesis_streams) | Batches and flushes log events to [AWS Kinesis Data Stream][aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).<br />`guarantee: at_least_once` |
-| [**`aws_s3`**](https://docs.vectorproject.io/usage/configuration/sinks/aws_s3) | Batches and flushes log events to [AWS S3][aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).<br />`guarantee: at_least_once` |
-| [**`blackhole`**](https://docs.vectorproject.io/usage/configuration/sinks/blackhole) | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes.<br />`guarantee: best_effort` |
-| [**`console`**](https://docs.vectorproject.io/usage/configuration/sinks/console) | Streams log and metric events to the console, `STDOUT` or `STDERR`.<br />`guarantee: best_effort` |
-| [**`elasticsearch`**](https://docs.vectorproject.io/usage/configuration/sinks/elasticsearch) | Batches and flushes log events to [Elasticsearch][elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).<br />`guarantee: best_effort` |
-| [**`http`**](https://docs.vectorproject.io/usage/configuration/sinks/http) | Batches and flushes log events to a generic HTTP endpoint.<br />`guarantee: at_least_once` |
-| [**`kafka`**](https://docs.vectorproject.io/usage/configuration/sinks/kafka) | Streams log events to [Apache Kafka][kafka] via the [Kafka protocol][kafka_protocol].<br />`guarantee: at_least_once` |
-| [**`splunk_hec`**](https://docs.vectorproject.io/usage/configuration/sinks/splunk_hec) | Batches and flushes log events to a [Splunk HTTP Event Collector][splunk_hec].<br />`guarantee: at_least_once` |
-| [**`tcp`**](https://docs.vectorproject.io/usage/configuration/sinks/tcp) | Streams log events to a TCP connection.<br />`guarantee: best_effort` |
-| [**`vector`**](https://docs.vectorproject.io/usage/configuration/sinks/vector) | Streams log events to another downstream Vector instance.<br />`guarantee: best_effort` |
+<!-- START: sinks_table -->
+<!-- ----------------------------------------------------------------- -->
+<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+
+| Name | Description |
+| :--- | :---------- |
+| [**`aws_cloudwatch_logs`**][docs.aws_cloudwatch_logs_sink] | Batches log events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint. |
+| [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | Batches log events to AWS Kinesis Data Stream via the `PutRecords` API endpoint. |
+| [**`aws_s3`**][docs.aws_s3_sink] | Batches log events to AWS S3 via the `PutObject` API endpoint. |
+| [**`blackhole`**][docs.blackhole_sink] | Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`console`**][docs.console_sink] | Streams log and metric events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**][docs.elasticsearch_sink] | Batches log events to Elasticsearch via the `_bulk` API endpoint. |
+| [**`http`**][docs.http_sink] | Batches log events to a generic HTTP endpoint. |
+| [**`kafka`**][docs.kafka_sink] | Streams log events to Apache Kafka. |
+| [**`splunk_hec`**][docs.splunk_hec_sink] | Batches log events to a Splunk HTTP Event Collector. |
+| [**`tcp`**][docs.tcp_sink] | Streams log events to a TCP connection. |
+| [**`vector`**][docs.vector_sink] | Streams log events to another downstream Vector instance. |
+
+<!-- ----------------------------------------------------------------- -->
+<!-- END: sinks_table -->
 
 [+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
 
@@ -163,44 +181,60 @@ the License.
   Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
 </p>
 
-[administration]: https://docs.vectorproject.io/usage/administration
-[agent]: https://docs.vectorproject.io/setup/deployment/roles/agent
-[backups]: https://docs.vectorproject.io/about/use_cases/backups
-[cli]: https://docs.vectorproject.io/administration/cli
-[community]: https://vectorproject.io/community/
-[configuration]: https://docs.vectorproject.io/usage/configuration
-[concepts]: https://docs.vectorproject.io/about/concepts
-[cost]: https://docs.vectorproject.io/about/use_cases/cost
-[correctness]: https://docs.vectorproject.io/comparisons
-[data_model]: https://docs.vectorproject.io/about/data_model
-[deployment]: https://docs.vectorproject.io/setup/deployment
-[forum]: https://forum.vectorproject.io
-[getting_started]: https://docs.vectorproject.io/setup/getting_started
-[governance]: https://docs.vectorproject.io/about/use_cases/governance
-[guarantees]: https://docs.vectorproject.io/about/guarantees
-[guides]: https://docs.vectorproject.io/usage/guides
-[installation]: https://docs.vectorproject.io/setup/installation
-[lock-in]: https://docs.vectorproject.io/about/use_cases/lock-in
-[mailing_list]: https://vectorproject.io/mailing_list
-[migrating]: https://docs.vectorproject.io/setup/migrating
-[multi-cloud]: https://docs.vectorproject.io/about/use_cases/multi-cloud
-[performance]: https://docs.vectorproject.io/performance
-[releases]: https://github.com/timberio/vector/releases
-[reloading]: https://docs.vectorproject.io/usage/administration/reloading
-[roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
-[roles]: https://docs.vectorproject.io/setup/deployment/roles
-[rust]: https://www.rust-lang.org/
-[security]: https://docs.vectorproject.io/about/use_cases/security-and-compliance
-[service]: https://docs.vectorproject.io/setup/deployment/roles/service
-[sinks]: https://docs.vectorproject.io/usage/configuration/sinks
-[slack]: https://chat.vectorproject.io
-[sources]: https://docs.vectorproject.io/usage/configuration/sources
-[starting]: https://docs.vectorproject.io/usage/administration/starting
-[stopping]: https://docs.vectorproject.io/usage/administration/stopping
-[test_harness]: https://github.com/timberio/vector-test-harness
-[test_harness_how_it_works]: https://github.com/timberio/vector-test-harness#how-it-works
-[topologies]: https://docs.vectorproject.io/setup/deployment/topologies
-[transforms]: https://docs.vectorproject.io/usage/configuration/transforms
-[updating]: https://docs.vectorproject.io/usage/administration/updating
-[use_cases]: https://docs.vectorproject.io/use_cases
-[vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+
+[docs.add_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/add_fields
+[docs.administration]: https://docs.vector.dev/usage/administration
+[docs.agent_role]: https://docs.vector.dev/setup/deployment/roles/agent
+[docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
+[docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
+[docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
+[docs.concepts]: https://docs.vector.dev/about/concepts
+[docs.configuration]: https://docs.vector.dev/usage/configuration
+[docs.console_sink]: https://docs.vector.dev/usage/configuration/sinks/console
+[docs.correctness]: https://docs.vector.dev/correctness
+[docs.data_model]: https://docs.vector.dev/about/data-model
+[docs.deployment]: https://docs.vector.dev/setup/deployment
+[docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
+[docs.field_filter_transform]: https://docs.vector.dev/usage/configuration/transforms/field_filter
+[docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
+[docs.getting_started]: https://docs.vector.dev/setup/getting-started
+[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
+[docs.guarantees]: https://docs.vector.dev/about/guarantees
+[docs.guides]: https://docs.vector.dev/usage/guides
+[docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
+[docs.installation]: https://docs.vector.dev/setup/installation
+[docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
+[docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
+[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
+[docs.performance]: https://docs.vector.dev/performance
+[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
+[docs.reloading]: https://docs.vector.dev/usage/administration/reloading
+[docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
+[docs.sampler_transform]: https://docs.vector.dev/usage/configuration/transforms/sampler
+[docs.service_role]: https://docs.vector.dev/setup/deployment/roles/service
+[docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.splunk_hec_sink]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.statsd_source]: https://docs.vector.dev/usage/configuration/sources/statsd
+[docs.stdin_source]: https://docs.vector.dev/usage/configuration/sources/stdin
+[docs.stopping]: https://docs.vector.dev/usage/administration/stopping
+[docs.syslog_source]: https://docs.vector.dev/usage/configuration/sources/syslog
+[docs.tcp_sink]: https://docs.vector.dev/usage/configuration/sinks/tcp
+[docs.tcp_source]: https://docs.vector.dev/usage/configuration/sources/tcp
+[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
+[docs.topologies]: https://docs.vector.dev/setup/deployment/topologies
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.updating]: https://docs.vector.dev/usage/administration/updating
+[docs.use_cases]: https://docs.vector.dev/use-cases
+[docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
+[docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
+[url.community]: https://vector.dev/community
+[url.mailing_list]: https://vector.dev/mailing_list/
+[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
+[url.rust]: https://www.rust-lang.org/
+[url.test_harness]: https://github.com/timberio/vector-test-harness/
+[url.vector_chat]: https://chat.vector.dev
+[url.vector_forum]: https://forum.vector.dev
+[url.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

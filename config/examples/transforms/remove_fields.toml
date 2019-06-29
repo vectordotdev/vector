@@ -1,7 +1,7 @@
 # `remove_fields` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `remove_fields` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/remove_fields
+# Docs: https://docs.vector.dev/usage/configuration/transforms/remove_fields
 
 [transforms.my_remove_fields_transform]
   # REQUIRED - General

@@ -88,3 +88,5 @@ You'll notice this time the event is structured. Vector knows when an event is s
 
 That's it! This tutorial demonstrates the _very_ basic [concepts](../../about/concepts.md) of Vector. From here, you can start to think about the various [sources](../../usage/configuration/sources/), [transforms](../../usage/configuration/transforms/), and [sinks](../../usage/configuration/sinks/) you'll need to combine to create your pipelines.
 
+
+

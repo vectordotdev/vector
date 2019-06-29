@@ -20,14 +20,21 @@
 ## Setup
 
 * [Installation](setup/installation/README.md)
+  * [Platforms](setup/installation/platforms/README.md)
+    * [Docker](setup/installation/platforms/docker.md)
+  * [Package Managers](setup/installation/package-managers/README.md)
+    * [APT](setup/installation/package-managers/apt.md)
+    * [Homebrew](setup/installation/package-managers/homebrew.md)
+    * [YUM](setup/installation/package-managers/yum.md)
   * [Operating Systems](setup/installation/operating-systems/README.md)
+    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
     * [CentOS](setup/installation/operating-systems/centos.md)
     * [Debian](setup/installation/operating-systems/debian.md)
     * [MacOS](setup/installation/operating-systems/macos.md)
+    * [RHEL](setup/installation/operating-systems/rhel.md)
     * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
-  * [Platforms](setup/installation/platforms/README.md)
-    * [Docker](setup/installation/platforms/docker.md)
-  * [Build From Source](setup/installation/build-from-source.md)
+  * [From Archives](setup/installation/from-archives.md)
+  * [From Source](setup/installation/from-source.md)
 * [Getting Started](setup/getting-started/README.md)
   * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
 * [Deployment](setup/deployment/README.md)
@@ -71,22 +78,19 @@
     * [vector sink](usage/configuration/sinks/vector.md)
   * [Specification](usage/configuration/specification.md)
 * [Administration](usage/administration/README.md)
-  * [CLI](usage/administration/cli.md)
-  * [Monitoring](usage/administration/monitoring.md)
-  * [Process Management](usage/administration/process-management.md)
-  * [Reloading](usage/administration/reloading.md)
   * [Starting](usage/administration/starting.md)
+  * [Reloading](usage/administration/reloading.md)
   * [Stopping](usage/administration/stopping.md)
+  * [Monitoring](usage/administration/monitoring.md)
+  * [Tuning](usage/administration/tuning.md)
   * [Updating](usage/administration/updating.md)
-  * [Validating Configuration](usage/administration/validating-configuration.md)
+  * [Env Vars](usage/administration/env-vars.md)
 * [Guides](usage/guides/README.md)
-  * [Monitoring Guide](usage/guides/monitoring.md)
   * [Troubleshooting Guide](usage/guides/troubleshooting.md)
-  * [Vector To Vector Guide](usage/guides/vector-to-vector-guide.md)
 
 ## Resources
 
-* [Community](https://vectorproject.io/community/)
+* [Community](https://vector.dev/community/)
 * [Download](https://github.com/timberio/vector/releases)
 * [Github Repo](https://github.com/timberio/vector)
 * [Roadmap](https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open)
@@ -95,4 +99,6 @@
 
 * [Conventions](meta/conventions.md)
 * [Glossary](meta/glossary.md)
+
+
 

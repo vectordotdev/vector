@@ -61,7 +61,7 @@ class Sink < Component
     }
 
     buffer_options["num_items"] = {
-      "description" => "Only relevant when `type` is `memory`. The maximum number of [events][event] allowed in the buffer.",
+      "description" => "Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.",
       "default" => 500,
       "type" => "int"
     }
@@ -91,15 +91,15 @@ class Sink < Component
           Vector checks for AWS credentials in the following order:
 
           1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-          ​2. [`credential_process` command][aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-          ​3. [AWS credentials file][aws_credentials_file], usually located at `~/.aws/credentials`.
-          4. ​[IAM instance profile][iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
+          ​2. [`credential_process` command][url.aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
+          ​3. [AWS credentials file][url.aws_credentials_file], usually located at `~/.aws/credentials`.
+          4. ​[IAM instance profile][url.iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
 
-          If credentials are not found the [healtcheck](#healthchecks) will fail and an error will be [logged][monitoring_logs].
+          If credentials are not found the [healtcheck](#healthchecks) will fail and an error will be [logged][docs.monitoring_logs].
 
           #### Obtaining an access key
 
-          In general, we recommend using instance profiles/roles whenever possible. In cases where this is not possible you can generate an AWS access key for any user within your AWS account. AWS provides a [detailed guide][aws_access_keys] on how to do this.
+          In general, we recommend using instance profiles/roles whenever possible. In cases where this is not possible you can generate an AWS access key for any user within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on how to do this.
           EOF
       })
     end
@@ -108,7 +108,7 @@ class Sink < Component
       "title" => "Buffers",
       "body" =>
         <<~EOF
-        Vector couples [buffers](buffer.md) with each sink, this offers [a number of advantages](buffer.md#coupled-with-sinks) over a single shared global buffer. In general, you should [configure your sink's buffer](buffer.md) to exceed the `batch_size`. This is especially true when using [on-disk](buffer.md#in-memory-or-on-disk) buffers, as it ensures data is not lost in the event of restarts.
+        Vector couples buffers with each sink, this offers a number of advantages over a single shared global buffer. In general, you should configure your sink's buffer to exceed the `batch_size`. This is especially true when using on-disk buffers, as it ensures data is not lost in the event of restarts.
 
         #### Buffer Types
 
@@ -169,11 +169,11 @@ class Sink < Component
     healthcheck_body =
       if @options.respond_to?("healthcheck_uri")
         <<~EOF
-        If the `healthcheck_uri` option is provided, Vector will issue a request to this URI to determine the service's health before initializing the sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector.
+        If the `healthcheck_uri` option is provided, Vector will issue a request to this URI to determine the service's health before initializing the sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][docs.starting] Vector.
         EOF
       else
         <<~EOF
-        Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][starting] Vector:
+        Vector will perform a simple health check against the underlying service before initializing this sink. This ensures that the service is reachable. You can require this check with the `--require-healthy` flag upon [starting][docs.starting] Vector:
 
         ```bash
         vector --config /etc/vector/vector.toml --require-healthy
@@ -202,7 +202,7 @@ class Sink < Component
   def compression_description(compression)
     case compression
     when "gzip"
-      "The payload will be compressed in [Gzip][gzip] format before being sent."
+      "The payload will be compressed in [Gzip][url.gzip] format before being sent."
     when "none"
       "The payload will not compressed at all."
     else
@@ -228,7 +228,7 @@ class Sink < Component
   def plural_write_verb
     case write_style
     when "batching"
-      "batches and flushes"
+      "batches"
     when "streaming"
       "streams"
     else

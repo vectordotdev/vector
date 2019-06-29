@@ -14,7 +14,7 @@ A binary refers to the static binary that Vector compiles to.
 
 ## Buffer
 
-A buffer refers to an ordered queue of events that is coupled with a sink. You can learn more about buffers in the [`*.buffers`](../usage/configuration/sinks/buffer.md) section.
+A buffer refers to an ordered queue of events that is coupled with a sink.
 
 ## Configuration
 
@@ -87,4 +87,6 @@ Config TOML
 ## Use Case
 
 ## Vector
+
+
 

@@ -1,7 +1,7 @@
 # `aws_s3` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `aws_s3` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/aws_s3
+# Docs: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 
 [sinks.my_aws_s3_sink]
   # REQUIRED - General

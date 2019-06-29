@@ -1,7 +1,7 @@
 # `console` Sink Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `console` sink
-# Docs: https://docs.vectorproject.io/usage/configuration/sinks/console
+# Docs: https://docs.vector.dev/usage/configuration/sinks/console
 
 [sinks.my_console_sink]
   # REQUIRED - General

@@ -1,6 +1,6 @@
 # Correctness
 
-This page demonstrates behavior correctness. Like our [performance tests](performance.md), our correct tests use the same Vector [test harness](https://github.com/timberio/vector-test-harness). You can click on the test, if applicable, to access the test's source and learn more about the test itself. This is by no means comprehensive and we plan to expand the tests over time
+This page demonstrates behavior correctness. Like our [performance tests][docs.performance], our correct tests use the same Vector [test harness](https://github.com/timberio/vector-test-harness). You can click on the test, if applicable, to access the test's source and learn more about the test itself. This is by no means comprehensive and we plan to expand the tests over time
 
 ## Tests
 
@@ -20,3 +20,5 @@ This page demonstrates behavior correctness. Like our [performance tests](perfor
 
 You can learn more about how our correctness tests work by clicking on each test or viewing the `README` in the test hardness repo.
 
+
+[docs.performance]: docs/performance.md

@@ -1,7 +1,7 @@
 # `regex_parser` Transform Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `regex_parser` transform
-# Docs: https://docs.vectorproject.io/usage/configuration/transforms/regex_parser
+# Docs: https://docs.vector.dev/usage/configuration/transforms/regex_parser
 
 [transforms.my_regex_parser_transform]
   # REQUIRED - General

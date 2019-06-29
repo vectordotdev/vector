@@ -7,7 +7,7 @@ labels: Type: Enhancement
 <!--
 Hi there,
 
-Thank you for opening an issue. Please note that we try to keep the Vector issue tracker reserved for bug reports and feature requests. For general usage questions, please see: https://vectorproject.io/community.
+Thank you for opening an issue. Please note that we try to keep the Vector issue tracker reserved for bug reports and feature requests. For general usage questions, please see: https://vector.dev/community.
 -->
 
 ### Current Vector Version

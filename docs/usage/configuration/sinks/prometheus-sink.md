@@ -78,3 +78,5 @@ The `prometheus` sink exposes prometheus metrics data via the configured `addres
 * [Source code](https://github.com/timberio/vector/blob/master/src/sinks/prometheus.rs)
 * [Issues](https://github.com/timberio/vector/labels/Sink%3A%20Prometheus)
 
+
+

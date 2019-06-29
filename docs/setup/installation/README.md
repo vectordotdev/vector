@@ -6,9 +6,8 @@ description: Install Vector on your OS or platform
 
 Vector compiles to a single static binary, making it simple to install.
 There is no runtime and there are no dependencies. Below are the various
-[operating systems](#operating-systems) and [platforms](#platforms) we provide
-instructions for. Alternatively, you can
-[build Vector directly from source][build_from_source].
+[platforms](#platforms), [operating systems](#operating-systems), other
+installation methods we support.
 
 ## Platforms
 
@@ -24,9 +23,11 @@ instructions for. Alternatively, you can
 
 {% page-ref page="operating-systems/ubuntu.md" %}
 
-## Source
+## Other
 
-{% page-ref page="build-from-source.md" %}
+{% page-ref page="from-archives.md" %}
+
+{% page-ref page="from-source.md" %}
 
 
-[build_from_source]: build-from-source.md
+

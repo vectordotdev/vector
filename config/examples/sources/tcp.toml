@@ -1,7 +1,7 @@
 # `tcp` Source Example
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `tcp` source
-# Docs: https://docs.vectorproject.io/usage/configuration/sources/tcp
+# Docs: https://docs.vector.dev/usage/configuration/sources/tcp
 
 [sources.my_tcp_source]
   # REQUIRED - General
