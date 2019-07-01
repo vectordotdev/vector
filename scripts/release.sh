@@ -41,7 +41,20 @@ package_cloud push timberio/packages/el/6 target/artifacts/*.rpm
 package_cloud push timberio/packages/el/7 target/artifacts/*.rpm
 
 #
+# Github
+#
+
+grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "target/artifacts/*"
+
+#
+# Homebrew
+#
+
+# scripts/release/release_homebrew.sh
+
+#
 # Docker
+# Install this last since the build process depends on the above.
 #
 
 docker build -t timberio/vector:$VERSION distribution/docker
@@ -54,15 +67,3 @@ docker push timberio/vector:$VERSION
 docker push timberio/vector-slim:$VERSION
 docker push timberio/vector:latest
 docker push timberio/vector-slim:latest
-
-#
-# Github
-#
-
-grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "target/artifacts/*"
-
-#
-# Homebrew
-#
-
-# scripts/release/release_homebrew.sh
