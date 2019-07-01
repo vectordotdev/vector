@@ -256,7 +256,7 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - Fields
+  # REQUIRED - Fields
   [transforms.add_fields.fields]
 
     # A key/value pair representing the new field to be added. Accepts all
@@ -276,17 +276,11 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The target field to compare against the `value`.
-  #
-  # * no default
   field = "file"
 
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
-  #
-  # * no default
   value = "/var/log/nginx.log"
 
 [transforms.grok_parser]
@@ -300,6 +294,9 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
+  # The Grok pattern
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+
   # OPTIONAL - General
 
   # If `true` will drop the `field` after parsing.
@@ -311,11 +308,6 @@ data_dir = "/var/lib/vector"
   #
   # * default: message
   field = "message"
-
-  # The Grok pattern
-  #
-  # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
 [transforms.json_parser]
   # REQUIRED - General
@@ -352,17 +344,7 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
-  # A list of directories search when loading a Lua file via the `require`
-  # function.
-  #
-  # * no default
-  search_dirs = ["/etc/vector/lua"]
-
   # The inline Lua source to evaluate.
-  #
-  # * no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -374,6 +356,15 @@ data_dir = "/var/lib/vector"
     event["host"] = hostname
   end
   """
+
+
+  # OPTIONAL - General
+
+  # A list of directories search when loading a Lua file via the `require`
+  # function.
+  #
+  # * no default
+  search_dirs = ["/etc/vector/lua"]
 
 [transforms.regex_parser]
   # REQUIRED - General
@@ -417,11 +408,7 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The field names to drop.
-  #
-  # * no default
   fields = ["field1", "field2"]
 
 [transforms.sampler]
@@ -460,6 +447,9 @@ data_dir = "/var/lib/vector"
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
+  # The field names assigned to the resulting tokens, in order.
+  field_names = ["timestamp", "level", "message"]
+
   # OPTIONAL - General
 
   # If `true` the `field` will be dropped after parsing.
@@ -471,11 +461,6 @@ data_dir = "/var/lib/vector"
   #
   # * default: message
   field = "message"
-
-  # The field names assigned to the resulting tokens, in order.
-  #
-  # * no default
-  field_names = ["timestamp", "level", "message"]
 
 # ------------------------------------------------------------------------------
 # Sinks

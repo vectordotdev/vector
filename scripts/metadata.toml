@@ -827,6 +827,7 @@ While unrealistic, this example demonstrates the various accepted \
 
 [transforms.add_fields.options.fields]
 type = "table"
+null = false
 description = """\
 A table of key/value pairs representing the keys to be added to the \
 event.\
@@ -928,11 +929,13 @@ resources = []
 [transforms.field_filter.options.field]
 type = "string"
 examples = ["file"]
+null = false
 description = "The target field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
 examples = ["/var/log/nginx.log"]
+null = false
 description = """\
 If the value of the specified `field` matches this value then the event \
 will be permitted, otherwise it is dropped.\
@@ -978,6 +981,7 @@ The field to execute the `pattern` against. Must be a `string` value.\
 [transforms.grok_parser.options.pattern]
 type = "string"
 examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
+null = false
 description = "The [Grok pattern][url.grok_patterns]"
 
 [[transforms.grok_parser.sections]]
@@ -1194,6 +1198,7 @@ if event["host"] == nil then
 end\
 """
 ]
+null = false
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
@@ -1383,6 +1388,7 @@ output_types = ["log", "metric"]
 [transforms.remove_fields.options.fields]
 type = "[string]"
 examples = [["field1", "field2"]]
+null = false
 description = "The field names to drop."
 
 # ------------------------------------------------------------------------------
@@ -1481,6 +1487,7 @@ description = "The field to tokenize."
 [transforms.tokenizer.options.field_names]
 type = "[string]"
 examples = [["timestamp", "level", "message"]]
+null = false
 description = "The field names assigned to the resulting tokens, in order."
 
 [transforms.tokenizer.options.drop_field]

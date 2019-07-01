@@ -27,7 +27,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   type = "add_fields" # must be: add_fields
   inputs = ["my-source-id"]
 
-  # OPTIONAL - Fields
+  # REQUIRED - Fields
   [transforms.my_add_fields_transform.fields]
     new_field = "new field value"
 ```
@@ -39,7 +39,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   type = {"add_fields"}
   inputs = "<string>"
 
-  # OPTIONAL - Fields
+  # REQUIRED - Fields
   [transforms.<transform-id>.fields]
     * = "<string>"
 ```
@@ -57,7 +57,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - Fields
+  # REQUIRED - Fields
   [transforms.add_fields.fields]
 
     # A key/value pair representing the new field to be added. Accepts all
@@ -76,7 +76,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - Fields | | |
+| **REQUIRED** - Fields | | |
 | `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
 
 ## I/O

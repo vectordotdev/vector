@@ -7,8 +7,8 @@
   # REQUIRED - General
   type = "tokenizer" # must be: tokenizer
   inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  field_names = ["timestamp", "level", "message"] # no default

@@ -7,6 +7,4 @@
   # REQUIRED - General
   type = "remove_fields" # must be: remove_fields
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  fields = ["field1", "field2"] # no default
+  fields = ["field1", "field2"]

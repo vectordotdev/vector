@@ -26,11 +26,11 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   # REQUIRED - General
   type = "grok_parser" # must be: grok_parser
   inputs = ["my-source-id"]
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -39,11 +39,11 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   # REQUIRED - General
   type = {"grok_parser"}
   inputs = "<string>"
+  pattern = "<string>"
 
   # OPTIONAL - General
   drop_field = <bool>
   field = "<string>"
-  pattern = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -59,6 +59,9 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
+  # The Grok pattern
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+
   # OPTIONAL - General
 
   # If `true` will drop the `field` after parsing.
@@ -70,11 +73,6 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   #
   # * default: message
   field = "message"
-
-  # The Grok pattern
-  #
-  # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -86,10 +84,10 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "grok_parser"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
-| `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`no default` `example: (see above)` |
 
 ## I/O
 

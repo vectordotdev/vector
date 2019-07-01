@@ -7,7 +7,5 @@
   # REQUIRED - General
   type = "field_filter" # must be: field_filter
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  field = "file" # no default
-  value = "/var/log/nginx.log" # no default
+  field = "file"
+  value = "/var/log/nginx.log"

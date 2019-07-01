@@ -28,10 +28,8 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   # REQUIRED - General
   type = "field_filter" # must be: field_filter
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  field = "file" # no default
-  value = "/var/log/nginx.log" # no default
+  field = "file"
+  value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -40,8 +38,6 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   # REQUIRED - General
   type = {"field_filter"}
   inputs = "<string>"
-
-  # OPTIONAL - General
   field = "<string>"
   value = "<string>"
 ```
@@ -59,17 +55,11 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The target field to compare against the `value`.
-  #
-  # * no default
   field = "file"
 
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
-  #
-  # * no default
   value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
@@ -79,12 +69,10 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "field_filter"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** | | |
-| `field` | `string` | The target field to compare against the `value`.<br />`no default` `example: "file"` |
-| `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`no default` `example: "/var/log/nginx.log"` |
+| `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
+| `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
 
 ## I/O
 

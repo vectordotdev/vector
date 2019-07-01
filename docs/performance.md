@@ -23,5 +23,6 @@ Higher throughput is better. The winner is in **bold**. Click on the test name f
 [url.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [url.tcp_to_blackhole_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_blackhole_performance
 [url.tcp_to_http_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance
+[url.tcp_to_tcp_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance
 [url.test_harness.how-it-works]: https://github.com/timberio/vector-test-harness/#how-it-works
 [url.test_harness]: https://github.com/timberio/vector-test-harness/

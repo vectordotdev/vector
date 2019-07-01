@@ -8,6 +8,6 @@
   type = "add_fields" # must be: add_fields
   inputs = ["my-source-id"]
 
-  # OPTIONAL - Fields
+  # REQUIRED - Fields
   [transforms.my_add_fields_transform.fields]
     new_field = "new field value"

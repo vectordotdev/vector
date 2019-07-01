@@ -7,9 +7,6 @@
   # REQUIRED - General
   type = "lua" # must be: lua
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  search_dirs = ["/etc/vector/lua"] # no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -21,3 +18,7 @@
     event["host"] = hostname
   end
   """
+
+
+  # OPTIONAL - General
+  search_dirs = ["/etc/vector/lua"] # no default

@@ -26,9 +26,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   # REQUIRED - General
   type = "remove_fields" # must be: remove_fields
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  fields = ["field1", "field2"] # no default
+  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -37,8 +35,6 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   # REQUIRED - General
   type = {"remove_fields"}
   inputs = "<string>"
-
-  # OPTIONAL - General
   fields = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
@@ -55,11 +51,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The field names to drop.
-  #
-  # * no default
   fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
@@ -69,11 +61,9 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "remove_fields"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** | | |
-| `fields` | `[string]` | The field names to drop.<br />`no default` `example: ["field1", "field2"]` |
+| `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
 
 ## I/O
 

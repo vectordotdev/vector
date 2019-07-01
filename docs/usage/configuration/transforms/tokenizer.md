@@ -26,11 +26,11 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   # REQUIRED - General
   type = "tokenizer" # must be: tokenizer
   inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  field_names = ["timestamp", "level", "message"] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -39,11 +39,11 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   # REQUIRED - General
   type = {"tokenizer"}
   inputs = "<string>"
+  field_names = ["<string>", ...]
 
   # OPTIONAL - General
   drop_field = <bool>
   field = "<string>"
-  field_names = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -59,6 +59,9 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
+  # The field names assigned to the resulting tokens, in order.
+  field_names = ["timestamp", "level", "message"]
+
   # OPTIONAL - General
 
   # If `true` the `field` will be dropped after parsing.
@@ -70,11 +73,6 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   #
   # * default: message
   field = "message"
-
-  # The field names assigned to the resulting tokens, in order.
-  #
-  # * no default
-  field_names = ["timestamp", "level", "message"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -86,10 +84,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "tokenizer"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
-| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`no default` `example: (see above)` |
 
 ## I/O
 

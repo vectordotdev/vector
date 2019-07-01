@@ -7,8 +7,8 @@
   # REQUIRED - General
   type = "grok_parser" # must be: grok_parser
   inputs = ["my-source-id"]
+  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" # no default

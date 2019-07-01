@@ -28,9 +28,6 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   # REQUIRED - General
   type = "lua" # must be: lua
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
-  search_dirs = ["/etc/vector/lua"] # no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -42,6 +39,10 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
     event["host"] = hostname
   end
   """
+
+
+  # OPTIONAL - General
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -50,10 +51,10 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   # REQUIRED - General
   type = {"lua"}
   inputs = "<string>"
+  source = "<string>"
 
   # OPTIONAL - General
   search_dirs = ["<string>", ...]
-  source = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -69,17 +70,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   # A list of upstream source for more info.
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
-  # A list of directories search when loading a Lua file via the `require`
-  # function.
-  #
-  # * no default
-  search_dirs = ["/etc/vector/lua"]
-
   # The inline Lua source to evaluate.
-  #
-  # * no default
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -91,6 +82,15 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
     event["host"] = hostname
   end
   """
+
+
+  # OPTIONAL - General
+
+  # A list of directories search when loading a Lua file via the `require`
+  # function.
+  #
+  # * no default
+  search_dirs = ["/etc/vector/lua"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -102,9 +102,9 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "lua"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
-| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`no default` `example: (see above)` |
 
 ## I/O
 
