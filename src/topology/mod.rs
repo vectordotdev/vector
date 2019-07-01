@@ -70,7 +70,7 @@ pub fn start_or_validate(
     if success && !exit_after_success {
         Right((running_topology, abort_rx))
     } else {
-        Left(exit_after_success)
+        Left(success && exit_after_success)
     }
 }
 
@@ -227,7 +227,8 @@ impl RunningTopology {
             rt.spawn(healthchecks);
         }
 
-        self.spawn_all(new_config, new_pieces, rt)
+        self.spawn_all(new_config, new_pieces, rt);
+        true
     }
 
     fn spawn_all(
@@ -235,7 +236,7 @@ impl RunningTopology {
         new_config: Config,
         mut new_pieces: Pieces,
         rt: &mut tokio::runtime::Runtime,
-    ) -> bool {
+    ) {
         // Sources
         let (sources_to_remove, sources_to_change, sources_to_add) =
             to_remove_change_add(&self.config.sources, &new_config.sources);
@@ -330,8 +331,6 @@ impl RunningTopology {
         }
 
         self.config = new_config;
-
-        true
     }
 
     fn spawn_sink(
@@ -795,17 +794,14 @@ mod tests {
         old_config.add_sink("out", &[], TcpSinkConfig::new(out_addr.to_string()));
         let mut new_config = old_config.clone();
 
-        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
-
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        assert!(std::net::TcpStream::connect(in_addr).is_err());
+        assert!(topology::start(old_config, &mut rt, false).is_none());
 
         new_config.add_source("in", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()]
             .inputs
             .push("in".to_string());
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        let (topology, _crash) = topology::start(new_config, &mut rt, false).unwrap();
 
         wait_for_tcp(in_addr);
 
@@ -849,9 +845,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
-
-        wait_for(|| std::net::TcpStream::connect(in_addr).is_err());
+        assert!(!topology.reload_config_on_hot(new_config, &mut rt, false));
 
         // Shut down server
         block_on(topology.stop()).unwrap();

@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate tracing;
 
+use exitcode;
 use futures::{future, Future, Stream};
 use std::{
     cmp::{max, min},
@@ -95,8 +96,8 @@ fn main() {
 
         if let Some(threads) = opts.threads {
             if threads < 1 || threads > 4 {
-                error!("thread must be between 1 and 4 (inclusive)");
-                std::process::exit(1);
+                error!("threads must be between 1 and 4 (inclusive)");
+                std::process::exit(exitcode::CONFIG);
             }
         }
 
@@ -108,7 +109,7 @@ fn main() {
         let file = if let Some(file) = open_config(&opts.config_path) {
             file
         } else {
-            std::process::exit(1);
+            std::process::exit(exitcode::CONFIG);
         };
 
         trace!(
@@ -166,7 +167,12 @@ fn main() {
 
         let result = topology::start_or_validate(config, &mut rt, exit_after, require_healthy);
         result.as_ref().left().map(|success| {
-            let exit_code = if *success { 0 } else { 1 };
+            let exit_code = if *success {
+                exitcode::OK
+            } else {
+                exitcode::CONFIG
+            };
+
             std::process::exit(exit_code);
         });
 
@@ -252,7 +258,7 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Config {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
-            std::process::exit(1);
+            std::process::exit(exitcode::CONFIG);
         }
         Ok(config) => {
             return config;

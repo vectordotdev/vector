@@ -290,33 +290,29 @@ fn bad_s3_region() {
 fn warnings() {
     let warnings = load(
         r#"
-        [sources.in]
+        [sources.in1]
         type = "tcp"
         address = "127.0.0.1:1235"
 
+        [sources.in2]
+        type = "tcp"
+        address = "127.0.0.1:1236"
+
         [transforms.sampler]
         type = "sampler"
-        inputs = []
+        inputs = ["in1"]
         rate = 10
         pass_list = ["error"]
 
         [sinks.out]
         type = "tcp"
-        inputs = []
+        inputs = ["sampler"]
         address = "127.0.0.1:9999"
       "#,
     )
     .unwrap();
 
-    assert_eq!(
-        warnings,
-        vec![
-            "Sink \"out\" has no inputs",
-            "Transform \"sampler\" has no inputs",
-            "Transform \"sampler\" has no outputs",
-            "Source \"in\" has no outputs",
-        ]
-    )
+    assert_eq!(warnings, vec!["Source \"in2\" has no outputs",])
 }
 
 #[test]
