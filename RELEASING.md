@@ -30,16 +30,11 @@ process is dependent on the version change.
 
 ### Major/Minor Releases
 
-1. Switch to the `master` branch, this should be reflective of the new version's changes.
-2. Update the `version` key in [`/Cargo.toml`] and run `cargo build` to get the version bump in the `Cargo.lock` file.
-3. Update the [`/CHANGELOG.md`] header to reflect the new version `vMAJOR.MINOR.0 - 2019-05-02`
-4. Commit the changes above with message `"Release vMAJOR.MINOR.PATCH"`
-5. Create a new tag named `vMAJOR.MINOR.PATCH`
-6. Push the new tag.
-7. Update the [`/CHANGELOG.md`] header to reflect the new upcoming version `vNEW_MAJOR.NEW_MINOR-dev`
-8. Commit the changes above with message `"Start vNEW_MAJOR.NEW_MINOR+1"`
-9. [All done](https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp)
+Run:
 
+```bash
+make prepare-release
+```
 
 [All done]: https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp
 [`/Cargo.toml`]: /Cargo.toml
