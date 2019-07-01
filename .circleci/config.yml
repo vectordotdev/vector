@@ -64,7 +64,7 @@ jobs:
   test-stable:
     resource_class: xlarge
     docker:
-      - image: timberiodev/vector-tester:latest
+      - image: rust:latest
         environment:
           TZ: "Australia/Brisbane"
           RUST_BACKTRACE: full
@@ -94,9 +94,7 @@ jobs:
       - checkout
       - run:
           name: Test
-          command: |
-            echo $TZ
-            make test
+          command: make test
       - store_test_results:
           path: ./test-results
 
