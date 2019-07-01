@@ -66,7 +66,6 @@ jobs:
     docker:
       - image: rust:latest
         environment:
-          TZ: "Australia/Brisbane"
           RUST_BACKTRACE: full
           AWS_ACCESS_KEY_ID: "fake-aws-key"
           AWS_SECRET_ACCESS_KEY: "fake-aws-key"
