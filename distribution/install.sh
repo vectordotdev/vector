@@ -56,9 +56,24 @@ main() {
 
     local _package_manager=$(get_package_manager)
 
+    local prompt=yes
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -y)
+                prompt=no
+                ;;
+            *)
+                ;;
+        esac
+    done
+
     # Confirm with the user before proceeding to install Vector through a
     # package manager. Otherwise, we install from an archive.
-    if [ -n "$_package_manager" ]; then
+    if [ "$prompt" = "yes" ] && [ -n "$_package_manager" ]; then
         echo "$_prompt How would you like to install vector?"
         echo ""
         echo "$_indent 1) Through the $_package_manager package manger (recommended)"
