@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_remove_fields_transform]
   # REQUIRED - General
@@ -29,7 +29,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -38,7 +38,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   fields = ["<string>", ...
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.remove_fields]
   # REQUIRED - General
@@ -65,9 +65,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
 
-## I/O
 
-The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events.
 
 
 

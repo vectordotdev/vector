@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_tokenizer_transform]
   # REQUIRED - General
@@ -43,7 +43,7 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
     timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -57,10 +57,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 
   # OPTIONAL - Types
   [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|<strftime-format>"}
+    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.tokenizer]
   # REQUIRED - General
@@ -92,10 +92,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   [transforms.tokenizer.types]
 
     # A definition of mapped field types. They key is the field name and the value
-    # is the type. These should coincide with the `field_names` option.
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
     #
     # * no default
-    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    # * enum: string, int, float, bool, timestamp|strftime
     status = "int"
     duration = "float"
     success = "bool"
@@ -119,12 +119,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. These should coincide with the `field_names` option.
-<br />`no default` `enum: "string", "int", "float", "bool", "timestamp|<strftime-format>"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
-## I/O
+## Examples
 
-The `tokenizer` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
 
 
 Given the following log line:
@@ -142,7 +140,7 @@ Given the following log line:
 And the following configuration:
 
 {% code-tabs %}
-{% code-tabs-item title="/var/log/rails.log" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.<transform-id>]
 type = "tokenizer"
@@ -172,6 +170,7 @@ A few things to note about the output:
 2. The `ident` field was dropped since it contained a `"-"` value.
 3. All values are strings, we have plans to add type coercion.
 4. [Special wrapper characters](#special-characters) were dropped, such as wrapping `[...]` and `"..."` characters.
+
 
 
 
@@ -228,3 +227,4 @@ Finally, consider the following alternatives:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

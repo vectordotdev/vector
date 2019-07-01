@@ -1,5 +1,5 @@
 ---
-description: transform events with a full embedded [Lua][url.lua] engine
+description: transform events with a full embedded Lua engine
 ---
 
 <!---
@@ -19,10 +19,10 @@ The `lua` transform is in beta. Please see the current [enhancements](https://gi
 {% endhint %}
 The `lua` transforms accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_lua_transform]
   # REQUIRED - General
@@ -45,7 +45,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -57,7 +57,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   search_dirs = ["<string>", ...
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.lua]
   # REQUIRED - General
@@ -106,15 +106,14 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 | **OPTIONAL** | | |
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
 
-## I/O
-
-The `lua` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
+## Examples
 
 
-Here are a few example Lua scripts that demonstrate working with the [`event` variable](#global-variables). You can pass these examples to the `source` option:
 
-{% code-tabs %}
-{% code-tabs-item title="add_fields.lua" %}
+{% tabs %}
+{% tab title="Add fields" %}
+Add a field to an event. Supply this as a the `source` value:
+
 ```lua
 # Add root level field
 event["new_field"] = "new value"
@@ -122,8 +121,11 @@ event["new_field"] = "new value"
 # Add nested field
 event["parent.child"] = "nested value"
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="remove_fields.lua" %}
+
+{% endtab %}
+{% tab title="Remove fields" %}
+Remove a field from an event. Supply this as a the `source` value:
+
 ```lua
 # Remove root level field
 event["field"] = nil
@@ -131,14 +133,22 @@ event["field"] = nil
 # Remove nested field
 event["parent.child"] = nil
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="drop_event.lua" %}
+
+{% endtab %}
+{% tab title="Drop event" %}
+Drop an event entirely. Supply this as a the `source` value:
+
 ```lua
-# To drop an event entirely
-event = nil
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+
+{% endtab %}
+{% endtabs %}
+
 
 
 

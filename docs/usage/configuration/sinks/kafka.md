@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol].
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -150,9 +150,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
 
-The `kafka` sink streams [`log`][docs.log_event] to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. The encoding of each event is dictated by the `encoding` option.
 
 
 

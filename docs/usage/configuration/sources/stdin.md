@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `stdin` source continuously ingests [`log`][docs.log_event] events through standard input (STDIN).
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -85,7 +85,7 @@ The `stdin` source continuously ingests [`log`][docs.log_event] events through s
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
 
-## I/O
+## Examples
 
 
 
@@ -114,6 +114,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
 
 
 

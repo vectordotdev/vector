@@ -19,7 +19,7 @@ The `aws_s3` sink is in beta. Please see the current [enhancements](https://gith
 {% endhint %}
 The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -254,7 +254,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batching](#batching) for more info.<br />`default: 300` `unit: bytes` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
-| `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported.  See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
+| `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
 | `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported.  See [Object Naming](#object-naming) and [Partitioning](#partitioning) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
 | `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
@@ -272,7 +272,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
+## Examples
 
 The `aws_s3` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). The encoding is dictated by the `encoding` option. For example:
 
@@ -301,6 +301,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
     "StreamName": "<stream_name>"
 }
 ```
+
 
 
 

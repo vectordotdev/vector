@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `syslog` source continuously ingests [`log`][docs.log_event] events through the Syslog 5424 protocol.
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -115,7 +115,7 @@ The `syslog` source continuously ingests [`log`][docs.log_event] events through 
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
 
-## I/O
+## Examples
 
 
 
@@ -147,6 +147,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 Vector only extracts the `"timestamp"` and `"host"` fields and leaves the `"message"` in-tact. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
 
 
 

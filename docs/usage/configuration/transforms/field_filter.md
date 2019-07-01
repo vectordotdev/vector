@@ -19,10 +19,10 @@ The `field_filter` transform is in beta. Please see the current [enhancements](h
 {% endhint %}
 The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_field_filter_transform]
   # REQUIRED - General
@@ -32,7 +32,7 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -42,7 +42,7 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   value = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.field_filter]
   # REQUIRED - General
@@ -74,9 +74,7 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
 | `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
 
-## I/O
 
-The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events.
 
 
 

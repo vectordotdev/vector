@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `add_fields` transforms accepts [`log`][docs.log_event] events and allows you to add one or more fields.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_add_fields_transform]
   # REQUIRED - General
@@ -35,7 +35,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
     new_bool_field = true
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -47,7 +47,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
     * = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.add_fields]
   # REQUIRED - General
@@ -85,15 +85,14 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 | **REQUIRED** - Fields | | |
 | `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
 
-## I/O
+## Examples
 
-The `add_fields` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
 
 
 Given the following configuration:
 
 {% code-tabs %}
-{% code-tabs-item title="/var/log/rails.log" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform]
   type = "add_fields"
@@ -133,6 +132,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 {% endcode-tabs %}
 
 While unrealistic, this example demonstrates the various accepted [types][docs.config_value_types].
+
 
 
 

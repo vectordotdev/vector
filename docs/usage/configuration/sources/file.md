@@ -19,7 +19,7 @@ The `file` source is in beta. Please see the current [enhancements](https://gith
 {% endhint %}
 The `file` source continuously ingests [`log`][docs.log_event] events through one or more local files.
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -127,7 +127,7 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 | `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
-## I/O
+## Examples
 
 
 
@@ -157,6 +157,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 {% endcode-tabs %}
 
 The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+
 
 
 

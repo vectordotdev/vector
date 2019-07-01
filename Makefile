@@ -32,8 +32,26 @@ package-deb: ## Create a .deb package from artifacts created via `build`
 package-rpm: ## Create a .rpm package from artifacts created via `build`
 	@scripts/package-rpm.sh
 
-release: ## Release artifacts produces by build
+release: ## Interactive script that releases the next version (major or minor)
 	@scripts/release.sh
+
+release-deb: ## Release .deb via Package Cloud
+	@scripts/release-deb.sh
+
+release-docker: ## Release to Docker Hub
+	@scripts/release-docker.sh
+
+release-github: ## Release to Github
+	@scripts/release-github.sh
+
+release-homebrew: ## Release to timberio Homebrew tap
+	@scripts/release-homebrew.sh
+
+release-rpm: ## Release .rpm via Package Cloud
+	@scripts/release-rpm.sh
+
+release-s3: ## Release artifacts to S3
+	@scripts/release-s3.sh
 
 test: ## Run tests
 	@cargo test --all --features docker -- --test-threads 4

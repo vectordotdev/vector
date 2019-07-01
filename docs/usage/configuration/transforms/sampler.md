@@ -19,10 +19,10 @@ The `sampler` transform is in beta. Please see the current [enhancements](https:
 {% endhint %}
 The `sampler` transforms accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_sampler_transform]
   # REQUIRED - General
@@ -34,7 +34,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   rate = ["field1", "field2"] # no default
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -46,7 +46,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   rate = <int>
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.sampler]
   # REQUIRED - General
@@ -87,9 +87,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 | `rate` | `int` | The maximum number of events allowed per second.<br />`no default` `example: ["field1", "field2"]` |
 
-## I/O
 
-The `sampler` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
 
 
 

@@ -19,7 +19,7 @@ The `aws_kinesis_streams` sink is in beta. Please see the current [enhancements]
 {% endhint %}
 The `aws_kinesis_streams` sink batch and flushes [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -217,7 +217,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][docs.log_event] events 
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
+## Examples
 
 The `aws_kinesis_streams` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
 
@@ -246,6 +246,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
     "StreamName": "<stream_name>"
 }
 ```
+
 
 
 

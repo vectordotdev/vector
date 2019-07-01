@@ -1,5 +1,5 @@
 ---
-description: parse a field's value with a [Regular Expression][url.regex]
+description: parse a field's value with a Regular Expression
 ---
 
 <!---
@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex].
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_regex_parser_transform]
   # REQUIRED - General
@@ -44,7 +44,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
     timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -59,10 +59,10 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 
   # OPTIONAL - Types
   [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|<strftime-format>"}
+    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.regex_parser]
   # REQUIRED - General
@@ -99,10 +99,10 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   [transforms.regex_parser.types]
 
     # A definition of mapped field types. They key is the field name and the value
-    # is the type.
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
     #
     # * no default
-    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    # * enum: string, int, float, bool, timestamp|strftime
     status = "int"
     duration = "float"
     success = "bool"
@@ -127,11 +127,63 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp|<strftime-format>"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
-## I/O
+## Examples
 
-The `regex_parser` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
+
+
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "message": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.<transform-id>]
+  type = "regex_parser"
+  field = "message"
+  regex = '^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+
+[transforms.<transform-id>.types]
+  bytes_int = "int"
+  timestamp = "timestamp|%m/%d/%Y:%H:%M:%S %z"
+  status = "int"
+  bytes_out = "int"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "bytes_in": 5667,
+  "host": "5.86.210.12",
+  "user_id": "zieme4647",
+  "timestamp": <19/06/2019:17:20:49 -0400>,
+  "message": "GET /embrace/supply-chains/dynamic/vertical",
+  "status": 201,
+  "bytes": 20574
+}
+```
+
+Things to note about the output:
+
+1. The `message` field was overwritten.
+2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
+
 
 
 
@@ -246,3 +298,4 @@ Finally, consider the following alternatives:
 [url.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

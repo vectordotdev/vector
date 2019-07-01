@@ -26,7 +26,7 @@ module Docs
     def generate
       content = <<~EOF
         ---
-        description: Continuously accept #{source.output_types.to_sentence} events through #{source.through_description}
+        description: Continuously accept #{source.output_types.to_sentence} events through #{remove_markdown_links(source.through_description)}
         ---
 
         #{warning}
@@ -38,11 +38,11 @@ module Docs
         #{beta(source)}
         The `#{source.name}` source continuously ingests #{event_type_links(source.output_types).to_sentence} events through #{source.through_description}.
 
-        ## Example
+        ## Config File
 
         {% code-tabs %}
         {% code-tabs-item title="vector.toml (example)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate(
           "sources.my_#{source.name}_source",
           :examples
@@ -50,12 +50,12 @@ module Docs
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (schema)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate("sources.<source-id>", :schema)}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (specification)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate("sources.#{source.name}", :spec)}
         ```
         {% endcode-tabs-item %}
@@ -65,7 +65,7 @@ module Docs
 
         #{options_table_generator.generate}
         
-        #{outputs_section(source)}
+        #{example_section(source)}
 
         #{guides_section(source)}
 

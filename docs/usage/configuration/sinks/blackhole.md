@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -116,9 +116,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
 
-The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_event] to a blackhole that simply discards data, designed for testing and benchmarking purposes. The encoding of each event is dictated by the `encoding` option.
 
 
 

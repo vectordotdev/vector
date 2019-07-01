@@ -101,7 +101,7 @@ jobs:
   # Building - Archives
   #
 
-  build-x86_64-apple-darwin:
+  build-x86_64-apple-darwin-archive:
     resource_class: large
     macos:
       xcode: "9.0"
@@ -115,13 +115,13 @@ jobs:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
             export VERSION=$(make version)
-            make build
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-unknown-linux-gnu:
+  build-x86_64-unknown-linux-gnu-archive:
     docker:
       - image: timberiodev/vector-builder-x86_64-unknown-linux-gnu:latest
     resource_class: xlarge
@@ -131,7 +131,7 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build
+            make build-archive
       # We _must_ build the deb package on the same machine that created
       # the binary. `cargo deb` performs dependency calculation via `ldd`
       # and this process must happen on the same machine it was built in
@@ -290,10 +290,23 @@ jobs:
           command: vector --version
 
   #
-  # Releasing
+  # Release
   #
 
-  release:
+  release-deb:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release deb
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-deb
+
+  release-docker:
     docker:
       - image: timberiodev/vector-releaser:latest
     steps:
@@ -302,20 +315,76 @@ jobs:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Release
+          name: Release Docker
           command: |
             export VERSION=$(make version)
             echo "Releasing $VERSION..."
-            make release
+            make release-docker
 
-test-workflow-filters: &test-workflow-filters
+  release-github:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release Github
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-github
+
+  release-homebrew:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release Homebrew
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-homebrew
+
+  release-rpm:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release Github
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-rpm
+
+  release-s3:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release S3
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-s3
+
+#
+# Workflow Macros
+#
+
+test-filters: &test-filters
   filters:
     branches:
       only: /.*/
     tags:
-      ignore: /.*/
+      only: /.*/
 
-compile-workflow-filters: &compile-workflow-filters
+release-workflow-filters: &release-workflow-filters
   filters:
     branches:
       only: master
@@ -329,9 +398,35 @@ tag-release-workflow-filters: &tag-release-workflow-filters
     tags:
       only: /v.*/
 
+build-requires: &build-requires
+  requires:
+    - rustfmt
+    - check-stable
+    - test-stable
+
+package-requires: &package-requires
+  requires:
+    - build-x86_64-unknown-linux-gnu-archive
+    - build-x86_64-apple-darwin-archive
+
 verify-requires: &verify-requires
   requires:
     - package-rpm
+
+release-requires: &release-requires
+  requires:
+    - verify-amazon-linux-1
+    - verify-amazon-linux-2
+    - verify-centos-7
+    - verify-deb-8
+    - verify-deb-9
+    - verify-ubuntu-16-04
+    - verify-ubuntu-18-04
+    - verify-ubuntu-19-04
+
+#
+# Workflows
+#
 
 workflows:
   version: 2
@@ -339,60 +434,63 @@ workflows:
   build:
     jobs:
       - rustfmt:
-          <<: *test-workflow-filters
+          <<: *test-filters
       - check-stable:
-          <<: *test-workflow-filters
+          <<: *test-filters
       - test-stable:
-          <<: *test-workflow-filters
-      - build-x86_64-unknown-linux-gnu:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - build-x86_64-apple-darwin:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+          <<: *test-filters
+      - build-x86_64-unknown-linux-gnu-archive:
+          <<: *release-workflow-filters
+          <<: *build-requires
+      - build-x86_64-apple-darwin-archive:
+          <<: *release-workflow-filters
+          <<: *build-requires
       - package-rpm:
-          <<: *tag-release-workflow-filters
-          requires:
-            - build-x86_64-unknown-linux-gnu
-            - build-x86_64-apple-darwin
+          <<: *release-workflow-filters
+          <<: *package-requires
       - verify-amazon-linux-1:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-amazon-linux-2:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-centos-7:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-deb-8:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-deb-9:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-ubuntu-16-04:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-ubuntu-18-04:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
       - verify-ubuntu-19-04:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *verify-requires
-      - release:
+      - release-deb:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-github:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-rpm:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-s3:
+          <<: *release-workflow-filters
+          <<: *release-requires
+      # Installs directly from S3
+      - release-docker:
           <<: *tag-release-workflow-filters
           requires:
-            - verify-amazon-linux-1
-            - verify-amazon-linux-2
-            - verify-centos-7
-            - verify-deb-8
-            - verify-deb-9
-            - verify-ubuntu-16-04
-            - verify-ubuntu-18-04
-            - verify-ubuntu-19-04
+            - release-s3
+      # Installs directly from S3
+      - release-homebrew:
+          <<: *tag-release-workflow-filters
+          requires:
+            - release-s3

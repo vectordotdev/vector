@@ -17,7 +17,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
 {% code-tabs %}
 {% code-tabs-item title="/etc/vector/vector.spec.toml" %}
-```toml
+```coffeescript
 #                                    __   __  __  
 #                                    \ \ / / / /
 #                                     \ V / / /
@@ -404,10 +404,10 @@ data_dir = "/var/lib/vector"
   [transforms.regex_parser.types]
 
     # A definition of mapped field types. They key is the field name and the value
-    # is the type.
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
     #
     # * no default
-    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    # * enum: string, int, float, bool, timestamp|strftime
     status = "int"
     duration = "float"
     success = "bool"
@@ -485,10 +485,10 @@ data_dir = "/var/lib/vector"
   [transforms.tokenizer.types]
 
     # A definition of mapped field types. They key is the field name and the value
-    # is the type. These should coincide with the `field_names` option.
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
     #
     # * no default
-    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    # * enum: string, int, float, bool, timestamp|strftime
     status = "int"
     duration = "float"
     success = "bool"

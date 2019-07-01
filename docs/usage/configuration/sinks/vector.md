@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `vector` sink streams [`log`][docs.log_event] events to another downstream Vector instance.
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -124,9 +124,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
 
-The `vector` sink streams [`log`][docs.log_event] to another downstream Vector instance. The encoding of each event is dictated by the `encoding` option.
 
 
 

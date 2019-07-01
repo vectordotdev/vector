@@ -4,76 +4,127 @@
 #
 # SUMMARY
 #
-#   Releases Vector to S3, APT, YUM, Homebrew, Docker, and Github
+#   A script that handles all of the steps to trigger an release via CI:
+#
+#   1. Updates the CHANGELOG.md to remove the `-dev` mention.
+#   2. Commits the change as "Release vX.X.X"
+#   3. Tags the commit with vX.X.X
+#   4. Creates a new branch for the new minor branch
+#   5. Updates the CHANGELOG.md again with the new version. Ex: vX.X.X-dev
+#   6. Commits the CHANGELOG.md change
+#   7. Pushes everything to origin
+
+#
+# Check
+# Perform various checks to ensure we are not releasing in a bad state.
+#
 
 set -eu
 
-#
-# S3
-#
+current_branch=$(git branch | grep \* | cut -d ' ' -f2)
 
-aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recursive
+if [[ "$current_branch" != "master" ]]; then
+  echo "You must be on the master branch"
+  exit 1
+fi
 
-# Update the "latest" files
-mkdir -p target/latest
-cp -a target/artifacts/. target/latest
-rename -v "s/$VERSION/latest/" target/latest/*
-aws s3 rm --recursive s3://packages.timber.io/vector/latest/
-aws s3 cp "target/latest/" "s3://packages.timber.io/vector/latest/" --recursive
-rm -rf target/latest
+has_unstaged_changes=$(git diff-index --name-only HEAD --)
 
-#
-# Packages
-#
-
-# Debian
-package_cloud push timberio/packages/debian/jessie target/artifacts/*.deb
-package_cloud push timberio/packages/debian/stretch target/artifacts/*.deb
-
-# Ubuntu
-package_cloud push timberio/packages/ubuntu/xenial target/artifacts/*.deb
-package_cloud push timberio/packages/ubuntu/zesty target/artifacts/*.deb
-package_cloud push timberio/packages/ubuntu/bionic target/artifacts/*.deb
-package_cloud push timberio/packages/ubuntu/disco target/artifacts/*.deb
-
-# Enterprise Linux (CentOS, RedHat, Amazon Linux)
-package_cloud push timberio/packages/el/6 target/artifacts/*.rpm
-package_cloud push timberio/packages/el/7 target/artifacts/*.rpm
+if [[ -n "$has_unstaged_changes" ]]; then
+  echo "You have unstaged changes, please commit them first"
+  exit 1
+fi
 
 #
-# Github
+# Determine versions
+# Collect version information and verify that it is correct.
 #
 
-grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "target/artifacts/*"
+previous_version_minor=$(grep -o -E 'v.*\.X' CHANGELOG.md | head -1 | sed 's/^v//g' | sed 's/\.X$//g')
+current_version=$(grep -o -E 'v.*-dev' CHANGELOG.md | head -1 | sed 's/^v//g' | sed 's/-dev$//g')
+current_version_minor=$(echo "$current_version" | cut -d. -f-2)
+
+echo "Current version detected: $current_version"
+echo -n "What's the next version? (ex: 0.4.0 or 1.0.0) "
+
+read new_version
+new_version_minor=$(echo "$new_version" | cut -d. -f-2)
+
+echo ""
+echo "Previous minor version: $previous_version_minor"
+echo "Version to be released: $current_version"
+echo "Next version: $new_version"
+echo ""
+
+echo -n "Does this look right? (y/n) "
+
+while true; do
+  read _choice
+  case $_choice in
+    y) break; ;;
+    n) exit; ;;
+    *) echo "Please enter y or n"; ;;
+  esac
+done
 
 #
-# Homebrew
+# Current version
+# Make changes necessary to lock in the new version
 #
 
-scripts/release/release_homebrew.sh
+# _changelog=$(cat CHANGELOG.md | sed "s/$current_version-dev/$current_version/g")
+# echo "$_changelog" > CHANGELOG.md
+
+# escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
+# _cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version-dev\"/ s/version = \"$escaped_current_version-dev\"/version = \"$escaped_current_version\"/")
+# echo "$_cargo" > cargo.toml
+
+# git commit -am "Release v$current_version"
+# git tag v$current_version
+# git checkout -b v$current_version_minor
+# git checkout master
 
 #
-# Install script
+# New version
+# Bump to the new -dev version.
 #
 
-aws s3api put-object \
-  --bucket "sh.vector.dev" \
-  --key "install.sh" \
-  --body "distribution/install.sh" \
-  --acl "public-read"
+# echo "
+# # Changelog for Vector v$new_version-dev
+
+# All notable changes to this project will be documented in this file.
+
+# The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+# and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+
+# ## v$new_version-dev
+
+# ### Added
+
+# ### Changed
+
+# ### Deprecated
+
+# ### Fixed
+
+# ### Removed
+
+# ### Security
+
+# ## v$current_version_minor.X
+
+# The CHANGELOG for v$current_version_minor.X releases can be found in the [v$current_version_minor branch](https://github.com/timberio/vector/blob/v$current_version_minor/CHANGELOG.md).
+# " > CHANGELOG.md
+
+# _cargo=$(cat cargo.toml | sed "s/version = \"$current_version\"/version = \"$current_version\"/g")
+# echo "$_cargo" > cargo.toml
+
+# git commit -am "Start v$new_version-dev"
 
 #
-# Docker
-# Install this last since the build process depends on the above.
+# Push
 #
 
-docker build -t timberio/vector:$VERSION distribution/docker
-docker build -t timberio/vector-slim:$VERSION distribution/docker/slim
-docker build -t timberio/vector:latest distribution/docker
-docker build -t timberio/vector-slim:latest distribution/docker/slim
-
-docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-docker push timberio/vector:$VERSION
-docker push timberio/vector-slim:$VERSION
-docker push timberio/vector:latest
-docker push timberio/vector-slim:latest
+# git push origin
+# git push -u origin v$current_version_minor
+# git push origin v$current_version

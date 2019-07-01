@@ -185,53 +185,39 @@ class Generator
       REPO_ISSUES_ROOT + '/new?' + params.to_query
     end
 
-    def outputs_section(component, prefix = nil)
-      if component.outputs.length > 1
-        tabs =
-          component.outputs.collect do |output|
-            content =
-              <<~EOF
-              {% tab title="#{output.type}" %}
-              #{output.body}
-              {% endtab %}
-              EOF
+    def example_section(component, prefix = nil)
+      return "" if component.examples.empty?
 
-            content.strip
-          end
+      content =
+        if component.examples.length > 1
+          tabs =
+            component.examples.collect do |example|
+              content =
+                <<~EOF
+                {% tab title="#{example.name}" %}
+                #{example.body}
+                {% endtab %}
+                EOF
 
-        content = 
+              content.strip
+            end
+
           <<~EOF
-          ## I/O
-
-          #{prefix}
-          
           {% tabs %}
           #{tabs.join("\n")}
           {% endtabs %}
           EOF
+        else
+          component.examples.first.body
+        end
 
-        content.strip
-      elsif component.outputs.length > 0
-        content = 
-          <<~EOF
-          ## I/O
+      <<~EOF
+      ## Examples
 
-          #{prefix}
+      #{prefix}
 
-          #{component.outputs.fetch(0).body}
-          EOF
-
-        content.strip
-      else
-        content = 
-          <<~EOF
-          ## I/O
-
-          #{prefix}
-          EOF
-
-        content.strip
-      end
+      #{content.strip}
+      EOF
     end
 
     def editorify(content)

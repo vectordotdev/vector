@@ -1,18 +1,18 @@
 require_relative "component"
 require_relative "field"
-require_relative "output"
+require_relative "example"
 
 class Source < Component
   attr_reader :delivery_guarantee,
-    :outputs,
+    :examples,
     :through_description
 
   def initialize(hash)
     super(hash)
 
     # Init
+
     @delivery_guarantee = hash.fetch("delivery_guarantee")
-    outputs_hashes = hash["outputs"] || []
     @through_description = hash.fetch("through_description")
 
     # delivery_guarantee
@@ -24,10 +24,10 @@ class Source < Component
       )
     end
 
-    # outputs
+    # examples
 
-    @outputs = outputs_hashes.collect do |output_hash|
-      Output.new(output_hash)
+    @examples = (hash["examples"] || []).collect do |example_hash|
+      Example.new(example_hash)
     end
 
     # through_description

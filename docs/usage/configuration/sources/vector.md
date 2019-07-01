@@ -19,7 +19,7 @@ The `vector` source is in beta. Please see the current [enhancements](https://gi
 {% endhint %}
 The `vector` source continuously ingests [`log`][docs.log_event] events through another upstream Vector instance.
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -80,11 +80,7 @@ The `vector` source continuously ingests [`log`][docs.log_event] events through 
 | `address` | `string` | The TCP address to bind to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 
-## I/O
 
-
-
-The `vector` source simply forwards incoming events from other upstream Vector instances, unalterated.
 
 
 

@@ -79,7 +79,8 @@ class OptionsTableGenerator < Generator
             end
 
             if option.enum
-              tags << "`enum: #{option.enum.collect(&:inspect).join(", ")}`"
+              escaped_values = option.enum.collect { |enum| enum.inspect.gsub("|", "\\|") }
+              tags << "`enum: #{escaped_values.join(", ")}`"
             end
 
             if !option.unit.nil?

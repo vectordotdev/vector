@@ -96,7 +96,7 @@ When specifying option types, if the type is enclosed with `[ ]` symbols then th
 
 Within code samples, if word is enclosed with `< >` symbols, this is a variable and it is required. For example:
 
-```coffeescript
+```toml
 [sinks.<sink-id>]
     type = "s3"
 ```
@@ -117,7 +117,7 @@ The entire `[<sink-id>]` variable is optional.
 
 Within code samples, if a word is enclosed with `{ }` symbols, then at least one of the variables listed is required. For example:
 
-```coffeescript
+```toml
 inputs = ["{<source-id> | <transform-id>}"]
 ```
 
@@ -129,7 +129,7 @@ Either `<source-id>` or `<transform-id>` must be supplied. The enclosing `{ }` s
 
 All sources, transforms, and sinks must include comprehensive configuration examples. This means all options must be represented. The example should be formatted as follows:
 
-```coffeescript
+```toml
 # REQUIRED
 inputs = ["{<source-id> | <transform-id>}"] # not relevant for sources
 type = "<type>"

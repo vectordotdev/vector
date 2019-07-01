@@ -1,5 +1,5 @@
 ---
-description: parse a field value with [Grok][url.grok]
+description: parse a field value with Grok
 ---
 
 <!---
@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok].
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_grok_parser_transform]
   # REQUIRED - General
@@ -33,7 +33,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   field = "message" # default
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -46,7 +46,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   field = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.grok_parser]
   # REQUIRED - General
@@ -89,9 +89,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
 
-## I/O
 
-The `grok_parser` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
 
 
 

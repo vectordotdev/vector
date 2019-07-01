@@ -1,5 +1,5 @@
 require_relative "component"
-require_relative "output"
+require_relative "example"
 require_relative "section"
 
 class Sink < Component
@@ -7,7 +7,7 @@ class Sink < Component
 
   attr_reader :delivery_guarantee,
     :input_types,
-    :outputs,
+    :examples,
     :service_limits_url,
     :service_provider,
     :write_style,
@@ -18,7 +18,6 @@ class Sink < Component
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
     @input_types = hash.fetch("input_types")
-    outputs_hashes = hash["outputs"] || []
     @service_limits_url = hash["service_limits_url"]
     @service_provider = hash["service_provider"]
     @write_style = hash.fetch("write_style")
@@ -75,10 +74,10 @@ class Sink < Component
 
     @options.buffer = buffer_option
 
-    # outputs
+    # examples
 
-    @outputs = outputs_hashes.collect do |output_hash|
-      Output.new(output_hash)
+    @examples = (hash["examples"] || []).collect do |example_hash|
+      Example.new(example_hash)
     end
 
     # sections

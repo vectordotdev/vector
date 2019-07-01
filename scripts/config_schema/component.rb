@@ -175,7 +175,7 @@ class Component
 
     if options.types && options.types.type == "table"
       @sections << Section.new({
-        "title" => "Type Coercion Guarantee",
+        "title" => "Type Coercion",
         "body" => "body"
       })
     end

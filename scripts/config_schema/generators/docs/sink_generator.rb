@@ -38,21 +38,21 @@ module Docs
         #{beta(sink)}
         The `#{sink.name}` sink #{sink.write_verb.pluralize} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
 
-        ## Example
+        ## Config File
 
         {% code-tabs %}
         {% code-tabs-item title="vector.toml (example)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate("sinks.my_#{sink.name}_sink", :examples)}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (schema)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate("sinks.<sink-id>", :schema)}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (specification)" %}
-        ```coffeescript
+        ```toml
         #{options_example_generator.generate("sinks.#{sink.name}", :spec)}
         ```
         {% endcode-tabs-item %}
@@ -62,7 +62,7 @@ module Docs
 
         #{options_table_generator.generate}
 
-        #{outputs_section(sink, output_prefix)}
+        #{example_section(sink, example_prefix)}
 
         #{guides_section(sink)}
 
@@ -78,15 +78,15 @@ module Docs
     end
 
     private
-      def output_prefix
+      def example_prefix
         content =
           if sink.batching?
             <<~EOF
-            The #{component_name(sink)} batches #{event_type_links(sink.input_types).to_sentence} up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to #{sink.write_to_description}. The encoding is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
+            The #{component_name(sink)} batches #{event_type_links(sink.input_types).to_sentence} up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to #{sink.write_to_description}. The encoding is dictated by the `encoding` option.#{sink.examples.any? ? " For example:" : ""}
             EOF
           else
             <<~EOF
-            The #{component_name(sink)} streams #{event_type_links(sink.input_types).to_sentence} to #{sink.write_to_description}. The encoding of each event is dictated by the `encoding` option.#{sink.outputs.any? ? " For example:" : ""}
+            The #{component_name(sink)} streams #{event_type_links(sink.input_types).to_sentence} to #{sink.write_to_description}. The encoding of each event is dictated by the `encoding` option.#{sink.examples.any? ? " For example:" : ""}
             EOF
           end
 

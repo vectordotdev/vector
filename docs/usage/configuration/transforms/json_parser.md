@@ -17,10 +17,10 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `json_parser` transforms accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON.
 
-## Example
+## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="example" %}
 ```coffeescript
 [transforms.my_json_parser_transform]
   # REQUIRED - General
@@ -32,7 +32,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
   field = "message" # default
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
+{% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
@@ -44,7 +44,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
   field = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="specification" %}
 ```coffeescript
 [transforms.json_parser]
   # REQUIRED - General
@@ -84,21 +84,49 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`no default` `example: true` |
 | `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
-## I/O
+## Examples
 
-The `json_parser` transform accepts [`log`][docs.log_event] events and outputs [`log`][docs.log_event] events.
 
 
 {% tabs %}
-{% tab title="simple" %}
-
-{% endtab %}
-{% tab title="wrapped" %}
-It is possible to chain `json_parser` transforms to effectively "unwrap"
-nested JSON documents. For example, give this raw log line:
+{% tab title="Simple" %}
+Given the following log event:
 
 ```
-{"message": "{"parent": "{\"child\": \"value2\"}"}"}
+{
+  "message": "{"key": "value"}"
+}
+```
+
+You can parse the JSON with:
+
+```coffeescript
+[transforms.json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "key": "value"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+
+{% endtab %}
+{% tab title="Wrapped" %}
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this log event:
+
+```
+{
+  "message": "{"parent": "{\"child\": \"value2\"}"}"
+}
 ```
 
 You could unwrap the JSON with the following transforms:
@@ -133,6 +161,7 @@ option.
 
 {% endtab %}
 {% endtabs %}
+
 
 
 

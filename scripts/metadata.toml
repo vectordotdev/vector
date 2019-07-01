@@ -88,7 +88,7 @@ file with the following syntax:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
-```coffeescript
+```toml
 [transforms.add_host]
     type = "add_fields"
     
@@ -151,8 +151,8 @@ guides = []
 resources = []
 through_description = "one or more local files"
 
-[[sources.file.outputs]]
-type = "text"
+[[sources.file.examples]]
+name = "Example"
 body = """\
 Given the following input:
 
@@ -340,8 +340,8 @@ output_types = ["metric"]
 resources = []
 through_description = "the StatsD UDP protocol"
 
-[[sources.statsd.outputs]]
-type = "counter"
+[[sources.statsd.examples]]
+name = "Counter"
 body = """\
 Given the following Statsd counter:
 
@@ -365,8 +365,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% endcode-tabs %}
 """
 
-[[sources.statsd.outputs]]
-type = "guage"
+[[sources.statsd.examples]]
+name = "Guage"
 body = """\
 Given the following Statsd guage:
 
@@ -390,8 +390,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% endcode-tabs %}
 """
 
-[[sources.statsd.outputs]]
-type = "set"
+[[sources.statsd.examples]]
+name = "Set"
 body = """\
 Given the following Statsd set:
 
@@ -415,8 +415,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% endcode-tabs %}
 """
 
-[[sources.statsd.outputs]]
-type = "timer"
+[[sources.statsd.examples]]
+name = "Timer"
 body = """\
 Given the following Statsd timer:
 
@@ -455,8 +455,8 @@ guides = []
 resources = []
 through_description = "standard input (STDIN)"
 
-[[sources.stdin.outputs]]
-type = "text"
+[[sources.stdin.examples]]
+name = "Example"
 body = """\
 Given the following input line:
 
@@ -518,8 +518,8 @@ guides = []
 resources = []
 through_description = "the Syslog 5424 protocol"
 
-[[sources.syslog.outputs]]
-type = "text"
+[[sources.syslog.examples]]
+name = "Example"
 body = """\
 Given the following input line:
 
@@ -642,8 +642,8 @@ guides = []
 resources = []
 through_description = "the TCP protocol"
 
-[[sources.tcp.outputs]]
-type = "text"
+[[sources.tcp.examples]]
+name = "Example"
 body = """\
 Given the following input line:
 
@@ -722,13 +722,6 @@ guides = []
 resources = []
 through_description = "another upstream Vector instance"
 
-[[sources.vector.outputs]]
-type = "*"
-body = """\
-The `vector` source simply forwards incoming events from other upstream \
-Vector instances, unalterated.
-"""
-
 [sources.vector.options.address]
 type = "string"
 examples = ["0.0.0.0:9000"]
@@ -776,14 +769,14 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
-[[transforms.add_fields.outputs]]
-type = "*"
+[[transforms.add_fields.examples]]
+name = "Example"
 body = """\
 Given the following configuration:
 
 {% code-tabs %}
-{% code-tabs-item title="/var/log/rails.log" %}
-```coffeescript
+{% code-tabs-item title="vector.toml" %}
+```toml
 [transforms.my_transform]
   type = "add_fields"
   inputs = [...]
@@ -1024,25 +1017,53 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
-[[transforms.json_parser.outputs]]
-type = "simple"
+[[transforms.json_parser.examples]]
+name = "Simple"
 body = """\
-
-"""
-
-[[transforms.json_parser.outputs]]
-type = "wrapped"
-body = """\
-It is possible to chain `json_parser` transforms to effectively "unwrap"
-nested JSON documents. For example, give this raw log line:
+Given the following log event:
 
 ```
-{"message": "{\"parent\": \"{\\\"child\\\": \\\"value2\\\"}\"}"}
+{
+  "message": "{\"key\": \"value\"}"
+}
+```
+
+You can parse the JSON with:
+
+```toml
+[transforms.json]
+  inputs = ["<source_id>"]
+  type   = "json_parser"
+  field  = "message"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "key": "value"
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.
+"""
+
+[[transforms.json_parser.examples]]
+name = "Wrapped"
+body = """\
+It is possible to chain `json_parser` transforms to effectively "unwrap"
+nested JSON documents. For example, give this log event:
+
+```
+{
+  "message": "{\"parent\": \"{\\\"child\\\": \\\"value2\\\"}\"}"
+}
 ```
 
 You could unwrap the JSON with the following transforms:
 
-```coffeescript
+```toml
 [transforms.root_json]
   inputs = ["<source_id>"]
   type   = "json_parser"
@@ -1152,15 +1173,11 @@ resources = [
   {name = "Lua Reference Manual", url = "http://www.lua.org/manual/5.1/manual.html"}
 ]
 
-[[transforms.lua.outputs]]
-type = "text"
+[[transforms.lua.examples]]
+name = "Add fields"
 body = """\
-Here are a few example Lua scripts that demonstrate working with the \
-[`event` variable](#global-variables). You can pass these examples to the \
-`source` option:
+Add a field to an event. Supply this as a the `source` value:
 
-{% code-tabs %}
-{% code-tabs-item title="add_fields.lua" %}
 ```lua
 # Add root level field
 event["new_field"] = "new value"
@@ -1168,8 +1185,13 @@ event["new_field"] = "new value"
 # Add nested field
 event["parent.child"] = "nested value"
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="remove_fields.lua" %}
+"""
+
+[[transforms.lua.examples]]
+name = "Remove fields"
+body = """\
+Remove a field from an event. Supply this as a the `source` value:
+
 ```lua
 # Remove root level field
 event["field"] = nil
@@ -1177,14 +1199,20 @@ event["field"] = nil
 # Remove nested field
 event["parent.child"] = nil
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="drop_event.lua" %}
+"""
+
+[[transforms.lua.examples]]
+name = "Drop event"
+body = """\
+Drop an event entirely. Supply this as a the `source` value:
+
 ```lua
-# To drop an event entirely
-event = nil
+# Remove root level field
+event["field"] = nil
+
+# Remove nested field
+event["parent.child"] = nil
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 """
 
 [transforms.lua.options.source]
@@ -1275,6 +1303,61 @@ input_types = ["log"]
 output_types = ["log"]
 resources = []
 
+[[transforms.regex_parser.examples]]
+name = "Example"
+body = """\
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "message": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \\"GET /embrace/supply-chains/dynamic/vertical\\" 201 20574"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.<transform-id>]
+  type = "regex_parser"
+  field = "message"
+  regex = '^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$'
+
+[transforms.<transform-id>.types]
+  bytes_int = "int"
+  timestamp = "timestamp|%m/%d/%Y:%H:%M:%S %z"
+  status = "int"
+  bytes_out = "int"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "bytes_in": 5667,
+  "host": "5.86.210.12",
+  "user_id": "zieme4647",
+  "timestamp": <19/06/2019:17:20:49 -0400>,
+  "message": "GET /embrace/supply-chains/dynamic/vertical",
+  "status": 201,
+  "bytes": 20574
+}
+```
+
+Things to note about the output:
+
+1. The `message` field was overwritten.
+2. The `bytes_in`, `timestamp`, `status`, and `bytes_out` fields were coerced.
+"""
+
 [transforms.regex_parser.options.drop_failed]
 type = "bool"
 default = false
@@ -1308,7 +1391,7 @@ description = "Key/Value pairs representing mapped field types."
 
 [transforms.regex_parser.options.types.options."*"]
 type = "string"
-enum = ["string", "int", "float", "bool", "timestamp|<strftime-format>"]
+enum = ["string", "int", "float", "bool", "timestamp|strftime"]
 examples = [
   {name = "status", value = "int"},
   {name = "duration", value = "float"},
@@ -1455,8 +1538,8 @@ function_categories = ["parse"]
 input_types = ["log"]
 output_types = ["log"]
 
-[[transforms.tokenizer.outputs]]
-type = "*"
+[[transforms.tokenizer.examples]]
+name = "Example"
 body = """\
 Given the following log line:
 
@@ -1473,8 +1556,8 @@ Given the following log line:
 And the following configuration:
 
 {% code-tabs %}
-{% code-tabs-item title="/var/log/rails.log" %}
-```coffeescript
+{% code-tabs-item title="vector.toml" %}
+```toml
 [transforms.<transform-id>]
 type = "tokenizer"
 field = "message"
@@ -1527,7 +1610,7 @@ description = "Key/Value pairs representing mapped field types."
 
 [transforms.tokenizer.options.types.options."*"]
 type = "string"
-enum = ["string", "int", "float", "bool", "timestamp|<strftime-format>"]
+enum = ["string", "int", "float", "bool", "timestamp|strftime"]
 examples = [
   {name = "status", value = "int"},
   {name = "duration", value = "float"},
@@ -1575,8 +1658,8 @@ service_provider = "AWS"
 write_style = "batching"
 write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
-[[sinks.aws_cloudwatch_logs.outputs]]
-type = "*"
+[[sinks.aws_cloudwatch_logs.examples]]
+name = "Example"
 body = """\
 ```http
 POST / HTTP/1.1
@@ -1652,8 +1735,8 @@ service_provider = "AWS"
 write_style = "batching"
 write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
 
-[[sinks.aws_kinesis_streams.outputs]]
-type = "*"
+[[sinks.aws_kinesis_streams.examples]]
+name = "Example"
 body = """\
 ```http
 POST / HTTP/1.1
@@ -1720,8 +1803,8 @@ service_provider = "AWS"
 write_style = "batching"
 write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
-[[sinks.aws_s3.outputs]]
-type = "*"
+[[sinks.aws_s3.examples]]
+name = "Example"
 body = """\
 ```http
 POST / HTTP/1.1
@@ -1958,8 +2041,8 @@ service_provider = "Elastic"
 write_style = "batching"
 write_to_description = "[Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
 
-[[sinks.elasticsearch.outputs]]
-type = "*"
+[[sinks.elasticsearch.examples]]
+name = "Example"
 body = """\
 ```http
 POST <host>/_bulk HTTP/1.1
@@ -2026,8 +2109,8 @@ service_provider = "Elastic"
 write_style = "batching"
 write_to_description = "a generic HTTP endpoint"
 
-[[sinks.http.outputs]]
-type = "*"
+[[sinks.http.examples]]
+name = "Example"
 body = """\
 ```http
 POST <host>/_bulk HTTP/1.1

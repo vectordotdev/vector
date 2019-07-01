@@ -17,7 +17,7 @@ Instead, please modify the contents of `scripts/metadata.toml`.
 
 The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec].
 
-## Example
+## Config File
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
@@ -226,9 +226,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
-## I/O
 
-The `splunk_hec` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to a [Splunk HTTP Event Collector][url.splunk_hec]. The encoding is dictated by the `encoding` option.
 
 
 

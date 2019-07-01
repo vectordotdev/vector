@@ -6,7 +6,7 @@ description: Install Vector on your OS or platform
 
 Vector compiles to a single static binary, making it simple to install.
 
-## Quit Install
+## Installer Script
 
 Run the following in your terminal, then follow the on-screen
 instructions:
@@ -15,7 +15,9 @@ instructions:
 curl https://sh.vector.dev -sSf | sh
 ```
 
-Or choose a method below for platform specific instructions.
+This script performs paltform detection and helps you choose the best
+method for installation. If you prefer a manual approach, choose your
+specific platform below.
 
 ## Platforms
 
