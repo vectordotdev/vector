@@ -3,6 +3,7 @@
 # A simple example that demonstrates Vector's environment variable
 # interpolation syntax. More information can be found in the Environment
 # Variables section in our docs:
+#
 # https://docs.vector.dev/usage/configuration#environment-variables
 
 data_dir = "/var/lib/vector"

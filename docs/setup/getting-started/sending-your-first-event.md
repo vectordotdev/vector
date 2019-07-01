@@ -44,7 +44,7 @@ Starting Vector ...
 172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272
 ```
 
-Exit `vector` by pressing `ctrl+c`.
+Exit Vector by pressing `ctrl+c`.
 
 Notice that Vector prints the same raw line that you sent it. This is because Vector does not awkwardly enforce structuring on you until you need it, which brings us to parsing...
 

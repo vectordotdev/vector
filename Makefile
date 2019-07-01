@@ -36,7 +36,6 @@ release: ## Release artifacts produces by build
 	@scripts/release.sh
 
 test: ## Run tests
-	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
 
 version: ## Get the current Vector version

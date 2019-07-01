@@ -17,8 +17,8 @@ harness README.
 | TCP Streaming | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
 | [JSON \(wrapped\)][url.wrapped_json_correctness_test] | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-✅ = passed
-❌ = failed
+✅ = passed<br />
+❌ = failed<br />
 ⚠️ = unknown, please click into the test for an explanation
 
 
