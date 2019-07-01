@@ -4,7 +4,7 @@ First, thank you for contributing to Vector! We know how important a
 strong community is to open source and we welcome anyone that is willing
 to particpate.
 
-<!-- MarkdownTOC autolink="true" style="ordered" -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Prerequisites](#prerequisites)
 1. [Workflow](#workflow)

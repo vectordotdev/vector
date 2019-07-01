@@ -34,13 +34,14 @@ The default Vector configuration file is placed at:
 etc/vector/vector.toml
 ```
 
-A full spec is located at `/etc/vector/vector.spec.toml` and examples are
-located in `/etc/vector/examples/*`. You an customize the configuration by
-your custom `vector.toml` file in the expected location:
+You an customize Vector's configuration by mounting your custom `vector.toml`
+file in the expected location:
 
 ```bash
 docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
 ```
+
+Modify `$PWD` to the directory where you store your local `vector.toml` file.
 
 Once logged in, [start][docs.starting] Vector with:
 

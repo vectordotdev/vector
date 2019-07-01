@@ -2,15 +2,15 @@
 
 This document covers the basics of developing in Vector. In this document:
 
-<!-- MarkdownTOC autolink="true" style="ordered" -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Prerequisites](#prerequisites)
 1. [Setup](#setup)
 1. [Directory Structure](#directory-structure)
 1. [Makefile](#makefile)
 1. [Testing](#testing)
-  1. [Docker](#docker)
-  1. [Sample Logs](#sample-logs)
+   1. [Docker](#docker)
+   1. [Sample Logs](#sample-logs)
 1. [Benchmarking](#benchmarking)
 1. [Building](#building)
 1. [Testing](#testing-1)

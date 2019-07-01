@@ -1,6 +1,6 @@
 # Code of Conduct
 
-<!-- MarkdownTOC autolink="true" style="ordered" -->
+<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Our Pledge](#our-pledge)
 1. [Our Standards](#our-standards)
