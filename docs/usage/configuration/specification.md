@@ -30,7 +30,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # Website: https://vector.dev
 # Docs: https://docs.vector.dev
 # Community: https://vector.dev/community
-# Repo: https://github.com/timberio/vector
 # ------------------------------------------------------------------------------
 # The file contains a full specification for the `vector.toml` configuration
 # file. It follows the TOML format and includes all options, types, and

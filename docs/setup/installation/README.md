@@ -5,9 +5,14 @@ description: Install Vector on your OS or platform
 # Installation
 
 Vector compiles to a single static binary, making it simple to install.
-There is no runtime and there are no dependencies. Below are the various
-[platforms](#platforms), [operating systems](#operating-systems), other
-installation methods we support.
+Just run the following in your terminal, then follow the on-screen
+instructions:
+
+```bash
+curl https://sh.vector.dev -sSf | sh
+```
+
+Or choose your platform below for platform specific instructions.
 
 ## Platforms
 

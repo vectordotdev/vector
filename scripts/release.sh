@@ -50,7 +50,17 @@ grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "target/art
 # Homebrew
 #
 
-# scripts/release/release_homebrew.sh
+scripts/release/release_homebrew.sh
+
+#
+# Install script
+#
+
+aws s3api put-object \
+  --bucket "sh.vector.dev" \
+  --key "install.sh" \
+  --body "distribution/install.sh" \
+  --acl "public-read"
 
 #
 # Docker

@@ -2,10 +2,13 @@
 
 set -eu
 
+td=$(mktemp -d)
+pushd $td
+
 git clone git@github.com:timberio/homebrew-brew.git
 cd homebrew-brew
 
-package_url="https://packages.timber.io/vector/v$VERSION/vector-v$VERSION-x86_64-apple-darwin.tar.gz"
+package_url="https://packages.timber.io/vector/$VERSION/vector-$VERSION-x86_64-apple-darwin.tar.gz"
 package_sha256=$(curl -s $package_url | sha256sum | cut -d " " -f 1)
 echo $package_sha256
 
@@ -20,5 +23,5 @@ scripts/test
 git commit -am "Release Vector $VERSION"
 git push
 
-cd ..
-rm -rf homebrew-brew
+popd
+rm -rf $td

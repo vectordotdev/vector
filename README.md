@@ -89,6 +89,17 @@ To learn more about our performance tests, please see the [Vector test harness][
 To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
 
 
+## Installation
+
+Run the following in your terminal, then follow the on-screen instructions.
+
+```bash
+curl https://sh.vector.dev -sSf | sh
+```
+
+Or view [platform specific installation instructions][docs.installation].
+
+
 ## Sources
 
 <!-- START: sources_table -->
