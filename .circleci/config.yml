@@ -64,7 +64,7 @@ jobs:
   test-stable:
     resource_class: xlarge
     docker:
-      - image: timberiodev/vector-tester:latest
+      - image: rust:latest
         environment:
           RUST_BACKTRACE: full
           AWS_ACCESS_KEY_ID: "fake-aws-key"
