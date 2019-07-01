@@ -50,6 +50,16 @@ data from A to B simple and unified.
 * [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
 
 
+## Installation
+
+Run the following in your terminal, then follow the on-screen instructions.
+
+```bash
+curl https://sh.vector.dev -sSf | sh
+```
+
+Or view [platform specific installation instructions][docs.installation].
+
 ## Features
 
 * ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.

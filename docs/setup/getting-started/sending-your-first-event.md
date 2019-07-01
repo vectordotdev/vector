@@ -1,20 +1,31 @@
 ---
-description: A "Hello World" style guide
+description: A "Hello World" getting started guide
 ---
 
 # Sending Your First Event
 
-{% hint style="info" %}
-This guide assumes you've already [installed](../installation/) Vector. If you have not, please install Vector before proceeding.
-{% endhint %}
-
-This is a "Hello World" style guide that walks through sending your first [event](../../about/data-model.md#event) through Vector. It designed to be followed locally, making it quick and easy. We'll start with the simplest of examples: accepting an event via the [`stdin` source](../../usage/configuration/sources/stdin.md), and then printing it out via the [`console` sink](../../usage/configuration/sinks/console.md).
+This is a "Hello World" style guide that walks through sending your first
+[event][docs.event] through Vector. It designed to be followed locally,
+making it quick and easy. We'll start with the simplest of examples: accepting
+an event via the [`stdin` source][docs.stdin_source], and then printing it out
+via the [`console` sink][docs.console_sink].
 
 ![](../../assets/getting-started-guide.svg)
 
-## 1. Send Your Event
+## 1. Install Vector
 
-Start by creating a temporary [Vector configuration file](../../usage/configuration/) in your home directory:
+If you haven't already, [install Vector]:
+
+```bash
+curl https://sh.vector.dev -sSf | sh
+```
+
+Or view [platform specific installation instructions][docs.installation].
+
+## 2. Send Your Event
+
+Start by creating a temporary [Vector configuration file][docs.configuration]
+in your home directory:
 
 {% code-tabs %}
 {% code-tabs-item title="~/vector.toml" %}
@@ -46,11 +57,16 @@ Starting Vector ...
 
 Exit Vector by pressing `ctrl+c`.
 
-Notice that Vector prints the same raw line that you sent it. This is because Vector does not awkwardly enforce structuring on you until you need it, which brings us to parsing...
+Notice that Vector prints the same raw line that you sent it. This is because
+Vector does not awkwardly enforce structuring on you until you need it, which
+brings us to parsing...
 
-## 2. Parse Your Event
+## 3. Parse Your Event
 
-In most cases you'll want to parse your event into a structured format. Vector makes this easy with [transforms](../../usage/configuration/transforms/). In this case, we'll use the [`regex_parser`](../../usage/configuration/transforms/regex_parser.md). Let's update your existing Vector configuration file:
+In most cases you'll want to parse your event into a structured format. Vector
+makes this easy with [transforms][docs.transforms]. In this case, we'll use
+the [`regex_parser`][docs.regex_parser_transform]. Let's update your existing
+Vector configuration file:
 
 ```bash
 echo '
@@ -84,9 +100,15 @@ Starting Vector ...
 
 Exit `vector` by pressing `ctrl+c`.
 
-You'll notice this time the event is structured. Vector knows when an event is structured or not and defaults to JSON encoding for outputs that support it. You can change the encoding in the [`console` sink options](../../usage/configuration/sinks/console.md).
+You'll notice this time the event is structured. Vector knows when an event
+is structured or not and defaults to JSON encoding for outputs that support
+it. You can change the encoding in the
+[`console` sink options][docs.console_sink].
 
-That's it! This tutorial demonstrates the _very_ basic [concepts](../../about/concepts.md) of Vector. From here, you can start to think about the various [sources](../../usage/configuration/sources/), [transforms](../../usage/configuration/transforms/), and [sinks](../../usage/configuration/sinks/) you'll need to combine to create your pipelines.
+That's it! This tutorial demonstrates the _very_ basic [concepts][docs.concepts]
+of Vector. From here, you can start to think about the various
+[sources][docs.soures], [transforms][docs.transforms], and [sinks][docs.sinks]
+you'll need to combine to create your pipelines.
 
 
 
