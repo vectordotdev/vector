@@ -94,7 +94,9 @@ jobs:
       - checkout
       - run:
           name: Test
-          command: make test
+          command: |
+            echo $TZ
+            make test
       - store_test_results:
           path: ./test-results
 
