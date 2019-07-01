@@ -1,8 +1,8 @@
 ---
-description: Install Vector through your package manager
+description: Install Vector manually
 ---
 
-# Package Managers
+# Manual Installation
 
 {% hint style="info" %}
 Please make sure your [platform][docs.platforms] is not supported before proceeding

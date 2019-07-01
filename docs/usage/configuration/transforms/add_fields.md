@@ -29,7 +29,10 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 
   # REQUIRED - Fields
   [transforms.my_add_fields_transform.fields]
-    new_field = "new field value"
+    new_string_field = "string value"
+    new_int_field = 1
+    new_float_field = 1.2
+    new_bool_field = true
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -64,7 +67,10 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
     # supported types. Use `.` for adding nested fields.
     #
     # * no default
-    new_field = "new field value"
+    new_string_field = "string value"
+    new_int_field = 1
+    new_float_field = 1.2
+    new_bool_field = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -8,7 +8,7 @@ class Generator
   end
 
   def generate
-    raise MethodMissinError.new
+    raise MethodMissingError.new
   end
 
   def _generate_new(file_path)

@@ -243,7 +243,10 @@ data_dir = "/var/lib/vector"
     # supported types. Use `.` for adding nested fields.
     #
     # * no default
-    new_field = "new field value"
+    new_string_field = "string value"
+    new_int_field = 1
+    new_float_field = 1.2
+    new_bool_field = true
 
 [transforms.field_filter]
   # REQUIRED - General
@@ -377,6 +380,22 @@ data_dir = "/var/lib/vector"
   # * default: message
   field = "message"
 
+  # OPTIONAL - Types
+  [transforms.regex_parser.types]
+
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type.
+    #
+    # * no default
+    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
+
 [transforms.remove_fields]
   # REQUIRED - General
 
@@ -441,6 +460,22 @@ data_dir = "/var/lib/vector"
   #
   # * default: message
   field = "message"
+
+  # OPTIONAL - Types
+  [transforms.tokenizer.types]
+
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. These should coincide with the `field_names` option.
+    #
+    # * no default
+    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 
 # ------------------------------------------------------------------------------
 # Sinks

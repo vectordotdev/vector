@@ -54,7 +54,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   source = "<string>"
 
   # OPTIONAL - General
-  search_dirs = ["<string>", ...]
+  search_dirs = ["<string>", ...
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}

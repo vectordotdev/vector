@@ -6,50 +6,45 @@ description: Install Vector from pre-built archives
 
 {% hint style="info" %}
 Before proceeding, please make sure Vector does not support your
-[platform][docs.platforms] or [package manager][docs.package_managers]. These are
-generally recommended before installing from archives.
+[platform][docs.platforms] or [package manager][docs.package_managers]. These
+are recommended before installing from archives.
 {% endhint %}
+
+## Downloads
 
 Vector provides [pre-built archives][url.releases] for popular target
 architectures. If you don't see an architecture, then we recommend
 [building Vector from source][docs.from_source].
 
+| Architecture | Notes |
+| :--- | :---- |
+| [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | 64-bit OSX (10.7+, Lion+) |
+| [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | 64-bit Linux (2.6.18+) |
+
+
 ## Installation
 
-Start by changing into your home directory:
+Change into the directory you want to install Vector, such as your home dir:
 
 ```bash
 cd ~
 ```
 
-Next, download the latest archive for your target:
-
-| Name | Notes |
-| :--- | :---- |
-| [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | 64-bit Linux (2.6.18+) |
-
-All releases are available on the [Vector releases page][url.releases].
-
-Once you copied the appropriate URL proceed to download it:
+Then copy the appropriate download link above and then proceed to download it:
 
 ```bash
-curl -o <release-download-url> | tar -xzf
+curl -o <release-download-url> | tar -xzf --directory="vector" --strip-components=1
 ```
 
-This will produce a directory called `vector-<version>`. Let's change into
-that directory:
+This will create a directory called `vector`. Let's change into that directory:
 
 ```bash
-cd vector-<version>
+cd vector
 ```
 
-The `vector-<version>` directory has the following structure:
+Issuing the `ls` command shows the following directory structure:
 
-{% code-tabs %}
-{% code-tabs-item title="vector-<version>" %}
 ```
-$ ls
 LICENSE
 README.md
 bin/vector - The vector binary
@@ -59,29 +54,24 @@ config/examples/* - A variety of configuration examples
 etc/systemd/vector.service - Systemd service file
 etc/init.d/vector - Init.d service file
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
-You can start vector with:
+To ensure `vector` is in your `$PATH` let's add it to your profile:
 
 ```bash
-bin/vector --config config/vector.toml
+echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
+source $HOME/.profile
 ```
 
-That's it! To make sure the `vector` binary is available, lets add it to your
-path:
+That's it! You can start vector with:
 
 ```bash
-export PATH="$(pwd)/bin:$PATH"
+vector --config config/vector.toml
 ```
 
-And finally, you'll want to edit the `config/vector.toml` file to suit
-your use case. The [Configuration][docs.configuration] section covers this in
-great detail.
+That's it! Proceed to [configure](#configuring) Vector for your use case.
 
-## Administration
 
-### Configuring
+## Configuring
 
 The Vector configuration file is located at:
 
@@ -93,7 +83,7 @@ A full spec is located at `config/vector.spec.toml` and examples are
 located in `config/vector/examples/*`. You can learn more about configuring
 Vector in the [Configuration][docs.configuration] section.
 
-#### Data Directory
+### Data Directory
 
 We highly recommend creating a [data directory][docs.data_directory] that Vector
 can use:
@@ -113,11 +103,11 @@ If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
 {% endhint %}
 
-### Service Managers
+## Service Managers
 
 Vector archives ship with service files in case you need them:
 
-#### Init.d
+### Init.d
 
 To install Vector into Init.d run:
 
@@ -125,7 +115,7 @@ To install Vector into Init.d run:
 cp -a etc/init.d/vector /etc/init.d
 ```
 
-#### Systemd
+### Systemd
 
 To install Vector into Systemd run:
 

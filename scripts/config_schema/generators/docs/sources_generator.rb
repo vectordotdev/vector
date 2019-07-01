@@ -42,7 +42,7 @@ module Docs
     private
       def source_rows
         links = sources.collect do |source|
-          "| [**`#{source.name}`**][docs.#{source.name}_source] | Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events.<br />`guarantee: #{source.delivery_guarantee}` |"
+          "| [**`#{source.name}`**][docs.#{source.name}_source] | Ingests data through #{source.through_description} and outputs #{event_type_links(source.output_types).to_sentence} events. |"
         end
 
         links.join("\n")

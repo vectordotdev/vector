@@ -8,6 +8,8 @@ Vector provides high level install instructions for the followig platforms:
 
 {% page-ref page="docker.md" %}
 
+## Alternatives
+
 If you do not see your platform you can consider:
 
 {% page-ref page="../package-managers/README.md" %}

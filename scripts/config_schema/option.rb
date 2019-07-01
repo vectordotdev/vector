@@ -33,10 +33,6 @@ class Option
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
-    if !@enum.nil? && @examples.any?
-      raise "#{self.class.name}#examples not required when a #enum is specified for #{@name}"
-    end
-
     if @examples.empty?
       if !@enum.nil?
         @examples = @enum
@@ -47,6 +43,12 @@ class Option
 
     if @examples.empty? && @options.nil? && !table?
       raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
+    end
+
+    if @name == "*"
+      if !@examples.any? { |example| example.is_a?(Hash) }
+        raise "#{self.class.name}#examples must be a hash with name/value keys when the name is \"*\""
+      end
     end
   end
 

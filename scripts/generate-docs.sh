@@ -122,8 +122,7 @@ guarantees_generator._generate_new("docs/about/guarantees.md")
 #
 
 global_generator = Docs::GlobalGenerator.new(schema)
-content = global_generator.generate()
-write("docs/usage/configuration/README.md", content)
+global_generator._generate_new("docs/usage/configuration/README.md")
 
 #
 # Sources

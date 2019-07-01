@@ -835,7 +835,12 @@ event.\
 
 [transforms.add_fields.options.fields.options."*"]
 type = "string"
-examples = ["new_field = \"new field value\""]
+examples = [
+  {name = "new_string_field", value = "string value"},
+  {name = "new_int_field", value = 1},
+  {name = "new_float_field", value = 1.2},
+  {name = "new_bool_field", value = true}
+]
 description = """\
 A key/value pair representing the new field to be added. Accepts all \
 [supported types][docs.config_value_types]. Use `.` for adding nested fields.\
@@ -1297,6 +1302,27 @@ examples = [
 ]
 null = false
 
+[transforms.regex_parser.options.types]
+type = "table"
+description = "Key/Value pairs representing mapped field types."
+
+[transforms.regex_parser.options.types.options."*"]
+type = "string"
+enum = ["string", "int", "float", "bool", "timestamp|<strftime-format>"]
+examples = [
+  {name = "status", value = "int"},
+  {name = "duration", value = "float"},
+  {name = "success", value = "bool"},
+  {name = "timestamp", value = "timestamp|%s", comment = "unix"},
+  {name = "timestamp", value = "timestamp|%+", comment = "iso8601 (date and time)"},
+  {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
+  {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
+]
+description = """\
+A definition of mapped field types. They key is the field name and the value \
+is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+"""
+
 [[transforms.regex_parser.sections]]
 title = "Failed Parsing"
 body = """\
@@ -1319,7 +1345,7 @@ You can name Regex captures with the `<name>` syntax. For example:
 ```
 
 Will capture `timestamp`, `level`, and `message`. All values are extracted \
-as `string` values and must be coerced with the `types` table.\
+as `string` values and must be coerced with the `types` table.
 
 More info can be found in the [Regex grouping and flags \
 documentation][url.regex_grouping_and_flags].
@@ -1494,6 +1520,27 @@ description = "The field names assigned to the resulting tokens, in order."
 type = "bool"
 default = true
 description = "If `true` the `field` will be dropped after parsing."
+
+[transforms.tokenizer.options.types]
+type = "table"
+description = "Key/Value pairs representing mapped field types."
+
+[transforms.tokenizer.options.types.options."*"]
+type = "string"
+enum = ["string", "int", "float", "bool", "timestamp|<strftime-format>"]
+examples = [
+  {name = "status", value = "int"},
+  {name = "duration", value = "float"},
+  {name = "success", value = "bool"},
+  {name = "timestamp", value = "timestamp|%s", comment = "unix"},
+  {name = "timestamp", value = "timestamp|%+", comment = "iso8601 (date and time)"},
+  {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
+  {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
+]
+description = """\
+A definition of mapped field types. They key is the field name and the value \
+is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+"""
 
 [[transforms.tokenizer.sections]]
 title = "Special Characters"
@@ -1731,7 +1778,7 @@ description = "Whether or not to append a UUID v4 token to the end of the file. 
 type = "string"
 category = "Object Names"
 default = "%s"
-description = "The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. "
+description = "The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported."
 
 [sinks.aws_s3.options.gzip]
 type = "bool"
@@ -2028,7 +2075,7 @@ description = "Options for custom headers."
 
 [sinks.http.options.headers.options."*"]
 type = "string"
-examples = ["X-Powered-By = \"Vector\""]
+examples = [{ name = "X-Powered-By", value = "Vector"}]
 description = "A custom header to be added to each outgoing HTTP request."
 
 [sinks.http.options.healthcheck_uri]

@@ -18,17 +18,39 @@ class Component
   attr_accessor :alternatives
 
   def initialize(hash)
-
-    # Init
+    #
+    # Base attributes
+    #
 
     @alternatives = []
     @beta = hash["beta"] == true
     @name = hash.fetch("name")
     @type = type
     @diagram = "#{ASSETS_PATH}#{@name}-#{@type}.svg"
-    options_hash = hash["options"] || {}
-    resource_hashes = hash["resources"] || []
-    section_hashes = hash["sections"] || []
+    @options = OpenStruct.new()
+
+    (hash["options"] || {}).each do |option_name, option_hash|
+      option = Option.new(
+        option_hash.merge({"name" => option_name}
+      ))
+
+      @options.send("#{option_name}=", option)
+    end
+
+    @resources = (hash["resources"] || []).collect do |resource_hash|
+      OpenStruct.new(resource_hash)
+    end
+
+    @sections = (hash["sections"] || []).collect do |section_hash|
+      Section.new(section_hash)
+    end
+
+    #
+    # Tests
+    #
+    # Select tests based on the component name. Tests commonly include
+    # the component name.
+    #
 
     test_keyword = @name.gsub(/_(decoder|parser)$/, "")
 
@@ -40,17 +62,11 @@ class Component
       test.include?(test_keyword)
     end
 
-    # resources
-
-    @resources = resource_hashes.collect do |resource_hash|
-      OpenStruct.new(resource_hash)
-    end
-
-    # sections
-
-    @sections = section_hashes.collect do |section_hash|
-      Section.new(section_hash)
-    end
+    #
+    # Correctness Section
+    #
+    # Based on the selected correctness tests, add a section showcasing this.
+    #
 
     if @correctness_tests.length > 0
       test_list = ""
@@ -83,6 +99,12 @@ class Component
       end
     end
 
+    #
+    # Performance Section
+    #
+    # Based on the selected performance tests, add a section showcasing this.
+    #
+
     if @performance_tests.length > 0
       test_list = ""
 
@@ -114,6 +136,13 @@ class Component
       end
     end
 
+    #
+    # Delivery Guarantee Section
+    #
+    # Based on the presence of a delivery guarantee, add a section showcasing
+    # this
+    #
+
     if delivery_guarantee = hash["delivery_guarantee"]
       body =
         case delivery_guarantee
@@ -137,25 +166,25 @@ class Component
         })
     end
 
-    @sections = @sections.sort_by(&:title)
+    #
+    # Type Coercion Section
+    #
+    # Based on the presence of a "types" option, add a type coercion section
+    # explaining how to use this
+    #
 
-    section_titles = @sections.collect(&:title)
-
-    if section_titles != section_titles.uniq
-      raise ("#{self.class.name} has duplicate sections!")
+    if options.types && options.types.type == "table"
+      @sections << Section.new({
+        "title" => "Type Coercion Guarantee",
+        "body" => "body"
+      })
     end
 
-    # options
-
-    @options = OpenStruct.new()
-
-    options_hash.each do |option_name, option_hash|
-      option = Option.new(
-        option_hash.merge({"name" => option_name}
-      ))
-
-      @options.send("#{option_name}=", option)
-    end
+    #
+    # Default options
+    #
+    # Add default options based on the presence of attributes
+    #
 
     @options.type = Option.new({
         "name" => "type",
@@ -173,6 +202,18 @@ class Component
         "null" => false,
         "type" => "string"
       })
+    end
+
+    #
+    # Cleanup
+    #
+
+    @sections = @sections.sort_by(&:title)
+
+    section_titles = @sections.collect(&:title)
+
+    if section_titles != section_titles.uniq
+      raise ("#{self.class.name} has duplicate sections!")
     end
   end
 

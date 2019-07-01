@@ -1,6 +1,8 @@
 require_relative "generator"
 
 class OptionsExampleGenerator < Generator
+  TYPES = ["string", "int", "float", "bool", "timestamp"]
+
   attr_reader :options
 
   def initialize(options)
@@ -32,12 +34,20 @@ class OptionsExampleGenerator < Generator
             content << sub_generator.generate("#{path}.#{option.name}", format, titles: false) + "\n"
           elsif format == :examples
             if option.name == "*"
-              content << option.examples.join("\n")
+              option.examples.each do |example|
+                key = example.fetch("name")
+                value = example.fetch("value")
+                comment = example["comment"]
+
+                content << "#{key} = #{to_toml_value(value)}"
+                content << " # #{comment}" if comment
+                content << "\n"
+              end
             else
               content << "#{option.name} = #{example_value(option)}\n"
             end
           elsif format == :schema
-            content << "#{option.name} = #{type_string(option)}\n"
+            content << "#{option.name} = #{type_string(option.type, option.enum)}\n"
           elsif format == :spec
             description = editorify(option.description)
             content << "\n# #{description}\n"
@@ -51,12 +61,20 @@ class OptionsExampleGenerator < Generator
               content << "# * #{tag}\n"
             end
 
-            option.examples.each do |example|
-              if option.name == "*"
-                content << "#{example}\n"
-              else
-                content << "#{option.name} = #{to_toml_value(example)}\n"
+            option.examples.each_with_index do |example, index|
+              key = option.name
+              value = example
+              comment = nil
+
+              if example.is_a?(Hash)
+                key = example.fetch("name")
+                value = example.fetch("value")
+                comment = example["comment"]
               end
+
+              content << "#{key} = #{to_toml_value(value)}"
+              content << " # #{comment}" if comment
+              content << "\n"
             end
           else
             raise("Unknown format: #{format.inspect}")
@@ -113,7 +131,7 @@ class OptionsExampleGenerator < Generator
 
     def example_value(option)
       if option.examples.empty?
-        type_string(option.type)
+        type_string(option.type, option.enum)
       else
         tags = build_tags(option)
         example = option.examples.first
@@ -139,17 +157,22 @@ class OptionsExampleGenerator < Generator
       end
     end
 
-    def type_string(option)
-      if option.enum
-        "{#{option.enum.collect(&:inspect).join(" | ")}}"
+    def type_string(type, enum = nil)
+      if enum
+        "{#{enum.collect(&:inspect).join(" | ")}}"
+      elsif type.start_with?("[")
+        inner_type = type[1..-2]
+        inner_type_string = type_string(inner_type)
+        "[#{inner_type_string}, ..."
+      elsif type == "*"
+        type_strings = TYPES.collect { |type| type_string(type) }
+        "{#{type_strings.join(" | ")}}"
       else
-        case option.type
-        when "[string]"
-          "[\"<string>\", ...]"
+        case type
         when "string"
           "\"<string>\""
         else
-          "<#{option.type}>"
+          "<#{type}>"
         end
       end
     end

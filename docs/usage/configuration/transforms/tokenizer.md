@@ -31,6 +31,16 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+
+  # OPTIONAL - Types
+  [transforms.my_tokenizer_transform.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -39,11 +49,15 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   # REQUIRED - General
   type = {"tokenizer"}
   inputs = "<string>"
-  field_names = ["<string>", ...]
+  field_names = ["<string>", ...
 
   # OPTIONAL - General
   drop_field = <bool>
   field = "<string>"
+
+  # OPTIONAL - Types
+  [transforms.<transform-id>.types]
+    * = {"string" | "int" | "float" | "bool" | "timestamp|<strftime-format>"}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -73,6 +87,22 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   #
   # * default: message
   field = "message"
+
+  # OPTIONAL - Types
+  [transforms.tokenizer.types]
+
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. These should coincide with the `field_names` option.
+    #
+    # * no default
+    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -81,13 +111,16 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** | | |
+| **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "tokenizer"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
+| **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
+| **OPTIONAL** - Types | | |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. These should coincide with the `field_names` option.
+<br />`no default` `enum: "string", "int", "float", "bool", "timestamp|<strftime-format>"` |
 
 ## I/O
 
@@ -151,6 +184,10 @@ In order to extract raw values and remove wrapping characters, we must treat cer
 * `"..."` - Is used tp wrap phrases. Spaces are preserved, but the wrapping quotes will be discarded.
 * `[...]` - Is used to wrap phrases. Spaces are preserved, but the wrapping brackers will be discarded.
 * `\` - Can be used to escape the above characters, making them literal.
+
+### Type Coercion Guarantee
+
+body
 
 ## Troubleshooting
 

@@ -13,3 +13,13 @@
   drop_failed = false # default
   drop_field = true # default
   field = "message" # default
+
+  # OPTIONAL - Types
+  [transforms.my_regex_parser_transform.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format

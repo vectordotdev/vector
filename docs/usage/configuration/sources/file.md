@@ -45,8 +45,8 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 [sources.<source-id>]
   # REQUIRED - General
   type = {"file"}
-  exclude = ["<string>", ...]
-  include = ["<string>", ...]
+  exclude = ["<string>", ...
+  include = ["<string>", ...
 
   # OPTIONAL - General
   ignore_older = <int>

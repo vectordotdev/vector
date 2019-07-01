@@ -42,7 +42,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   inputs = "<string>"
 
   # OPTIONAL - General
-  pass_list = ["<string>", ...]
+  pass_list = ["<string>", ...
   rate = <int>
 ```
 {% endcode-tabs-item %}

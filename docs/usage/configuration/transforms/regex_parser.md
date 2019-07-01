@@ -32,6 +32,16 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   drop_failed = false # default
   drop_field = true # default
   field = "message" # default
+
+  # OPTIONAL - Types
+  [transforms.my_regex_parser_transform.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -46,6 +56,10 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   drop_failed = <bool>
   drop_field = <bool>
   field = "<string>"
+
+  # OPTIONAL - Types
+  [transforms.<transform-id>.types]
+    * = {"string" | "int" | "float" | "bool" | "timestamp|<strftime-format>"}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -80,6 +94,22 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   #
   # * default: message
   field = "message"
+
+  # OPTIONAL - Types
+  [transforms.regex_parser.types]
+
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type.
+    #
+    # * no default
+    # * enum: string, int, float, bool, timestamp|<strftime-format>
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -88,14 +118,16 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
-| **REQUIRED** | | |
+| **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
 | `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing), [Regex Debugger](#regex-debugger), and [Regex Syntax](#regex-syntax) for more info.<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
+| **OPTIONAL** - General | | |
 | `drop_failed` | `bool` | If `true`, events that fail to properly parse will be dropped. See [Failed Parsing](#failed-parsing) for more info.<br />`default: false` |
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
+| **OPTIONAL** - Types | | |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp|<strftime-format>"` |
 
 ## I/O
 
@@ -127,7 +159,9 @@ You can name Regex captures with the `<name>` syntax. For example:
 ^(?P<timestamp>.*) (?P<level>\w*) (?P<message>.*)$
 ```
 
-Will capture `timestamp`, `level`, and `message`. All values are extracted as `string` values and must be coerced with the `types` table.More info can be found in the [Regex grouping and flags documentation][url.regex_grouping_and_flags].
+Will capture `timestamp`, `level`, and `message`. All values are extracted as `string` values and must be coerced with the `types` table.
+
+More info can be found in the [Regex grouping and flags documentation][url.regex_grouping_and_flags].
 
 ### Regex Debugger
 
@@ -160,6 +194,10 @@ More info can be found in the [Regex grouping and flags documentation][url.regex
 The syntax of the `regex` option should follow [documented Rust Regex syntax][url.rust_regex_syntax] since Vector is written in Rust. This syntax follows a Perl-style regular expression syntax, but lacks a few features like look around and backreferences.
 
 You can read more in the [Rust Regex docs][url.rust_regex_syntax].
+
+### Type Coercion Guarantee
+
+body
 
 ## Troubleshooting
 

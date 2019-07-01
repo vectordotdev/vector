@@ -14,12 +14,12 @@ Sources are responsible for ingesting [events][docs.event] into Vector, they can
 
 | Name | Description |
 | :--- | :---------- |
-| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events.<br />`guarantee: best_effort` |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events.<br />`guarantee: best_effort` |
-| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events.<br />`guarantee: at_least_once` |
-| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events.<br />`guarantee: best_effort` |
-| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events.<br />`guarantee: best_effort` |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events.<br />`guarantee: best_effort` |
+| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
+| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
+| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
 <!-- ----------------------------------------------------------------- -->
 <!-- END: sources_table -->

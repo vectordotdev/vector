@@ -275,7 +275,7 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 | **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: "X-Powered-By = \"Vector\""` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: (see above)` |
 
 ## I/O
 

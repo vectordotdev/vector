@@ -10,4 +10,7 @@
 
   # REQUIRED - Fields
   [transforms.my_add_fields_transform.fields]
-    new_field = "new field value"
+    new_string_field = "string value"
+    new_int_field = 1
+    new_float_field = 1.2
+    new_bool_field = true

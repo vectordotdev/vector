@@ -35,7 +35,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   # REQUIRED - General
   type = {"remove_fields"}
   inputs = "<string>"
-  fields = ["<string>", ...]
+  fields = ["<string>", ...
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
