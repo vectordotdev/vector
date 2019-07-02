@@ -76,8 +76,9 @@ _changelog=$(cat CHANGELOG.md | sed "s/$current_version-dev/$current_version/g")
 echo "$_changelog" > CHANGELOG.md
 
 escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
-_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version-dev\"/ s/version = \"$escaped_current_version-dev\"/version = \"$escaped_current_version\"/")
-echo "$_cargo" > cargo.toml
+_cargo=$(cat Cargo.toml | sed "1,/version = \"$escaped_current_version-dev\"/ s/version = \"$escaped_current_version-dev\"/version = \"$escaped_current_version\"/")
+echo "$_cargo" > Cargo.toml
+cargo check
 
 git commit -am "Release v$current_version"
 git tag -a v$current_version -m "v$current_version"
@@ -118,8 +119,9 @@ The CHANGELOG for v$current_version_minor.X releases can be found in the [v$curr
 
 escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
 escaped_new_version=$(echo $new_version | sed "s/\./\\\./g")
-_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version\"/ s/version = \"$escaped_current_version\"/version = \"$escaped_new_version-dev\"/")
-echo "$_cargo" > cargo.toml
+_cargo=$(cat Cargo.toml | sed "1,/version = \"$escaped_current_version\"/ s/version = \"$escaped_current_version\"/version = \"$escaped_new_version-dev\"/")
+echo "$_cargo" > Cargo.toml
+cargo check
 
 git commit -am "Start v$new_version-dev"
 
