@@ -90,7 +90,14 @@ impl LogToMetric {
 }
 
 impl Transform for LogToMetric {
+    // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
+        let mut output = Vec::new();
+        self.transform_into(&mut output, event);
+        output.pop()
+    }
+
+    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
         let event = event.into_log();
 
         for metric in self.config.metrics.iter() {
@@ -99,17 +106,16 @@ impl Transform for LogToMetric {
                     if let Some(val) = event.get(&counter.field) {
                         if counter.increment_by_value {
                             if let Ok(val) = val.to_string_lossy().parse::<f32>() {
-                                return Some(Event::Metric(Metric::Counter {
+                                output.push(Event::Metric(Metric::Counter {
                                     name: counter.sanitized_name.to_string(),
                                     val: val as u32,
                                     sampling: None,
                                 }));
                             } else {
                                 trace!("failed to parse counter value");
-                                return None;
                             }
                         } else {
-                            return Some(Event::Metric(Metric::Counter {
+                            output.push(Event::Metric(Metric::Counter {
                                 name: counter.sanitized_name.to_string(),
                                 val: 1,
                                 sampling: None,
@@ -120,21 +126,18 @@ impl Transform for LogToMetric {
                 MetricConfig::Gauge(gauge) => {
                     if let Some(val) = event.get(&gauge.field) {
                         if let Ok(val) = val.to_string_lossy().parse() {
-                            return Some(Event::Metric(Metric::Gauge {
+                            output.push(Event::Metric(Metric::Gauge {
                                 name: gauge.sanitized_name.to_string(),
                                 val,
                                 direction: None,
                             }));
                         } else {
                             trace!("failed to parse gauge value");
-                            return None;
                         }
                     }
                 }
             }
         }
-
-        None
     }
 }
 
@@ -327,5 +330,52 @@ mod tests {
 
         let mut transform = LogToMetric::new(&config);
         assert!(transform.transform(log).is_none());
+    }
+
+    #[test]
+    fn multiple_metrics() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            labels = {status = "#{event.status}", host = "#{event.host}"}
+
+            [[metrics]]
+            type = "counter"
+            field = "backtrace"
+            name = "exception_total"
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("status".into(), "42".into());
+        log.as_mut_log()
+            .insert_explicit("backtrace".into(), "message".into());
+
+        let mut transform = LogToMetric::new(&config);
+
+        let mut output = Vec::new();
+        transform.transform_into(&mut output, log);
+        assert_eq!(2, output.len());
+        assert_eq!(
+            output.pop().unwrap().into_metric(),
+            Metric::Counter {
+                name: "exception_total".into(),
+                val: 1,
+                sampling: None
+            }
+        );
+        assert_eq!(
+            output.pop().unwrap().into_metric(),
+            Metric::Counter {
+                name: "status_total".into(),
+                val: 1,
+                sampling: None
+            }
+        );
     }
 }
