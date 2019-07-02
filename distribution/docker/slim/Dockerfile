@@ -1,5 +1,8 @@
 FROM debian:9-slim
 
+RUN apt-get update -y
+RUN apt-get install -y wget
+
 ENV VECTOR_VERSION latest
 RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" && \
     case "${dpkgArch##*-}" in \
