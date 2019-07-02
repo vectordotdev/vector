@@ -9,4 +9,4 @@
 set -eu
 
 echo "Adding release to Github"
-grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "target/artifacts/*"
+grease create-release timberio/vector v$VERSION $CIRCLE_SHA1 --assets "target/artifacts/*"
