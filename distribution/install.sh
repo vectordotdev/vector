@@ -13,7 +13,7 @@ set -u
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-https://packages.timber.io/vector}"
 _divider="--------------------------------------------------------------------------------"
-_prompt="-->"
+_prompt=">>>"
 _indent="   "
 
 header() {
@@ -81,7 +81,7 @@ main() {
         echo ""
 
         while true; do
-            read -p "$_prompt " _choice
+            read -p "$_prompt " _choice </dev/tty
             case $_choice in
                 1)
                     break
@@ -165,26 +165,26 @@ install_from_archive() {
 
     ensure mkdir -p "$_dir"
 
-    echo -n "$_prompt Downloading Vector..."
+    printf "$_prompt Downloading Vector..."
     ensure downloader "$_url" "$_file"
-    echo " ✓"
+    printf " ✓\n"
 
-    echo -n "$_prompt Unpacking archive to $HOME/.vector ..."
+    printf "$_prompt Unpacking archive to $HOME/.vector ..."
     ensure mkdir -p "$HOME/.vector"
     ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=1
-    echo " ✓"
+    printf " ✓\n"
 
-    echo -n "$_prompt Adding Vector path to ~/.profile"
+    printf "$_prompt Adding Vector path to ~/.profile"
     echo 'export PATH="$HOME/.vector/bin:$PATH"' >> $HOME/.profile
     echo 'export PATH="$HOME/.vector/bin:$PATH"' >> $HOME/.zprofile
-    echo " ✓"
+    printf " ✓\n"
 
-    echo "$_prompt Install succeeded! 🚀"
-    echo "$_prompt To start Vector:"
-    echo ""
-    echo "$_indent vector --config ~/.vector/vector.toml"
-    echo ""
-    echo "$_prompt More information at https://docs.vector.dev"
+    printf "$_prompt Install succeeded! 🚀\n"
+    printf "$_prompt To start Vector:\n"
+    printf "\n"
+    printf "$_indent vector --config ~/.vector/vector.toml\n"
+    printf "\n"
+    printf "$_prompt More information at https://docs.vector.dev\n"
 
     local _retval=$?
 
