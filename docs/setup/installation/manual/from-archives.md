@@ -16,11 +16,30 @@ Vector provides [pre-built archives][url.releases] for popular target
 architectures. If you don't see an architecture, then we recommend
 [building Vector from source][docs.from_source].
 
-| Architecture | Notes |
-| :--- | :---- |
-| [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | 64-bit Linux (2.6.18+) |
+{% tabs %}
+{% tab title=Latest %}
+"Latest" represents the latest stable release.
 
+| Architecture | Channel | Notes |
+| :------------| :-----: | :---- |
+| [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | `latest` | 64-bit OSX (10.7+, Lion+) |
+| [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
+
+{% endtab %}
+{% tab title="Edge" %}
+"Edge" represents build off of the latest version of `master`.
+
+{% hint style="warning" %}
+This release could have bugs or other issues. Please think carefully before
+using them over the "latest" alternatives.
+{% endhint %}
+
+| Architecture | Channel | Notes |
+| :------------| :-----: | :---- |
+| [`x86_64-apple-darwin`][url.vector_edge_x86_64-apple-darwin] | `edge` | 64-bit OSX (10.7+, Lion+) |
+| [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
+{% endtab %}
+{% endtabs %}
 
 ## Installation
 

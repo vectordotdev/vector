@@ -8,8 +8,10 @@ RUN add-apt-repository ppa:git-core/ppa
 
 RUN apt-get update
 RUN apt-get upgrade -y
+RUN apt-get update
 RUN apt-get install -y \
   build-essential \
+  curl \
   git \
   python3-pip \
   rename \

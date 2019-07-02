@@ -11,6 +11,9 @@ set -eu
 td=$(mktemp -d)
 pushd $td
 
+git config --global user.email "vector-ci@timber.io"
+git config --global user.name "Vector CI"
+
 git clone git@github.com:timberio/homebrew-brew.git
 cd homebrew-brew
 
@@ -22,8 +25,6 @@ new_content=$(cat Formula/vector.rb | \
   sed "s|sha256 \".*\"|sha256 \"$package_sha256\"|")
 
 echo "$new_content" > Formula/vector.rb
-
-scripts/test
 
 git commit -am "Release Vector $VERSION"
 git push
