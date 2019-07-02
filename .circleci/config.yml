@@ -49,7 +49,7 @@ jobs:
             cargo fmt -- --check
 
   check-stable:
-    resource_class: large
+    resource_class: xlarge
     docker:
       - image: timberiodev/vector-tester:latest
     steps:
