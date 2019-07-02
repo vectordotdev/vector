@@ -174,6 +174,19 @@ class Component
     #
 
     if options.types && options.types.type == "table"
+      body =
+        <<~EOF
+        You can coerce your extract values into types via the `types` table
+        as shown in the examples above. The supported types are:
+
+        | Type | Desription |
+        | :--- | :--------- |
+        | `string` | Coerces to a string. Generally not necessary since values are extracted as strings. |
+        | `int` | Coerce to a 64 bit integer. |
+        | `float` | Coerce to 64 bit floats. |
+        | `bool`  | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
+        EOF
+
       @sections << Section.new({
         "title" => "Type Coercion",
         "body" => "body"

@@ -1419,8 +1419,22 @@ specified `field`.\
 """
 
 [[transforms.regex_parser.sections]]
-title = "Regex Captures"
+title = "Regex Debugger"
 body = """\
+To test the validity of the `regex` option, we recommend the \
+[Golang Regex Tester][url.golang_regex_tester] as it's Regex syntax closely 
+follows Rust's.\
+"""
+
+[[transforms.regex_parser.sections]]
+title = "Regex Syntax"
+body = """\
+Vector follows the [documented Rust Regex syntax][url.rust_regex_syntax] since
+Vector is written in Rust. This syntax follows a Perl-style regular expression
+syntax, but lacks a few features like look around and backreferences.
+
+#### Named Captures
+
 You can name Regex captures with the `<name>` syntax. For example:
 
 ```
@@ -1432,19 +1446,9 @@ as `string` values and must be coerced with the `types` table.
 
 More info can be found in the [Regex grouping and flags \
 documentation][url.regex_grouping_and_flags].
-"""
 
-[[transforms.regex_parser.sections]]
-title = "Regex Debugger"
-body = """\
-To test the validity of the `regex` option, we recommend the \
-[Golang Regex Tester][url.golang_regex_tester] as it's Regex syntax closely 
-follows Rust's.\
-"""
+#### Flags
 
-[[transforms.regex_parser.sections]]
-title = "Regex Flags"
-body = """\
 Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
 
 | Flag | Descriuption |
@@ -1464,17 +1468,6 @@ For example, to enable the case-insensitive flag you can write:
 
 More info can be found in the [Regex grouping and flags \
 documentation][url.regex_grouping_and_flags]. 
-"""
-
-[[transforms.regex_parser.sections]]
-title = "Regex Syntax"
-body = """\
-The syntax of the `regex` option should follow [documented Rust \
-Regex syntax][url.rust_regex_syntax] since Vector is written in Rust. This \
-syntax follows a Perl-style regular expression syntax, but lacks a few \
-features like look around and backreferences.
-
-You can read more in the [Rust Regex docs][url.rust_regex_syntax].\
 """
 
 [[transforms.regex_parser.resources]]
