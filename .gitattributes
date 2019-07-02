@@ -2,3 +2,4 @@ distribution/* linguist-detectable=false
 docs/* linguist-documentation
 lib/* linguist-vendored
 scripts/* linguist-detectable=false
+Makefile linguist-detectable=false
