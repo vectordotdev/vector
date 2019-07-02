@@ -146,7 +146,7 @@ mod test {
             parse("foo:1|c"),
             Ok(Metric::Counter {
                 name: "foo".into(),
-                val: 1,
+                val: 1.0,
                 sampling: None
             }),
         );
@@ -158,7 +158,7 @@ mod test {
             parse("bar:2|c|@0.1"),
             Ok(Metric::Counter {
                 name: "bar".into(),
-                val: 2,
+                val: 2.0,
                 sampling: Some(0.1)
             }),
         );
@@ -170,7 +170,7 @@ mod test {
             parse("glork:320|ms|@0.1"),
             Ok(Metric::Timer {
                 name: "glork".into(),
-                val: 320,
+                val: 320.0,
                 sampling: Some(0.1)
             }),
         );
@@ -182,7 +182,7 @@ mod test {
             parse("gaugor:333|g"),
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
-                val: 333,
+                val: 333.0,
                 direction: None
             }),
         );
@@ -194,7 +194,7 @@ mod test {
             parse("gaugor:-4|g"),
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
-                val: 4,
+                val: 4.0,
                 direction: Some(Direction::Minus)
             }),
         );
@@ -202,7 +202,7 @@ mod test {
             parse("gaugor:+10|g"),
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
-                val: 10,
+                val: 10.0,
                 direction: Some(Direction::Plus)
             }),
         );

@@ -101,7 +101,7 @@ impl Transform for LogToMetric {
                             if let Ok(val) = val.to_string_lossy().parse::<f32>() {
                                 return Some(Event::Metric(Metric::Counter {
                                     name: counter.sanitized_name.to_string(),
-                                    val: val as u32,
+                                    val,
                                     sampling: None,
                                 }));
                             } else {
@@ -111,7 +111,7 @@ impl Transform for LogToMetric {
                         } else {
                             return Some(Event::Metric(Metric::Counter {
                                 name: counter.sanitized_name.to_string(),
-                                val: 1,
+                                val: 1.0,
                                 sampling: None,
                             }));
                         };
@@ -166,7 +166,7 @@ mod tests {
             metric.into_metric(),
             Metric::Counter {
                 name: "status_total".into(),
-                val: 1,
+                val: 1.0,
                 sampling: None
             }
         );
@@ -196,7 +196,7 @@ mod tests {
             metric.into_metric(),
             Metric::Counter {
                 name: "exception_total".into(),
-                val: 1,
+                val: 1.0,
                 sampling: None
             }
         );
@@ -241,7 +241,7 @@ mod tests {
 
         let mut log = Event::from("i am a log");
         log.as_mut_log()
-            .insert_explicit("amount".into(), "33.95".into());
+            .insert_explicit("amount".into(), "33.99".into());
 
         let mut transform = LogToMetric::new(&config);
 
@@ -250,7 +250,7 @@ mod tests {
             metric.into_metric(),
             Metric::Counter {
                 name: "amount_total".into(),
-                val: 33,
+                val: 33.99,
                 sampling: None
             }
         );
@@ -280,7 +280,7 @@ mod tests {
             metric.into_metric(),
             Metric::Gauge {
                 name: "memory_rss_bytes".into(),
-                val: 123,
+                val: 123.0,
                 direction: None,
             }
         );
