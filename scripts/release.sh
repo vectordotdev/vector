@@ -72,59 +72,61 @@ done
 # Make changes necessary to lock in the new version
 #
 
-# _changelog=$(cat CHANGELOG.md | sed "s/$current_version-dev/$current_version/g")
-# echo "$_changelog" > CHANGELOG.md
+_changelog=$(cat CHANGELOG.md | sed "s/$current_version-dev/$current_version/g")
+echo "$_changelog" > CHANGELOG.md
 
-# escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
-# _cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version-dev\"/ s/version = \"$escaped_current_version-dev\"/version = \"$escaped_current_version\"/")
-# echo "$_cargo" > cargo.toml
+escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
+_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version-dev\"/ s/version = \"$escaped_current_version-dev\"/version = \"$escaped_current_version\"/")
+echo "$_cargo" > cargo.toml
 
-# git commit -am "Release v$current_version"
-# git tag v$current_version
-# git checkout -b v$current_version_minor
-# git checkout master
+git commit -am "Release v$current_version"
+git tag -a v$current_version -m "v$current_version"
+git checkout -b v$current_version_minor
+git checkout master
 
 #
 # New version
 # Bump to the new -dev version.
 #
 
-# echo "
-# # Changelog for Vector v$new_version-dev
+echo "
+# Changelog for Vector v$new_version-dev
 
-# All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-# The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
-# and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-# ## v$new_version-dev
+## v$new_version-dev
 
-# ### Added
+### Added
 
-# ### Changed
+### Changed
 
-# ### Deprecated
+### Deprecated
 
-# ### Fixed
+### Fixed
 
-# ### Removed
+### Removed
 
-# ### Security
+### Security
 
-# ## v$current_version_minor.X
+## v$current_version_minor.X
 
-# The CHANGELOG for v$current_version_minor.X releases can be found in the [v$current_version_minor branch](https://github.com/timberio/vector/blob/v$current_version_minor/CHANGELOG.md).
-# " > CHANGELOG.md
+The CHANGELOG for v$current_version_minor.X releases can be found in the [v$current_version_minor branch](https://github.com/timberio/vector/blob/v$current_version_minor/CHANGELOG.md).
+" > CHANGELOG.md
 
-# _cargo=$(cat cargo.toml | sed "s/version = \"$current_version\"/version = \"$current_version\"/g")
-# echo "$_cargo" > cargo.toml
+escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
+escaped_new_version=$(echo $new_version | sed "s/\./\\\./g")
+_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version\"/ s/version = \"$escaped_current_version\"/version = \"$escaped_new_version\"/")
+echo "$_cargo" > cargo.toml
 
-# git commit -am "Start v$new_version-dev"
+git commit -am "Start v$new_version-dev"
 
 #
 # Push
 #
 
-# git push origin
-# git push -u origin v$current_version_minor
-# git push origin v$current_version
+git push origin
+git push -u origin v$current_version_minor
+git push origin v$current_version
