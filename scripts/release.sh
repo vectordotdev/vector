@@ -118,7 +118,7 @@ The CHANGELOG for v$current_version_minor.X releases can be found in the [v$curr
 
 escaped_current_version=$(echo $current_version | sed "s/\./\\\./g")
 escaped_new_version=$(echo $new_version | sed "s/\./\\\./g")
-_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version\"/ s/version = \"$escaped_current_version\"/version = \"$escaped_new_version\"/")
+_cargo=$(cat cargo.toml | sed "1,/version = \"$escaped_current_version\"/ s/version = \"$escaped_current_version\"/version = \"$escaped_new_version-dev\"/")
 echo "$_cargo" > cargo.toml
 
 git commit -am "Start v$new_version-dev"
