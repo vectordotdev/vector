@@ -7,5 +7,5 @@ edition = "2018"
 [dependencies]
 bytes = { version = "0.4.10", features = ["serde"] }
 tokio-codec = "0.1"
-tokio-trace = "0.1"
+tracing = "0.1"
 serde_json = "1.0.33"

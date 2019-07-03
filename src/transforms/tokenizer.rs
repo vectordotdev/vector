@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use tokio_trace::field;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]

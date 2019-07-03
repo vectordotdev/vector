@@ -6,7 +6,7 @@ use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
-use tokio_trace::field;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

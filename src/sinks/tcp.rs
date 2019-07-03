@@ -14,7 +14,7 @@ use tokio::{
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_trace::field;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]

@@ -11,7 +11,7 @@ use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
-use tokio_trace::field;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -129,7 +129,7 @@ impl PrometheusSink {
                     method = field::debug(req.method()),
                     path = field::debug(req.uri().path()),
                 )
-                .enter(|| handle(req, &registry))
+                .in_scope(|| handle(req, &registry))
             })
         };
 

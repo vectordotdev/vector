@@ -2,7 +2,7 @@ extern crate bytes;
 extern crate tokio_codec;
 
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use std::{cmp, io, usize};

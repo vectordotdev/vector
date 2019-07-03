@@ -3,7 +3,7 @@ use crate::event::{self, Event, ValueKind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
-use tokio_trace::field;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]

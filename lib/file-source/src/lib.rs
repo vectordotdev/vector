@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 
 pub mod file_server;
 mod file_watcher;

@@ -12,8 +12,8 @@ use tokio::{
     net::TcpListener,
     timer,
 };
-use tokio_trace::field;
-use tokio_trace_futures::Instrument;
+use tracing::field;
+use tracing_futures::Instrument;
 
 pub trait TcpSource: Clone + Send + 'static {
     type Decoder: Decoder<Error = io::Error> + Send + 'static;
@@ -86,7 +86,7 @@ pub trait TcpSource: Clone + Send + 'static {
                         .map_err(|_| ());
 
                     let source = self.clone();
-                    span.enter(|| {
+                    span.in_scope(|| {
                         debug!("accepted a new socket.");
 
                         let out = out.clone();
@@ -103,8 +103,10 @@ pub trait TcpSource: Clone + Send + 'static {
 
                         let handler = events_in.forward(out).map(|_| debug!("connection closed"));
 
-                        tokio::spawn(handler.instrument(span.clone()))
-                    })
+                        tokio::spawn(handler.instrument(span.clone()));
+                    });
+
+                    Ok(())
                 })
                 .inspect(|_| trigger.cancel());
             future::Either::A(future)

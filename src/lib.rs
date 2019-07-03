@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
 
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 #[macro_use]
 extern crate prost_derive;
 #[macro_use]

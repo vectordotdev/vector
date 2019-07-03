@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 
 use futures::{future, Future, Stream};
 use std::{
@@ -10,9 +10,9 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-use tokio_trace::{field, Dispatch};
-use tokio_trace_futures::Instrument;
 use trace_metrics::MetricsSubscriber;
+use tracing::{field, Dispatch};
+use tracing_futures::Instrument;
 use vector::{metrics, topology};
 
 #[derive(StructOpt, Debug)]
@@ -69,11 +69,10 @@ fn main() {
         levels.push_str(&additional_level);
     };
 
-    let subscriber = tokio_trace_fmt::FmtSubscriber::builder()
-        .with_filter(tokio_trace_fmt::filter::EnvFilter::from(levels.as_str()))
-        .full()
+    let subscriber = tracing_fmt::FmtSubscriber::builder()
+        .with_filter(tracing_fmt::filter::EnvFilter::from(levels.as_str()))
         .finish();
-    tokio_trace_env_logger::try_init().expect("init log adapter");
+    tracing_env_logger::try_init().expect("init log adapter");
 
     let (metrics_controller, metrics_sink) = metrics::build();
     let dispatch = if opts.metrics_addr.is_some() {
@@ -82,7 +81,7 @@ fn main() {
         Dispatch::new(subscriber)
     };
 
-    tokio_trace::dispatcher::with_default(&dispatch, || {
+    tracing::dispatcher::with_default(&dispatch, || {
         info!("Log level {:?} is enabled.", level);
 
         if let Some(threads) = opts.threads {
