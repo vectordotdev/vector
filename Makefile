@@ -14,7 +14,26 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 bench: ## Run internal benchmarks
-	@cargo bench
+	@cargo bench --all
+
+run:
+	@cargo run
+
+build:
+	@cargo build
+
+check:
+	@cargo check --all --all-features --all-targets
+
+test: ## Run tests
+	@docker-compose up -d
+	@cargo test --all --features docker -- --test-threads 4
+
+test-simple:
+	@cargo test --all -- --test-threads=4
+
+fmt:
+	@cargo fmt
 
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 	@scripts/build-archive.sh
@@ -52,9 +71,6 @@ release-rpm: ## Release .rpm via Package Cloud
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
-
-test: ## Run tests
-	@cargo test --all --features docker -- --test-threads 4
 
 version: ## Get the current Vector version
 	@scripts/version.sh

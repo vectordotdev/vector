@@ -93,7 +93,7 @@ jobs:
       - checkout
       - run:
           name: Test
-          command: make test
+          command: cargo test --all --features docker -- --test-threads 8
       - store_test_results:
           path: ./test-results
 

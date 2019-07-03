@@ -9,12 +9,12 @@ This document covers the basics of developing in Vector. In this document:
 1. [Directory Structure](#directory-structure)
 1. [Makefile](#makefile)
 1. [Testing](#testing)
-   1. [Docker](#docker)
    1. [Sample Logs](#sample-logs)
-1. [Benchmarking](#benchmarking)
-1. [Building](#building)
 1. [Testing](#testing-1)
-1. [Benchmarking](#benchmarking-1)
+1. [Building](#building)
+1. [Checking](#checking)
+1. [Running](#running)
+1. [Benchmarking](#benchmarking)
 1. [CI](#ci)
 1. [Code Style](#code-style)
 
@@ -29,13 +29,13 @@ This document covers the basics of developing in Vector. In this document:
 
 ## Setup
 
-1. Install Rust:
+1. Install Rust via [`rustup`](https://rustup.rs/):
 
    ```bash
    curl https://sh.rustup.rs -sSf | sh
    ```
 
-2. [Install Docker](https://docs.docker.com/docker-for-mac/install/). Docker
+2. [Install Docker](https://docs.docker.com/install/). Docker
    containers are used for mocking Vector's integrations.
 
 ## Directory Structure
@@ -44,7 +44,7 @@ This document covers the basics of developing in Vector. In this document:
 * [`/config`](/config) - Public facing Vector config, included in releases.
 * [`/distribution`](/distribution) - Distribution artifacts for various targets.
 * [`/docs`](/docs) - https://docs.vector.dev source.
-* [`/lib`](/lib) - External libraries.
+* [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 * [`/proto`](/proto) - Protobuf definitions.
 * [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
 * [`/tests`](/tests) - Various high-level test cases.
@@ -55,67 +55,78 @@ Vector includes a [`Makefile`](/Makefile) that exposes top-level commands. Ex:
 
 - `make test`
 - `make build`
+- `make check`
+- `make run`
+- `make bench`
 - `make generate_docs`
 
 The various commands are below within their respective sections.
 
 ## Testing
 
+This command will attempt to run `docker-compose up -d` then follow up with `cargo test --features docker` command. Currently, it limits the test threads to 4 as we spin up many `tokio` runtimes which sometimes causes fd limit exceeded errors.
+ 
 ```bash
 make test
 ```
 
-### Docker
+Testing is a bit more complicated, this is because to test all the sinks we need to stand
+up local mock versions of the sources we send logs too. To do this we use `docker` and 
+`docker-compose` to stand up this environment. To run the full test suit you can run
 
-We use docker to mock out external services for our tests. The `make test`
-command calls `docker-compose up -d` which is defined by the
-`docker-compose.yml` file.
+```bash
+# To run every test
+make test
+
+# To test things that do not require docker
+make test-simple
+```
 
 ### Sample Logs
 
 We use `flog` to build a sample set of log files to test sending logs from a file. This can
-be done with the following commands on mac with homebrew.
+be done with the following commands on mac with homebrew. Installation instruction for flog can be found [here](https://github.com/mingrammer/flog#installation).
 
 ```bash
-brew tap mingrammer/flog
-brew install flog
-$ flog --bytes $((100 * 1024 * 1024)) > sample.log
+flog --bytes $((100 * 1024 * 1024)) > sample.log
 ```
 
 This will create a `100MiB` sample log file in the `sample.log` file.
 
-## Benchmarking
-
-```bash
-make bench
-```
-
 ## Building
+
+This will _compile_ the `vector` project in _debug_ mode. Be aware that this mode is not optimized and may run slow. Generally speaking, `make build` can be quite slow and poor for quick feedback. In most cases while developing `vector` you may want to use `make check` instead.
 
 ```bash
 make build
 ```
 
-## Testing
+## Checking
 
-Testing is a bit more complicated, this because to test all the sinks we need to stand
-up local mock versions of the sources we send logs too. To do this we use `docker` and 
-`docker-compose` to stand up this environment. To run the full test suit you can run
+This command will internally call `cargo check` which runs all the checks the compiler would run normally without actually doing any linking or codegen. This is a lot quicker than running `make build` and is perfect for when you want to get quick feedback. To ensure that you check every code path this will check every feature, every target (including tests and benches), and test every crate in the workspace. This command is what is run on the `check-stable` CI job.
 
 ```bash
-# Test everything that does not require docker
-cargo test -- --test-threads=4
+make check
+```
 
-# Test everything that can also be tested with docker
-cargo test --features docker
+## Running
+
+Vector can also be run in debug mode via calling `make run`. Though this may not be sufficient since you may need to pass arguments to the `vector` binary. To do this you can do the following:
+
+```bash
+# To run it simply
+make run
+
+# To run it with a custom config
+cargo run -- -c <path to config>
 ```
 
 ## Benchmarking
 
-You can run the internal project benchmarks with
+This will run our internal set of benchmarks mainly used for find regressions and comparing implementations. All the benchmarks live within `/benches`.
 
-```
-cargo bench
+```bash
+make bench
 ```
 
 ## CI
@@ -132,5 +143,9 @@ this format style. To run the following command make sure `rustfmt` has been ins
 the stable toolchain locally.
 
 ```bash
-cargo fmt
+# To install rustfmt
+rustup component add rustfmt
+
+# To format the code
+make fmt
 ```
