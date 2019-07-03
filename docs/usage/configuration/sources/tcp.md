@@ -124,11 +124,11 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 {
   "timestamp": <timestamp> # current time,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
-  "host": "10.2.22.122" # current nostname
+  "host": "10.2.22.122" # current hostname
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
