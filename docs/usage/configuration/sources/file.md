@@ -27,8 +27,8 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 [sources.my_file_source]
   # REQUIRED - General
   type = "file" # must be: file
-  exclude = ["/var/log/nginx*.log"]
-  include = ["/var/log/nginx*.log"]
+  exclude = ["/var/log/nginx/access.log"]
+  include = ["/var/log/nginx/*.log"]
 
   # OPTIONAL - General
   ignore_older = 86400 # no default, seconds
@@ -70,10 +70,10 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
-  exclude = ["/var/log/nginx*.log"]
+  exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
-  include = ["/var/log/nginx*.log"]
+  include = ["/var/log/nginx/*.log"]
 
   # OPTIONAL - General
 
@@ -150,13 +150,13 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
   "timestamp": <timestamp> # current time,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
   "file": "/var/log/rails.log", # original file
-  "host": "10.2.22.122" # current nostname
+  "host": "10.2.22.122" # current hostname
 }
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
 
 
 
@@ -165,7 +165,7 @@ The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as conte
 
 ### Auto Discovery
 
-Vector will continually look for new files matching any of your include patterns. If a new file is added that matches any of the supplied patterns, Vector will begin tailing it. Vector maintains a unique list of files and will not tail a file more than once, even if it matches multiple patterns. You can read more about how we identify file in the Identification section.
+Vector will continually look for new files matching any of your include patterns. If a new file is added that matches any of the supplied patterns, Vector will begin tailing it. Vector maintains a unique list of files and will not tail a file more than once, even if it matches multiple patterns. You can read more about how we identify a file in the [Identification](#file-identification) section.
 
 ### Context
 
