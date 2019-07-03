@@ -14,7 +14,23 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 bench: ## Run internal benchmarks
-	@cargo bench
+	@cargo bench --all
+
+run: ## Starts Vector in development mode
+	@cargo run
+
+build: ## Build the project
+	@cargo build
+
+check: ## Check all code
+	@cargo check --all --all-features --all-targets
+
+test: ## Spins up Docker resources and runs _every_ test
+	@docker-compose up -d
+	@cargo test --all --features docker -- --test-threads 4
+
+fmt: ## Format code
+	@cargo fmt
 
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 	@scripts/build-archive.sh
@@ -55,9 +71,6 @@ release-s3: ## Release artifacts to S3
 
 signoff: ## Signsoff all previous commits since branch creation
 	@scripts/signoff.sh
-
-test: ## Run tests
-	@cargo test --all --features docker -- --test-threads 4
 
 version: ## Get the current Vector version
 	@scripts/version.sh
