@@ -365,7 +365,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric::Counter {
                 name: "exception_total".into(),
-                val: 1,
+                val: 1.0,
                 sampling: None
             }
         );
@@ -373,7 +373,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric::Counter {
                 name: "status_total".into(),
-                val: 1,
+                val: 1.0,
                 sampling: None
             }
         );
