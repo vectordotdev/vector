@@ -1,56 +1,87 @@
 # Contributing
 
-First, thank you for contributing to Vector! We know how important a
-strong community is to open source and we welcome anyone that is willing
-to particpate.
+First, thank you for contributing to Vector! Our goal is to make it as easy
+as possible to contribute while still protecting users of Vector.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
+1. Your commits must include a [DCO](https://developercertificate.org/) signature.
+   This is simpler than it sounds; it just means that all of your commits
+   must contain:
 
-1. [Prerequisites](#prerequisites)
-1. [Workflow](#workflow)
-1. [Getting Started](#getting-started)
-1. [Developing](#developing)
-1. [Documenting](#documenting)
-1. [Pull Request Process](#pull-request-process)
+   ```
+   Signed-off-by: Joe Smith <joe.smith@email.com>
+   ```
 
-<!-- /MarkdownTOC -->
+   Git makes this easy by adding the `-s` or `--signoff` flags when you commit:
 
+   ```bash
+   git commit -sm 'My commit message'
+   ```
 
-## Prerequisites
+2. Open a pull request.
+3. At least one Vector team member must approve your work before merging.
 
-1. **You are familiar with the [docs](https://docs.vector.dev).**
-2. **You have read the [code of conduct](/CODE_OF_CONDUCT.md)**
+## FAQ
 
-## Workflow
+### What is a DCO?
 
-1. [Github issues][issues] for bug and feature tracking.
-2. Github [milestones] are used for Roadmap planning.
-3. All new work should be contained in a branch.
-4. Pull requests are submittted for review. See the
-   [pull request process](#pull-request-process).
+DCO stands for Developer Certificate of Origin and is maintained by the
+[Linux Foundation](https://www.linuxfoundation.org). It is an attestation
+attached to every commit made by every developer. It ensures that all commited
+code adheres to the Vector license (Apache 2.0).
 
-## Getting Started
+### Why does Vector adopt the DCO?
 
-Vector maintains a [`Meta: Good first issue` label][good_first_issues].
-These are excellent simple issues that will help you get acclimated with
-the Vector project.
+To protect the users of Vector. It ensures that all code commited to Vector
+adheres to the Vector license (Apache 2.0).
 
-## Developing
+### Why a DCO instead of a CLA?
 
-Please see the [DEVELOPING.md](/DEVELOPING.md) guide.
+It's simpler, clearer, and still protects users of Vector. We believe the DCO
+more accurately embodies the principles of open-source. More info can be found
+here:
 
-## Documenting
+* [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
+* [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
 
-Please see the [DOCUMENTING.md](/DOCUMENTING.md) guide.
+### What about trivial changes?
 
-## Pull Request Process
+Trivial changes, such as spelling fixes, do not need to be signed.
 
-- [ ] Update the [`CHANGELOG.md`](/CHANGELOG.md) if necessary.
-- [ ] Update the [`scripts/metadata.toml`](/scripts/metadata.toml)
-      if necessary. Run `cargo make docs` sync changes across the docs.
-- [ ] You may merge the Pull Request once you have an approved pull request
-      review from a team member.
+### Granted rights and copyright assignment
 
-[good_first_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Meta%3A+Good+first+issue%22
-[issues]: https://github.com/timberio/vector/issues
-[milestones]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
+It is important to note that the DCO is not a license. The license of the
+project – in our case the Apache License – is the license under which the
+contribution is made. However, the DCO in conjunction with the Apache License
+may be considered an alternate CLA.
+
+The existence of section 5 of the Apache License is proof that the Apache
+License is intended to be usable without CLAs. Users need for the code to be
+open source, with all the legal rights that implies, but it is the open source
+license that provides this. The Apache License provides very generous
+copyright permissions from contributors, and contributors explicitly grant
+patent licenses as well. These rights are granted to everyone.
+
+### If I’m contributing while an employee, do I still need my employer to sign something?
+
+Nope! The DCO confirms that you are entitled to submit the code, which assumes
+that you are authorized to do so.  It treats you like an adult and relies on
+your accurate statement about your rights to submit a contribution.  
+
+### What if I forgot to sign my commits?
+
+No probs! We made this simple with the [`signoff` Makefile target](Makefile):
+
+```bash
+make signoff
+```
+
+If you prefer to do this manually:
+
+https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
+
+## Credits
+
+**Many thanks to the [Apache](http://www.apache.org/) and
+[Linux](https://www.linuxfoundation.org/) software foundatons for providing
+the framework and inspiration for these agreements.**
+

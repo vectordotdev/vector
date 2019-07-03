@@ -72,5 +72,8 @@ release-rpm: ## Release .rpm via Package Cloud
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
+signoff: ## Signsoff all previous commits since branch creation
+	@scripts/signoff.sh
+
 version: ## Get the current Vector version
 	@scripts/version.sh

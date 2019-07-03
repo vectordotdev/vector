@@ -9,5 +9,6 @@ Include any "Closes #123" or "Ref #123" statements.
 
 ### TODO
 
-- [ ] `CHANGELOG.md` has been updated to reflect noteworthy changes
-- [ ] `scripts/metadata.toml` has been updated to reflect configuration changes
+- [ ] All commits are signed as required by the DCO (see CONTRIBUTING.md)
+- [ ] The CHANGELOG.md has been updated to reflect noteworthy changes
+- [ ] Documentation has been updated to reflect changes (see DOCUMENTING.md)
