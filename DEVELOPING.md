@@ -95,7 +95,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 ## Building
 
-This will _compile_ the `vector` project in _debug_ mode. Be aware that this mode is not optimized and may run slow. Generally speaking, `make build` can be quite slow and poor for quick feedback. In most cases while developing `vector` you may want to use `make check` instead.
+This will _compile_ the `vector` project in _debug_ mode. Be aware that this mode is not optimized and may run slowly. Generally speaking, `make build` can be quite slow and poor for quick feedback. In most cases while developing `vector` you may want to use `make check` instead.
 
 ```bash
 make build
