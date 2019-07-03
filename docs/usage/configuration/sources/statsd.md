@@ -89,7 +89,7 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% endcode-tabs %}
 
 {% endtab %}
-{% tab title="Guage" %}
+{% tab title="Gauge" %}
 Given the following Statsd guage:
 
 ```
