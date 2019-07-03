@@ -2,17 +2,17 @@
 pub enum Metric {
     Counter {
         name: String,
-        val: u32,
+        val: f32,
         sampling: Option<f32>,
     },
     Timer {
         name: String,
-        val: u32,
+        val: f32,
         sampling: Option<f32>,
     },
     Gauge {
         name: String,
-        val: u32,
+        val: f32,
         direction: Option<Direction>,
     },
     Set {
