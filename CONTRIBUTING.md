@@ -27,12 +27,12 @@ as possible to contribute while still protecting users of Vector.
 DCO stands for Developer Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
 attached to every commit made by every developer. It ensures that all commited
-code adheres to the Vector license (Apache 2.0).
+code adheres to the [Vector license](LICENSE.md) (Apache 2.0).
 
 ### Why does Vector adopt the DCO?
 
-To protect the users of Vector. It ensures that all code commited to Vector
-adheres to the Vector license (Apache 2.0).
+To protect the users of Vector. It ensures that all Vector contributors, and
+committed code, agree to the [Vector license](LICENSE.md).
 
 ### Why a DCO instead of a CLA?
 
@@ -81,7 +81,7 @@ https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
 
 ## Credits
 
-**Many thanks to the [Apache](http://www.apache.org/) and
+*Many thanks to the [Apache](http://www.apache.org/) and
 [Linux](https://www.linuxfoundation.org/) software foundatons for providing
-the framework and inspiration for these agreements.**
+the framework and inspiration for these agreements.*
 
