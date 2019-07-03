@@ -50,10 +50,10 @@ tokio-threadpool = "0.1.8"
 
 # Tracing
 tracing = "0.1"
-tracing-futures = { git = "https://github.com/tokio-rs/tracing", branch = "fix-deps" }
-tracing-fmt = { git = "https://github.com/tokio-rs/tracing", branch = "fix-deps" }
-tracing-env-logger = { git = "https://github.com/tokio-rs/tracing", branch = "fix-deps" }
-tracing-tower-http = { git = "https://github.com/tokio-rs/tracing", branch = "fix-deps" }
+tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
+tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
+tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
+tracing-tower-http = { git = "https://github.com/tokio-rs/tracing" }
 
 # Metrics
 hotmic = "0.8"
