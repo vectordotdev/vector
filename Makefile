@@ -16,23 +16,20 @@ help:
 bench: ## Run internal benchmarks
 	@cargo bench --all
 
-run:
+run: ## Starts Vector in development mode
 	@cargo run
 
-build:
+build: ## Build the project
 	@cargo build
 
-check:
+check: ## Check all code
 	@cargo check --all --all-features --all-targets
 
-test: ## Run tests
+test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
 
-test-simple:
-	@cargo test --all -- --test-threads=4
-
-fmt:
+fmt: ## Format code
 	@cargo fmt
 
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
