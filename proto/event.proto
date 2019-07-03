@@ -38,13 +38,12 @@ message Metric {
 message Counter {
   string name = 1;
   float val = 2;
-  float sampling = 3;
 }
 
 message Timer {
   string name = 1;
   float val = 2;
-  float sampling = 3;
+  float count = 3;
 }
 
 message Gauge {

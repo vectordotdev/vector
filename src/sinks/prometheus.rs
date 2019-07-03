@@ -156,12 +156,9 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         match event.into_metric() {
-            Metric::Counter {
-                name,
-                val,
-                // TODO: take sampling into account
-                sampling: _,
-            } => self.with_counter(name, |counter| counter.inc_by(val as f64)),
+            Metric::Counter { name, val } => {
+                self.with_counter(name, |counter| counter.inc_by(val as f64))
+            }
             Metric::Gauge {
                 name,
                 val,
