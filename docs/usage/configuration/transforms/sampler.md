@@ -27,11 +27,11 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
 [transforms.my_sampler_transform_id]
   # REQUIRED - General
   type = "sampler" # must be: sampler
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
-  pass_list = ["\"[error]\"", "\"field2\""] # no default
-  rate = ["\"field1\"", "\"field2\""] # no default
+  pass_list = ["[error]", "field2"] # no default
+  rate = ["field1", "field2"] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
@@ -57,7 +57,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   type = "sampler"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 
@@ -66,12 +66,12 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   # sampled.
   #
   # * no default
-  pass_list = ["\"[error]\"", "\"field2\""]
+  pass_list = ["[error]", "field2"]
 
   # The maximum number of events allowed per second.
   #
   # * no default
-  rate = ["\"field1\"", "\"field2\""]
+  rate = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

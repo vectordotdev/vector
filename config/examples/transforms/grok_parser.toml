@@ -6,7 +6,7 @@
 [transforms.my_grok_parser_transform]
   # REQUIRED - General
   type = "grok_parser" # must be: grok_parser
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   # OPTIONAL - General

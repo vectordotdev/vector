@@ -6,7 +6,7 @@
 [transforms.my_add_fields_transform]
   # REQUIRED - General
   type = "add_fields" # must be: add_fields
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # REQUIRED - Fields
   [transforms.my_add_fields_transform.fields]

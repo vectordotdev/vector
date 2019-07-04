@@ -27,7 +27,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: aws_cloudwatch_logs
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   group_name = "/var/log/my-log.log"
   region = "us-east-1"
   stream_name = "my-stream"
@@ -95,7 +95,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
   type = "aws_cloudwatch_logs"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The group name of the target CloudWatch Logs stream.
   group_name = "/var/log/my-log.log"

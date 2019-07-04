@@ -6,7 +6,7 @@
 [transforms.my_lua_transform]
   # REQUIRED - General
   type = "lua" # must be: lua
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -21,4 +21,4 @@
 
 
   # OPTIONAL - General
-  search_dirs = ["\"/etc/vector/lua\""] # no default
+  search_dirs = ["/etc/vector/lua"] # no default

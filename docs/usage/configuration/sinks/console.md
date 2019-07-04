@@ -25,7 +25,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 [sinks.my_console_sink_id]
   # REQUIRED - General
   type = "console" # must be: console
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
   encoding = "json" # no default, enum: json, text
@@ -69,7 +69,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
   type = "console"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 

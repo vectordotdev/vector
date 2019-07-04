@@ -25,7 +25,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 [transforms.my_regex_parser_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: regex_parser
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
   # OPTIONAL - General
@@ -73,7 +73,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   type = "regex_parser"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"

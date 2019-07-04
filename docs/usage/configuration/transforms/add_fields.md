@@ -25,7 +25,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 [transforms.my_add_fields_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: add_fields
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # REQUIRED - Fields
   [transforms.my_add_fields_transform_id.fields]
@@ -60,7 +60,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   type = "add_fields"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # REQUIRED - Fields
   [transforms.add_fields.fields]

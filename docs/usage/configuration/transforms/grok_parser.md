@@ -25,7 +25,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 [transforms.my_grok_parser_transform_id]
   # REQUIRED - General
   type = "grok_parser" # must be: grok_parser
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   # OPTIONAL - General
@@ -57,7 +57,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   type = "grok_parser"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The Grok pattern
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"

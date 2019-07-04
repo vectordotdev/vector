@@ -27,7 +27,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][docs.log_event] events 
 [sinks.my_aws_kinesis_streams_sink_id]
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: aws_kinesis_streams
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   region = "us-east-1"
   stream_name = "my-stream"
 
@@ -93,7 +93,7 @@ The `aws_kinesis_streams` sink batch and flushes [`log`][docs.log_event] events 
   type = "aws_kinesis_streams"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The AWS region of the target CloudWatch Logs stream resides.
   region = "us-east-1"

@@ -25,7 +25,7 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
 [sinks.my_http_sink_id]
   # REQUIRED - General
   type = "http" # must be: http
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   encoding = "ndjson" # enum: ndjson, text
   uri = "https://10.22.212.22:9000/endpoint"
 
@@ -115,7 +115,7 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
   type = "http"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing.
   #

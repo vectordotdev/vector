@@ -27,8 +27,8 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 [sources.my_file_source_id]
   # REQUIRED - General
   type = "file" # must be: file
-  exclude = ["\"/var/log/nginx*.log\""]
-  include = ["\"/var/log/nginx*.log\""]
+  exclude = ["/var/log/nginx*.log"]
+  include = ["/var/log/nginx*.log"]
 
   # OPTIONAL - General
   ignore_older = 86400 # no default, seconds
@@ -70,10 +70,10 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
-  exclude = ["\"/var/log/nginx*.log\""]
+  exclude = ["/var/log/nginx*.log"]
 
   # Array of file patterns to include. Globbing is supported.
-  include = ["\"/var/log/nginx*.log\""]
+  include = ["/var/log/nginx*.log"]
 
   # OPTIONAL - General
 

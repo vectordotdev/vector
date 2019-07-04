@@ -25,8 +25,8 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
 [transforms.my_remove_fields_transform_id]
   # REQUIRED - General
   type = "remove_fields" # must be: remove_fields
-  inputs = ["\"my-source-id\""]
-  fields = ["\"field1\"", "\"field2\""]
+  inputs = ["my-source-id"]
+  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
@@ -49,10 +49,10 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   type = "remove_fields"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The field names to drop.
-  fields = ["\"field1\"", "\"field2\""]
+  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

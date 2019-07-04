@@ -25,7 +25,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
 [sinks.my_splunk_hec_sink_id]
   # REQUIRED - General
   type = "splunk_hec" # must be: splunk_hec
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
   host = "my-splunk-host.com" # no default
@@ -95,7 +95,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
   type = "splunk_hec"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 

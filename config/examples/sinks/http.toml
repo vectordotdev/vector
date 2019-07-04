@@ -6,7 +6,7 @@
 [sinks.my_http_sink]
   # REQUIRED - General
   type = "http" # must be: http
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   encoding = "ndjson" # enum: ndjson, text
   uri = "https://10.22.212.22:9000/endpoint"
 

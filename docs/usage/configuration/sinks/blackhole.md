@@ -25,7 +25,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 [sinks.my_blackhole_sink_id]
   # REQUIRED - General
   type = "blackhole" # must be: blackhole
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   print_amount = "1000"
 
   # OPTIONAL - Buffer
@@ -63,7 +63,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
   type = "blackhole"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The number of events that must be received in order to print a summary of
   # activity.

@@ -25,7 +25,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
 [transforms.my_json_parser_transform_id]
   # REQUIRED - General
   type = "json_parser" # must be: json_parser
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
   drop_invalid = true # no default
@@ -55,7 +55,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
   type = "json_parser"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 

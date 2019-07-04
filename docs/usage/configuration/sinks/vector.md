@@ -25,7 +25,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 [sinks.my_vector_sink_id]
   # REQUIRED - General
   type = "vector" # must be: vector
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
@@ -67,7 +67,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
   type = "vector"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 

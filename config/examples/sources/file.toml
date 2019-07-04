@@ -6,8 +6,8 @@
 [sources.my_file_source]
   # REQUIRED - General
   type = "file" # must be: file
-  exclude = ["\"/var/log/nginx*.log\""]
-  include = ["\"/var/log/nginx*.log\""]
+  exclude = ["/var/log/nginx*.log"]
+  include = ["/var/log/nginx*.log"]
 
   # OPTIONAL - General
   ignore_older = 86400 # no default, seconds

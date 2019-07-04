@@ -25,8 +25,8 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 [transforms.my_tokenizer_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: tokenizer
-  inputs = ["\"my-source-id\""]
-  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
+  inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
 
   # OPTIONAL - General
   drop_field = true # default
@@ -71,10 +71,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   type = "tokenizer"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The field names assigned to the resulting tokens, in order.
-  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
+  field_names = ["timestamp", "level", "message"]
 
   # OPTIONAL - General
 

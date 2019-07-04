@@ -6,7 +6,7 @@
 [sinks.my_aws_kinesis_streams_sink]
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: aws_kinesis_streams
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   region = "us-east-1"
   stream_name = "my-stream"
 

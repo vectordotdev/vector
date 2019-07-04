@@ -25,7 +25,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 [sinks.my_tcp_sink_id]
   # REQUIRED - General
   type = "tcp" # must be: tcp
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
@@ -73,7 +73,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
   type = "tcp"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # OPTIONAL - General
 

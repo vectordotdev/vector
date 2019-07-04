@@ -27,7 +27,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 [sinks.my_aws_s3_sink_id]
   # REQUIRED - General
   type = "aws_s3" # must be: aws_s3
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
 
@@ -107,7 +107,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
   type = "aws_s3"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   bucket = "my-bucket"

@@ -6,6 +6,6 @@
 [transforms.my_field_filter_transform]
   # REQUIRED - General
   type = "field_filter" # must be: field_filter
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   field = "file"
   value = "/var/log/nginx.log"

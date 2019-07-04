@@ -27,7 +27,7 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
 [sinks.my_elasticsearch_sink_id]
   # REQUIRED - General
   type = "elasticsearch" # must be: elasticsearch
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
 
   # OPTIONAL - General
@@ -97,7 +97,7 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
   type = "elasticsearch"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example.

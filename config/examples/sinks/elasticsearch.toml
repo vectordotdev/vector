@@ -6,7 +6,7 @@
 [sinks.my_elasticsearch_sink]
   # REQUIRED - General
   type = "elasticsearch" # must be: elasticsearch
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
 
   # OPTIONAL - General

@@ -6,7 +6,7 @@
 [sinks.my_kafka_sink]
   # REQUIRED - General
   type = "kafka" # must be: kafka
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   topic = "topic-1234"
 

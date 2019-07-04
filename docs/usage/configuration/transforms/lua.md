@@ -27,7 +27,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 [transforms.my_lua_transform_id]
   # REQUIRED - General
   type = "lua" # must be: lua
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -42,7 +42,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 
 
   # OPTIONAL - General
-  search_dirs = ["\"/etc/vector/lua\""] # no default
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
@@ -68,7 +68,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   type = "lua"
 
   # A list of upstream source for more info.
-  inputs = ["\"my-source-id\""]
+  inputs = ["my-source-id"]
 
   # The inline Lua source to evaluate.
   source = """
@@ -90,7 +90,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   # function.
   #
   # * no default
-  search_dirs = ["\"/etc/vector/lua\""]
+  search_dirs = ["/etc/vector/lua"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

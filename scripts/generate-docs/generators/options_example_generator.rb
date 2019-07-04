@@ -153,7 +153,7 @@ class OptionsExampleGenerator < Generator
         "{" + values.join(", ") + "}"
       elsif value.is_a?(Array)
         values = value.collect { |value| to_toml_value(value) }
-        values.inspect
+        "[" + values.join(", ") + "]"
       elsif value.is_a?(Time)
         value.iso8601(6)
       elsif value.is_a?(String) && value.include?("\n")
