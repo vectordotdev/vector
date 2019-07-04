@@ -69,10 +69,10 @@ data_dir = "/var/lib/vector"
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
-  exclude = ["/var/log/nginx*.log"]
+  exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
-  include = ["/var/log/nginx*.log"]
+  include = ["/var/log/nginx/*.log"]
 
   # OPTIONAL - General
 

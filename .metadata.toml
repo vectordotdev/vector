@@ -154,7 +154,7 @@ context. You can further parse the `"message"` key with a \
 [sources.file.options.include]
 type = "[string]"
 null = false
-examples = [["/var/log/nginx*.log"]]
+examples = [["/var/log/nginx/*.log"]]
 description = """\
 Array of file patterns to include. [Globbing](#globbing) is supported.\
 """
@@ -162,7 +162,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 [sources.file.options.exclude]
 type = "[string]"
 null = false
-examples = [["/var/log/nginx*.log"]]
+examples = [["/var/log/nginx/access.log"]]
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
@@ -226,7 +226,7 @@ include patterns. If a new file is added that matches any of the \
 supplied patterns, Vector will begin tailing it. Vector maintains a \
 unique list of files and will not tail a file more than once, even \
 if it matches multiple patterns. You can read more about how we \
-identify file in the Identification section.\
+identify a file in the [Identification](#file-identification) section.\
 """
 
 [[sources.file.sections]]
@@ -630,13 +630,13 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 {
   "timestamp": <timestamp> # current time,
   "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
-  "host": "10.2.22.122" # current nostname
+  "host": "10.2.22.122" # current hostname
 }
 ```
 
 The "timestamp" and `"host"` keys were automatically added as \
 context. You can further parse the `"message"` key with a \
-[transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+[transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 """

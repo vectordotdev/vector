@@ -27,8 +27,8 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 [sources.my_file_source_id]
   # REQUIRED - General
   type = "file" # must be: file
-  exclude = ["/var/log/nginx*.log"]
-  include = ["/var/log/nginx*.log"]
+  exclude = ["/var/log/nginx/access.log"]
+  include = ["/var/log/nginx/*.log"]
 
   # OPTIONAL - General
   ignore_older = 86400 # no default, seconds
@@ -70,10 +70,10 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
-  exclude = ["/var/log/nginx*.log"]
+  exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
-  include = ["/var/log/nginx*.log"]
+  include = ["/var/log/nginx/*.log"]
 
   # OPTIONAL - General
 
@@ -117,8 +117,8 @@ The `file` source continuously ingests [`log`][docs.log_event] events through on
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "file"` |
-| `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx*.log"]` |
-| `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx*.log"]` |
+| `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
+| `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [File Rotation](#file-rotation) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
@@ -165,7 +165,7 @@ The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as conte
 
 ### Auto Discovery
 
-Vector will continually look for new files matching any of your include patterns. If a new file is added that matches any of the supplied patterns, Vector will begin tailing it. Vector maintains a unique list of files and will not tail a file more than once, even if it matches multiple patterns. You can read more about how we identify file in the Identification section.
+Vector will continually look for new files matching any of your include patterns. If a new file is added that matches any of the supplied patterns, Vector will begin tailing it. Vector maintains a unique list of files and will not tail a file more than once, even if it matches multiple patterns. You can read more about how we identify a file in the [Identification](#file-identification) section.
 
 ### Context
 
