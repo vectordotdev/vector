@@ -146,16 +146,6 @@ impl RunningTopology {
         .map_err(|_| ())
     }
 
-    pub fn load_config_and_spawn(
-        &mut self,
-        new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
-        exit_after: Option<Stage>,
-        require_healthy: bool,
-    ) -> bool {
-        self.reload_config_and_respawn(new_config, rt, exit_after, require_healthy, true)
-    }
-
     pub fn reload_config_on_hot(
         &mut self,
         new_config: Config,
