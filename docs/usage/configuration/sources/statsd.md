@@ -89,8 +89,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% endcode-tabs %}
 
 {% endtab %}
-{% tab title="Guage" %}
-Given the following Statsd guage:
+{% tab title="Gauge" %}
+Given the following Statsd gauge:
 
 ```
 gas_tank:0.50|g
@@ -102,7 +102,7 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% code-tabs-item title="metric" %}
 ```javascript
 {
-  "guage": {
+  "gauge": {
     "name": "gas_tank",
     "val": 0.5
   }

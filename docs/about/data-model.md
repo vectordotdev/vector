@@ -177,7 +177,7 @@ to address core issues such as supporting [histograms][url.issue_384] and
 {% endhint %}
 
 Vector characterizes a "metric" as an individual measurement with any number
-of labels. The measure must either be a `counter`, `guage`, `set`, or `timer`.
+of labels. The measure must either be a `counter`, `gauge`, `set`, or `timer`.
 
 For example:
 
@@ -195,7 +195,7 @@ For example:
 {% code-tabs-item title="gauge" %}
 ```javascript
 {
-  "guage": {
+  "gauge": {
     "name": "gas_tank",
     "val": 0.5
   }
