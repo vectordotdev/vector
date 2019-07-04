@@ -24,10 +24,10 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_lua_transform]
+[transforms.my_lua_transform_id]
   # REQUIRED - General
   type = "lua" # must be: lua
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   source = """
   require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -42,19 +42,19 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 
 
   # OPTIONAL - General
-  search_dirs = ["/etc/vector/lua"] # no default
+  search_dirs = ["\"/etc/vector/lua\""] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"lua"}
-  inputs = "<string>"
+  type = "lua"
+  inputs = ["<string>", ...]
   source = "<string>"
 
   # OPTIONAL - General
-  search_dirs = ["<string>", ...
+  search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="specification" %}
@@ -68,7 +68,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   type = "lua"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The inline Lua source to evaluate.
   source = """
@@ -90,7 +90,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
   # function.
   #
   # * no default
-  search_dirs = ["/etc/vector/lua"]
+  search_dirs = ["\"/etc/vector/lua\""]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -101,7 +101,7 @@ The `lua` transforms accepts [`log`][docs.log_event] events and allows you to tr
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "lua"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |

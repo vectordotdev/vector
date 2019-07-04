@@ -6,7 +6,7 @@
 [sinks.my_tcp_sink]
   # REQUIRED - General
   type = "tcp" # must be: tcp
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default

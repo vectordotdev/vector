@@ -6,7 +6,7 @@
 [sinks.my_vector_sink]
   # REQUIRED - General
   type = "vector" # must be: vector
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default

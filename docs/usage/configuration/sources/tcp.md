@@ -22,7 +22,7 @@ The `tcp` source continuously ingests [`log`][docs.log_event] events through the
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_tcp_source]
+[sources.my_tcp_source_id]
   # REQUIRED - General
   type = "tcp" # must be: tcp
 
@@ -39,7 +39,7 @@ The `tcp` source continuously ingests [`log`][docs.log_event] events through the
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {"tcp"}
+  type = "tcp"
 
   # OPTIONAL - General
   address = "<string>"

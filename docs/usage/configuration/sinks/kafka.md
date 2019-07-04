@@ -22,10 +22,10 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_kafka_sink]
+[sinks.my_kafka_sink_id]
   # REQUIRED - General
   type = "kafka" # must be: kafka
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   topic = "topic-1234"
 
@@ -34,7 +34,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
   key_field = "partition_key" # no default
 
   # OPTIONAL - Buffer
-  [sinks.my_kafka_sink.buffer]
+  [sinks.my_kafka_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -45,8 +45,8 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"kafka"}
-  inputs = "<string>"
+  type = "kafka"
+  inputs = ["<string>", ...]
   bootstrap_servers = "<string>"
   topic = "<string>"
 
@@ -73,7 +73,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
   type = "kafka"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
@@ -138,7 +138,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "kafka"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
 | **OPTIONAL** - General | | |

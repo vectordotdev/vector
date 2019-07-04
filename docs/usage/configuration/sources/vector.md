@@ -24,7 +24,7 @@ The `vector` source continuously ingests [`log`][docs.log_event] events through 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_vector_source]
+[sources.my_vector_source_id]
   # REQUIRED - General
   type = "vector" # must be: vector
 
@@ -37,7 +37,7 @@ The `vector` source continuously ingests [`log`][docs.log_event] events through 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {"vector"}
+  type = "vector"
 
   # OPTIONAL - General
   address = "<string>"

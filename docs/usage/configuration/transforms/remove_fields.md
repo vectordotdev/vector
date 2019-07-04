@@ -22,20 +22,20 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_remove_fields_transform]
+[transforms.my_remove_fields_transform_id]
   # REQUIRED - General
   type = "remove_fields" # must be: remove_fields
-  inputs = ["my-source-id"]
-  fields = ["field1", "field2"]
+  inputs = ["\"my-source-id\""]
+  fields = ["\"field1\"", "\"field2\""]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"remove_fields"}
-  inputs = "<string>"
-  fields = ["<string>", ...
+  type = "remove_fields"
+  inputs = ["<string>", ...]
+  fields = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="specification" %}
@@ -49,10 +49,10 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
   type = "remove_fields"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The field names to drop.
-  fields = ["field1", "field2"]
+  fields = ["\"field1\"", "\"field2\""]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -62,7 +62,7 @@ The `remove_fields` transforms accepts [`log`][docs.log_event] and [`metric`][do
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | `type` | `string` | The component type<br />`required` `enum: "remove_fields"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
 
 

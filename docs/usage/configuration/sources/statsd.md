@@ -24,7 +24,7 @@ The `statsd` source continuously ingests [`log`][docs.log_event] events through 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_statsd_source]
+[sources.my_statsd_source_id]
   # REQUIRED - General
   type = "statsd" # must be: statsd
   address = "127.0.0.1:8126"
@@ -34,7 +34,7 @@ The `statsd` source continuously ingests [`log`][docs.log_event] events through 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {"statsd"}
+  type = "statsd"
   address = "<string>"
 ```
 {% endcode-tabs-item %}

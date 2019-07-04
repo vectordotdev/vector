@@ -22,10 +22,10 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_splunk_hec_sink]
+[sinks.my_splunk_hec_sink_id]
   # REQUIRED - General
   type = "splunk_hec" # must be: splunk_hec
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   host = "my-splunk-host.com" # no default
@@ -45,7 +45,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
   retry_backoff_secs = 5 # default, seconds
 
   # OPTIONAL - Buffer
-  [sinks.my_splunk_hec_sink.buffer]
+  [sinks.my_splunk_hec_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -56,8 +56,8 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"splunk_hec"}
-  inputs = "<string>"
+  type = "splunk_hec"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
   host = "<string>"
@@ -95,7 +95,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
   type = "splunk_hec"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -205,7 +205,7 @@ The `splunk_hec` sink batch and flushes [`log`][docs.log_event] events to a [Spl
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "splunk_hec"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `host` | `string` | Your Splunk HEC host. See [Setup](#setup) for more info.<br />`no default` `example: "my-splunk-host.com"` |
 | `token` | `string` | Your Splunk HEC token. See [Setup](#setup) for more info.<br />`no default` `example: "A94A8FE5CCB19BA61C4C08"` |

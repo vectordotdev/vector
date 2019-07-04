@@ -22,7 +22,7 @@ The `stdin` source continuously ingests [`log`][docs.log_event] events through s
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_stdin_source]
+[sources.my_stdin_source_id]
   # REQUIRED - General
   type = "stdin" # must be: stdin
 
@@ -37,7 +37,7 @@ The `stdin` source continuously ingests [`log`][docs.log_event] events through s
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {"stdin"}
+  type = "stdin"
 
   # OPTIONAL - General
   max_length = <int>

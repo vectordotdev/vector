@@ -69,10 +69,10 @@ data_dir = "/var/lib/vector"
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
-  exclude = ["/var/log/nginx*.log"]
+  exclude = ["\"/var/log/nginx*.log\""]
 
   # Array of file patterns to include. Globbing is supported.
-  include = ["/var/log/nginx*.log"]
+  include = ["\"/var/log/nginx*.log\""]
 
   # OPTIONAL - General
 
@@ -254,7 +254,7 @@ data_dir = "/var/lib/vector"
   type = "add_fields"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # REQUIRED - Fields
   [transforms.add_fields.fields]
@@ -263,10 +263,12 @@ data_dir = "/var/lib/vector"
     # supported types. Use `.` for adding nested fields.
     #
     # * no default
-    new_string_field = "string value"
-    new_int_field = 1
-    new_float_field = 1.2
-    new_bool_field = true
+    my_string_field = "string value"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_table_field = {key1 = "value1", key2 = "value2"}
 
 [transforms.field_filter]
   # REQUIRED - General
@@ -277,7 +279,7 @@ data_dir = "/var/lib/vector"
   type = "field_filter"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The target field to compare against the `value`.
   field = "file"
@@ -295,7 +297,7 @@ data_dir = "/var/lib/vector"
   type = "grok_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The Grok pattern
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -321,7 +323,7 @@ data_dir = "/var/lib/vector"
   type = "json_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -345,7 +347,7 @@ data_dir = "/var/lib/vector"
   type = "lua"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The inline Lua source to evaluate.
   source = """
@@ -367,7 +369,7 @@ data_dir = "/var/lib/vector"
   # function.
   #
   # * no default
-  search_dirs = ["/etc/vector/lua"]
+  search_dirs = ["\"/etc/vector/lua\""]
 
 [transforms.regex_parser]
   # REQUIRED - General
@@ -378,7 +380,7 @@ data_dir = "/var/lib/vector"
   type = "regex_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
@@ -425,10 +427,10 @@ data_dir = "/var/lib/vector"
   type = "remove_fields"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The field names to drop.
-  fields = ["field1", "field2"]
+  fields = ["\"field1\"", "\"field2\""]
 
 [transforms.sampler]
   # REQUIRED - General
@@ -439,7 +441,7 @@ data_dir = "/var/lib/vector"
   type = "sampler"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -448,12 +450,12 @@ data_dir = "/var/lib/vector"
   # sampled.
   #
   # * no default
-  pass_list = ["[error]", "field2"]
+  pass_list = ["\"[error]\"", "\"field2\""]
 
   # The maximum number of events allowed per second.
   #
   # * no default
-  rate = ["field1", "field2"]
+  rate = ["\"field1\"", "\"field2\""]
 
 [transforms.tokenizer]
   # REQUIRED - General
@@ -464,10 +466,10 @@ data_dir = "/var/lib/vector"
   type = "tokenizer"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The field names assigned to the resulting tokens, in order.
-  field_names = ["timestamp", "level", "message"]
+  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
 
   # OPTIONAL - General
 
@@ -512,7 +514,7 @@ data_dir = "/var/lib/vector"
   type = "aws_cloudwatch_logs"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The group name of the target CloudWatch Logs stream.
   group_name = "/var/log/my-log.log"
@@ -619,7 +621,7 @@ data_dir = "/var/lib/vector"
   type = "aws_kinesis_streams"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The AWS region of the target CloudWatch Logs stream resides.
   region = "us-east-1"
@@ -723,7 +725,7 @@ data_dir = "/var/lib/vector"
   type = "aws_s3"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   bucket = "my-bucket"
@@ -862,7 +864,7 @@ data_dir = "/var/lib/vector"
   type = "blackhole"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The number of events that must be received in order to print a summary of
   # activity.
@@ -907,7 +909,7 @@ data_dir = "/var/lib/vector"
   type = "console"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -964,7 +966,7 @@ data_dir = "/var/lib/vector"
   type = "elasticsearch"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example.
@@ -1073,7 +1075,7 @@ data_dir = "/var/lib/vector"
   type = "http"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The encoding format used to serialize the events before flushing.
   #
@@ -1208,7 +1210,7 @@ data_dir = "/var/lib/vector"
   type = "kafka"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
@@ -1273,7 +1275,7 @@ data_dir = "/var/lib/vector"
   type = "splunk_hec"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -1383,7 +1385,7 @@ data_dir = "/var/lib/vector"
   type = "tcp"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -1440,7 +1442,7 @@ data_dir = "/var/lib/vector"
   type = "vector"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 

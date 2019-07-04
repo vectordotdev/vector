@@ -6,8 +6,8 @@
 [transforms.my_tokenizer_transform]
   # REQUIRED - General
   type = "tokenizer" # must be: tokenizer
-  inputs = ["my-source-id"]
-  field_names = ["timestamp", "level", "message"]
+  inputs = ["\"my-source-id\""]
+  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
 
   # OPTIONAL - General
   drop_field = true # default

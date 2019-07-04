@@ -215,7 +215,7 @@ class Component
         "description" => "A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.",
         "examples" => [["my-source-id"]],
         "null" => false,
-        "type" => "string"
+        "type" => "[string]"
       })
     end
 

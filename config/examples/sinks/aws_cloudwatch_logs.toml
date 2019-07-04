@@ -6,7 +6,7 @@
 [sinks.my_aws_cloudwatch_logs_sink]
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: aws_cloudwatch_logs
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   group_name = "/var/log/my-log.log"
   region = "us-east-1"
   stream_name = "my-stream"

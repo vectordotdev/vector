@@ -22,10 +22,10 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_json_parser_transform]
+[transforms.my_json_parser_transform_id]
   # REQUIRED - General
   type = "json_parser" # must be: json_parser
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   drop_invalid = true # no default
@@ -36,8 +36,8 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"json_parser"}
-  inputs = "<string>"
+  type = "json_parser"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
   drop_invalid = <bool>
@@ -55,7 +55,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
   type = "json_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -79,7 +79,7 @@ The `json_parser` transforms accepts [`log`][docs.log_event] events and allows y
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "json_parser"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`no default` `example: true` |
 | `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |

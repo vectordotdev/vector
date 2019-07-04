@@ -148,24 +148,47 @@ class OptionsExampleGenerator < Generator
     end
 
     def to_toml_value(value)
-      if value.is_a?(String) && value.include?("\n")
+      if value.is_a?(Hash)
+        values = value.collect { |key, value| "#{key} = #{to_toml_value(value)}" }
+        "{" + values.join(", ") + "}"
+      elsif value.is_a?(Array)
+        values = value.collect { |value| to_toml_value(value) }
+        values.inspect
+      elsif value.is_a?(Time)
+        value.iso8601(6)
+      elsif value.is_a?(String) && value.include?("\n")
         <<~EOF
         """
         #{value}
         """
         EOF
-      else
+      elsif is_primitive_type?(value)
         value.inspect
+      else
+        raise "Unknown value type: #{value.class}"
       end
+    end
+
+    def is_primitive_type?(value)
+      value.is_a?(String) ||
+        value.is_a?(Integer) ||
+        value.is_a?(TrueClass) ||
+        value.is_a?(FalseClass) ||
+        value.is_a?(NilClass) ||
+        value.is_a?(Float)
     end
 
     def type_string(type, enum = nil)
       if enum
-        "{#{enum.collect(&:inspect).join(" | ")}}"
+        if enum.length > 1
+          "{#{enum.collect(&:inspect).join(" | ")}}"
+        else
+          enum.first.inspect
+        end
       elsif type.start_with?("[")
         inner_type = type[1..-2]
         inner_type_string = type_string(inner_type)
-        "[#{inner_type_string}, ..."
+        "[#{inner_type_string}, ...]"
       elsif type == "*"
         type_strings = TYPES.collect { |type| type_string(type) }
         "{#{type_strings.join(" | ")}}"

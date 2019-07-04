@@ -46,17 +46,26 @@ module Docs
         {% code-tabs %}
         {% code-tabs-item title="example" %}
         ```toml
-        #{options_example_generator.generate("transforms.my_#{transform.name}_transform", :examples)}
+        #{options_example_generator.generate(
+          "transforms.my_#{transform.name}_transform_id",
+          :examples
+        )}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="schema" %}
         ```toml
-        #{options_example_generator.generate("transforms.<transform-id>", :schema)}
+        #{options_example_generator.generate(
+          "transforms.<transform-id>",
+          :schema
+        )}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="specification" %}
         ```toml
-        #{options_example_generator.generate("transforms.#{transform.name}", :spec)}
+        #{options_example_generator.generate(
+          "transforms.#{transform.name}",
+          :spec
+        )}
         ```
         {% endcode-tabs-item %}
         {% endcode-tabs %}

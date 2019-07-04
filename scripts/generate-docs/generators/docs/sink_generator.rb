@@ -46,17 +46,26 @@ module Docs
         {% code-tabs %}
         {% code-tabs-item title="vector.toml (example)" %}
         ```toml
-        #{options_example_generator.generate("sinks.my_#{sink.name}_sink", :examples)}
+        #{options_example_generator.generate(
+          "sinks.my_#{sink.name}_sink_id",
+          :examples
+        )}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (schema)" %}
         ```toml
-        #{options_example_generator.generate("sinks.<sink-id>", :schema)}
+        #{options_example_generator.generate(
+          "sinks.<sink-id>",
+          :schema
+        )}
         ```
         {% endcode-tabs-item %}
         {% code-tabs-item title="vector.toml (specification)" %}
         ```toml
-        #{options_example_generator.generate("sinks.#{sink.name}", :spec)}
+        #{options_example_generator.generate(
+          "sinks.#{sink.name}",
+          :spec
+        )}
         ```
         {% endcode-tabs-item %}
         {% endcode-tabs %}

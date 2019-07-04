@@ -794,12 +794,14 @@ event.\
 """
 
 [transforms.add_fields.options.fields.options."*"]
-type = "string"
+type = "*"
 examples = [
-  {name = "new_string_field", value = "string value"},
-  {name = "new_int_field", value = 1},
-  {name = "new_float_field", value = 1.2},
-  {name = "new_bool_field", value = true}
+  {name = "my_string_field", value = "string value"},
+  {name = "my_int_field", value = 1},
+  {name = "my_float_field", value = 1.2},
+  {name = "my_bool_field", value = true},
+  {name = "my_timestamp_field", value = 1979-05-27T00:32:00.999999-07:00},
+  {name = "my_table_field", value = {key1 = "value1", key2 = "value2"}},
 ]
 description = """\
 A key/value pair representing the new field to be added. Accepts all \

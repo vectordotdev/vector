@@ -22,10 +22,10 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_grok_parser_transform]
+[transforms.my_grok_parser_transform_id]
   # REQUIRED - General
   type = "grok_parser" # must be: grok_parser
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
   # OPTIONAL - General
@@ -37,8 +37,8 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"grok_parser"}
-  inputs = "<string>"
+  type = "grok_parser"
+  inputs = ["<string>", ...]
   pattern = "<string>"
 
   # OPTIONAL - General
@@ -57,7 +57,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
   type = "grok_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The Grok pattern
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -83,7 +83,7 @@ The `grok_parser` transforms accepts [`log`][docs.log_event] events and allows y
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "grok_parser"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |

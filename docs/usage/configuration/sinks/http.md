@@ -22,10 +22,10 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_http_sink]
+[sinks.my_http_sink_id]
   # REQUIRED - General
   type = "http" # must be: http
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   encoding = "ndjson" # enum: ndjson, text
   uri = "https://10.22.212.22:9000/endpoint"
 
@@ -46,19 +46,19 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
   retry_backoff_secs = 10 # default, seconds
 
   # OPTIONAL - Basic auth
-  [sinks.my_http_sink.basic_auth]
+  [sinks.my_http_sink_id.basic_auth]
     password = "password" # no default
     user = "username" # no default
 
   # OPTIONAL - Buffer
-  [sinks.my_http_sink.buffer]
+  [sinks.my_http_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
     num_items = 500 # default
 
   # OPTIONAL - Headers
-  [sinks.my_http_sink.headers]
+  [sinks.my_http_sink_id.headers]
     X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
@@ -66,13 +66,13 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"http"}
-  inputs = "<string>"
+  type = "http"
+  inputs = ["<string>", ...]
   encoding = {"ndjson" | "text"}
   uri = "<string>"
 
   # OPTIONAL - General
-  compression = {"gzip"}
+  compression = "gzip"
   healthcheck_uri = "<string>"
 
   # OPTIONAL - Batching
@@ -115,7 +115,7 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
   type = "http"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The encoding format used to serialize the events before flushing.
   #
@@ -250,7 +250,7 @@ The `http` sink batch and flushes [`log`][docs.log_event] events to a generic HT
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "http"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI. See [Health Checks](#health-checks) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |

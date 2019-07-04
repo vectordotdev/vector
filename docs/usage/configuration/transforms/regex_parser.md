@@ -22,10 +22,10 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_regex_parser_transform]
+[transforms.my_regex_parser_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: regex_parser
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
   # OPTIONAL - General
@@ -34,7 +34,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   field = "message" # default
 
   # OPTIONAL - Types
-  [transforms.my_regex_parser_transform.types]
+  [transforms.my_regex_parser_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -48,8 +48,8 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"regex_parser"}
-  inputs = "<string>"
+  type = "regex_parser"
+  inputs = ["<string>", ...]
   regex = "<string>"
 
   # OPTIONAL - General
@@ -73,7 +73,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
   type = "regex_parser"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
@@ -120,7 +120,7 @@ The `regex_parser` transforms accepts [`log`][docs.log_event] events and allows 
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_failed` | `bool` | If `true`, events that fail to properly parse will be dropped. See [Failed Parsing](#failed-parsing) for more info.<br />`default: false` |

@@ -22,17 +22,17 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_console_sink]
+[sinks.my_console_sink_id]
   # REQUIRED - General
   type = "console" # must be: console
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   encoding = "json" # no default, enum: json, text
   target = "stdout" # no default, enum: stdout, stderr
 
   # OPTIONAL - Buffer
-  [sinks.my_console_sink.buffer]
+  [sinks.my_console_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -43,8 +43,8 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"console"}
-  inputs = "<string>"
+  type = "console"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
   encoding = {"json" | "text"}
@@ -69,7 +69,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
   type = "console"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -126,7 +126,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "console"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json", "text"` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`no default` `enum: "stdout", "stderr"` |

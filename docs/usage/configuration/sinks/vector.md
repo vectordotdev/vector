@@ -22,16 +22,16 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_vector_sink]
+[sinks.my_vector_sink_id]
   # REQUIRED - General
   type = "vector" # must be: vector
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
 
   # OPTIONAL - Buffer
-  [sinks.my_vector_sink.buffer]
+  [sinks.my_vector_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -42,8 +42,8 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"vector"}
-  inputs = "<string>"
+  type = "vector"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
   address = "<string>"
@@ -67,7 +67,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
   type = "vector"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -115,7 +115,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "vector"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The downstream Vector address.<br />`no default` `example: "92.12.333.224:5000"` |
 | **OPTIONAL** - Buffer | | |

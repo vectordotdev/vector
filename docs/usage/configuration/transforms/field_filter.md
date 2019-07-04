@@ -24,10 +24,10 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_field_filter_transform]
+[transforms.my_field_filter_transform_id]
   # REQUIRED - General
   type = "field_filter" # must be: field_filter
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   field = "file"
   value = "/var/log/nginx.log"
 ```
@@ -36,8 +36,8 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"field_filter"}
-  inputs = "<string>"
+  type = "field_filter"
+  inputs = ["<string>", ...]
   field = "<string>"
   value = "<string>"
 ```
@@ -53,7 +53,7 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
   type = "field_filter"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The target field to compare against the `value`.
   field = "file"
@@ -70,7 +70,7 @@ The `field_filter` transforms accepts [`log`][docs.log_event] and [`metric`][doc
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
 | `type` | `string` | The component type<br />`required` `enum: "field_filter"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
 

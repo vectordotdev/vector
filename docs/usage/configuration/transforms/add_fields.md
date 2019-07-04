@@ -22,29 +22,31 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_add_fields_transform]
+[transforms.my_add_fields_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: add_fields
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # REQUIRED - Fields
-  [transforms.my_add_fields_transform.fields]
-    new_string_field = "string value"
-    new_int_field = 1
-    new_float_field = 1.2
-    new_bool_field = true
+  [transforms.my_add_fields_transform_id.fields]
+    my_string_field = "string value"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_table_field = {key1 = "value1", key2 = "value2"}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"add_fields"}
-  inputs = "<string>"
+  type = "add_fields"
+  inputs = ["<string>", ...]
 
   # REQUIRED - Fields
   [transforms.<transform-id>.fields]
-    * = "<string>"
+    * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="specification" %}
@@ -58,7 +60,7 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   type = "add_fields"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # REQUIRED - Fields
   [transforms.add_fields.fields]
@@ -67,10 +69,12 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
     # supported types. Use `.` for adding nested fields.
     #
     # * no default
-    new_string_field = "string value"
-    new_int_field = 1
-    new_float_field = 1.2
-    new_bool_field = true
+    my_string_field = "string value"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_table_field = {key1 = "value1", key2 = "value2"}
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -81,9 +85,9 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `fields.*` | `string` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
 
 ## Examples
 

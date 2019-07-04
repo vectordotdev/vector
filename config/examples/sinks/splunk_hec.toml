@@ -6,7 +6,7 @@
 [sinks.my_splunk_hec_sink]
   # REQUIRED - General
   type = "splunk_hec" # must be: splunk_hec
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   host = "my-splunk-host.com" # no default

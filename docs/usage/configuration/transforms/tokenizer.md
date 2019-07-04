@@ -22,18 +22,18 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_tokenizer_transform]
+[transforms.my_tokenizer_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: tokenizer
-  inputs = ["my-source-id"]
-  field_names = ["timestamp", "level", "message"]
+  inputs = ["\"my-source-id\""]
+  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
 
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
 
   # OPTIONAL - Types
-  [transforms.my_tokenizer_transform.types]
+  [transforms.my_tokenizer_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -47,9 +47,9 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"tokenizer"}
-  inputs = "<string>"
-  field_names = ["<string>", ...
+  type = "tokenizer"
+  inputs = ["<string>", ...]
+  field_names = ["<string>", ...]
 
   # OPTIONAL - General
   drop_field = <bool>
@@ -71,10 +71,10 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
   type = "tokenizer"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The field names assigned to the resulting tokens, in order.
-  field_names = ["timestamp", "level", "message"]
+  field_names = ["\"timestamp\"", "\"level\"", "\"message\""]
 
   # OPTIONAL - General
 
@@ -113,7 +113,7 @@ The `tokenizer` transforms accepts [`log`][docs.log_event] events and allows you
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "tokenizer"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |

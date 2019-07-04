@@ -6,7 +6,7 @@
 [sinks.my_aws_s3_sink]
   # REQUIRED - General
   type = "aws_s3" # must be: aws_s3
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   bucket = "my-bucket"
   region = "us-east-1"
 

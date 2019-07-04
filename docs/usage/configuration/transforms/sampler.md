@@ -24,25 +24,25 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
 {% code-tabs %}
 {% code-tabs-item title="example" %}
 ```coffeescript
-[transforms.my_sampler_transform]
+[transforms.my_sampler_transform_id]
   # REQUIRED - General
   type = "sampler" # must be: sampler
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
-  pass_list = ["[error]", "field2"] # no default
-  rate = ["field1", "field2"] # no default
+  pass_list = ["\"[error]\"", "\"field2\""] # no default
+  rate = ["\"field1\"", "\"field2\""] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = {"sampler"}
-  inputs = "<string>"
+  type = "sampler"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
-  pass_list = ["<string>", ...
+  pass_list = ["<string>", ...]
   rate = <int>
 ```
 {% endcode-tabs-item %}
@@ -57,7 +57,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   type = "sampler"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -66,12 +66,12 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
   # sampled.
   #
   # * no default
-  pass_list = ["[error]", "field2"]
+  pass_list = ["\"[error]\"", "\"field2\""]
 
   # The maximum number of events allowed per second.
   #
   # * no default
-  rate = ["field1", "field2"]
+  rate = ["\"field1\"", "\"field2\""]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -82,7 +82,7 @@ The `sampler` transforms accepts [`log`][docs.log_event] events and allows you t
 | :--- | :---: | :---------- |
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "sampler"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 | `rate` | `int` | The maximum number of events allowed per second.<br />`no default` `example: ["field1", "field2"]` |

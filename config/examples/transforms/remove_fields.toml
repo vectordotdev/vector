@@ -6,5 +6,5 @@
 [transforms.my_remove_fields_transform]
   # REQUIRED - General
   type = "remove_fields" # must be: remove_fields
-  inputs = ["my-source-id"]
-  fields = ["field1", "field2"]
+  inputs = ["\"my-source-id\""]
+  fields = ["\"field1\"", "\"field2\""]

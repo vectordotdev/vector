@@ -47,7 +47,7 @@ module Docs
         {% code-tabs-item title="vector.toml (example)" %}
         ```toml
         #{options_example_generator.generate(
-          "sources.my_#{source.name}_source",
+          "sources.my_#{source.name}_source_id",
           :examples
         )}
         ```

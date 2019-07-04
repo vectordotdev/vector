@@ -24,10 +24,10 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_aws_s3_sink]
+[sinks.my_aws_s3_sink_id]
   # REQUIRED - General
   type = "aws_s3" # must be: aws_s3
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   bucket = "my-bucket"
   region = "us-east-1"
 
@@ -52,7 +52,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
   retry_backoff_secs = 5 # default, seconds
 
   # OPTIONAL - Buffer
-  [sinks.my_aws_s3_sink.buffer]
+  [sinks.my_aws_s3_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -63,8 +63,8 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"aws_s3"}
-  inputs = "<string>"
+  type = "aws_s3"
+  inputs = ["<string>", ...]
   bucket = "<string>"
   region = "<string>"
 
@@ -78,7 +78,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
   key_prefix = "<string>"
 
   # OPTIONAL - Requests
-  compression = {"gzip"}
+  compression = "gzip"
   encoding = {"ndjson" | "text"}
   gzip = <bool>
   rate_limit_duration = <int>
@@ -107,7 +107,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
   type = "aws_s3"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
   bucket = "my-bucket"
@@ -246,7 +246,7 @@ The `aws_s3` sink batch and flushes [`log`][docs.log_event] events to [AWS S3][u
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "aws_s3"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
 | **OPTIONAL** - Batching | | |

@@ -22,10 +22,10 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_tcp_sink]
+[sinks.my_tcp_sink_id]
   # REQUIRED - General
   type = "tcp" # must be: tcp
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   address = "92.12.333.224:5000" # no default
@@ -34,7 +34,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
   encoding = "json" # no default, enum: json, text
 
   # OPTIONAL - Buffer
-  [sinks.my_tcp_sink.buffer]
+  [sinks.my_tcp_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -45,8 +45,8 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"tcp"}
-  inputs = "<string>"
+  type = "tcp"
+  inputs = ["<string>", ...]
 
   # OPTIONAL - General
   address = "<string>"
@@ -73,7 +73,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
   type = "tcp"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
 
@@ -130,7 +130,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "tcp"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP address.<br />`no default` `example: "92.12.333.224:5000"` |
 | **OPTIONAL** - Requests | | |

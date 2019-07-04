@@ -6,7 +6,7 @@
 [sinks.my_console_sink]
   # REQUIRED - General
   type = "console" # must be: console
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # OPTIONAL - General
   encoding = "json" # no default, enum: json, text

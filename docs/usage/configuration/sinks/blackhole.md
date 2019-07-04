@@ -22,14 +22,14 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_blackhole_sink]
+[sinks.my_blackhole_sink_id]
   # REQUIRED - General
   type = "blackhole" # must be: blackhole
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   print_amount = "1000"
 
   # OPTIONAL - Buffer
-  [sinks.my_blackhole_sink.buffer]
+  [sinks.my_blackhole_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -40,8 +40,8 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"blackhole"}
-  inputs = "<string>"
+  type = "blackhole"
+  inputs = ["<string>", ...]
   print_amount = <int>
 
   # OPTIONAL - Buffer
@@ -63,7 +63,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
   type = "blackhole"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The number of events that must be received in order to print a summary of
   # activity.
@@ -108,7 +108,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "blackhole"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `print_amount` | `int` | The number of events that must be received in order to print a summary of activity.<br />`required` `example: "1000"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts. See [Buffers](#buffers) for more info.<br />`default: "memory"` `enum: "memory", "disk"` |

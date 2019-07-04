@@ -22,7 +22,7 @@ The `syslog` source continuously ingests [`log`][docs.log_event] events through 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_syslog_source]
+[sources.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: syslog
 
@@ -40,7 +40,7 @@ The `syslog` source continuously ingests [`log`][docs.log_event] events through 
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = {"syslog"}
+  type = "syslog"
 
   # OPTIONAL - General
   address = "<string>"

@@ -24,10 +24,10 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_aws_cloudwatch_logs_sink]
+[sinks.my_aws_cloudwatch_logs_sink_id]
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: aws_cloudwatch_logs
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   group_name = "/var/log/my-log.log"
   region = "us-east-1"
   stream_name = "my-stream"
@@ -46,7 +46,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
   retry_backoff_secs = 5 # default, seconds
 
   # OPTIONAL - Buffer
-  [sinks.my_aws_cloudwatch_logs_sink.buffer]
+  [sinks.my_aws_cloudwatch_logs_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -57,8 +57,8 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"aws_cloudwatch_logs"}
-  inputs = "<string>"
+  type = "aws_cloudwatch_logs"
+  inputs = ["<string>", ...]
   group_name = "<string>"
   region = "<string>"
   stream_name = "<string>"
@@ -95,7 +95,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
   type = "aws_cloudwatch_logs"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The group name of the target CloudWatch Logs stream.
   group_name = "/var/log/my-log.log"
@@ -202,7 +202,7 @@ The `aws_cloudwatch_logs` sink batch and flushes [`log`][docs.log_event] events 
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "aws_cloudwatch_logs"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.<br />`required` `example: "/var/log/my-log.log"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |

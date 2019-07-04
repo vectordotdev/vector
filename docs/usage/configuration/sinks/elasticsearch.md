@@ -24,10 +24,10 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_elasticsearch_sink]
+[sinks.my_elasticsearch_sink_id]
   # REQUIRED - General
   type = "elasticsearch" # must be: elasticsearch
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
   host = "http://10.24.32.122:9000"
 
   # OPTIONAL - General
@@ -47,7 +47,7 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
   retry_backoff_secs = 5 # default, seconds
 
   # OPTIONAL - Buffer
-  [sinks.my_elasticsearch_sink.buffer]
+  [sinks.my_elasticsearch_sink_id.buffer]
     type = "memory" # default, enum: memory, disk
     when_full = "block" # default, enum: block, drop_newest
     max_size = 104900000 # no default
@@ -58,8 +58,8 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
 ```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
-  type = {"elasticsearch"}
-  inputs = "<string>"
+  type = "elasticsearch"
+  inputs = ["<string>", ...]
   host = "<string>"
 
   # OPTIONAL - General
@@ -97,7 +97,7 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
   type = "elasticsearch"
 
   # A list of upstream source for more info.
-  inputs = ["my-source-id"]
+  inputs = ["\"my-source-id\""]
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example.
@@ -206,7 +206,7 @@ The `elasticsearch` sink batch and flushes [`log`][docs.log_event] events to [El
 | :--- | :---: | :---------- |
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type See [Buffers](#buffers) for more info.<br />`required` `enum: "elasticsearch"` |
-| `inputs` | `string` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
