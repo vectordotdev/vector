@@ -159,6 +159,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`console`**][docs.console_sink] | Streams log and metric events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | Batches log events to Elasticsearch via the `_bulk` API endpoint. |
 | [**`http`**][docs.http_sink] | Batches log events to a generic HTTP endpoint. |
+| [**`prometheus`**][docs.prometheus_sink] | Exposes a metrics endpoint for Prometheus scraping. |
 | [**`kafka`**][docs.kafka_sink] | Streams log events to Apache Kafka. |
 | [**`splunk_hec`**][docs.splunk_hec_sink] | Batches log events to a Splunk HTTP Event Collector. |
 | [**`tcp`**][docs.tcp_sink] | Streams log events to a TCP connection. |
@@ -222,6 +223,7 @@ the License.
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
 [docs.performance]: https://docs.vector.dev/performance
+[docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
 [docs.reloading]: https://docs.vector.dev/usage/administration/reloading
 [docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
