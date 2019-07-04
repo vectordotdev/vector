@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event};
 use crate::types::{parse_conversion_map, Conversion};
-use crate::event::ValueKind;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag},
@@ -198,10 +197,7 @@ mod tests {
 
     #[test]
     fn dash_field() {
-        assert_eq!(
-            parse("foo - bar"),
-            &["foo", "-", "bar"]
-        );
+        assert_eq!(parse("foo - bar"), &["foo", "-", "bar"]);
     }
 
     #[test]
@@ -282,7 +278,13 @@ mod tests {
 
     #[test]
     fn tokenizer_keeps_dash_as_nil() {
-        let log = parse_log("1234 - foo", "code who why", None, false, &[("code", "integer"), ("who", "string"), ("why", "string")]);
+        let log = parse_log(
+            "1234 - foo",
+            "code who why",
+            None,
+            false,
+            &[("code", "integer"), ("who", "string"), ("why", "string")],
+        );
         assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
         assert_eq!(log[&"who".into()], ValueKind::Bytes("nil".into()));
         assert_eq!(log[&"why".into()], ValueKind::Bytes("foo".into()));
