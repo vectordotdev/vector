@@ -333,9 +333,9 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 """
 
 [[sources.statsd.examples]]
-name = "Guage"
+name = "Gauge"
 body = """\
-Given the following Statsd guage:
+Given the following Statsd gauge:
 
 ```
 gas_tank:0.50|g
@@ -347,7 +347,7 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {% code-tabs-item title="metric" %}
 ```javascript
 {
-  "guage": {
+  "gauge": {
     "name": "gas_tank",
     "val": 0.5
   }

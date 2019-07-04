@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn memory_usage_guage() {
+    fn memory_usage_gauge() {
         let config: LogToMetricConfig = toml::from_str(
             r##"
             [[metrics]]
