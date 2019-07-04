@@ -6,9 +6,10 @@ RUN apt-get update
 RUN apt-get install -y software-properties-common
 RUN add-apt-repository ppa:git-core/ppa
 
-RUN apt-get update
-RUN apt-get upgrade -y
-RUN apt-get update
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get update
+  
 RUN apt-get install -y \
   build-essential \
   curl \
@@ -27,6 +28,8 @@ RUN tar -xvf grease-1.0.1-linux-amd64.tar.gz
 ENV PATH="$PATH:/grease/bin"
 
 # Package Cloud is used to host deb, rpm, and other packages
+ENV LC_ALL en_US.UTF-8
+
 RUN gem install rake
 RUN gem install package_cloud
 

@@ -11,36 +11,46 @@ help:
 	@echo ""
 	@echo "---------------------------------------------------------------------------------------"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Development
 
 bench: ## Run internal benchmarks
 	@cargo bench --all
 
-run: ## Starts Vector in development mode
-	@cargo run
-
 build: ## Build the project
 	@cargo build
 
-check: ## Check all code
+check: ## Check all code and formatting
 	@cargo check --all --all-features --all-targets
+	@cargo fmt -- --check
+	@bundle install --gemfile=scripts/generate-docs/Gemfile
+	@scripts/check-docs.sh
+
+generate-docs: ## Generate docs from the /.metadata.toml file
+	@bundle install --gemfile=scripts/generate-docs/Gemfile
+	@scripts/generate-docs.sh
+
+fmt: ## Format code
+	@cargo fmt
+
+run: ## Starts Vector in development mode
+	@cargo run
+
+signoff: ## Signsoff all previous commits since branch creation
+	@scripts/signoff.sh
 
 test: ## Spins up Docker resources and runs _every_ test
 	@docker-compose up -d
 	@cargo test --all --features docker -- --test-threads 4
 
-fmt: ## Format code
-	@cargo fmt
+##@ Releasing
 
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 	@scripts/build-archive.sh
 
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
-
-generate-docs: ## Generate docs from the scipts/metadata.toml file
-	@bundle install --gemfile=scripts/config_schema/Gemfile
-	@scripts/generate-docs.sh
 
 package-deb: ## Create a .deb package from artifacts created via `build`
 	@scripts/package-deb.sh
@@ -68,9 +78,6 @@ release-rpm: ## Release .rpm via Package Cloud
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
-
-signoff: ## Signsoff all previous commits since branch creation
-	@scripts/signoff.sh
 
 version: ## Get the current Vector version
 	@scripts/version.sh
