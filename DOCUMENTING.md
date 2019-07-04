@@ -25,9 +25,9 @@ In this document:
 2. All files are in markdown format.
 3. The documentation is a mix of hand-written and generated docs.
 4. Docs are generated via the `make generate-docs` command which delegates to
-   the [`scripts/generate_docs.sh`](/scripts/generate_docs.sh) file.
-   1. This is a mix of Ruby scripts that parses the [`scripts/metadata.toml`]
-      file and runs a series of generators.
+   the [`scripts/generate-docs.sh`](/scripts/generate-docs.sh) file.
+   1. This is a mix of Ruby scripts that parses the
+      [`/.metadata.toml`](/.metadata.toml) file and runs a series of generators.
    2. Each generated section is clearly called out in the markdown file to
       help ensure humans do not modify it:
 
@@ -48,7 +48,7 @@ You can edit the markdown files directly in the /docs folder.  Auto-generated
 sections are clearly denoted as described above. To make make changes
 to auto-generated sections:
 
-1. Modify the `scripts/metadata.toml` file as necessary.
+1. Modify the `/.metadata.toml` file as necessary.
 2. Run `make generate-docs`
 3. Commit changes.
 

@@ -64,7 +64,8 @@ data_dir = "/var/lib/vector"
 
 <!-- START: global_options_table -->
 <!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
+<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
 
 | Key  | Type  | Description |
 | :--- | :---: | :---------- |
@@ -77,7 +78,8 @@ data_dir = "/var/lib/vector"
 
 <!-- START: sources_table -->
 <!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
+<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
 
 | Name  | Description |
 | :---  | :---------- |
@@ -97,7 +99,8 @@ data_dir = "/var/lib/vector"
 
 <!-- START: transforms_table -->
 <!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
+<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
 
 | Name  | Description |
 | :---  | :---------- |
@@ -120,7 +123,8 @@ data_dir = "/var/lib/vector"
 
 <!-- START: sinks_table -->
 <!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
+<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
 
 | Name  | Description |
 | :---  | :---------- |
@@ -145,7 +149,8 @@ data_dir = "/var/lib/vector"
 
 <!-- START: how_it_works_sections -->
 <!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated via `make generate-docs` -->
+<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
+<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
 
 ### Composition
 

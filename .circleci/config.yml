@@ -2,19 +2,6 @@
 # Run macros
 #
 
-install-cargo-deb: &install-cargo-deb
-  run:
-    name: Install cargo deb
-    command: |
-      export PATH="$HOME/.cargo/bin:$PATH"
-      cargo install cargo-deb
-
-install-rpm: &install-rpm
-  run:
-    name: Install RPM package
-    command: |
-      sudo apt-get install -y rpm
-
 install-rust: &install-rust
   run:
     name: Install Rust
@@ -36,30 +23,17 @@ jobs:
   # Testing
   #
 
-  rustfmt:
-    docker:
-      - image: timberiodev/vector-tester:latest
-    steps:
-      - checkout
-      - run:
-          name: Check formatting
-          command: |
-            rustup component add rustfmt
-            rustfmt --version
-            cargo fmt -- --check
-
   check-stable:
     resource_class: xlarge
     docker:
-      - image: timberiodev/vector-tester:latest
+      - image: timberiodev/vector-checker:latest
     steps:
       - checkout
       - run:
-          name: Check
+          name: Check code and formatting
           environment:
             RUSTFLAGS: "-D warnings"
-          command: |
-            cargo check --all --all-features --all-targets
+          command: make check
 
   test-stable:
     resource_class: xlarge
@@ -400,7 +374,6 @@ tag-release-workflow-filters: &tag-release-workflow-filters
 
 build-requires: &build-requires
   requires:
-    - rustfmt
     - check-stable
     - test-stable
 
@@ -433,8 +406,6 @@ workflows:
 
   build:
     jobs:
-      - rustfmt:
-          <<: *test-filters
       - check-stable:
           <<: *test-filters
       - test-stable:

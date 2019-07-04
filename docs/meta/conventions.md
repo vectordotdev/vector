@@ -61,7 +61,7 @@ with the following syntax:
 
 This can be extended entire variables:
 
-```toml
+```coffeescript
 inputs = ["{<source-id> | <transform-id>}"]
 ```
 
@@ -71,7 +71,7 @@ In this case, the `<source-id>` or `<transform-id>` must be supplied.
 
 ### Configuration Examples
 
-All [sources][docs.soures], [transforms][docs.transforms], and
+All [sources][docs.sources], [transforms][docs.transforms], and
 [sinks][docs.sinks] must include comprehensive configuration examples. This
 means all options must be represented. The example should be formatted as
 follows:
@@ -325,3 +325,7 @@ Here a few examples to help illustrate this point:
 
 [docs.administration]: ../usage/administration
 [docs.guides]: ../usage/guides
+[docs.sinks]: ../usage/configuration/sinks
+[docs.sources]: ../usage/configuration/sources
+[docs.summary]: ../SUMMARY.md
+[docs.transforms]: ../usage/configuration/transforms
