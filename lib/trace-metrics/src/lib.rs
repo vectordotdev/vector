@@ -1,6 +1,6 @@
-//! A `tokio-trace` metrics based subscriber
+//! A `tracing` metrics based subscriber
 //!
-//! This subscriber takes another subscriber like `tokio-trace-fmt` and wraps it
+//! This subscriber takes another subscriber like `tracing-fmt` and wraps it
 //! with this basic subscriber. It will enable all spans and events that match the
 //! metric capturing criteria. This means every span is enabled regardless of its level
 //! and any event with a field name ending with `_counter` or `_gauge`.
@@ -8,13 +8,13 @@
 //! # Example
 //!
 //! ```
-//! # #[macro_use] extern crate tokio_trace;
-//! # extern crate tokio_trace_fmt;
+//! # #[macro_use] extern crate tracing;
+//! # extern crate tracing_fmt;
 //! # extern crate trace_metrics;
 //! # extern crate hotmic;
 //! # use hotmic::Receiver;
 //! # use trace_metrics::MetricsSubscriber;
-//! # use tokio_trace_fmt::FmtSubscriber;
+//! # use tracing_fmt::FmtSubscriber;
 //! // Get the metrics sink
 //! let mut receiver = Receiver::builder().build();
 //! let sink = receiver.get_sink();
@@ -23,14 +23,14 @@
 //! let fmt_subscriber = FmtSubscriber::builder().finish();
 //! let metric_subscriber = MetricsSubscriber::new(fmt_subscriber, sink);
 //!
-//! tokio_trace::subscriber::with_default(metric_subscriber, || {
+//! tracing::subscriber::with_default(metric_subscriber, || {
 //!     info!({ do_something_counter = 1 }, "Do some logging");
 //! })
 //! ```
 
 #[warn(missing_debug_implementations, missing_docs)]
 extern crate hotmic;
-extern crate tokio_trace_core;
+extern crate tracing_core;
 
 use hotmic::Sink;
 use std::{
@@ -38,7 +38,7 @@ use std::{
     fmt,
     sync::{Mutex, RwLock},
 };
-use tokio_trace_core::{
+use tracing_core::{
     field::{Field, Visit},
     span::{Attributes, Id, Record},
     Event, Interest, Metadata, Subscriber,
@@ -56,7 +56,7 @@ pub struct MetricsSubscriber<S> {
     collector: Collector,
 }
 
-/// A `tokio_trace_core::field::Visit` implementation that captures fields
+/// A `tracing_core::field::Visit` implementation that captures fields
 /// that contain `counter` or `gague` in their name and dispatches the `i64`
 /// or `u64` value to the underlying metrics sink.
 pub struct MetricVisitor {
@@ -164,7 +164,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
     }
 
     // extra non required fn
-    fn register_callsite(&self, metadata: &Metadata) -> Interest {
+    fn register_callsite(&self, metadata: &'static Metadata<'static>) -> Interest {
         if metadata.name().contains("event")
             && metadata
                 .fields()

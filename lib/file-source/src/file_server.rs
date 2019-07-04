@@ -8,7 +8,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
-use tokio_trace::field;
+use tracing::field;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As

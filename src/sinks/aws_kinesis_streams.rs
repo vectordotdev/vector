@@ -16,9 +16,9 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
-use tokio_trace::field;
-use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
+use tracing::field;
+use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
 pub struct KinesisService {

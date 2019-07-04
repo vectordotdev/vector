@@ -43,17 +43,17 @@ trace-metrics = { path = "lib/trace-metrics" }
 
 # Tokio / Futures
 futures = "0.1.25"
-tokio = { version = "0.1.21", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
+tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
 
 # Tracing
-tokio-trace = "0.1"
-tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-tower-http = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tracing = "0.1"
+tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
+tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
+tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
+tracing-tower-http = { git = "https://github.com/tokio-rs/tracing" }
 
 # Metrics
 hotmic = "0.8"

@@ -9,7 +9,7 @@ use hyper::{
     Body, Request, Response, Server,
 };
 use std::net::SocketAddr;
-use tokio_trace::field;
+use tracing::field;
 
 /// Build the metrics receiver, controller and sink
 pub fn build() -> (Controller, Sink<&'static str>) {
@@ -32,7 +32,7 @@ pub fn serve(addr: &SocketAddr, controller: Controller) -> impl Future<Item = ()
         let controller = controller.clone();
 
         service_fn_ok(move |_: Request<Body>| {
-            connection_span.enter(|| {
+            connection_span.in_scope(|| {
                 debug!(message = "snapshotting metrics.");
                 let snapshot = controller.get_snapshot().unwrap();
                 let output = process_snapshot(snapshot).unwrap();

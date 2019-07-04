@@ -18,9 +18,9 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::time::Duration;
-use tokio_trace::field;
-use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
+use tracing::field;
+use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
 
 #[derive(Clone)]

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
-use tokio_trace::{dispatcher, field};
+use tracing::{dispatcher, field};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
@@ -97,7 +97,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         thread::spawn(move || {
             let dispatcher = dispatcher;
             dispatcher::with_default(&dispatcher, || {
-                span.enter(|| {
+                span.in_scope(|| {
                     file_server.run(out, shutdown_rx);
                 })
             });

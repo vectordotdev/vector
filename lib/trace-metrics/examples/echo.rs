@@ -1,10 +1,10 @@
 extern crate futures;
 extern crate hyper;
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 extern crate tokio;
-extern crate tokio_trace_fmt;
-extern crate tokio_trace_futures;
+extern crate tracing_fmt;
+extern crate tracing_futures;
 
 use futures::future;
 use hyper::rt::{Future, Stream};
@@ -14,8 +14,8 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 
 use std::str;
 
-use tokio_trace::field;
-use tokio_trace_futures::{Instrument, Instrumented};
+use tracing::field;
+use tracing_futures::{Instrument, Instrumented};
 
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
@@ -26,7 +26,7 @@ fn echo(req: Request<Body>) -> Instrumented<BoxFut> {
         uri = &field::debug(req.uri()),
         headers = &field::debug(req.headers())
     )
-    .enter(|| {
+    .in_scope(|| {
         info!("received request");
         let mut response = Response::new(Body::empty());
 
@@ -81,7 +81,7 @@ fn echo(req: Request<Body>) -> Instrumented<BoxFut> {
             // it can be reversed. Only then can we return a `Response`.
             (&Method::POST, "/echo/reversed") => {
                 let span = trace_span!("response", response_kind = "reversed");
-                let reversed = span.enter(|| {
+                let reversed = span.in_scope(|| {
                     req.into_body().concat2().map(move |chunk| {
                         let body = chunk.iter().rev().cloned().collect::<Vec<u8>>();
                         debug!(
@@ -134,12 +134,12 @@ fn main() {
         // println!("Metrics snapshot: {}", raw_snap);
     });
 
-    let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();
-    tokio_trace_env_logger::try_init().expect("init log adapter");
+    let subscriber = tracing_fmt::FmtSubscriber::builder().finish();
+    tracing_env_logger::try_init().expect("init log adapter");
 
     let subscriber = trace_metrics::MetricsSubscriber::new(subscriber, sink);
 
-    tokio_trace::subscriber::with_default(subscriber, || {
+    tracing::subscriber::with_default(subscriber, || {
         let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
         let server_span = trace_span!("server", local = &field::debug(addr));
         let server = tokio::net::TcpListener::bind(&addr)
@@ -168,7 +168,7 @@ fn main() {
                 error!({ error = field::display(e) }, "server error");
             })
             .instrument(server_span.clone());
-        server_span.enter(|| {
+        server_span.in_scope(|| {
             info!("listening...");
             hyper::rt::run(server);
         });

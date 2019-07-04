@@ -4,7 +4,7 @@ use futures::{sync::mpsc, Future, Stream};
 use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::util::FutureExt;
-use tokio_trace_futures::Instrument;
+use tracing_futures::Instrument;
 
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send>;
 

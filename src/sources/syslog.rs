@@ -11,9 +11,9 @@ use tokio::{
     codec::{BytesCodec, FramedRead, LinesCodec},
     net::{UdpFramed, UdpSocket},
 };
-use tokio_trace::field;
-use tokio_trace_futures::Instrument;
 use tokio_uds::UnixListener;
+use tracing::field;
+use tracing_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
