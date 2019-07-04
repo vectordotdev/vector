@@ -30,11 +30,13 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
   # REQUIRED - Fields
   [transforms.my_add_fields_transform_id.fields]
     my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
     my_int_field = 1
     my_float_field = 1.2
     my_bool_field = true
     my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
-    my_table_field = {key1 = "value1", key2 = "value2"}
+    my_nested_fields = {key1 = "value1", key2 = "value2"}
+    my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="schema" %}
@@ -70,11 +72,13 @@ The `add_fields` transforms accepts [`log`][docs.log_event] events and allows yo
     #
     # * no default
     my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
     my_int_field = 1
     my_float_field = 1.2
     my_bool_field = true
     my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
-    my_table_field = {key1 = "value1", key2 = "value2"}
+    my_nested_fields = {key1 = "value1", key2 = "value2"}
+    my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
