@@ -1,6 +1,6 @@
 use crate::event::{self, Event};
 use bytes::Bytes;
-use file_source::file_server::FileServer;
+use file_source::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -199,9 +199,12 @@ mod tests {
             writeln!(&mut file2, "goodbye {}", i).unwrap();
         }
 
-        let received = rx.take(n * 2).collect().wait().unwrap();
+        sleep();
+
         drop(trigger);
         shutdown_on_idle(rt);
+
+        let received = rx.collect().wait().unwrap();
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -265,9 +268,12 @@ mod tests {
             writeln!(&mut file, "posttrunc {}", i).unwrap();
         }
 
-        let received = rx.take(n * 2).collect().wait().unwrap();
+        sleep();
+
         drop(trigger);
         shutdown_on_idle(rt);
+
+        let received = rx.collect().wait().unwrap();
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -332,9 +338,12 @@ mod tests {
             writeln!(&mut file, "postrot {}", i).unwrap();
         }
 
-        let received = rx.take(n * 2).collect().wait().unwrap();
+        sleep();
+
         drop(trigger);
         shutdown_on_idle(rt);
+
+        let received = rx.collect().wait().unwrap();
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -398,14 +407,18 @@ mod tests {
             writeln!(&mut file4, "4 {}", i).unwrap();
         }
 
-        let received = rx.take(n * 3).collect().wait().unwrap();
+        sleep();
+
         drop(trigger);
         shutdown_on_idle(rt);
+
+        let received = rx.collect().wait().unwrap();
 
         let mut is = [0; 3];
 
         for event in received {
             let line = event.as_log()[&event::MESSAGE].to_string_lossy();
+            println!("{}", &line);
             let mut split = line.split(" ");
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -444,6 +457,8 @@ mod tests {
 
             writeln!(&mut file, "hello there").unwrap();
 
+            sleep();
+
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
                 received.as_log()[&"file".into()].to_string_lossy(),
@@ -472,6 +487,8 @@ mod tests {
 
             writeln!(&mut file, "hello there").unwrap();
 
+            sleep();
+
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
                 received.as_log()[&"source".into()].to_string_lossy(),
@@ -499,6 +516,8 @@ mod tests {
             sleep();
 
             writeln!(&mut file, "hello there").unwrap();
+
+            sleep();
 
             let received = rx.into_future().wait().unwrap().0.unwrap();
             assert_eq!(
@@ -543,6 +562,8 @@ mod tests {
             sleep();
 
             drop(trigger);
+            shutdown_on_idle(rt);
+
             let received = rx.collect().wait().unwrap();
             let lines = received
                 .into_iter()
@@ -577,6 +598,8 @@ mod tests {
             sleep();
 
             drop(trigger);
+            shutdown_on_idle(rt);
+
             let received = rx.collect().wait().unwrap();
             let lines = received
                 .into_iter()
@@ -649,6 +672,8 @@ mod tests {
             sleep();
 
             drop(trigger);
+            shutdown_on_idle(rt);
+
             let received = rx.collect().wait().unwrap();
             let before_lines = received
                 .iter()
