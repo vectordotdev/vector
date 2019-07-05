@@ -1,0 +1,58 @@
+#                                    __   __  __  
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                            Configuration Specification
+#
+# ------------------------------------------------------------------------------
+# Website: <%= metadata.links.fetch("url.website") %>
+# Docs: <%= metadata.links.fetch("url.docs") %>
+# Community: <%= metadata.links.fetch("url.community") %>
+# ------------------------------------------------------------------------------
+# The file contains a full specification for the `vector.toml` configuration
+# file. It follows the TOML format and includes all options, types, and
+# possible values.
+#
+# More info on Vector's configuration can be found at:
+# <%= metadata.links.fetch("docs.configuration") %>
+
+# ------------------------------------------------------------------------------
+# Global
+# ------------------------------------------------------------------------------
+# Global options are relevant to Vector as a whole and apply to global behavior.
+#
+# Documentation: <%= metadata.links.fetch("url.configuration") %>
+<%= config_spec(metadata.options.to_h.values.sort) %>
+
+# ------------------------------------------------------------------------------
+# Sources
+# ------------------------------------------------------------------------------
+# Sources specify data sources and are responsible for ingesting data into
+# Vector.
+#
+# Documentation: <%= metadata.links.fetch("docs.sources") %>
+<% metadata.sources.to_h.values.sort.each do |source| %>
+<%= config_spec(source.options.to_h.values.sort, path: "sources.#{source.name}") %>
+<% end %>
+
+# ------------------------------------------------------------------------------
+# Transforms
+# ------------------------------------------------------------------------------
+# Transforms parse, structure, and enrich events.
+#
+# Documentation: <%= metadata.links.fetch("docs.transforms") %>
+<% metadata.transforms.to_h.values.sort.each do |transform| %>
+<%= config_spec(transform.options.to_h.values.sort, path: "transforms.#{transform.name}") %>
+<% end %>
+
+# ------------------------------------------------------------------------------
+# Sinks
+# ------------------------------------------------------------------------------
+# Sinks batch or stream data out of Vector.
+#
+# Documentation: <%= metadata.links.fetch("docs.sinks") %>
+<% metadata.sinks.to_h.values.sort.each do |sink| %>
+<%= config_spec(sink.options.to_h.values.sort, path: "sinks.#{sink.name}") %>
+<% end %>

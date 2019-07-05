@@ -65,7 +65,7 @@ data quickly available for querying. To implement this, you can forgo using a
 centralized Vector service entirely and stream data directly from your client
 nodes.
 
-## Tuning
+## System Configuration
 
 ### Limiting Resources
 

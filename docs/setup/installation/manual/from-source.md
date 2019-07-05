@@ -131,6 +131,10 @@ To install Vector into Systemd run:
 cp -a distribution/systemd/vector /etc/systemd/system
 ```
 
+## Updating
+
+Simply follow the same [installation instructions above](#installation).
+
 
 [docs.configuration]: ../../../usage/configuration
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory

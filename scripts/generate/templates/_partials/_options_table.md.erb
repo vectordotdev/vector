@@ -1,0 +1,17 @@
+<% if opts[:header] -%>
+| Key  | Type  | Description |
+|:-----|:-----:|:------------|
+<% end -%>
+<% table.grouped.each do |title, options| -%>
+<% if opts[:titles] -%>
+| <%= title %> | | |
+<% end -%>
+<% options.each do |option| -%>
+<% if !option.options.nil? -%>
+<%= options_table(option.options, header: false, path: option.name, titles: false) %>
+<% else -%>
+<% tags = table.option_tags(option) -%>
+| `<%= option.name %>` | `<%= option.type %>` | <%= option.description %><% if tags.any? %><br /><%= tags(tags) %><% end %> |
+<% end -%>
+<% end -%>
+<% end -%>

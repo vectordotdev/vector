@@ -1,3 +1,11 @@
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/README.md.erb
+-->
+
 ---
 description: Vector configuration
 ---
@@ -6,7 +14,10 @@ description: Vector configuration
 
 ![](../../assets/configure.svg)
 
-This section covers configuring Vector and creating [pipelines](../../about/concepts.md#pipelines) like the one shown above. Vector requires only a _single_ [TOML](https://github.com/toml-lang/toml) configurable file, which you can specify via the [`--config` flag](../administration/starting.md#options) when [starting](../administration/starting.md) vector:
+This section covers configuring Vector and creating [pipelines][docs.pipelines]
+like the one shown above. Vector requires only a _single_ [TOML][url.toml]
+configurable file, which you can specify via the
+[`--config` flag][docs.starting.flags] when [starting][docs.starting] vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -62,27 +73,15 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
-<!-- START: global_options_table -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
 | Key  | Type  | Description |
-| :--- | :---: | :---------- |
-| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.<br />`no default` `example: "/var/lib/vector"` |
-
-<!-- ----------------------------------------------------------------- -->
-<!-- END: global_options_table -->
+|:-----|:-----:|:------------|
+| **OPTIONAL** | | |
+| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers. Please make sure the Vector project has write permissions to this dir.<br />`no default` `example: "/var/lib/vector"` |
 
 ## Sources
 
-<!-- START: sources_table -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
 | Name  | Description |
-| :---  | :---------- |
+|:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
 | [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
@@ -90,20 +89,12 @@ data_dir = "/var/lib/vector"
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
-<!-- ----------------------------------------------------------------- -->
-<!-- END: sources_table -->
-
-[+ request a new source](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+source%22%7D&title=New+%60%3Cname%3E%60+source)
+[+ request a new source][url.new_source]
 
 ## Transforms
 
-<!-- START: transforms_table -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
 | Name  | Description |
-| :---  | :---------- |
+|:------|:------------|
 | [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
@@ -114,20 +105,12 @@ data_dir = "/var/lib/vector"
 | [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
 | [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
-<!-- ----------------------------------------------------------------- -->
-<!-- END: transforms_table -->
-
-[+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+transform%22%7D&title=New+%60%3Cname%3E%60+transform)
+[+ request a new transform][url.new_transform]
 
 ## Sinks
 
-<!-- START: sinks_table -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
 | Name  | Description |
-| :---  | :---------- |
+|:------|:------------|
 | [**`aws_cloudwatch_logs`**][docs.aws_cloudwatch_logs_sink] | Batches [`log`][docs.log_event] events to [AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
 | [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | Batches [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.aws_s3_sink] | Batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
@@ -136,39 +119,41 @@ data_dir = "/var/lib/vector"
 | [**`elasticsearch`**][docs.elasticsearch_sink] | Batches [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | Batches [`log`][docs.log_event] events to a generic HTTP endpoint. |
 | [**`kafka`**][docs.kafka_sink] | Streams [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
+| [**`prometheus`**][docs.prometheus_sink] | Pulls [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.splunk_hec_sink] | Batches [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec]. |
 | [**`tcp`**][docs.tcp_sink] | Streams [`log`][docs.log_event] events to a TCP connection. |
 | [**`vector`**][docs.vector_sink] | Streams [`log`][docs.log_event] events to another downstream Vector instance. |
 
-<!-- ----------------------------------------------------------------- -->
-<!-- END: sinks_table -->
-
-[+ request a new sink](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+sink%22%7D&title=New+%60%3Cname%3E%60+sink)
+[+ request a new sink][url.new_sink]
 
 ## How It Works
 
-<!-- START: how_it_works_sections -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
 ### Composition
 
-The primary purpose of the configuration file is to compose pipelines. Pipelines are formed by connecting [sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks] through the `inputs` option.
+The primary purpose of the configuration file is to compose pipelines. Pipelines
+are formed by connecting [sources][docs.sources], [transforms][docs.transforms],
+and [sinks][docs.sinks] through the `inputs` option.
 
-Notice in the above example each input references the `id` assigned to a previous source or transform.
+Notice in the above example each input references the `id` assigned to a
+previous source or transform.
 
 ### Config File Location
 
-The location of your Vector configuration file depends on your [platform][docs.platforms] or [operating system][docs.operating_systems]. For most Linux based systems the file can be found at `/etc/vector/vector.toml`.
+The location of your Vector configuration file depends on your
+[platform][docs.platforms] or [operating system][docs.operating_systems]. For
+most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 
 ### Data Directory
 
-Vector requires a `data_dir` value for on-disk operations. Currently, the only operation using this directory are Vector's on-disk buffers. Buffers, by default, are memory-based, but if you switch them to disk-based you'll need to specify a `data_directory`.
+Vector requires a `data_dir` value for on-disk operations. Currently, the only
+operation using this directory are Vector's on-disk buffers. Buffers, by
+default, are memory-based, but if you switch them to disk-based you'll need to
+specify a `data_directory`.
 
 ### Environment Variables
 
-Vector will interpolate environment variables within your configuration file with the following syntax:
+Vector will interpolate environment variables within your configuration file
+with the following syntax:
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
@@ -182,15 +167,20 @@ Vector will interpolate environment variables within your configuration file wit
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-The entire `${HOSTNAME}` variable will be replaced, hence the requirement of quotes around the definition.
+The entire `${HOSTNAME}` variable will be replaced, hence the requirement of
+quotes around the definition.
 
 #### Escaping
 
-You can escape environment variable by preceding them with a `$` character. For example `$${HOSTNAME}` will be treated _literally_ in the above environment variable example.
+You can escape environment variable by preceding them with a `$` character. For
+example `$${HOSTNAME}` will be treated _literally_ in the above environment
+variable example.
 
 ### Format
 
-The Vector configuration file requires the [TOML][url.toml] format for it's simplicity, explicitness, and relaxed white-space parsing. For more information, please refer to the excellent [TOML documentation][url.toml].
+The Vector configuration file requires the [TOML][url.toml] format for it's
+simplicity, explicitness, and relaxed white-space parsing. For more information,
+please refer to the excellent [TOML documentation][url.toml].
 
 ### Value Types
 
@@ -206,9 +196,6 @@ All TOML values types are supported. For convenience this includes:
 * [Local Times](https://github.com/toml-lang/toml#local-time)
 * [Arrays](https://github.com/toml-lang/toml#array)
 * [Tables](https://github.com/toml-lang/toml#table)
-
-<!-- ----------------------------------------------------------------- -->
-<!-- END: how_it_works_sections -->
 
 
 [docs.add_fields_transform]: ../../usage/configuration/transforms/add_fields.md
@@ -228,13 +215,17 @@ All TOML values types are supported. For convenience this includes:
 [docs.lua_transform]: ../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../about/data-model.md#metric
 [docs.operating_systems]: ../../setup/installation/operating-systems
+[docs.pipelines]: ../../usage/configuration/README.md#composition
 [docs.platforms]: ../../setup/installation/platforms
+[docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
 [docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ../../usage/configuration/transforms/remove_fields.md
 [docs.sampler_transform]: ../../usage/configuration/transforms/sampler.md
 [docs.sinks]: ../../usage/configuration/sinks
 [docs.sources]: ../../usage/configuration/sources
 [docs.splunk_hec_sink]: ../../usage/configuration/sinks/splunk_hec.md
+[docs.starting.flags]: ../../usage/administration/starting.md#flags
+[docs.starting]: ../../usage/administration/starting.md
 [docs.statsd_source]: ../../usage/configuration/sources/statsd.md
 [docs.stdin_source]: ../../usage/configuration/sources/stdin.md
 [docs.syslog_source]: ../../usage/configuration/sources/syslog.md
@@ -252,6 +243,10 @@ All TOML values types are supported. For convenience this includes:
 [url.kafka]: https://kafka.apache.org/
 [url.kafka_protocol]: https://kafka.apache.org/protocol
 [url.lua]: https://www.lua.org/
+[url.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[url.prometheus]: https://prometheus.io/
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.toml]: https://github.com/toml-lang/toml

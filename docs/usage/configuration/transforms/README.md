@@ -1,20 +1,25 @@
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/README.md.erb
+-->
+
 ---
 description: Parse, structure, and transform events
 ---
 
 # Transforms
 
-![](../../../assets/transforms.svg)
+![][images.transforms]
 
-Transforms are in the middle of the [pipeline][docs.pipelines], sitting in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform [events][docs.event] or the stream as a whole.
+Transforms are in the middle of the [pipeline][docs.pipelines], sitting
+in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
+[events][docs.event] or the stream as a whole.
 
-<!-- START: transforms_table -->
-<!-- ----------------------------------------------------------------- -->
-<!-- DO NOT MODIFY! This section is generated from the /.metadata.toml -->
-<!-- via `make generate-docs`. See /DOCUMENTING.md for more info.      -->
-
-| Name | Description |
-| :--- | :---------- |
+| Name  | Description |
+|:------|:------------|
 | [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
@@ -25,11 +30,7 @@ Transforms are in the middle of the [pipeline][docs.pipelines], sitting in-betwe
 | [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
 | [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
-<!-- ----------------------------------------------------------------- -->
-<!-- END: transforms_table -->
-
-
-[+ request a new transform](https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature%2C%7B%3Atitle%3D%3E%22New+%60%3Cname%3E%60+transform%22%7D&title=New+%60%3Cname%3E%60+transform)
+[+ request a new transform][url.new_transform]
 
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
@@ -47,6 +48,8 @@ Transforms are in the middle of the [pipeline][docs.pipelines], sitting in-betwe
 [docs.sinks]: ../../../usage/configuration/sinks
 [docs.sources]: ../../../usage/configuration/sources
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
+[images.transforms]: ../../../assets/transforms.svg
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.lua]: https://www.lua.org/
+[url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression

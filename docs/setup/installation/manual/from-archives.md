@@ -142,10 +142,14 @@ To install Vector into Systemd run:
 cp -a etc/systemd/vector /etc/systemd/system
 ```
 
+## Updating
+
+Simply follow the same [installation instructions above](#installation).
+
 
 [docs.configuration]: ../../../usage/configuration
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory
-[docs.from_source]: ../../../setup/installation/from-source.md
+[docs.from_source]: ../../../setup/installation/manual/from-source.md
 [docs.package_managers]: ../../../setup/installation/package-managers
 [docs.platforms]: ../../../setup/installation/platforms
 [url.releases]: https://github.com/timberio/vector/releases

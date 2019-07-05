@@ -24,12 +24,12 @@ build: ## Build the project
 check: ## Check all code and formatting
 	@cargo check --all --all-features --all-targets
 	@cargo fmt -- --check
-	@bundle install --gemfile=scripts/generate-docs/Gemfile
-	@scripts/check-docs.sh
+	@bundle install --gemfile=scripts/generate/Gemfile
+	@scripts/check-generate.sh
 
-generate-docs: ## Generate docs from the /.metadata.toml file
-	@bundle install --gemfile=scripts/generate-docs/Gemfile
-	@scripts/generate-docs.sh
+generate: ## Generates files across the repo from the /.metadata.toml file
+	@bundle install --gemfile=scripts/generate/Gemfile
+	@scripts/generate.sh
 
 fmt: ## Format code
 	@cargo fmt
