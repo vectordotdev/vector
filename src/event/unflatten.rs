@@ -11,7 +11,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum MapValue {
+pub enum MapValue {
     Value(ValueKind),
     Map(HashMap<Atom, MapValue>),
     Array(Vec<MapValue>),
@@ -21,6 +21,12 @@ enum MapValue {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Unflatten {
     map: HashMap<Atom, MapValue>,
+}
+
+impl Unflatten {
+    pub fn get(&self, key: &Atom) -> Option<&MapValue> {
+        self.map.get(key)
+    }
 }
 
 impl From<HashMap<Atom, Value>> for Unflatten {

@@ -1,0 +1,67 @@
+[sinks.cratedb]
+batch_size = 1000
+batch_timeout = 1
+buffer = true
+delivery_guarantee = "at_least_once"
+egress_method = "batching"
+healthcheck = true
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 10
+retry_attempts = 10
+retry_backoff_secs = 1
+request_in_flight_limit = 10
+request_timeout_secs = 30
+service_provider = "CrateDB"
+write_to_description = "[CrateDB][urls.cratedb] via the [HTTP protocol][urls.cratedb_http_api]"
+
+[sinks.cratedb.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.cratedb.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.cratedb.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
+[sinks.cratedb.options.host]
+type = "string"
+examples = ["http://localhost:4200/"]
+null = false
+description = "The URL to the CrateDB cluster. This should include the protocol, host, and port, but not the path or other parts."
+
+[sinks.cratedb.options.schema]
+type = "string"
+examples = ["doc"]
+default = "doc"
+null = true
+description = "The database schema within CrateDB."
+
+[sinks.cratedb.options.table]
+type = "string"
+examples = ["logging"]
+default = "logging"
+null = true
+description = "The database table within the schema within CrateDB."
+
+[sinks.cratedb.options.columns]
+type = "[string]"
+examples = [["timestamp", "message"]]
+default = ["timestamp", "message"]
+null = true
+description = "The table columns. If a column requires quoting due to its name, quote it using double quotes (`\"`): `columns = ['\"time\"', '\"msg\"']`"
+
+[sinks.cratedb.options.keys]
+type = "[string]"
+examples = [["timestamp", "message"]]
+default = ["timestamp", "message"]
+null = true
+description = "The keys from the event, mapped 1-to-1 to the columns."

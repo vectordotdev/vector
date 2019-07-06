@@ -9,7 +9,7 @@ use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
 pub mod metric;
-mod unflatten;
+pub mod unflatten;
 
 pub use metric::Metric;
 

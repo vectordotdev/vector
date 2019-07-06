@@ -1,0 +1,91 @@
+<% component = metadata.sinks.cratedb %>
+
+<%= component_header(component) %>
+
+## Example
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_sections(component.specific_options_list, depth: 3) %>
+
+## Input/Output
+
+The `http` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
+`batch_timeout` options. When flushed, Vector will write the events to the
+[configured CrateDB cluster][urls.cratedb] using the [HTTP
+protocol][urls.cratedb_http_api].
+
+```http
+POST <host>/_sql HTTP/1.1
+Host: <host>
+Content-Type: application/json
+Content-Length: 532
+
+{
+  "stmt": "INSERT INTO \"doc\".\"logging\" (timestamp, message, response, bytes, method, remote) VALUES (?, ?, ?, ?, ?, ?)",
+  "bulk_args": [
+    ["2019-08-09T12:34:56Z","52a2:9302:f27a:eb89::e2fb:f6c8 - - [09/Aug/2019:14:34:56 +0200] \"GET / HTTP/1.1\" 200 16298 \"-\" \"Firefox\"",200,16298,"GET","52a2:9302:f27a:eb89::e2fb:f6c8"],
+    ["2019-08-09T12:49:12Z","d507:6487:325:58e8::bf4a:4820 - - [09/Aug/2019:14:49:12 +0200] \"POST /contact/ HTTP/1.1\" 302 0 \"-\" \"Firefox\"",302,0,"POST","d507:6487:325:58e8::bf4a:4820"]
+  ]
+}
+```
+
+### Preparation
+
+After [running CrateDB](https://crate.io/docs/crate/reference/en/latest/run.html)
+you need to create a table for the log entries. You can either use the
+[CrateDB Admin UI](https://crate.io/docs/clients/admin-ui/en/latest/) or the
+[CrateDB Shell](https://crate.io/docs/clients/crash/en/latest/).
+
+```sql
+CREATE TABLE "doc"."logs" (
+    "timestamp" TIMESTAMP,
+    "message" STRING INDEX USING FULLTEXT WITH (
+        analyzer = 'simple'
+    ),
+)
+```
+
+The schema (`doc`) and the table name (`logs`) can be configured using the
+corresponding configuration options.
+
+You can also configure other column, but `timestamp` and `message` are the
+default and map Vector's event keys `timestamp` and `message`. For the example
+above, you'd add the additional columns fof `reponse`, `bytes`, `method` and
+`remote`:
+
+```sql
+CREATE TABLE "doc"."logs" (
+    "timestamp" TIMESTAMP,
+    "message" STRING INDEX USING FULLTEXT WITH (
+        analyzer = 'simple'
+    ),
+    "response" SMALLINT,
+    "bytes" INTEGER,  -- Or BIGINT to cover sizes of up to 2^63-1 bytes instead of 2^31-1
+    "method" STRING,
+    "remote" STRING
+)
+```
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Authentication
+
+HTTP authentication is controlled via the `Authorization` header which you can
+set with the `headers` option. For convenience, Vector also supports the
+`basic_auth.username` and `basic_auth.password` options which handle setting the
+`Authorization` header for the [base access authentication
+scheme][urls.basic_auth].
+
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

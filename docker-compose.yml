@@ -74,3 +74,7 @@ services:
       image: yandex/clickhouse-server:19
       ports:
         - "8123:8123"
+    cratedb:
+      image: crate:4.0
+      ports:
+        - "4200:4200"

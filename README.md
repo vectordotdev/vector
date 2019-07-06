@@ -52,7 +52,7 @@ simple and unified.
 
 * [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [syslog][docs.sources.syslog], [tcp][docs.sources.tcp], and [4 more...][docs.sources]
 * [**Transforms**][docs.transforms] - [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], [sampler][docs.transforms.sampler], [tokenizer][docs.transforms.tokenizer], and [8 more...][docs.transforms]
-* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [http][docs.sinks.http], [kafka][docs.sinks.kafka], [prometheus][docs.sinks.prometheus], and [10 more...][docs.sinks]
+* [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [cratedb][docs.sinks.cratedb], [elasticsearch][docs.sinks.elasticsearch], [http][docs.sinks.http], [kafka][docs.sinks.kafka], [prometheus][docs.sinks.prometheus], and [10 more...][docs.sinks]
 
 #### Administration
 
@@ -153,6 +153,7 @@ Or use your own [preferred method][docs.installation].
 [docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3
 [docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse
+[docs.sinks.cratedb]: https://vector.dev/docs/reference/sinks/cratedb
 [docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch
 [docs.sinks.http]: https://vector.dev/docs/reference/sinks/http
 [docs.sinks.kafka]: https://vector.dev/docs/reference/sinks/kafka

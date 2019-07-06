@@ -177,6 +177,7 @@ jobs:
           - xpack.ssl.certificate=certs/localhost.crt
           - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
+      - image: crate:4.0
     steps:
       - checkout
       - setup_remote_docker:
