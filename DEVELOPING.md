@@ -37,6 +37,10 @@ This document covers the basics of developing in Vector. In this document:
 2. [Install Docker](https://docs.docker.com/install/). Docker
    containers are used for mocking Vector's integrations.
 
+3. [Install Ruby](https://www.ruby-lang.org/en/downloads/) and
+   [Bundler 2](https://bundler.io/v2.0/guides/bundler_2_upgrade.html).
+   They are used to build Vector's documentation.
+
 ## Directory Structure
 
 * [`/benches`](/benches) - Internal benchmarks.
