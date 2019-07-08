@@ -21,15 +21,21 @@ bench: ## Run internal benchmarks
 build: ## Build the project
 	@cargo build
 
-check: ## Check all code and formatting
-	@cargo check --all --all-features --all-targets
-	@cargo fmt -- --check
-	@bundle install --gemfile=scripts/generate-docs/Gemfile
-	@scripts/check-docs.sh
+check: check-code check-fmt check-generate
 
-generate-docs: ## Generate docs from the /.metadata.toml file
-	@bundle install --gemfile=scripts/generate-docs/Gemfile
-	@scripts/generate-docs.sh
+check-code: ## Checks code for compilation errors
+	@cargo check --all --all-features --all-targets
+
+check-fmt: ## Checks code formatting correctness
+	@cargo fmt -- --check
+
+check-generate: ## Checks for pending `make generate` changes
+	@bundle install --gemfile=scripts/generate/Gemfile
+	@scripts/check-generate.sh
+
+generate: ## Generates files across the repo from the /.metadata.toml file
+	@bundle install --gemfile=scripts/generate/Gemfile
+	@scripts/generate.sh --check-urls
 
 fmt: ## Format code
 	@cargo fmt

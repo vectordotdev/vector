@@ -1,0 +1,5 @@
+| Name  | Description |
+|:------|:------------|
+<% components.each do |component| -%>
+| [**`<%= component.name %>`**][docs.<%= component.name %>_<%= component.type %>] | <%= component_description(component) %> |
+<% end -%>

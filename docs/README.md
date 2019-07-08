@@ -6,6 +6,10 @@ Vector is a [high-performance][docs.performance], [open-source][url.vector_repo]
 
 Built in [Rust][url.rust], Vector places high-value on [performance][docs.performance], [correctness][docs.correctness], and [operator friendliness][docs.administration]. It compiles to a single static binary and is designed to be [deployed][docs.deployment] across your entire infrastructure, serving both as a light-weight [agent][docs.agent_role] and a highly efficient [service][docs.service_role], making it the single tool you need to get data from A to B.
 
+| headerff | col    |
+|:---------|:-------|
+| test     | tessss |
+
 
 [docs.administration]: /usage/administration
 [docs.agent_role]: /setup/deployment/roles/agent.md

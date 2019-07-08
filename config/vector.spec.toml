@@ -24,13 +24,16 @@
 # Global options are relevant to Vector as a whole and apply to global behavior.
 #
 # Documentation: https://docs.vector.dev/usage/configuration
-# OPTIONAL - General
-
-# The directory used for persisting Vector state, such as on-disk buffers.
-# Please make sure the Vector project has write permissions to this dir.
 #
-# * no default
-data_dir = "/var/lib/vector"
+  # General
+  #
+
+  # The directory used for persisting Vector state, such as on-disk buffers.
+  # Please make sure the Vector project has write permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
 
 # ------------------------------------------------------------------------------
 # Sources
@@ -39,185 +42,236 @@ data_dir = "/var/lib/vector"
 # Vector.
 #
 # Documentation: https://docs.vector.dev/usage/configuration/sources
+
 [sources.file]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: file
+  # 
+  # * required
+  # * no default
+  # * must be: "file"
   type = "file"
 
   # Array of file patterns to exclude. Globbing is supported. *Takes precedence
   # over the `include` option.*
+  # 
+  # * required
+  # * no default
   exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
+  # 
+  # * required
+  # * no default
   include = ["/var/log/nginx/*.log"]
 
-  # OPTIONAL - General
-
   # Ignore files with a data modification date that does not exceed this age.
-  #
+  # 
+  # * optional
   # * no default
-  # * seconds
+  # * unit: seconds
   ignore_older = 86400
 
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
-  #
+  # 
+  # * optional
   # * default: 102400
-  # * bytes
+  # * unit: bytes
   max_line_bytes = 102400
 
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
-  #
+  # 
+  # * optional
   # * default: false
   start_at_beginning = false
 
-  # OPTIONAL - Context
+  #
+  # Context
+  #
 
   # The key name added to each event with the full path of the file.
-  #
-  # * default: file
+  # 
+  # * optional
+  # * default: "file"
   file_key = "file"
 
   # The key name added to each event representing the current host.
-  #
-  # * default: host
+  # 
+  # * optional
+  # * default: "host"
   host_key = "host"
 
 [sources.statsd]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: statsd
+  # 
+  # * required
+  # * no default
+  # * must be: "statsd"
   type = "statsd"
 
   # UDP socket address to bind to.
+  # 
+  # * required
+  # * no default
   address = "127.0.0.1:8126"
 
 [sources.stdin]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: stdin
+  # 
+  # * required
+  # * no default
+  # * must be: "stdin"
   type = "stdin"
 
-  # OPTIONAL - General
-
   # The maxiumum bytes size of a message before it is discarded.
-  #
+  # 
+  # * optional
   # * default: 102400
-  # * bytes
+  # * unit: bytes
   max_length = 102400
 
-  # OPTIONAL - Context
+  #
+  # Context
+  #
 
   # The key name added to each event representing the current host.
-  #
-  # * default: host
+  # 
+  # * optional
+  # * default: "host"
   host_key = "host"
 
 [sources.syslog]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: syslog
+  # 
+  # * required
+  # * no default
+  # * must be: "syslog"
   type = "syslog"
-
-  # OPTIONAL - General
 
   # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or
   # `udp`.
-  #
+  # 
+  # * optional
   # * no default
   address = "0.0.0.0:9000"
 
   # The maximum bytes size of incoming messages before they are discarded.
-  #
+  # 
+  # * optional
   # * default: 102400
-  # * bytes
+  # * unit: bytes
   max_length = 102400
 
   # The input mode.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: tcp, udp, unix
+  # * enum: "tcp", "udp", "unix"
   mode = "tcp"
   mode = "udp"
   mode = "unix"
 
   # The unix socket path. *This should be absolute path.* Only relevant when
   # `mode` is `unix`.
-  #
+  # 
+  # * optional
   # * no default
   path = "/path/to/socket"
 
-  # OPTIONAL - Context
+  #
+  # Context
+  #
 
   # The key name added to each event representing the current host.
-  #
-  # * default: host
+  # 
+  # * optional
+  # * default: "host"
   host_key = "host"
 
 [sources.tcp]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: tcp
+  # 
+  # * required
+  # * no default
+  # * must be: "tcp"
   type = "tcp"
 
-  # OPTIONAL - General
-
   # The address to bind the socket to.
-  #
+  # 
+  # * optional
   # * no default
   address = "0.0.0.0:9000"
 
   # The maximum bytes size of incoming messages before they are discarded.
-  #
+  # 
+  # * optional
   # * default: 102400
-  # * bytes
+  # * unit: bytes
   max_length = 102400
 
   # The timeout before a connection is forcefully closed during shutdown.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   shutdown_timeout_secs = 30
 
-  # OPTIONAL - Context
+  #
+  # Context
+  #
 
   # The key name added to each event representing the current host.
-  #
-  # * default: host
+  # 
+  # * optional
+  # * default: "host"
   host_key = "host"
 
 [sources.vector]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: vector
+  # 
+  # * required
+  # * no default
+  # * must be: "vector"
   type = "vector"
 
-  # OPTIONAL - General
-
   # The TCP address to bind to.
-  #
+  # 
+  # * optional
   # * no default
   address = "0.0.0.0:9000"
 
   # The timeout before a connection is forcefully closed during shutdown.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   shutdown_timeout_secs = 30
+
 
 # ------------------------------------------------------------------------------
 # Transforms
@@ -225,23 +279,35 @@ data_dir = "/var/lib/vector"
 # Transforms parse, structure, and enrich events.
 #
 # Documentation: https://docs.vector.dev/usage/configuration/transforms
+
 [transforms.add_fields]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: add_fields
+  # 
+  # * required
+  # * no default
+  # * must be: "add_fields"
   type = "add_fields"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
-  # REQUIRED - Fields
-  [transforms.add_fields.fields]
+  #
+  # Fields
+  #
 
+  [transforms.add_fields.fields]
     # A key/value pair representing the new field to be added. Accepts all
     # supported types. Use `.` for adding nested fields.
-    #
+    # 
+    # * optional
     # * no default
     my_string_field = "string value"
     my_env_var_field = "${ENV_VAR}"
@@ -253,233 +319,325 @@ data_dir = "/var/lib/vector"
     my_list = ["first", "second", "third"]
 
 [transforms.field_filter]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: field_filter
+  # 
+  # * required
+  # * no default
+  # * must be: "field_filter"
   type = "field_filter"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The target field to compare against the `value`.
+  # 
+  # * required
+  # * no default
   field = "file"
 
   # If the value of the specified `field` matches this value then the event will
   # be permitted, otherwise it is dropped.
+  # 
+  # * required
+  # * no default
   value = "/var/log/nginx.log"
 
 [transforms.grok_parser]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: grok_parser
+  # 
+  # * required
+  # * no default
+  # * must be: "grok_parser"
   type = "grok_parser"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The Grok pattern
+  # 
+  # * required
+  # * no default
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
-  # OPTIONAL - General
-
   # If `true` will drop the `field` after parsing.
-  #
+  # 
+  # * optional
   # * default: true
   drop_field = true
 
   # The field to execute the `pattern` against. Must be a `string` value.
-  #
-  # * default: message
+  # 
+  # * optional
+  # * default: "message"
   field = "message"
 
 [transforms.json_parser]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: json_parser
+  # 
+  # * required
+  # * no default
+  # * must be: "json_parser"
   type = "json_parser"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
 
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
-  #
+  # 
+  # * optional
   # * no default
   drop_invalid = true
 
   # The field decode as JSON. Must be a `string` value.
-  #
-  # * default: message
+  # 
+  # * optional
+  # * default: "message"
   field = "message"
 
 [transforms.lua]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: lua
+  # 
+  # * required
+  # * no default
+  # * must be: "lua"
   type = "lua"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The inline Lua source to evaluate.
+  # 
+  # * required
+  # * no default
   source = """
-  require("script") # a `script.lua` file must be in your `search_dirs`
+require("script") # a `script.lua` file must be in your `search_dirs`
 
-  if event["host"] == nil then
-    local f = io.popen ("/bin/hostname")
-    local hostname = f:read("*a") or ""
-    f:close()
-    hostname = string.gsub(hostname, "\n$", "")
-    event["host"] = hostname
-  end
-  """
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""
 
-
-  # OPTIONAL - General
 
   # A list of directories search when loading a Lua file via the `require`
   # function.
-  #
+  # 
+  # * optional
   # * no default
   search_dirs = ["/etc/vector/lua"]
 
 [transforms.regex_parser]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: regex_parser
+  # 
+  # * required
+  # * no default
+  # * must be: "regex_parser"
   type = "regex_parser"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+  # 
+  # * required
+  # * no default
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
-  # OPTIONAL - General
-
   # If `true`, events that fail to properly parse will be dropped.
-  #
+  # 
+  # * optional
   # * default: false
   drop_failed = false
 
   # If the `field` should be dropped (removed) after parsing.
-  #
+  # 
+  # * optional
   # * default: true
   drop_field = true
 
   # The field to parse.
-  #
-  # * default: message
+  # 
+  # * optional
+  # * default: "message"
   field = "message"
 
-  # OPTIONAL - Types
-  [transforms.regex_parser.types]
+  #
+  # Types
+  #
 
+  [transforms.regex_parser.types]
     # A definition of mapped field types. They key is the field name and the value
     # is the type. `strftime` specifiers are supported for the `timestamp` type.
-    #
+    # 
+    # * optional
     # * no default
-    # * enum: string, int, float, bool, timestamp|strftime
+    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s" # unix
-    timestamp = "timestamp|%+" # iso8601 (date and time)
-    timestamp = "timestamp|%F" # iso8601 (date)
-    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 [transforms.remove_fields]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: remove_fields
+  # 
+  # * required
+  # * no default
+  # * must be: "remove_fields"
   type = "remove_fields"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The field names to drop.
+  # 
+  # * required
+  # * no default
   fields = ["field1", "field2"]
 
 [transforms.sampler]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: sampler
+  # 
+  # * required
+  # * no default
+  # * must be: "sampler"
   type = "sampler"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
-
-  # OPTIONAL - General
 
   # A list of regular expression patterns to exclude events from sampling. If an
   # event's `"message"` key matches _any_ of these patterns it will _not_ be
   # sampled.
-  #
+  # 
+  # * optional
   # * no default
   pass_list = ["[error]", "field2"]
 
   # The maximum number of events allowed per second.
-  #
+  # 
+  # * optional
   # * no default
   rate = ["field1", "field2"]
 
 [transforms.tokenizer]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: tokenizer
+  # 
+  # * required
+  # * no default
+  # * must be: "tokenizer"
   type = "tokenizer"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The field names assigned to the resulting tokens, in order.
+  # 
+  # * required
+  # * no default
   field_names = ["timestamp", "level", "message"]
 
-  # OPTIONAL - General
-
   # If `true` the `field` will be dropped after parsing.
-  #
+  # 
+  # * optional
   # * default: true
   drop_field = true
 
   # The field to tokenize.
-  #
-  # * default: message
+  # 
+  # * optional
+  # * default: "message"
   field = "message"
 
-  # OPTIONAL - Types
-  [transforms.tokenizer.types]
+  #
+  # Types
+  #
 
+  [transforms.tokenizer.types]
     # A definition of mapped field types. They key is the field name and the value
     # is the type. `strftime` specifiers are supported for the `timestamp` type.
-    #
+    # 
+    # * optional
     # * no default
-    # * enum: string, int, float, bool, timestamp|strftime
+    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
-    timestamp = "timestamp|%s" # unix
-    timestamp = "timestamp|%+" # iso8601 (date and time)
-    timestamp = "timestamp|%F" # iso8601 (date)
-    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+
 
 # ------------------------------------------------------------------------------
 # Sinks
@@ -487,978 +645,1323 @@ data_dir = "/var/lib/vector"
 # Sinks batch or stream data out of Vector.
 #
 # Documentation: https://docs.vector.dev/usage/configuration/sinks
+
 [sinks.aws_cloudwatch_logs]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: aws_cloudwatch_logs
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_cloudwatch_logs"
   type = "aws_cloudwatch_logs"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The group name of the target CloudWatch Logs stream.
+  # 
+  # * required
+  # * no default
   group_name = "/var/log/my-log.log"
 
   # The AWS region of the target CloudWatch Logs stream resides.
+  # 
+  # * required
+  # * no default
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
+  # 
+  # * required
+  # * no default
   stream_name = "my-stream"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1049000
-  # * bytes
+  # * unit: bytes
   batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1
-  # * bytes
+  # * unit: bytes
   batch_timeout = 1
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: json, text
+  # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 5
   rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 5
   request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 5
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 5
 
-  # OPTIONAL - Buffer
-  [sinks.aws_cloudwatch_logs.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.aws_cloudwatch_logs.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.aws_kinesis_streams]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: aws_kinesis_streams
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_kinesis_streams"
   type = "aws_kinesis_streams"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The AWS region of the target CloudWatch Logs stream resides.
+  # 
+  # * required
+  # * no default
   region = "us-east-1"
 
   # The stream name of the target CloudWatch Logs stream.
+  # 
+  # * required
+  # * no default
   stream_name = "my-stream"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1049000
-  # * bytes
+  # * unit: bytes
   batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1
-  # * bytes
+  # * unit: bytes
   batch_timeout = 1
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: json, text
+  # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 5
   rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 5
   request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 5
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 5
 
-  # OPTIONAL - Buffer
-  [sinks.aws_kinesis_streams.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.aws_kinesis_streams.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.aws_s3]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: aws_s3
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_s3"
   type = "aws_s3"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+  # 
+  # * required
+  # * no default
   bucket = "my-bucket"
 
   # The AWS region of the target S3 bucket.
+  # 
+  # * required
+  # * no default
   region = "us-east-1"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 10490000
-  # * bytes
+  # * unit: bytes
   batch_size = 10490000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 300
-  # * bytes
+  # * unit: bytes
   batch_timeout = 300
 
-  # OPTIONAL - Object Names
+  #
+  # Object Names
+  #
 
   # Whether or not to append a UUID v4 token to the end of the file. This ensures
   # there are no name collisions high volume use cases.
-  #
+  # 
+  # * optional
   # * default: true
   filename_append_uuid = true
 
   # The format of the resulting object file name. `strftime` specifiers are
   # supported.
-  #
-  # * default: %s
+  # 
+  # * optional
+  # * default: "%s"
   filename_time_format = "%s"
 
   # A prefix to apply to all object key names. This should be used to partition
   # your objects, and it's important to end this value with a `/` if you want
   # this to be the root S3 "folder". `strftime` specifiers are supported.
-  #
-  # * default: date=%F
+  # 
+  # * optional
+  # * default: "date=%F"
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The compression type to use before writing data.
-  #
+  # 
+  # * optional
   # * no default
-  # * must be: gzip
+  # * must be: "gzip"
   compression = "gzip"
 
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: ndjson, text
+  # * enum: "ndjson", "text"
   encoding = "ndjson"
   encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
-  #
+  # 
+  # * optional
   # * default: false
   gzip = false
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 5
   rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 5
   request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 5
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 5
 
-  # OPTIONAL - Buffer
-  [sinks.aws_s3.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.aws_s3.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.blackhole]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: blackhole
+  # 
+  # * required
+  # * no default
+  # * must be: "blackhole"
   type = "blackhole"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The number of events that must be received in order to print a summary of
   # activity.
+  # 
+  # * required
+  # * no default
   print_amount = "1000"
 
-  # OPTIONAL - Buffer
-  [sinks.blackhole.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.blackhole.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.console]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: console
+  # 
+  # * required
+  # * no default
+  # * must be: "console"
   type = "console"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The encoding format used to serialize the events before writing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: json, text
+  # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
 
   # The standard stream to write to.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: stdout, stderr
+  # * enum: "stdout", "stderr"
   target = "stdout"
   target = "stderr"
 
-  # OPTIONAL - Buffer
-  [sinks.console.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.console.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.elasticsearch]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: elasticsearch
+  # 
+  # * required
+  # * no default
+  # * must be: "elasticsearch"
   type = "elasticsearch"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example.
+  # 
+  # * required
+  # * no default
   host = "http://10.24.32.122:9000"
-
-  # OPTIONAL - General
 
   # The `doc_type` for your index data. This is only relevant for Elasticsearch
   # <= 6.X. If you are using >= 7.0 you do not need to set this option since
   # Elasticsearch has removed it.
-  #
-  # * default: _doc
+  # 
+  # * optional
+  # * default: "_doc"
   doc_type = "_doc"
 
   # Index name to write events to. `strftime` specifiers are supported.
-  #
-  # * default: vector-%F
+  # 
+  # * optional
+  # * default: "vector-%F"
   index = "vector-%F"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 10490000
-  # * bytes
+  # * unit: bytes
   batch_size = 10490000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1
-  # * bytes
+  # * unit: bytes
   batch_timeout = 1
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 5
   rate_limit_num = 5
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 5
   request_in_flight_limit = 5
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 60
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 60
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 5
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 5
 
-  # OPTIONAL - Buffer
-  [sinks.elasticsearch.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.elasticsearch.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.http]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: http
+  # 
+  # * required
+  # * no default
+  # * must be: "http"
   type = "http"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing.
-  #
-  # * enum: ndjson, text
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson", "text"
   encoding = "ndjson"
   encoding = "text"
 
   # The full URI to make HTTP requests to. This should include the protocol and
   # host, but can also include the port, path, and any other valid part of a URI.
+  # 
+  # * required
+  # * no default
   uri = "https://10.22.212.22:9000/endpoint"
 
-  # OPTIONAL - General
-
   # The compression strategy used to compress the payload before sending.
-  #
+  # 
+  # * optional
   # * no default
-  # * must be: gzip
+  # * must be: "gzip"
   compression = "gzip"
 
   # A URI that Vector can request in order to determine the service health.
-  #
+  # 
+  # * optional
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1049000
-  # * bytes
+  # * unit: bytes
   batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * bytes
+  # * unit: bytes
   batch_timeout = 5
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 10
   rate_limit_num = 10
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 10
   request_in_flight_limit = 10
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 30
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 30
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 10
   retry_attempts = 10
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 10
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 10
 
-  # OPTIONAL - Basic auth
-  [sinks.http.basic_auth]
+  #
+  # Basic auth
+  #
 
+  [sinks.http.basic_auth]
     # The basic authentication password.
-    #
+    # 
+    # * optional
     # * no default
     password = "password"
 
     # The basic authentication user name.
-    #
+    # 
+    # * optional
     # * no default
     user = "username"
 
-  # OPTIONAL - Buffer
-  [sinks.http.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.http.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
-  # OPTIONAL - Headers
-  [sinks.http.headers]
+  #
+  # Headers
+  #
 
+  [sinks.http.headers]
     # A custom header to be added to each outgoing HTTP request.
-    #
+    # 
+    # * optional
     # * no default
     X-Powered-By = "Vector"
 
 [sinks.kafka]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: kafka
+  # 
+  # * required
+  # * no default
+  # * must be: "kafka"
   type = "kafka"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
   # A comma-separated list of host and port pairs that are the addresses of the
   # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
   # initially to bootstrap itself
+  # 
+  # * required
+  # * no default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
   # The Kafka topic name to write events to.
+  # 
+  # * required
+  # * no default
   topic = "topic-1234"
 
-  # OPTIONAL - General
-
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: json, text
+  # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
 
   # The field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the event, a blank value
   # will be used.
-  #
+  # 
+  # * optional
   # * no default
   key_field = "partition_key"
 
-  # OPTIONAL - Buffer
-  [sinks.kafka.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.kafka.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
+    # * default: 500
+    num_items = 500
+
+[sinks.prometheus]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "prometheus"
+  type = "prometheus"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The address to expose for scraping.
+  # 
+  # * optional
+  # * no default
+  address = "0.0.0.0:9598"
+
+  #
+  # Buffer
+  #
+
+  [sinks.prometheus.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
+    # disk.
+    # 
+    # * optional
+    # * no default
+    max_size = 104900000
+
+    # Only relevant when `type` is `memory`. The maximum number of events allowed
+    # in the buffer.
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.splunk_hec]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: splunk_hec
+  # 
+  # * required
+  # * no default
+  # * must be: "splunk_hec"
   type = "splunk_hec"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # Your Splunk HEC host.
-  #
+  # 
+  # * optional
   # * no default
   host = "my-splunk-host.com"
 
   # Your Splunk HEC token.
-  #
+  # 
+  # * optional
   # * no default
   token = "A94A8FE5CCB19BA61C4C08"
 
-  # OPTIONAL - Batching
+  #
+  # Batching
+  #
 
   # The maximum size of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1049000
-  # * bytes
+  # * unit: bytes
   batch_size = 1049000
 
   # The maximum age of a batch before it is flushed.
-  #
+  # 
+  # * optional
   # * default: 1
-  # * bytes
+  # * unit: bytes
   batch_timeout = 1
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: ndjson, text
+  # * enum: "ndjson", "text"
   encoding = "ndjson"
   encoding = "text"
 
   # The window used for the `request_rate_limit_num` option
-  #
+  # 
+  # * optional
   # * default: 1
-  # * seconds
+  # * unit: seconds
   rate_limit_duration = 1
 
   # The maximum number of requests allowed within the `rate_limit_duration`
   # window.
-  #
+  # 
+  # * optional
   # * default: 10
   rate_limit_num = 10
 
   # The maximum number of in-flight requests allowed at any given time.
-  #
+  # 
+  # * optional
   # * default: 10
   request_in_flight_limit = 10
 
   # The maximum time a request can take before being aborted.
-  #
+  # 
+  # * optional
   # * default: 60
-  # * seconds
+  # * unit: seconds
   request_timeout_secs = 60
 
   # The maximum number of retries to make for failed requests.
-  #
+  # 
+  # * optional
   # * default: 5
   retry_attempts = 5
 
   # The amount of time to wait before attempting a failed request again.
-  #
+  # 
+  # * optional
   # * default: 5
-  # * seconds
+  # * unit: seconds
   retry_backoff_secs = 5
 
-  # OPTIONAL - Buffer
-  [sinks.splunk_hec.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.splunk_hec.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.tcp]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: tcp
+  # 
+  # * required
+  # * no default
+  # * must be: "tcp"
   type = "tcp"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The TCP address.
-  #
+  # 
+  # * optional
   # * no default
   address = "92.12.333.224:5000"
 
-  # OPTIONAL - Requests
+  #
+  # Requests
+  #
 
   # The encoding format used to serialize the events before flushing.
-  #
+  # 
+  # * optional
   # * no default
-  # * enum: json, text
+  # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
 
-  # OPTIONAL - Buffer
-  [sinks.tcp.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.tcp.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500
 
 [sinks.vector]
-  # REQUIRED - General
+  #
+  # General
+  #
 
   # The component type
-  #
-  # * must be: vector
+  # 
+  # * required
+  # * no default
+  # * must be: "vector"
   type = "vector"
 
-  # A list of upstream source for more info.
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
   inputs = ["my-source-id"]
 
-  # OPTIONAL - General
-
   # The downstream Vector address.
-  #
+  # 
+  # * optional
   # * no default
   address = "92.12.333.224:5000"
 
-  # OPTIONAL - Buffer
-  [sinks.vector.buffer]
+  #
+  # Buffer
+  #
 
+  [sinks.vector.buffer]
     # The buffer's type / location. `disk` buffers are persistent and will be
     # retained between restarts.
-    #
-    # * default: memory
-    # * enum: memory, disk
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
     type = "memory"
     type = "disk"
 
     # The behavior when the buffer becomes full.
-    #
-    # * default: block
-    # * enum: block, drop_newest
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
     # Only relevant when `type` is `disk`. The maximum size of the buffer on the
     # disk.
-    #
+    # 
+    # * optional
     # * no default
     max_size = 104900000
 
     # Only relevant when `type` is `memory`. The maximum number of events allowed
     # in the buffer.
-    #
+    # 
+    # * optional
     # * default: 500
     num_items = 500

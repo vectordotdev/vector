@@ -1,0 +1,7 @@
+* [**Issues**][url.<%= component.id %>_issues] - [enhancements][url.<%= component.id %>_enhancements] - [bugs][url.<%= component.id %>_bugs]
+* [**Source code**][url.<%= component.id %>_source]
+<% if component.resources.any? -%>
+<% component.resources.each do |resource| -%>
+* [**<%= resource.name %>**][url.<%= resource.short_link %>]
+<% end -%>
+<% end -%>

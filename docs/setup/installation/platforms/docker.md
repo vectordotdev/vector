@@ -77,9 +77,29 @@ possible is desired. To minimize image size, it's uncommon for additional
 related tools (such as git or bash) to be included. Using this image as a
 base, add the things you need in your own Dockerfile.
 
+## Versions
+
+Timber's Docker images include a special `latest` version that will be updated
+whenever Timber is [released][url.releases]. All other [releases][url.releases]
+are available via the `X.X.X` tag:
+
+```bash
+docker run timberio/vector:latest
+docker run timberio/vector:X.X.X
+```
+
+## Updating
+
+Simply run the with the `latest` tag:
+
+```bash
+docker run timberio/vector:latest
+```
+
 
 [docs.configuration]: ../../../usage/configuration
 [docs.starting]: ../../../usage/administration/starting.md
 [url.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [url.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
+[url.releases]: https://github.com/timberio/vector/releases
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/

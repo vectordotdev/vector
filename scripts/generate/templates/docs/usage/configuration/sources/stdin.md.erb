@@ -1,0 +1,55 @@
+<% component = metadata.sources.stdin %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## Examples
+
+Given the following input line:
+
+{% code-tabs %}
+{% code-tabs-item title="stdin" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "host": "10.2.22.122" # current hostname
+}
+```
+
+The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+## How It Works
+
+<%= component_sections(component) %>
+
+### Line Delimiters
+
+Each line is read until a new line delimiter (the `0xA` byte) is found.
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

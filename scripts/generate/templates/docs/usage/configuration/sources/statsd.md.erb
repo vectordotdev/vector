@@ -1,0 +1,120 @@
+<% component = metadata.sources.statsd %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## Examples
+
+{% tabs %}
+{% tab title="Counter" %}
+Given the following Statsd counter:
+
+```
+login.invocations:1|c
+```
+
+A [`metric` event][docs.metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "counter": {
+    "name": "login.invocations",
+    "val": 1
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+{% endtab %}
+{% tab title="Gauge" %}
+Given the following Statsd gauge:
+
+```
+gas_tank:0.50|g
+```
+
+A [`metric` event][docs.metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "gauge": {
+    "name": "gas_tank",
+    "val": 0.5
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+{% endtab %}
+{% tab title="Set" %}
+Given the following Statsd set:
+
+```
+unique_users:foo|s
+```
+
+A [`metric` event][docs.metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "set": {
+    "name": "unique_users",
+    "val": 1
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+{% endtab %}
+{% tab title="Timer" %}
+Given the following Statsd timer:
+
+```
+login.time:22|ms 
+```
+
+A [`metric` event][docs.metric_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="metric" %}
+```javascript
+{
+  "timer": {
+    "name": "login.time",
+    "val": 22
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+{% endtab %}
+{% endtabs %}
+
+## How It Works
+
+<%= component_sections(component) %>
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

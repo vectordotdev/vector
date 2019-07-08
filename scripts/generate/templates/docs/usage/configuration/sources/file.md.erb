@@ -1,0 +1,113 @@
+<% component = metadata.sources.file %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## Examples
+
+Given the following input:
+
+{% code-tabs %}
+{% code-tabs-item title="/var/log/rails.log" %}
+```
+2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  "timestamp": <timestamp> # current time,
+  "message": "2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1",
+  "file": "/var/log/rails.log", # original file
+  "host": "10.2.22.122" # current nostname
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as
+context. You can further parse the `"message"` key with a
+[transform][docs.transforms], such as the
+[`regex` transform][docs.regex_parser_transform].
+
+## How It Works
+
+<%= component_sections(component) %>
+
+### Auto Discovery
+
+Vector will continually look for new files matching any of your include
+patterns. If a new file is added that matches any of the supplied patterns,
+Vector will begin tailing it. Vector maintains a unique list of files and will
+not tail a file more than once, even if it matches multiple patterns. You can
+read more about how we identify file in the Identification section.
+
+### Context
+
+Each event is augmented with contextual fields controlled by the `file_key`
+and `host_key` options. Please see the descriptions for each respective option.
+
+### File Deletions
+
+If a file is deleted Vector will flush the current buffer and stop tailing
+the file.
+
+### File Identification
+
+Vector identifies files by creating a [cyclic redundancy check (CRC)][url.crc]
+on the first 256 bytes of the file. This serves as a fingerprint to uniquely
+identify the file. This strategy avoids the common pitfalls of using device and
+inode names since inode names, allowing Vector to [properly tail files in the 
+event of rotation][docs.correctness].
+
+### File Rotation
+
+Vector will follow files across rotations in the manner of tail, and because of
+the way Vector [identifies files](#file-identification), Vector will properly
+recognize newly rotated files regardless if you are using `copytruncate` or
+`create` directive. To ensure Vector handles rotated files properly we
+recommend:
+
+1. Ensure the `includes` paths include rotated files. For example, use
+   `/var/log/nginx*.log` to recognize `/var/log/nginx.2.log`.
+2. Use either the `copytruncate` or `create` directives when rotating files.
+   If historical data is compressed, or altered in any way, Vector will not be
+   able to properly identify the file.
+3. Only delete files when they have exceeded the `ignore_older` age. While
+   extremely rare, this ensures you do not delete data before Vector has a
+   chance to ingest it.
+
+### Globbing
+
+[Globbing][url.globbing] is supported in all provided file paths, files will
+be [autodiscovered](#auto_discovery) continually.
+
+### Line Delimiters
+
+Each line is read until a new line delimiter (the `0xA` byte) or `EOF` is found.
+
+### Read Position
+
+Vector defaults to reading new data only. Only data added to the file after
+Vector starts tailing the file will be collected. To read from the beginning
+of the file set the `start_at_beginning` option to true.
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>
