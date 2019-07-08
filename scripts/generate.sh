@@ -32,6 +32,18 @@ require_relative "generate/post_processors/link_checker"
 require_relative "generate/post_processors/section_sorter"
 
 #
+# Functions
+#
+
+def say(words, color = nil)
+  if color
+    words = Paint[words, color]
+  end
+
+  puts "---> #{words}"
+end
+
+#
 # Vars
 #
 
@@ -44,6 +56,10 @@ CHECK_URLS = ARGV.any? { |arg| arg == "--check-urls" }
 #
 # Render templates
 #
+
+puts ""
+puts "Generating files"
+puts ""
 
 context = Context.new(metadata)
 templates = Dir.glob("templates/**/*.erb").to_a
@@ -71,7 +87,18 @@ templates.each do |template|
     end
 
     target = template.gsub(/^templates\//, "../../").gsub(/\.erb$/, "")
-    File.write(target, content)
+
+    current_content = File.read(target)
+    current_content = PostProcessors::LinkChecker.remove_link_footers(current_content)
+
+    if current_content.strip != content.strip
+      action = false ? "Will be changed" : "Changed"
+      say("#{action} - #{target.gsub("../../", "")}", :green)
+      File.write(target, content)
+    else
+      action = false ? "Will not be changed" : "Not changed"
+      say("#{action} - #{target.gsub("../../", "")}", :blue)
+    end
   end
 end
 
@@ -92,11 +119,16 @@ PostProcessors::ComponentPresenceChecker.check!("sinks", docs, metadata.sinks)
 # Post process individual docs
 #
 
+puts ""
+puts "Checking links"
+puts ""
+
 docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
 docs = docs - ["#{DOCS_ROOT}/SUMMARY.md"]
 docs.each do |doc|
   content = File.read(doc)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::LinkChecker.check!(content, doc, metadata.links)
+  say("Checked - #{doc}", :green)
   File.write(doc, content)
 end

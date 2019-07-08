@@ -23,17 +23,37 @@ jobs:
   # Testing
   #
 
-  check-stable:
+  check-code:
     resource_class: xlarge
     docker:
       - image: timberiodev/vector-checker:latest
     steps:
       - checkout
       - run:
-          name: Check code and formatting
+          name: Check code
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check
+          command: make check-code
+
+  check-fmt:
+    docker:
+      - image: timberiodev/vector-checker:latest
+    steps:
+      - checkout
+      - run:
+          name: Check fmt
+          environment:
+            RUSTFLAGS: "-D warnings"
+          command: make check-fmt
+
+  check-generate:
+    docker:
+      - image: timberiodev/vector-checker:latest
+    steps:
+      - checkout
+      - run:
+          name: Check generate
+          command: make check-generate
 
   test-stable:
     resource_class: xlarge
@@ -374,7 +394,9 @@ tag-release-workflow-filters: &tag-release-workflow-filters
 
 build-requires: &build-requires
   requires:
-    - check-stable
+    - check-code
+    - check-fmt
+    - check-generate
     - test-stable
 
 package-requires: &package-requires
@@ -406,7 +428,11 @@ workflows:
 
   build:
     jobs:
-      - check-stable:
+      - check-code:
+          <<: *test-filters
+      - check-fmt:
+          <<: *test-filters
+      - check-generate:
           <<: *test-filters
       - test-stable:
           <<: *test-filters

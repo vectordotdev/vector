@@ -258,5 +258,5 @@ Finally, consider the following alternatives:
 [url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.toml_array]: https://github.com/toml-lang/toml#user-content-array
-[url.toml_table]: https://github.com/toml-lang/toml#user-content-table
+[url.toml_array]: https://github.com/toml-lang/toml#array
+[url.toml_table]: https://github.com/toml-lang/toml#table

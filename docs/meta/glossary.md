@@ -47,12 +47,12 @@
 ## Log
 
 "Log" refers to an individual log event. This is a type of
-[Vector event][docs.metric].
+[Vector event][docs.metric_event].
 
 ## Metric
 
 "Metric" refers to an individual data unit used to represent a point in time
-measurement. This is a type of [Vector event][docs.metric].
+measurement. This is a type of [Vector event][docs.metric_event].
 
 ## Parser
 
@@ -65,7 +65,7 @@ measurement. This is a type of [Vector event][docs.metric].
 
 ## Platform
 
-"Platform" refers to a [platform][docs.platform] that Vector can be deployed
+"Platform" refers to a [platform][docs.platforms] that Vector can be deployed
 on, such as [Docker][docs.docker].
 
 ## Reducer
@@ -139,3 +139,15 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
+[docs.docker]: ../setup/installation/platforms/docker.md
+[docs.metric_event]: ../about/data-model.md#metric
+[docs.platforms]: ../setup/installation/platforms
+[docs.roles]: ../setup/deployment/roles
+[docs.sinks]: ../usage/configuration/sinks
+[docs.sources]: ../usage/configuration/sources
+[docs.topologies]: ../setup/deployment/topologies.md
+[docs.transforms]: ../usage/configuration/transforms
+[url.rust]: https://www.rust-lang.org/
+[url.toml]: https://github.com/toml-lang/toml
+[url.toml_table]: https://github.com/toml-lang/toml#table
+[url.vector_repo]: https://github.com/timberio/vector

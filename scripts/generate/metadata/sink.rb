@@ -42,6 +42,7 @@ class Sink < Component
     if service_provider == "AWS"
       buffer_option = Option.new({
         "name" => "hostname",
+        "examples" => ["127.0.0.0:5000"],
         "description" => "Custom hostname to send requests to. Useful for testing.",
         "type" => "string"
       })
