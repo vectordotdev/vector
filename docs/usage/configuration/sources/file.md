@@ -181,11 +181,6 @@ context. You can further parse the `"message"` key with a
 
 ## How It Works
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
-
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
@@ -198,6 +193,11 @@ read more about how we identify file in the Identification section.
 
 Each event is augmented with contextual fields controlled by the `file_key`
 and `host_key` options. Please see the descriptions for each respective option.
+
+### Delivery Guarantee
+
+Due to the nature of this component, it offers a
+[**best effort** delivery guarantee][docs.best_effort_delivery].
 
 ### File Deletions
 

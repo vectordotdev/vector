@@ -197,7 +197,160 @@ See the [`remove_fields` transform][docs.remove_fields_transform].
 
 ### Special Characters
 
-Aside from the [special characters][docs.event_key_special_characters] listed in the [Data Model][docs.data_model] doc, Vector does not restrict the characters allowed in keys. You can wrap key names in `" "` quote to preserve spaces and use `\` to escape quotes.
+Aside from the [special characters][docs.event_key_special_characters] listed in the [Data Model][docs.data_model] doc, Vector does not restrict the characters allowed in keys. You can wrap key names in `" "` quote to preserve spaces and use `---
+description: Accepts `log` events and allows you to add one or more fields.
+---
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/add_fields.md.erb
+-->
+
+# add_fields transform
+
+![][images.add_fields_transform]
+
+
+The `add_fields` transform accepts [`log`][docs.log_event] events and allows you to add one or more fields.
+
+## Config File
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml (example)" %}
+```coffeescript
+[sinks.my_add_fields_transform_id]
+  # REQUIRED - General
+  type = "add_fields" # must be: "add_fields"
+  inputs = ["my-source-id"]
+  
+  # REQUIRED - Fields
+  [sinks.my_add_fields_transform_id.fields]
+    # OPTIONAL
+  my_string_field = "string value"
+  my_env_var_field = "${ENV_VAR}"
+  my_int_field = 1
+  my_float_field = 1.2
+  my_bool_field = true
+  my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+  my_nested_fields = {key1 = "value1", key2 = "value2"}
+  my_list = ["first", "second", "third"]
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (schema)" %}
+```coffeescript
+[sinks.<sink-id>]
+  # REQUIRED - General
+  type = "add_fields"
+  inputs = ["<string>", ...]
+
+  # REQUIRED - Fields
+  [sinks.<sink-id>.fields]
+    * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.add_fields]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "add_fields"
+  type = "add_fields"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Fields
+  #
+
+  [sinks.add_fields.fields]
+    # A key/value pair representing the new field to be added. Accepts all
+    # supported types. Use `.` for adding nested fields.
+    # 
+    # * optional
+    # * no default
+    my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_nested_fields = {key1 = "value1", key2 = "value2"}
+    my_list = ["first", "second", "third"]
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+## Options
+
+| Key  | Type  | Description |
+|:-----|:-----:|:------------|
+| **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| **REQUIRED** - Fields | | |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
+
+## Examples
+
+Given the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.my_transform]
+  type = "add_fields"
+  inputs = [...]
+
+  [transforms.my_transform.fields]
+    field1 = "string value"
+    field2 = 1
+    field3 = 2.0
+    field4 = true
+    field5 = 2019-05-27T07:32:00Z
+    field6 = ["item 1", "item 2"]
+    field7.nested = "nested value",
+    field8 = "#{HOSTNAME}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```javascript
+{
+  // ... existing fields
+  "field1": "string value",
+  "field2": 1,
+  "field3": 2.0,
+  "field4": true,
+  "field5": <timestamp:2019-05-27T07:32:00Z>,
+  "field6": ["item1", "item2"],
+  "field7.nested": "nested value",
+  "field8": "my.hostname.com"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+While unrealistic, this example demonstrates the various accepted [types][docs.config_value_types].
+
+## How It Works to escape quotes.
 
 ### Types
 

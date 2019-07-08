@@ -340,6 +340,15 @@ Content-Length: 654
 
 ## How It Works
 
+### Authentication
+
+HTTP authentication is controlled via the `Authorization` header which you can
+set with the `headers` option. For convenience, Vector also supports the
+`basic_auth.username` and `basic_auth.password` options which handle setting the
+`Authorization` header for the [base access authentication
+scheme][url.basic_auth].
+
+
 ### Buffers & Batches
 
 ![][images.sink-flow-serial]
@@ -441,15 +450,6 @@ This can be adjsuted with the `request_timeout_secs` option.
 It is highly recommended that you do not lower value below the service's
 internal timeout, as this could create orphaned requests, pile on retries,
 and result in deuplicate data downstream.
-
-### Authentication
-
-HTTP authentication is controlled via the `Authorization` header which you can
-set with the `headers` option. For convenience, Vector also supports the
-`basic_auth.username` and `basic_auth.password` options which handle setting the
-`Authorization` header for the [base access authentication
-scheme][url.basic_auth].
-
 
 ## Troubleshooting
 

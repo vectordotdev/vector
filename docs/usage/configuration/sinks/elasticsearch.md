@@ -344,6 +344,13 @@ Be careful when doing this if you have multiple sinks configured, as it will
 prevent Vector from starting is one sink is unhealthy, preventing the other
 healthy sinks from receiving data.
 
+### Nested Documents
+
+Vector will explode events into nested documents before writing them to
+Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
+more about how Vector handles nested documents in the [Data Model
+document][docs.data_model].
+
 ### Partitioning
 
 Partitioning is controlled via the `index`
@@ -386,13 +393,6 @@ This can be adjsuted with the `request_timeout_secs` option.
 It is highly recommended that you do not lower value below the service's
 internal timeout, as this could create orphaned requests, pile on retries,
 and result in deuplicate data downstream.
-
-### Nested Documents
-
-Vector will explode events into nested documents before writing them to
-Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
-more about how Vector handles nested documents in the [Data Model
-document][docs.data_model].
 
 ## Troubleshooting
 

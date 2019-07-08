@@ -221,7 +221,6 @@ class Links
     end
 
     def normalize_path(path, current_file)
-      puts current_file
       if current_file && current_file.start_with?(DOCS_ROOT)
         relative_root =
           current_file.

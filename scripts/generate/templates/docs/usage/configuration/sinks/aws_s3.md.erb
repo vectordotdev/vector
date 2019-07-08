@@ -44,7 +44,7 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 }
 ```
 
-## How It Works
+## How It Works [[sort]]
 
 <%= component_sections(component) %>
 
@@ -91,15 +91,6 @@ time.
 
 You can control the resulting name via the `key_prefix`, `filename_time_format`,
 and `filename_append_uuid` options.
-
-### Partitioning
-
-Vector supports dynamic `key_prefix` values through [`strftime`
-specificiers][url.strftime_specifiers]. This allows you to create time based
-partitions based on the [event `timestamp`][docs.default_schema]. This is highly
-recommended for the logging use case since it allows for clean data
-segmentation, making it easy to prune and read data efficiently. Please see the
-[example specification](#example) for examples.
 
 ### Searching
 

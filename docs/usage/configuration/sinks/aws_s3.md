@@ -428,6 +428,11 @@ Batches are flushed when 1 of 2 conditions are met:
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `300 bytes`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `10490000 bytes`).
 
+### Columnar Formats
+
+Vector has plans to support column formats, such as ORC and Parquet, in
+[`v0.6`][url.roadmap].
+
 ### Compression
 
 The `aws_s3` sink compresses payloads before
@@ -476,54 +481,6 @@ Be careful when doing this if you have multiple sinks configured, as it will
 prevent Vector from starting is one sink is unhealthy, preventing the other
 healthy sinks from receiving data.
 
-### Partitioning
-
-Partitioning is controlled via the `bucket` and `key_prefix`
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
-
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
-
-### Rate Limits
-
-Vector offers a few levers to control the rate and volume of requests to the
-downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
-options to ensure Vector does not exceed the specified number of requests in
-the specified window. You can further control the pace at which this window is
-saturated with the `request_in_flight_limit` option, which will guarantee no
-more than the specified number of requests are in-flight at any given time.
-
-Please note, Vector's defaults are carefully chosen and it should be rare that
-you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_aws_s3_sink_issue].
-
-### Retry Policy
-
-Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
-Other responses will _not_ be retried. You can control the number of retry
-attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
-
-### Timeouts
-
-To ensure the pipeline does not halt when a service fails to respond Vector
-will abort requests after `30 seconds`.
-This can be adjsuted with the `request_timeout_secs` option.
-
-It is highly recommended that you do not lower value below the service's
-internal timeout, as this could create orphaned requests, pile on retries,
-and result in deuplicate data downstream.
-
-### Columnar Formats
-
-Vector has plans to support column formats, such as ORC and Parquet, in
-[`v0.6`][url.roadmap].
-
 ### Object Naming
 
 By default, Vector will name your S3 objects in the following format:
@@ -565,12 +522,36 @@ and `filename_append_uuid` options.
 
 ### Partitioning
 
-Vector supports dynamic `key_prefix` values through [`strftime`
-specificiers][url.strftime_specifiers]. This allows you to create time based
-partitions based on the [event `timestamp`][docs.default_schema]. This is highly
-recommended for the logging use case since it allows for clean data
-segmentation, making it easy to prune and read data efficiently. Please see the
-[example specification](#example) for examples.
+Partitioning is controlled via the `bucket` and `key_prefix`
+options and allows you to dynamically partition data. You'll notice that
+[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling dynamic partitioning. The interpolated result is effectively the
+internal batch partition key. Let's look at a few examples:
+
+| Value | Interpolation | Desc |
+|:------|:--------------|:-----|
+| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
+| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
+options to ensure Vector does not exceed the specified number of requests in
+the specified window. You can further control the pace at which this window is
+saturated with the `request_in_flight_limit` option, which will guarantee no
+more than the specified number of requests are in-flight at any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][url.new_aws_s3_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
 ### Searching
 
@@ -614,6 +595,16 @@ Vector has plans to support [columnar formats](#columnar-formats) in
 [`v0.6`][url.roadmap] which will allows for very fast and efficient querying on
 S3.
 
+### Timeouts
+
+To ensure the pipeline does not halt when a service fails to respond Vector
+will abort requests after `30 seconds`.
+This can be adjsuted with the `request_timeout_secs` option.
+
+It is highly recommended that you do not lower value below the service's
+internal timeout, as this could create orphaned requests, pile on retries,
+and result in deuplicate data downstream.
+
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -637,7 +628,6 @@ issue, please:
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.default_schema]: ../../../about/data-model.md#default-schema
 [docs.event]: ../../../about/data-model.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model.md#log
