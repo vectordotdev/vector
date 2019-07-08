@@ -19,7 +19,6 @@ use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 use tower::{
     buffer::Buffer,
     limit::{
@@ -29,6 +28,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceExt,
 };
+use tracing::field;
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
@@ -36,6 +36,7 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
+    request_config: RequestConfig
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +50,7 @@ type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<E
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
+    request_config: RequestConfig
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -75,6 +77,14 @@ pub enum Encoding {
     Json,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct RequestConfig {
+    in_flight_limit: usize,
+    timeout_secs: u64,
+    rate_limit_duration_secs: u64,
+    rate_limit_num: u64,
+}
+
 enum State {
     Idle,
     Token(Option<String>),
@@ -96,13 +106,15 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let svc = CloudwatchLogsPartitionSvc::new(self.clone())?;
+
 
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
         let log_group = self.group_name.clone().into();
         let log_stream = interpolate(&self.stream_name);
+
+        let svc = CloudwatchLogsPartitionSvc::new(self.clone())?;
 
         let sink = {
             let svc_sink = BatchServiceSink::new(svc, acker)
@@ -122,10 +134,25 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+    pub fn new(
+        config: CloudwatchLogsSinkConfig,
+    ) -> Result<Self, String> {
+        let timeout_secs = config.request_timeout_secs.unwrap_or(60);
+        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
+        let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+
+        let request_config = RequestConfig {
+            in_flight_limit,
+            timeout_secs,
+            rate_limit_duration_secs,
+            rate_limit_num,
+        };
+        
         Ok(Self {
             config,
             clients: HashMap::new(),
+            request_config,
         })
     }
 }
@@ -142,23 +169,25 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
     fn call(&mut self, req: PartitionInnerBuffer<Vec<Event>, CloudwatchKey>) -> Self::Future {
         let (events, key) = req.into_parts();
 
-        let timeout = self.config.request_timeout_secs.unwrap_or(60);
-        let in_flight_limit = self.config.request_in_flight_limit.unwrap_or(5);
-        let rate_limit_duration = self.config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = self.config.request_rate_limit_num.unwrap_or(5);
+        let RequestConfig {
+            timeout_secs,
+            in_flight_limit,
+            rate_limit_duration_secs,
+            rate_limit_num,
+        } = self.request_config;
 
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
             let svc = {
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config).unwrap();
-                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout));
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config, self.request_config).unwrap();
+                let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
 
                 // TODO: add Buffer/Retry here
 
                 let rate = RateLimit::new(
                     timeout,
-                    Rate::new(rate_limit_num, Duration::from_secs(rate_limit_duration)),
+                    Rate::new(rate_limit_num, Duration::from_secs(rate_limit_duration_secs)),
                 );
                 let concurrency = ConcurrencyLimit::new(rate, in_flight_limit);
 
@@ -180,7 +209,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: &CloudwatchLogsSinkConfig) -> Result<Self, String> {
+    pub fn new(config: &CloudwatchLogsSinkConfig, request_config: RequestConfig) -> Result<Self, String> {
         let region = config.region.clone().try_into()?;
         let client = CloudWatchLogsClient::new(region);
 
@@ -190,6 +219,7 @@ impl CloudwatchLogsSvc {
             stream_name: config.stream_name.clone(),
             group_name: config.group_name.clone(),
             state: State::Idle,
+            request_config
         })
     }
 
@@ -551,7 +581,13 @@ mod tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
         };
-        let svc = CloudwatchLogsSvc::new(&config).unwrap();
+        let request_config = RequestConfig {
+                in_flight_limit: 1,
+    timeout_secs: 5,
+    rate_limit_duration_secs: 1,
+    rate_limit_num: 5,
+        };
+        let svc = CloudwatchLogsSvc::new(&config, request_config).unwrap();
 
         let mut event = Event::from("hello world").into_log();
 
