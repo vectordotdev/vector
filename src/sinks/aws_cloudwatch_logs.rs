@@ -19,7 +19,7 @@ use std::convert::TryInto;
 use std::fmt;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
-use tokio_trace::field;
+use tracing::field;
 use tower::{
     buffer::Buffer,
     limit::{
@@ -41,7 +41,7 @@ pub struct CloudwatchLogsSvc {
 #[derive(Debug, Clone, PartialEq)]
 enum Partition {
     Static(Bytes),
-    Event(Atom),
+    Field(Atom),
 }
 
 type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<Event>>;
@@ -345,7 +345,7 @@ fn interpolate(s: &str) -> Partition {
 
     if let Some(cap) = r.captures(s) {
         if let Some(m) = cap.name("key") {
-            return Partition::Event(m.as_str().into());
+            return Partition::Field(m.as_str().into());
         }
     }
 
@@ -359,7 +359,7 @@ fn partition(
 ) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, CloudwatchKey>, Error = ()> {
     let stream = match stream {
         Partition::Static(g) => g.clone(),
-        Partition::Event(key) => {
+        Partition::Field(key) => {
             if let Some(val) = event.as_log().get(&key) {
                 val.as_bytes().clone()
             } else {
@@ -474,7 +474,7 @@ mod tests {
     fn interpolate_event() {
         let partition = interpolate("{event.some_key}");
 
-        assert_eq!(partition, Partition::Event("some_key".into()));
+        assert_eq!(partition, Partition::Field("some_key".into()));
     }
 
     #[test]
@@ -514,7 +514,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = Partition::Event("log_stream".into());
+        let stream = Partition::Field("log_stream".into());
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream)
@@ -537,7 +537,7 @@ mod tests {
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = Partition::Event("log_stream".into());
+        let stream = Partition::Field("log_stream".into());
         let group = "group".into();
 
         let stream_val = partition(event, &group, &stream).wait().into_iter().next();
