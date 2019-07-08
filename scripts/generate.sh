@@ -126,6 +126,7 @@ puts "Checking links"
 puts ""
 
 docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
+docs = docs + ["#{VECTOR_ROOT}/README.md"]
 docs = docs - ["#{DOCS_ROOT}/SUMMARY.md"]
 docs.each do |doc|
   content = File.read(doc)
