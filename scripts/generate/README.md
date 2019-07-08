@@ -6,7 +6,7 @@ that command.
 
 ## Metadata
 
-To start, you shuold be familiar with the Vector
+To start, you should be familiar with the Vector
 [`/.metadata.toml`](/.metadata.toml) file. This file contains various metadata
 about the Vector project as a whole, mostly configuration details but also
 link definitions. This file is loaded via the [`metadata.rb`](metadata.rb)
