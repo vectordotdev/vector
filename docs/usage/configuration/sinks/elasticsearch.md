@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/elasticsearch.md.erb
 -->
-
----
-description: Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
----
 
 # elasticsearch sink
 
@@ -28,7 +28,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_elasticsearch_sink_id]
   # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
@@ -60,7 +60,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "elasticsearch"
@@ -92,7 +92,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.elasticsearch]
   #
   # General

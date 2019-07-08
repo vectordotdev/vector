@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/tokenizer.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
----
 
 # tokenizer transform
 
@@ -21,7 +21,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_tokenizer_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
@@ -38,7 +38,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "tokenizer"
@@ -55,7 +55,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.tokenizer]
   #
   # General

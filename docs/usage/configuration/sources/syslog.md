@@ -1,3 +1,7 @@
+---
+description: Ingests data through the Syslog 5424 protocol and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/syslog.md.erb
 -->
-
----
-description: Ingests data through the Syslog 5424 protocol and outputs `log` events.
----
 
 # syslog source
 
@@ -21,7 +21,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: "syslog"
@@ -37,7 +37,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "syslog"
@@ -53,7 +53,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.syslog]
   #
   # General

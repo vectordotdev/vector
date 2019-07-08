@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to AWS S3 via the `PutObject` API endpoint.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/aws_s3.md.erb
 -->
-
----
-description: Batches `log` events to AWS S3 via the `PutObject` API endpoint.
----
 
 # aws_s3 sink
 
@@ -28,7 +28,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_aws_s3_sink_id]
   # REQUIRED - General
   type = "aws_s3" # must be: "aws_s3"
@@ -65,7 +65,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "aws_s3"
@@ -102,7 +102,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.aws_s3]
   #
   # General

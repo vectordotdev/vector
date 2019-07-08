@@ -1,3 +1,7 @@
+---
+description: Parse, structure, and transform events
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/README.md.erb
 -->
-
----
-description: Parse, structure, and transform events
----
 
 # Transforms
 

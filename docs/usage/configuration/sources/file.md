@@ -1,3 +1,7 @@
+---
+description: Ingests data through one or more local files and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/file.md.erb
 -->
-
----
-description: Ingests data through one or more local files and outputs `log` events.
----
 
 # file source
 
@@ -28,7 +28,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_file_source_id]
   # REQUIRED - General
   type = "file" # must be: "file"
@@ -46,7 +46,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "file"
@@ -64,7 +64,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.file]
   #
   # General

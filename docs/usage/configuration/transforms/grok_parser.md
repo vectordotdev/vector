@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to parse a field value with Grok.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/grok_parser.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to parse a field value with Grok.
----
 
 # grok_parser transform
 
@@ -21,7 +21,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_grok_parser_transform_id]
   # REQUIRED
   type = "grok_parser" # must be: "grok_parser"
@@ -34,7 +34,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "grok_parser"
@@ -47,7 +47,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.grok_parser]
   #
   # General

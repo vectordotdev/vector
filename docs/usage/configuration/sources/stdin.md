@@ -1,3 +1,7 @@
+---
+description: Ingests data through standard input (STDIN) and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/stdin.md.erb
 -->
-
----
-description: Ingests data through standard input (STDIN) and outputs `log` events.
----
 
 # stdin source
 
@@ -21,7 +21,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_stdin_source_id]
   # REQUIRED - General
   type = "stdin" # must be: "stdin"
@@ -34,7 +34,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "stdin"
@@ -47,7 +47,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.stdin]
   #
   # General

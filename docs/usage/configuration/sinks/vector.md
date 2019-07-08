@@ -1,3 +1,7 @@
+---
+description: Streams `log` events to another downstream Vector instance.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/vector.md.erb
 -->
-
----
-description: Streams `log` events to another downstream Vector instance.
----
 
 # vector sink
 
@@ -21,7 +21,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_vector_sink_id]
   # REQUIRED - General
   type = "vector" # must be: "vector"
@@ -39,7 +39,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "vector"
@@ -57,7 +57,7 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.vector]
   #
   # General

@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to parse a field's value with a Regular Expression.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/regex_parser.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to parse a field's value with a Regular Expression.
----
 
 # regex_parser transform
 
@@ -21,7 +21,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_regex_parser_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
@@ -39,7 +39,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "regex_parser"
@@ -57,7 +57,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.regex_parser]
   #
   # General

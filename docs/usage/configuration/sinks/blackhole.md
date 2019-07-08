@@ -1,3 +1,7 @@
+---
+description: Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/blackhole.md.erb
 -->
-
----
-description: Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
----
 
 # blackhole sink
 
@@ -21,7 +21,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_blackhole_sink_id]
   # REQUIRED - General
   type = "blackhole" # must be: "blackhole"
@@ -37,7 +37,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "blackhole"
@@ -53,7 +53,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.blackhole]
   #
   # General

@@ -1,3 +1,7 @@
+---
+description: Ingests data through the StatsD UDP protocol and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/statsd.md.erb
 -->
-
----
-description: Ingests data through the StatsD UDP protocol and outputs `log` events.
----
 
 # statsd source
 
@@ -28,7 +28,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_statsd_source_id]
   # REQUIRED
   type = "statsd" # must be: "statsd"
@@ -36,7 +36,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "statsd"
@@ -44,7 +44,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.statsd]
   #
   # General

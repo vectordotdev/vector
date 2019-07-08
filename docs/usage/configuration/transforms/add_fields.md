@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to add one or more fields.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/add_fields.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to add one or more fields.
----
 
 # add_fields transform
 
@@ -21,7 +21,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_add_fields_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: "add_fields"
@@ -33,7 +33,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "add_fields"
@@ -45,7 +45,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.add_fields]
   #
   # General

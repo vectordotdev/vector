@@ -1,3 +1,7 @@
+---
+description: Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/console.md.erb
 -->
-
----
-description: Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
----
 
 # console sink
 
@@ -21,7 +21,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_console_sink_id]
   # REQUIRED - General
   type = "console" # must be: "console"
@@ -40,7 +40,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "console"
@@ -59,7 +59,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.console]
   #
   # General

@@ -1,11 +1,3 @@
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/specification.md.erb
--->
-
 ---
 description: Full Vector config specification
 ---
@@ -18,6 +10,14 @@ Instead, please modify the contents of `/.metadata.toml`.
 -->
 
 
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Config Specification
 
 Below is a full config specification. Note, this file is included with
@@ -25,32 +25,200 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
 {% code-tabs %}
 {% code-tabs-item title="/etc/vector/vector.spec.toml" %}
-```toml
+```coffeescript
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                                    __   __  __  
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                                    \ \ / / / /
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                                     \ V / / /
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                                      \_/  \/
 #
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                                    V E C T O R
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 #                            Configuration Specification
 #
-# ------------------------------------------------------------------------------
-# Website: https://vector.dev
-# Docs: https://docs.vector.dev
-# Community: https://vector.dev/community
-# ------------------------------------------------------------------------------
-# The file contains a full specification for the `vector.toml` configuration
-# file. It follows the TOML format and includes all options, types, and
-# possible values.
-#
-# More info on Vector's configuration can be found at:
-# https://docs.vector.dev/usage/configuration
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
 
 # ------------------------------------------------------------------------------
-# Global
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# Website: https://vector.dev
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# Docs: https://docs.vector.dev
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# Community: https://vector.dev/community
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# The file contains a full specification for the `vector.toml` configuration
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# file. It follows the TOML format and includes all options, types, and
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# possible values.
+#
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# More info on Vector's configuration can be found at:
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# https://docs.vector.dev/usage/configuration
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# Global
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
+# ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Global options are relevant to Vector as a whole and apply to global behavior.
 #
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Documentation: https://docs.vector.dev/usage/configuration
 #
   # General
@@ -63,12 +231,60 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   data_dir = "/var/lib/vector"
 
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Sources
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Sources specify data sources and are responsible for ingesting data into
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Vector.
 #
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Documentation: https://docs.vector.dev/usage/configuration/sources
 
 [sources.file]
@@ -301,11 +517,51 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   shutdown_timeout_secs = 30
 
 
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Transforms
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Transforms parse, structure, and enrich events.
 #
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Documentation: https://docs.vector.dev/usage/configuration/transforms
 
 [transforms.add_fields]
@@ -667,11 +923,51 @@ end
     timestamp = "timestamp|%a %b %e %T %Y"
 
 
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Sinks
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # ------------------------------------------------------------------------------
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Sinks batch or stream data out of Vector.
 #
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/specification.md.erb
+-->
+
 # Documentation: https://docs.vector.dev/usage/configuration/sinks
 
 [sinks.aws_cloudwatch_logs]

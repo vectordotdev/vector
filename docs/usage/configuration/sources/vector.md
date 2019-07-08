@@ -1,3 +1,7 @@
+---
+description: Ingests data through another upstream Vector instance and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/vector.md.erb
 -->
-
----
-description: Ingests data through another upstream Vector instance and outputs `log` events.
----
 
 # vector source
 
@@ -28,7 +28,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_vector_source_id]
   # REQUIRED
   type = "vector" # must be: "vector"
@@ -39,7 +39,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "vector"
@@ -50,7 +50,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.vector]
   #
   # General

@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to transform events with a full embedded Lua engine.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to transform events with a full embedded Lua engine.
----
 
 # lua transform
 
@@ -28,7 +28,7 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_lua_transform_id]
   # REQUIRED
   type = "lua" # must be: "lua"
@@ -51,7 +51,7 @@ end
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "lua"
@@ -63,7 +63,7 @@ end
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.lua]
   #
   # General
@@ -128,8 +128,24 @@ end
 Add a field to an event. Supply this as a the `source` value:
 
 ```lua
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
+
 # Add root level field
 event["new_field"] = "new value"
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
 
 # Add nested field
 event["parent.child"] = "nested value"
@@ -140,8 +156,24 @@ event["parent.child"] = "nested value"
 Remove a field from an event. Supply this as a the `source` value:
 
 ```lua
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
+
 # Remove root level field
 event["field"] = nil
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -152,8 +184,24 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
+
 # Remove root level field
 event["field"] = nil
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -196,8 +244,24 @@ accessing, or removing nested fields is as simple as added a `.` in your key
 name:
 
 ```lua
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
+
 # Add nested field
 event["parent.child"] = "nested value"
+
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
+-->
 
 # Remove nested field
 event["parent.child"] = nil

@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/aws_kinesis_streams.md.erb
 -->
-
----
-description: Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
----
 
 # aws_kinesis_streams sink
 
@@ -28,7 +28,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_aws_kinesis_streams_sink_id]
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
@@ -58,7 +58,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "aws_kinesis_streams"
@@ -88,7 +88,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.aws_kinesis_streams]
   #
   # General

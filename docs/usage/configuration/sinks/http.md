@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to a generic HTTP endpoint.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/http.md.erb
 -->
-
----
-description: Batches `log` events to a generic HTTP endpoint.
----
 
 # http sink
 
@@ -21,7 +21,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_http_sink_id]
   # REQUIRED - General
   type = "http" # must be: "http"
@@ -63,7 +63,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "http"
@@ -105,7 +105,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.http]
   #
   # General

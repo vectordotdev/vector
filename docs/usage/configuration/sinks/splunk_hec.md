@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to a Splunk HTTP Event Collector.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/splunk_hec.md.erb
 -->
-
----
-description: Batches `log` events to a Splunk HTTP Event Collector.
----
 
 # splunk_hec sink
 
@@ -21,7 +21,7 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_splunk_hec_sink_id]
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
@@ -53,7 +53,7 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "splunk_hec"
@@ -85,7 +85,7 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.splunk_hec]
   #
   # General

@@ -1,3 +1,7 @@
+---
+description: Streams `log` events to Apache Kafka via the Kafka protocol.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/kafka.md.erb
 -->
-
----
-description: Streams `log` events to Apache Kafka via the Kafka protocol.
----
 
 # kafka sink
 
@@ -21,7 +21,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_kafka_sink_id]
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
@@ -42,7 +42,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "kafka"
@@ -63,7 +63,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.kafka]
   #
   # General

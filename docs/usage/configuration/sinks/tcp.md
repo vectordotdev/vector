@@ -1,3 +1,7 @@
+---
+description: Streams `log` events to a TCP connection.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/tcp.md.erb
 -->
-
----
-description: Streams `log` events to a TCP connection.
----
 
 # tcp sink
 
@@ -21,7 +21,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_tcp_sink_id]
   # REQUIRED - General
   type = "tcp" # must be: "tcp"
@@ -42,7 +42,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "tcp"
@@ -63,7 +63,7 @@ The `tcp` sink streams [`log`][docs.log_event] events to a TCP connection.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.tcp]
   #
   # General

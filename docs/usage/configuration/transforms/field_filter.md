@@ -1,3 +1,7 @@
+---
+description: Accepts `log` and `metric` events and allows you to filter events by a field's value.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/field_filter.md.erb
 -->
-
----
-description: Accepts `log` and `metric` events and allows you to filter events by a field's value.
----
 
 # field_filter transform
 
@@ -28,7 +28,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_field_filter_transform_id]
   # REQUIRED
   type = "field_filter" # must be: "field_filter"
@@ -38,7 +38,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "field_filter"
@@ -48,7 +48,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.field_filter]
   #
   # General

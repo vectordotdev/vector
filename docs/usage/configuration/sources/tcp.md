@@ -1,3 +1,7 @@
+---
+description: Ingests data through the TCP protocol and outputs `log` events.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sources/tcp.md.erb
 -->
-
----
-description: Ingests data through the TCP protocol and outputs `log` events.
----
 
 # tcp source
 
@@ -21,7 +21,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_tcp_source_id]
   # REQUIRED - General
   type = "tcp" # must be: "tcp"
@@ -36,7 +36,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "tcp"
@@ -51,7 +51,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.tcp]
   #
   # General

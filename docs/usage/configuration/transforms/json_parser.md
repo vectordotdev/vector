@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to parse a field value as JSON.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/json_parser.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to parse a field value as JSON.
----
 
 # json_parser transform
 
@@ -21,7 +21,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_json_parser_transform_id]
   # REQUIRED
   type = "json_parser" # must be: "json_parser"
@@ -33,7 +33,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "json_parser"
@@ -45,7 +45,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.json_parser]
   #
   # General

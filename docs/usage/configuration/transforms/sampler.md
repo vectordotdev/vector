@@ -1,3 +1,7 @@
+---
+description: Accepts `log` events and allows you to sample events with a configurable rate.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/sampler.md.erb
 -->
-
----
-description: Accepts `log` events and allows you to sample events with a configurable rate.
----
 
 # sampler transform
 
@@ -28,7 +28,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_sampler_transform_id]
   # REQUIRED
   type = "sampler" # must be: "sampler"
@@ -40,7 +40,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "sampler"
@@ -52,7 +52,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.sampler]
   #
   # General

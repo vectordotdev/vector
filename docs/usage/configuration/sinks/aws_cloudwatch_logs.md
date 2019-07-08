@@ -1,3 +1,7 @@
+---
+description: Batches `log` events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/aws_cloudwatch_logs.md.erb
 -->
-
----
-description: Batches `log` events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.
----
 
 # aws_cloudwatch_logs sink
 
@@ -28,7 +28,7 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
@@ -59,7 +59,7 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "aws_cloudwatch_logs"
@@ -90,7 +90,7 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.aws_cloudwatch_logs]
   #
   # General

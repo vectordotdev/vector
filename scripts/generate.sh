@@ -30,6 +30,7 @@ require_relative "generate/core_ext/string"
 require_relative "generate/post_processors/component_presence_checker"
 require_relative "generate/post_processors/link_checker"
 require_relative "generate/post_processors/section_sorter"
+require_relative "generate/post_processors/toml_syntax_switcher"
 
 #
 # Functions
@@ -72,8 +73,9 @@ templates.each do |template|
     content = renderer.result(context.get_binding)
 
     if basename.end_with?(".md.erb")
-      content =
+      notice =
         <<~EOF
+        
         <!--
              THIS FILE IS AUTOOGENERATED!
 
@@ -81,9 +83,9 @@ templates.each do |template|
 
              scripts/generate/#{template}
         -->
-
-        #{content.lstrip}
         EOF
+
+      content.gsub!(/\n# /, "#{notice}\n# ")
     end
 
     target = template.gsub(/^templates\//, "../../").gsub(/\.erb$/, "")
@@ -129,6 +131,7 @@ docs.each do |doc|
   content = File.read(doc)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::LinkChecker.check!(content, doc, metadata.links)
+  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   say("Checked - #{doc}", :green)
   File.write(doc, content)
 end

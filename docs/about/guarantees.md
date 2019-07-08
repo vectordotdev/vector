@@ -1,3 +1,7 @@
+---
+description: An in-depth look into Vector's delivery guarantees
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/about/guarantees.md.erb
 -->
-
----
-description: An in-depth look into Vector's delivery guarantees
----
 
 # Guarantees
 

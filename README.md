@@ -1,11 +1,3 @@
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/README.md.erb
--->
-
 <p align="center">
   <strong>
     <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -183,4 +175,3 @@ the License.
 <p align="center">
   Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong>
 </p>
-

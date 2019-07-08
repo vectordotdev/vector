@@ -1,3 +1,7 @@
+---
+description: Receive and pull log and metric events into Vector
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/README.md.erb
 -->
-
----
-description: Receive and pull log and metric events into Vector
----
 
 # Sources
 

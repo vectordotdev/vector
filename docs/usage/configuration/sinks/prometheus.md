@@ -1,3 +1,7 @@
+---
+description: Pulls `metric` events to Prometheus metrics service.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/sinks/prometheus.md.erb
 -->
-
----
-description: Pulls `metric` events to Prometheus metrics service.
----
 
 # prometheus sink
 
@@ -28,7 +28,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_prometheus_sink_id]
   # REQUIRED - General
   type = "prometheus" # must be: "prometheus"
@@ -46,7 +46,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "prometheus"
@@ -64,7 +64,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.prometheus]
   #
   # General

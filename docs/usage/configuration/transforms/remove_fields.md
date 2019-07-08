@@ -1,3 +1,7 @@
+---
+description: Accepts `log` and `metric` events and allows you to remove one or more event fields.
+---
+
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -5,10 +9,6 @@
 
      scripts/generate/templates/docs/usage/configuration/transforms/remove_fields.md.erb
 -->
-
----
-description: Accepts `log` and `metric` events and allows you to remove one or more event fields.
----
 
 # remove_fields transform
 
@@ -21,7 +21,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```toml
+```coffeescript
 [sinks.my_remove_fields_transform_id]
   # REQUIRED
   type = "remove_fields" # must be: "remove_fields"
@@ -30,7 +30,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```toml
+```coffeescript
 [sinks.<sink-id>]
   # REQUIRED
   type = "remove_fields"
@@ -39,7 +39,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```toml
+```coffeescript
 [sinks.remove_fields]
   #
   # General
