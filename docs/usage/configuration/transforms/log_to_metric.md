@@ -190,7 +190,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregates in the store itself.
+be aggregated in the store itself.
 {% endtab %}
 {% tab title="Summing" %}
 In this example we'll demonstrate computing a sum. The scenario we've chosen
@@ -246,7 +246,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregates in the store itself.
+be aggregated in the store itself.
 {% endtab %}
 {% tab title="Gauges" %}
 In this example we'll demonstrate creating a gauge that represents the current
@@ -331,7 +331,7 @@ structure:
 
 These metrics will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregates in the store itself.
+be aggregated in the store itself.
 {% endtab %}
 {% tab title="Timings" %}
 {% hint style="info" %}
