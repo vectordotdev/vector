@@ -10,11 +10,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- aws_s3: Add `filename_extension` options
+
 ### Changed
 
 ### Deprecated
 
 ### Fixed
+
+- aws_s3: Fixed #517 and trailing slash issues with the generated key.
 
 ### Removed
 

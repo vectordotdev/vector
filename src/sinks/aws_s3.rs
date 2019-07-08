@@ -31,6 +31,7 @@ pub struct S3Sink {
     gzip: bool,
     filename_time_format: String,
     filename_append_uuid: bool,
+    filename_extension: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -40,6 +41,7 @@ pub struct S3SinkConfig {
     pub key_prefix: Option<String>,
     pub filename_time_format: Option<String>,
     pub filename_append_uuid: Option<bool>,
+    pub filename_extension: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: Option<usize>,
@@ -186,6 +188,7 @@ impl S3Sink {
             gzip: compression,
             filename_time_format,
             filename_append_uuid,
+            filename_extension: config.filename_extension.clone(),
         };
 
         let svc = ServiceBuilder::new()
@@ -262,23 +265,13 @@ impl Service<InnerBuffer> for S3Sink {
     fn call(&mut self, body: InnerBuffer) -> Self::Future {
         let InnerBuffer { inner, key } = body;
 
-        // TODO: pull the seconds from the last event
-        let filename = {
-            let seconds = Utc::now().format(&self.filename_time_format);
-
-            if self.filename_append_uuid {
-                let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.to_hyphenated())
-            } else {
-                seconds.to_string()
-            }
-        };
-
-        let extension = if self.gzip { "log.gz" } else { "log" };
-
-        let key = String::from_utf8_lossy(&key[..]).into_owned();
-
-        let key = format!("{}/{}.{}", key, filename, extension);
+        let key = generate_key(
+            &key[..],
+            &self.filename_time_format,
+            self.filename_extension.clone(),
+            self.filename_append_uuid,
+            self.gzip,
+        );
 
         debug!(
             message = "sending events.",
@@ -318,6 +311,32 @@ impl RetryLogic for S3RetryLogic {
             _ => false,
         }
     }
+}
+
+fn generate_key(
+    key: &[u8],
+    time_format: &str,
+    extension: Option<String>,
+    uuid: bool,
+    gzip: bool,
+) -> String {
+    // TODO: pull the seconds from the last event
+    let filename = {
+        let seconds = Utc::now().format(time_format);
+
+        if uuid {
+            let uuid = Uuid::new_v4();
+            format!("{}-{}", seconds, uuid.to_hyphenated())
+        } else {
+            seconds.to_string()
+        }
+    };
+
+    let extension = extension.unwrap_or_else(|| if gzip { "log.gz".into() } else { "log".into() });
+
+    let key = String::from_utf8_lossy(&key[..]).into_owned();
+
+    format!("{}{}.{}", key, filename, extension)
 }
 
 fn encode_event(
@@ -390,6 +409,26 @@ mod tests {
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn s3_generate_key() {
+        assert_eq!(
+            generate_key("key/".as_bytes(), &"date", Some("ext".into()), false, false),
+            "key/date.ext"
+        );
+        assert_eq!(
+            generate_key("key/".as_bytes(), &"date", None, false, false),
+            "key/date.log"
+        );
+        assert_eq!(
+            generate_key("key/".as_bytes(), &"date", None, false, true),
+            "key/date.log.gz"
+        );
+        assert_eq!(
+            generate_key("key".as_bytes(), &"date", None, false, true),
+            "keydate.log.gz"
+        );
     }
 }
 
@@ -584,7 +623,7 @@ mod integration_tests {
         ensure_bucket(&client());
 
         S3SinkConfig {
-            key_prefix: Some(random_string(10) + "/date=%F"),
+            key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
             compression: Compression::None,
             batch_timeout: Some(5),

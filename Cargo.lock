@@ -3238,6 +3238,15 @@ dependencies = [
 [[package]]
 name = "tracing"
 version = "0.1.0"
+source = "git+https://github.com/tokio-rs/tracing#1a02731ab09a0c568dd0aa67d6f7186911ea2fcc"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-core 0.1.0 (git+https://github.com/tokio-rs/tracing)",
+]
+
+[[package]]
+name = "tracing"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
