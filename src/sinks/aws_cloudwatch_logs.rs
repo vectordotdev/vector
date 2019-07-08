@@ -191,7 +191,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
                 );
                 let concurrency = ConcurrencyLimit::new(rate, in_flight_limit);
 
-                Buffer::new(concurrency, 5)
+                Buffer::new(concurrency, 1)
             };
 
             self.clients.insert(key, svc.clone());
