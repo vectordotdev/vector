@@ -8,7 +8,7 @@ use std::{
     },
     time::{SystemTime, UNIX_EPOCH},
 };
-use tokio_trace_core::{
+use tracing_core::{
     callsite::Identifier,
     field::{Field, Visit},
     span::{Attributes, Id, Record},
@@ -132,7 +132,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
         self.inner.exit(span);
     }
 
-    fn register_callsite(&self, metadata: &Metadata) -> Interest {
+    fn register_callsite(&self, metadata: &'static Metadata) -> Interest {
         self.inner.register_callsite(metadata)
     }
 
