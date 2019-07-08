@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
 
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 #[macro_use]
 extern crate prost_derive;
 #[macro_use]
@@ -19,5 +19,6 @@ pub mod sources;
 pub mod test_util;
 pub mod topology;
 pub mod transforms;
+pub mod types;
 
 pub use event::Event;

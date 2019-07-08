@@ -9,5 +9,6 @@ Include any "Closes #123" or "Ref #123" statements.
 
 ### TODO
 
-- [ ] `CHANGELOG.md` has been updated to reflect noteworthy changes
-- [ ] `dist/config/spec.toml` has been updated to reflect configuration changes
+- [ ] All commits are signedoff (See CONTRIBUTING.md). Forgot? `make signoff`.
+- [ ] CHANGELOG.md has been updated to reflect noteworthy changes.
+- [ ] Documentation has been updated to reflect changes (see DOCUMENTING.md).

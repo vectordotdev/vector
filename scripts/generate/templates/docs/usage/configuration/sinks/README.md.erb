@@ -1,0 +1,17 @@
+---
+description: Receive and pull log and metric events into Vector
+---
+
+# Sources
+
+![][images.sinks]
+
+Sinks are last in the [pipeline][docs.pipelines], responsible for sending
+[events][docs.event] downstream. These can be service specific sinks, such as
+[`vector`][docs.vector_sink], [`elasticsearch`][docs.elasticsearch_sink], and
+[`s3`][docs.aws_s3_sink], or generic protocol sinks like
+[`http`][docs.http_sink] or [`tcp`][docs.tcp_sink].
+
+<%= components_table(metadata.sinks.to_h.values.sort) %>
+
+[+ request a new sink][url.new_sink]

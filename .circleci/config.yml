@@ -1,133 +1,16 @@
 #
-# Cache macros
-#
-
-restore-git-cache: &restore-git-cache
-  restore_cache:
-    name: Restore .git cache
-    keys:
-      - vector-git-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-      - vector-git-cache-{{ arch }}-{{ .Branch }}
-      - vector-git-cache-{{ arch }}
-
-save-git-cache: &save-git-cache
-  save_cache:
-    name: Save .git cache
-    key: vector-git-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-    paths:
-      - ".git"
-
-restore-cargo-cache: &restore-cargo-cache
-  restore_cache:
-    name: Restore .cargo cache
-    keys:
-      - vector-cargo-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-      - vector-cargo-cache-{{ arch }}-{{ .Branch }}
-      - vector-cargo-cache-{{ arch }}
-
-save-cargo-cache: &save-cargo-cache
-  save_cache:
-    name: Save .cargo cache
-    key: vector-cargo-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-    paths:
-      - "~/.cargo"
-
-restore-build-cache: &restore-build-cache
-  restore_cache:
-    name: Restore target cache
-    keys:
-      - vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-      - vector-build-cache-{{ arch }}-{{ .Branch }}
-      - vector-build-cache-{{ arch }}
-
-save-build-cache: &save-build-cache
-  save_cache:
-    name: Save target cache
-    key: vector-build-cache-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-    paths:
-      - "target"
-
-#
 # Run macros
 #
-
-cross-compile: &cross-compile
-  run:
-    name: Cross Compile
-    command: |
-      export PATH="$HOME/.cargo/bin:$PATH"
-      ./.circleci/release.sh
-
-install-cross: &install-cross
-  run:
-    name: Install Cross
-    command: |
-      export PATH="$HOME/.cargo/bin:$PATH"
-      cargo install cross
-
-install-make: &install-make
-  run:
-    name: Install make and friends
-    command: |
-      apt-get update
-      apt-get -y install build-essential
-
-install-make-sudo: &install-make-sudo
-  run:
-    name: Install make and friends
-    command: |
-      sudo apt-get update
-      sudo apt-get -y install build-essential
-
-install-gplusplus: &install-gplusplus
-  run:
-    name: Install g++
-    command: |
-      sudo apt-get update
-      sudo apt-get -y install g++
 
 install-rust: &install-rust
   run:
     name: Install Rust
     command: |
-      set -e
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-      export PATH="$HOME/.cargo/bin:$PATH"
 
-persist-dist-to-workspace: &persist-dist-to-workspace
-  persist_to_workspace:
-    root: dist
-    paths:
-      - "*.tar.gz"
-
-#
-# Job macros
-#
-
-release-job-defaults: &release-job-defaults
-  machine: true
-  steps:
-    - *restore-git-cache
-    - *restore-cargo-cache
-    - *restore-build-cache
-    - *install-rust
-    - run:
-        name: Install Cross
-        command: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cross
-    - run:
-        name: Install AWS CLI
-        command: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip install --upgrade awscli
-    - checkout
-    - run:
-        name: Cross Compile
-        command: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          ./.circleci/release.sh
+restore-artifacts-from-workspace: &restore-artifacts-from-workspace
+  attach_workspace:
+    at: target/artifacts
 
 #
 # Main document
@@ -136,41 +19,41 @@ release-job-defaults: &release-job-defaults
 version: 2
 
 jobs:
-  rustfmt:
-    docker:
-      - image: rust:latest
+  #
+  # Testing
+  #
 
+  check-code:
+    resource_class: xlarge
+    docker:
+      - image: timberiodev/vector-checker:latest
     steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
       - checkout
       - run:
-          name: Check formatting
-          command: |
-            rustup component add rustfmt
-            rustfmt --version
-            cargo fmt -- --check
-      - *save-git-cache
-      - *save-cargo-cache
-
-  check-stable:
-    resource_class: large
-    docker:
-      - image: rust:latest
-
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - checkout
-      - *install-make
-      - run:
-          name: Check
+          name: Check code
           environment:
             RUSTFLAGS: "-D warnings"
-          command: |
-            cargo check --all --all-features --all-targets
-      - *save-git-cache
-      - *save-cargo-cache
+          command: make check-code
+
+  check-fmt:
+    docker:
+      - image: timberiodev/vector-checker:latest
+    steps:
+      - checkout
+      - run:
+          name: Check fmt
+          environment:
+            RUSTFLAGS: "-D warnings"
+          command: make check-fmt
+
+  check-generate:
+    docker:
+      - image: timberiodev/vector-checker:latest
+    steps:
+      - checkout
+      - run:
+          name: Check generate
+          command: make check-generate
 
   test-stable:
     resource_class: xlarge
@@ -200,189 +83,302 @@ jobs:
       - image: elasticsearch:6.6.2
         environment:
           - discovery.type=single-node
-
     steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      # - *restore-build-cache
       - checkout
-      - *install-make
       - run:
           name: Test
-          command: |
-            cargo test --all --features docker -- --test-threads 4
+          command: cargo test --all --features docker -- --test-threads 4
       - store_test_results:
           path: ./test-results
-      - *save-git-cache
-      - *save-cargo-cache
-      # - *save-build-cache
 
-  compile-armv7-unknown-linux-gnueabihf:
-    machine: true
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-make-sudo
-      - *install-gplusplus
-      - *install-rust
-      - *install-cross
-      - checkout
-      - *cross-compile
-      - *persist-dist-to-workspace
-    environment:
-      TARGET: "armv7-unknown-linux-gnueabihf"
+  #
+  # Building - Archives
+  #
 
-  compile-x86_64-unknown-freebsd:
-    machine: true
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-make-sudo
-      - *install-gplusplus
-      - *install-rust
-      - *install-cross
-      - checkout
-      - *cross-compile
-      - *persist-dist-to-workspace
-    environment:
-      TARGET: "x86_64-unknown-freebsd"
-
-  compile-x86_64-unknown-linux-gnu:
-    machine: true
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-rust
-      - *install-cross
-      - checkout
-      - *cross-compile
-      - *persist-dist-to-workspace
-    environment:
-      TARGET: "x86_64-unknown-linux-gnu"
-
-  compile-x86_64-unknown-netbsd:
-    machine: true
-    steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-make-sudo
-      - *install-gplusplus
-      - *install-rust
-      - *install-cross
-      - checkout
-      - *cross-compile
-      - *persist-dist-to-workspace
-    environment:
-      TARGET: "x86_64-unknown-netbsd"
-
-  compile-x86_64-apple-darwin:
+  build-x86_64-apple-darwin-archive:
+    resource_class: large
     macos:
       xcode: "9.0"
     environment:
       TARGET: "x86_64-apple-darwin"
-      BUILDER: "cargo"
     steps:
-      - *restore-git-cache
-      - *restore-cargo-cache
-      - *restore-build-cache
-      - *install-rust
       - checkout
+      - *install-rust
       - run:
-          name: Compile
+          name: Build archive
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            ./.circleci/release.sh
+            export VERSION=$(make version)
+            make build-archive
       - persist_to_workspace:
-          root: dist
+          root: target/artifacts
           paths:
-            - "*.tar.gz"
+            - "*-x86_64-apple-darwin.tar.gz"
 
-  compile-deb:
-    resource_class: xlarge
+  build-x86_64-unknown-linux-gnu-archive:
     docker:
-      - image: timberio/vector-deb-builder:latest
+      - image: timberiodev/vector-builder-x86_64-unknown-linux-gnu:latest
+    resource_class: xlarge
     steps:
       - checkout
       - run:
-          name: Compile
+          name: Build archive
           command: |
-            export VERSION=$(./.circleci/version.sh)
-            VERSION=$(echo $VERSION | sed 's/^v//g')
-            cargo deb --deb-version $VERSION
+            export VERSION=$(make version)
+            make build-archive
+      # We _must_ build the deb package on the same machine that created
+      # the binary. `cargo deb` performs dependency calculation via `ldd`
+      # and this process must happen on the same machine it was built in
+      # order to be accurate.
       - run:
-          name: Save
+          name: Build .deb package
           command: |
-            export VERSION=$(./.circleci/version.sh)
-            mkdir dist
-            mv $(find target/debian/ -name *.deb) "dist/vector-$VERSION-amd64.deb"
+            export VERSION=$(make version)
+            make package-deb
       - persist_to_workspace:
-          root: dist
+          root: target/artifacts
           paths:
-            - "*.deb"
+            - "*-x86_64-unknown-linux-gnu.tar.gz"
+            - "*-amd64.deb"
 
-  release-docker:
+  #
+  # Packaging
+  #
+
+  # Unlike the .deb package, the .rpm package is best created on a single
+  # CentOS machine. This is because we interface with the rpmbuilder
+  # directly and define a spec (distribution/rpm/vector.spec) that outlines
+  # all of the dependencies. The end result will be the same regardless of
+  # the original target environment that built the binary.
+  #
+  # This is how I'd like the .deb packager to work as well, and I have a
+  # feeling if we ditched `cargo deb` we could achieve this.
+  package-rpm:
+    docker:
+      - image: timberiodev/vector-packager-rpm:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build x86_64-unknown-linux-gnu .rpm package
+          command: |
+            export VERSION=$(make version)
+            make package-rpm
+          environment:
+            TARGET: x86_64-unknown-linux-gnu
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*.rpm"
+
+  #
+  # Verifying
+  #
+
+  verify-amazon-linux-1:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-1
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-amazon-linux-2:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-2
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-centos-7:
+    docker:
+      - image: centos:7
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-8:
+    docker:
+      - image: timberiodev/vector-verifier-deb-8:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-deb-9:
+    docker:
+      - image: timberiodev/vector-verifier-deb-9:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-systemd:
     machine: true
     steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify Systemd starts the service
+          command: |
+            sudo systemctl start vector
+
+  verify-ubuntu-16-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-16-04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-ubuntu-18-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-18-04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-ubuntu-19-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-19-04
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  #
+  # Release
+  #
+
+  release-deb:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
       - checkout
+      - *restore-artifacts-from-workspace
       - run:
-          name: Build
+          name: Release deb
           command: |
-            export VERSION=$(./.circleci/version.sh)
-            docker build -t timberio/vector:$VERSION .
-            docker build -t timberio/vector:latest .
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-deb
+
+  release-docker:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - *restore-artifacts-from-workspace
       - run:
-          name: Push
+          name: Release Docker
           command: |
-            export VERSION=$(./.circleci/version.sh)
-            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker push timberio/vector:$VERSION
-            docker push timberio/vector:latest
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-docker
 
   release-github:
     docker:
-      - image: timberio/vector-release-builder:latest
+      - image: timberiodev/vector-releaser:latest
     steps:
       - checkout
-      - attach_workspace:
-          at: dist
+      - *restore-artifacts-from-workspace
       - run:
-          name: Upload
+          name: Release Github
           command: |
-            export VERSION=$(./.circleci/version.sh)
+            export VERSION=$(make version)
             echo "Releasing $VERSION..."
-            grease create-release timberio/vector $VERSION $CIRCLE_SHA1 --assets "dist/*"
+            make release-github
+
+  release-homebrew:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release Homebrew
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-homebrew
+
+  release-rpm:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Release Github
+          command: |
+            export VERSION=$(make version)
+            echo "Releasing $VERSION..."
+            make release-rpm
 
   release-s3:
-    machine: true
+    docker:
+      - image: timberiodev/vector-releaser:latest
     steps:
       - checkout
-      - attach_workspace:
-          at: dist
+      - *restore-artifacts-from-workspace
       - run:
-          name: Install AWS CLI
+          name: Release S3
           command: |
-            sudo apt-get update
-            sudo apt-get install -y python3-pip
-            pip install --upgrade awscli
-      - run:
-          name: Upload
-          command: |
-            export VERSION=$(./.circleci/version.sh)
+            export VERSION=$(make version)
             echo "Releasing $VERSION..."
-            aws s3 cp "dist/" "s3://packages.timber.io/vector/" --recursive
+            make release-s3
 
-test-workflow-filters: &test-workflow-filters
+#
+# Workflow Macros
+#
+
+test-filters: &test-filters
   filters:
     branches:
-      ignore: master
+      only: /.*/
     tags:
-      ignore: /.*/
+      only: /.*/
 
-compile-workflow-filters: &compile-workflow-filters
+release-workflow-filters: &release-workflow-filters
   filters:
     branches:
       only: master
@@ -396,72 +392,102 @@ tag-release-workflow-filters: &tag-release-workflow-filters
     tags:
       only: /v.*/
 
-edge-release-workflow-filters: &edge-release-workflow-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      ignore: /.*/
+build-requires: &build-requires
+  requires:
+    - check-code
+    - check-fmt
+    - check-generate
+    - test-stable
+
+package-requires: &package-requires
+  requires:
+    - build-x86_64-unknown-linux-gnu-archive
+    - build-x86_64-apple-darwin-archive
+
+verify-requires: &verify-requires
+  requires:
+    - package-rpm
+
+release-requires: &release-requires
+  requires:
+    - verify-amazon-linux-1
+    - verify-amazon-linux-2
+    - verify-centos-7
+    - verify-deb-8
+    - verify-deb-9
+    - verify-ubuntu-16-04
+    - verify-ubuntu-18-04
+    - verify-ubuntu-19-04
+
+#
+# Workflows
+#
 
 workflows:
   version: 2
 
-  test:
+  build:
     jobs:
-      - rustfmt:
-          <<: *test-workflow-filters
-      - check-stable:
-          <<: *test-workflow-filters
+      - check-code:
+          <<: *test-filters
+      - check-fmt:
+          <<: *test-filters
+      - check-generate:
+          <<: *test-filters
       - test-stable:
-          <<: *test-workflow-filters
-  
-  release:
-    jobs:
-      - rustfmt:
-          <<: *compile-workflow-filters
-      - check-stable:
-          <<: *compile-workflow-filters
-      - test-stable:
-          <<: *compile-workflow-filters
-      - compile-deb:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - compile-x86_64-unknown-linux-gnu:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
-      - compile-x86_64-apple-darwin:
-          <<: *compile-workflow-filters
-          requires:
-            - rustfmt
-            - check-stable
-            - test-stable
+          <<: *test-filters
+      - build-x86_64-unknown-linux-gnu-archive:
+          <<: *release-workflow-filters
+          <<: *build-requires
+      - build-x86_64-apple-darwin-archive:
+          <<: *release-workflow-filters
+          <<: *build-requires
+      - package-rpm:
+          <<: *release-workflow-filters
+          <<: *package-requires
+      - verify-amazon-linux-1:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-amazon-linux-2:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-centos-7:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-deb-8:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-deb-9:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-ubuntu-16-04:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-ubuntu-18-04:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-ubuntu-19-04:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - release-deb:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-github:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-rpm:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
       - release-s3:
-          <<: *edge-release-workflow-filters
-          requires:
-            - compile-deb
-            - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-apple-darwin
+          <<: *release-workflow-filters
+          <<: *release-requires
+      # Installs directly from S3
       - release-docker:
           <<: *tag-release-workflow-filters
           requires:
-            - compile-deb
-            - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-apple-darwin
-      - release-github:
+            - release-s3
+      # Installs directly from S3
+      - release-homebrew:
           <<: *tag-release-workflow-filters
           requires:
-            - compile-deb
-            - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-apple-darwin
-      - release-s3:
-          <<: *edge-release-workflow-filters
-          requires:
-            - compile-deb
-            - compile-x86_64-unknown-linux-gnu
-            - compile-x86_64-apple-darwin
+            - release-s3

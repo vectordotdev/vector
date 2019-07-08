@@ -5,10 +5,10 @@ use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
-use tokio_trace::field;
-use tokio_trace_tower_http::InstrumentedHttpService;
 use tower::Service;
 use tower_hyper::{body::Body, client::Client};
+use tracing::field;
+use tracing_tower_http::InstrumentedHttpService;
 
 type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 

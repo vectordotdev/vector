@@ -1,0 +1,15 @@
+[<%= opts[:path] %>]
+<% example.grouped.each do |title, options| -%>
+<% if opts[:titles] -%>
+  # <%= title %>
+<% end -%>
+<% options.each do |option| -%>
+<% if option.table? -%>
+<%= config_example(option.options, titles: false, path: "#{opts[:path]}.#{option.name}").indent(2) %>
+<% else -%>
+<% value = option.examples.first.to_toml -%>
+<% tags = example.tags(option) -%>
+  <%= option.name %> = <%= value %><% if tags.any? && !value.include?("\n") %> # <%= tags.join(", ") %><% end %>
+<% end -%>
+<% end %>
+<% end -%>

@@ -8,7 +8,7 @@ use tokio::{
     codec::BytesCodec,
     net::{UdpFramed, UdpSocket},
 };
-use tokio_trace::field;
+use tracing::field;
 
 mod parser;
 

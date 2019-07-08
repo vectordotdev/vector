@@ -1,0 +1,35 @@
+#                                    __   __  __  
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                                   Configuration
+#
+# ------------------------------------------------------------------------------
+# Website: https://vector.dev
+# Docs: https://docs.vector.dev
+# Community: https://vector.dev/community
+# Repo: https://github.com/timberio/vector
+# ------------------------------------------------------------------------------
+
+# Note: A full config spec is located at ./vector.spec.toml and examples
+#       in the ./examples folder.
+
+data_dir = "/var/lib/vector"
+
+# Ingest data by tailing one or more files
+[sources.apache_logs]
+  type         = "file"
+  include      = ["/var/log/apache2/*.log"]
+  ignore_older = 86400 # 1 day
+
+# Structure and parse the data
+[transforms.apache_parser]
+  inputs       = ["apache_logs"]
+  type         = "regex_parser"
+  regex        = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
+
+# Output data
+[sinks.print]
+  type         = "console"

@@ -1,0 +1,54 @@
+<% component = metadata.sinks.aws_cloudwatch_logs %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## Examples
+
+```http
+POST / HTTP/1.1
+Host: logs.<region>.<domain>
+X-Amz-Date: <date>
+Accept: application/json
+Content-Type: application/x-amz-json-1.1
+Content-Length: <byte_size>
+Connection: Keep-Alive
+X-Amz-Target: Logs_20140328.PutLogEvents
+{
+  "logGroupName": "<group_name>",
+  "logStreamName": "<stream_name>",
+  "logEvents": [
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }, 
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }, 
+    {
+      "timestamp": <timestamp>, 
+      "message": "<encoded_event>"
+    }
+  ]
+}
+```
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

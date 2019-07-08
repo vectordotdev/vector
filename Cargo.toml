@@ -1,11 +1,11 @@
 [package]
 name = "vector"
-version = "0.3.0-dev"
+version = "0.4.0-dev"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
-description = "A High-Performance Log and Metrics Routing Layer"
-homepage = "https://vectorproject.io"
-license = "apache-2.0"
+description = "A High-Performance Logs, Metrics, and Events Router"
+homepage = "https://vector.dev"
+license-file = "LICENSE"
 readme = "README.md"
 publish = false
 
@@ -13,12 +13,18 @@ publish = false
 debug = true
 
 [package.metadata.deb]
-maintainer-scripts = "dist/debian/scripts/"
+section = "utility"
+maintainer-scripts = "distribution/debian/scripts/"
+conf-files = ["/etc/vector/vector.toml"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
-  ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["dist/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
+  ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
+  ["config/examples/complete/*", "/etc/vector/examples/complex/", "644"],
+  ["config/examples/sources/*", "/etc/vector/examples/sources/", "644"],
+  ["config/examples/transforms/*", "/etc/vector/examples/transforms/", "644"],
+  ["config/examples/sinks/*", "/etc/vector/examples/sinks/", "644"],
+  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
 ]
 
 [workspace]
@@ -26,6 +32,7 @@ members = [
   ".",
   "lib/file-source",
   "lib/trace-metrics",
+  "lib/trace-limit",
   "lib/codec",
 ]
 
@@ -37,17 +44,17 @@ trace-metrics = { path = "lib/trace-metrics" }
 
 # Tokio / Futures
 futures = "0.1.25"
-tokio = { version = "0.1.21", features = ["io", "uds", "tcp", "rt-full"], default-features = false }
+tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
 
 # Tracing
-tokio-trace = "0.1"
-tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-tower-http = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tracing = "0.1"
+tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
+tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
+tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
+tracing-tower-http = { git = "https://github.com/tokio-rs/tracing" }
 
 # Metrics
 hotmic = "0.8"
@@ -143,4 +150,3 @@ splunk-integration-tests = []
 [[bench]]
 name = "bench"
 harness = false
-

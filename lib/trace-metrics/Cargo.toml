@@ -5,15 +5,15 @@ authors = ["Lucio Franco <luciofranco14@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio-trace-core = "0.2"
+tracing-core = "0.1"
 hotmic = "0.8"
 
 [dev-dependencies]
-tokio-trace = "0.1"
+tracing = "0.1"
 serde_json = "1.0"
 futures = "0.1.25"
 tokio = "0.1.21"
 hyper = "0.12.18"
-tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-fmt = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
-tokio-trace-env-logger = { git = "https://github.com/tokio-rs/tokio-trace-nursery" }
+tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
+tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
+tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }

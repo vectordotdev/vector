@@ -1,0 +1,35 @@
+<% component = metadata.sources.vector %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## How It Works
+
+<%= component_sections(component) %>
+
+### Encoding
+
+Data is encoded via Vector's [event protobuf][url.event_proto] before it is sent over the wire.
+
+### Message Acking
+
+Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost.
+
+### TCP Protocol
+
+Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

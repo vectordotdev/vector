@@ -1,0 +1,18 @@
+[Unit]
+Description=Vector
+Documentation=http://vector.dev
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+User=vector
+Group=vector
+ExecStart=/opt/vector/bin/vector --config=/etc/vector/vector.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=no
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vector
+
+[Install]
+WantedBy=multi-user.target

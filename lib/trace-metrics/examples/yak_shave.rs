@@ -1,16 +1,16 @@
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 extern crate hotmic;
 extern crate serde_json;
-extern crate tokio_trace_env_logger;
-extern crate tokio_trace_fmt;
 extern crate trace_metrics;
+extern crate tracing_env_logger;
+extern crate tracing_fmt;
 
 use hotmic::Receiver;
 use std::thread;
 
 fn shave(yak: usize) -> bool {
-    trace_span!("shave", yak = yak).enter(|| {
+    trace_span!("shave", yak = yak).in_scope(|| {
         debug!(
             message = "hello! I'm gonna shave a yak.",
             excitement = "yay!"
@@ -34,16 +34,16 @@ fn main() {
         receiver.run();
     });
 
-    let subscriber = tokio_trace_fmt::FmtSubscriber::builder().full().finish();
-    tokio_trace_env_logger::try_init().expect("init log adapter");
+    let subscriber = tracing_fmt::FmtSubscriber::builder().finish();
+    tracing_env_logger::try_init().expect("init log adapter");
     let subscriber = trace_metrics::MetricsSubscriber::new(subscriber, sink);
 
-    tokio_trace::subscriber::with_default(subscriber, || {
+    tracing::subscriber::with_default(subscriber, || {
         let number_of_yaks = 3;
         let mut number_shaved = 0;
         debug!("preparing to shave {} yaks", number_of_yaks);
 
-        trace_span!("shaving_yaks", yaks_to_shave = number_of_yaks).enter(|| {
+        trace_span!("shaving_yaks", yaks_to_shave = number_of_yaks).in_scope(|| {
             info!("shaving yaks");
 
             for yak in 1..=number_of_yaks {

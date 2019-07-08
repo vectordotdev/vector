@@ -2,33 +2,47 @@
 description: Receive and pull log and metric events into Vector
 ---
 
+<!--
+     THIS FILE IS AUTOOGENERATED!
+
+     To make changes please edit the template located at:
+
+     scripts/generate/templates/docs/usage/configuration/sources/README.md.erb
+-->
+
 # Sources
 
-![](../../../.gitbook/assets/sources.svg)
+![][images.sources]
 
-Sources are first in the [pipeline](../../../about/concepts.md#pipelines), responsible for ingesting data into Vector, they can both receive and pull data. If you're deploying Vector in an [agent role](../../../setup/deployment/roles/agent.md), you'll want to look at local data sources like a [`file`](file.md), [`journald`](), and [`stdin`](stdin.md). If you're deploying Vector in a [service role](../../../setup/deployment/roles/service.md), you'll want to look at sources that receive data over the network, like the [`vector`](vector.md), [`tcp`](tcp.md), [`http`](), and [`kafka`]() sources. A full list of sources is available in the left-hand navigation.
+Sources are responsible for ingesting [events][docs.event] into Vector, they can
+both receive and pull in data. If you're deploying Vector in an [agent
+role][docs.agent_role], you'll want to look at local data sources like a
+[`file`][docs.file_source] and [`stdin`][docs.stdin_source]. If you're deploying
+Vector in a [service role][docs.service_role], you'll want to look at sources
+that receive data over the network, like the [`vector`][docs.vector_source],
+[`tcp`][docs.tcp_source], and [`syslog`][docs.syslog_source] sources.
 
-## How It Works
+| Name  | Description |
+|:------|:------------|
+| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
+| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
+| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
-### Context
-
-When possible a source will add context to each [event](../../../about/data-model.md#event). For example, the [`tcp` source](tcp.md) adds the `"host"` context key representing the address of the upstream host. Context keys, when possible, will follow the [default schema](../../../about/data-model.md#default-schema) which is outlined in the [Data Model](../../../about/data-model.md) document. For explicitness, each source will document the context keys it adds as well as the expected event output structure.
-
-### Event Types
-
-#### Output
-
-Every source will specify the output [event type](../../../about/data-model.md#event). This makes it clear the type of event you're being emitted.
-
-#### Connectivity
-
-A source must be connected to a [transforms](../transforms/) or [sinks](../sinks/) with the same input type.
-
-### Vector to Vector Communication
-
-If you're receiving data from another upstream Vector instance then you should use the [`vector` source](vector.md), with the upstream instance using the [`vector` sink](../sinks/vector.md). A more detailed guide is below:
-
-{% page-ref page="../../guides/vector-to-vector-guide.md" %}
+[+ request a new source][url.new_source]
 
 
-
+[docs.agent_role]: ../../../setup/deployment/roles/agent.md
+[docs.event]: ../../../about/data-model.md#event
+[docs.file_source]: ../../../usage/configuration/sources/file.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.service_role]: ../../../setup/deployment/roles/service.md
+[docs.statsd_source]: ../../../usage/configuration/sources/statsd.md
+[docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
+[docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.vector_source]: ../../../usage/configuration/sources/vector.md
+[images.sources]: ../../../assets/sources.svg
+[url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature

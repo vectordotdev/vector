@@ -16,7 +16,7 @@ use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
 use stream_cancel::Trigger;
 use tokio::timer;
-use tokio_trace_futures::Instrument;
+use tracing_futures::Instrument;
 
 #[allow(dead_code)]
 pub struct RunningTopology {

@@ -25,7 +25,7 @@ pub enum InnerBuffer {
 impl Buffer {
     pub fn new(gzip: bool) -> Self {
         let inner = if gzip {
-            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::default()))
+            InnerBuffer::Gzip(GzEncoder::new(Vec::new(), flate2::Compression::fast()))
         } else {
             InnerBuffer::Plain(Vec::new())
         };
@@ -214,7 +214,7 @@ mod test {
             .collect::<Vec<Vec<u8>>>();
 
         assert!(output.len() > 1);
-        assert!(output.iter().map(|o| o.len()).sum::<usize>() < 50_000);
+        assert!(dbg!(output.iter().map(|o| o.len()).sum::<usize>()) < 51_000);
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];

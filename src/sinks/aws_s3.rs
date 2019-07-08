@@ -18,9 +18,9 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::time::Duration;
-use tokio_trace::field;
-use tokio_trace_futures::{Instrument, Instrumented};
 use tower::{Service, ServiceBuilder};
+use tracing::field;
+use tracing_futures::{Instrument, Instrumented};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -114,7 +114,7 @@ impl S3Sink {
         let key_prefix = config
             .key_prefix
             .clone()
-            .unwrap_or_else(|| "date=%F".into());
+            .unwrap_or_else(|| "date=%F/".into());
 
         let region = config.region.clone();
         let s3 = S3Sink {
