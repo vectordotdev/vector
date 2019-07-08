@@ -2,9 +2,9 @@
 extern crate tracing;
 extern crate hotmic;
 extern crate serde_json;
-extern crate trace_metrics;
 extern crate tracing_env_logger;
 extern crate tracing_fmt;
+extern crate tracing_metrics;
 
 use hotmic::Receiver;
 use std::thread;
@@ -36,7 +36,7 @@ fn main() {
 
     let subscriber = tracing_fmt::FmtSubscriber::builder().finish();
     tracing_env_logger::try_init().expect("init log adapter");
-    let subscriber = trace_metrics::MetricsSubscriber::new(subscriber, sink);
+    let subscriber = tracing_metrics::MetricsSubscriber::new(subscriber, sink);
 
     tracing::subscriber::with_default(subscriber, || {
         let number_of_yaks = 3;

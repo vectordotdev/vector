@@ -2,7 +2,7 @@
 extern crate tracing;
 
 use tracing::Dispatch;
-use trace_limit::LimitSubscriber;
+use tracing_limit::LimitSubscriber;
 
 fn main() {
     let subscriber = tracing_fmt::FmtSubscriber::builder().finish();

@@ -137,7 +137,7 @@ fn main() {
     let subscriber = tracing_fmt::FmtSubscriber::builder().finish();
     tracing_env_logger::try_init().expect("init log adapter");
 
-    let subscriber = trace_metrics::MetricsSubscriber::new(subscriber, sink);
+    let subscriber = tracing_metrics::MetricsSubscriber::new(subscriber, sink);
 
     tracing::subscriber::with_default(subscriber, || {
         let addr: ::std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();

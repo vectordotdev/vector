@@ -10,7 +10,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 use tracing::{field, span, Event, Id, Metadata};
-use trace_limit::LimitSubscriber;
+use tracing_limit::LimitSubscriber;
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("basline_record", |b| {
