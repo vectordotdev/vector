@@ -1,23 +1,22 @@
 #[macro_use]
-extern crate tokio_trace;
+extern crate tracing;
 
 #[macro_use]
 extern crate criterion;
 
 use criterion::{black_box, Criterion};
-
 use std::{
     fmt,
     sync::{Mutex, MutexGuard},
 };
-use tokio_trace::{field, span, Event, Id, Metadata};
-use trace_limit::LimitSubscriber;
+use tracing::{field, span, Event, Id, Metadata};
+use tracing_limit::LimitSubscriber;
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("basline_record", |b| {
         let sub = VisitingSubscriber(Mutex::new(String::from("")));
         let n = black_box(5000);
-        tokio_trace::subscriber::with_default(sub, || {
+        tracing::subscriber::with_default(sub, || {
             b.iter(|| {
                 for _ in 0..n {
                     info!(
@@ -25,7 +24,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         foo = "foo",
                         bar = "bar",
                         baz = 3,
-                        quuux = tokio_trace::field::debug(0.99)
+                        quuux = field::debug(0.99)
                     )
                 }
             })
@@ -35,7 +34,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("limit_record_5", |b| {
         let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
         let n = black_box(5000);
-        tokio_trace::subscriber::with_default(sub, || {
+        tracing::subscriber::with_default(sub, || {
             b.iter(|| {
                 for _ in 0..n {
                     info!(
@@ -43,7 +42,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         foo = "foo",
                         bar = "bar",
                         baz = 3,
-                        quuux = tokio_trace::field::debug(0.99),
+                        quuux = field::debug(0.99),
                         rate_limit = 5
                     )
                 }
@@ -54,7 +53,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("limit_record_100", |b| {
         let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
         let n = black_box(5000);
-        tokio_trace::subscriber::with_default(sub, || {
+        tracing::subscriber::with_default(sub, || {
             b.iter(|| {
                 for _ in 0..n {
                     info!(
@@ -62,7 +61,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         foo = "foo",
                         bar = "bar",
                         baz = 3,
-                        quuux = tokio_trace::field::debug(0.99),
+                        quuux = field::debug(0.99),
                         rate_limit = 100
                     )
                 }
@@ -73,7 +72,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("limit_record_1000", |b| {
         let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
         let n = black_box(5000);
-        tokio_trace::subscriber::with_default(sub, || {
+        tracing::subscriber::with_default(sub, || {
             b.iter(|| {
                 for _ in 0..n {
                     info!(
@@ -81,7 +80,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         foo = "foo",
                         bar = "bar",
                         baz = 3,
-                        quuux = tokio_trace::field::debug(0.99),
+                        quuux = field::debug(0.99),
                         rate_limit = 1000
                     )
                 }
@@ -102,7 +101,7 @@ impl<'a> field::Visit for Visitor<'a> {
     }
 }
 
-impl tokio_trace::Subscriber for VisitingSubscriber {
+impl tracing::Subscriber for VisitingSubscriber {
     fn new_span(&self, span: &span::Attributes) -> Id {
         let mut visitor = Visitor(self.0.lock().unwrap());
         span.record(&mut visitor);

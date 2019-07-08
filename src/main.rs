@@ -10,9 +10,9 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-use trace_metrics::MetricsSubscriber;
 use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
+use tracing_metrics::MetricsSubscriber;
 use vector::{metrics, topology};
 
 #[derive(StructOpt, Debug)]
