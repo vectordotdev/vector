@@ -379,15 +379,15 @@ issue, please:
 * [**Source code**][url.log_to_metric_transform_source]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.log_to_metric_transform]: https://docs.vector.dev/assets/log_to_metric-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
 [url.community]: https://vector.dev/community
 [url.issue_540]: https://github.com/timberio/vector/issues/540
 [url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Bug%22

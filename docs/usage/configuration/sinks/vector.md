@@ -184,16 +184,16 @@ issue, please:
 * [**Source code**][url.vector_sink_source]
 
 
-[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.starting]: https://docs.vector.dev/usage/administration/starting
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.vector_sink]: https://docs.vector.dev/assets/vector-sink.svg
+[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.event]: ../../../about/data-model.md#event
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.vector_sink]: ../../../assets/vector-sink.svg
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.vector_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+vector%22+label%3A%22Type%3A+Bug%22

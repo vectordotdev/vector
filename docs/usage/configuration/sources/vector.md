@@ -125,11 +125,11 @@ issue, please:
 * [**Source code**][url.vector_source_source]
 
 
-[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.vector_source]: https://docs.vector.dev/assets/vector-source.svg
+[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.vector_source]: ../../../assets/vector-source.svg
 [url.community]: https://vector.dev/community
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.new_vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_vector%22

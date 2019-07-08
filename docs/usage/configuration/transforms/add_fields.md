@@ -247,19 +247,19 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.config_value_types]: https://docs.vector.dev/usage/configuration/README#value-types
-[docs.configuration]: https://docs.vector.dev/usage/configuration
-[docs.data_model]: https://docs.vector.dev/about/data-model
-[docs.event_key_special_characters]: https://docs.vector.dev/about/data-model#special-characters
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.add_fields_transform]: https://docs.vector.dev/assets/add_fields-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.config_value_types]: ../../../usage/configuration/README.md#value-types
+[docs.configuration]: ../../../usage/configuration
+[docs.data_model]: ../../../about/data-model.md
+[docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.add_fields_transform]: ../../../assets/add_fields-transform.svg
 [url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Bug%22
 [url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancement%22
 [url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22

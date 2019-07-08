@@ -385,18 +385,18 @@ should supply to the `host` and `token` options.
 * [**Source code**][url.splunk_hec_sink_source]
 
 
-[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.guarantees]: https://docs.vector.dev/about/guarantees
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.starting]: https://docs.vector.dev/usage/administration/starting
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.sink-flow-serial]: https://docs.vector.dev/assets/sink-flow-serial.svg
-[images.splunk_hec_sink]: https://docs.vector.dev/assets/splunk_hec-sink.svg
+[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.event]: ../../../about/data-model.md#event
+[docs.guarantees]: ../../../about/guarantees.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg
 [url.community]: https://vector.dev/community
 [url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+splunk_hec
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

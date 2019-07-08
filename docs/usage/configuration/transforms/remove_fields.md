@@ -108,15 +108,15 @@ Finally, consider the following alternatives:
 * [**Source code**][url.remove_fields_transform_source]
 
 
-[docs.add_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/add_fields
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.remove_fields_transform]: https://docs.vector.dev/assets/remove_fields-transform.svg
+[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.remove_fields_transform]: ../../../assets/remove_fields-transform.svg
 [url.community]: https://vector.dev/community
 [url.remove_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Bug%22
 [url.remove_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Enhancement%22

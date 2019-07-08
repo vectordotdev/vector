@@ -153,17 +153,17 @@ Finally, consider the following alternatives:
 * [**Grok Patterns**][url.grok_patterns]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.performance]: https://docs.vector.dev/performance
-[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.grok_parser_transform]: https://docs.vector.dev/assets/grok_parser-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.performance]: ../../../performance.md
+[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
 [url.community]: https://vector.dev/community
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.grok_debugger]: http://grokdebug.herokuapp.com/

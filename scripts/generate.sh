@@ -102,7 +102,7 @@ templates.each do |template|
   # Skip partials
   if !basename.start_with?("_")
     content = render(template, context)
-    target = template.gsub(/^templates\//, "../../").gsub(/\.erb$/, "")
+    target = template.gsub(/^templates\//, "#{VECTOR_ROOT}/").gsub(/\.erb$/, "")
     content = post_process(content, target, metadata.links)
     current_content = File.read(target)
 

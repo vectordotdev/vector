@@ -34,23 +34,23 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [+ request a new transform][url.new_transform]
 
 
-[docs.add_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/add_fields
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.field_filter_transform]: https://docs.vector.dev/usage/configuration/transforms/field_filter
-[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
-[docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
-[docs.pipelines]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
-[docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
-[docs.sampler_transform]: https://docs.vector.dev/usage/configuration/transforms/sampler
-[docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
-[images.transforms]: https://docs.vector.dev/assets/transforms.svg
+[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
+[docs.event]: ../../../about/data-model.md#event
+[docs.field_filter_transform]: ../../../usage/configuration/transforms/field_filter.md
+[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_to_metric_transform]: ../../../usage/configuration/transforms/log_to_metric.md
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.pipelines]: ../../../usage/configuration/README.md#composition
+[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
+[docs.sinks]: ../../../usage/configuration/sinks
+[docs.sources]: ../../../usage/configuration/sources
+[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
+[images.transforms]: ../../../assets/transforms.svg
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.lua]: https://www.lua.org/
 [url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature

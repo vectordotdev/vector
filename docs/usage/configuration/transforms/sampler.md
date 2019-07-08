@@ -121,13 +121,13 @@ issue, please:
 * [**Source code**][url.sampler_transform_source]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.sampler_transform]: https://docs.vector.dev/assets/sampler-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.sampler_transform]: ../../../assets/sampler-transform.svg
 [url.community]: https://vector.dev/community
 [url.new_sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_sampler%22
 [url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22

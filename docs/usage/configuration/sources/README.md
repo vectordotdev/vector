@@ -34,15 +34,15 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 [+ request a new source][url.new_source]
 
 
-[docs.agent_role]: https://docs.vector.dev/setup/deployment/roles/agent
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.service_role]: https://docs.vector.dev/setup/deployment/roles/service
-[docs.statsd_source]: https://docs.vector.dev/usage/configuration/sources/statsd
-[docs.stdin_source]: https://docs.vector.dev/usage/configuration/sources/stdin
-[docs.syslog_source]: https://docs.vector.dev/usage/configuration/sources/syslog
-[docs.tcp_source]: https://docs.vector.dev/usage/configuration/sources/tcp
-[docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
-[images.sources]: https://docs.vector.dev/assets/sources.svg
+[docs.agent_role]: ../../../setup/deployment/roles/agent.md
+[docs.event]: ../../../about/data-model.md#event
+[docs.file_source]: ../../../usage/configuration/sources/file.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.service_role]: ../../../setup/deployment/roles/service.md
+[docs.statsd_source]: ../../../usage/configuration/sources/statsd.md
+[docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
+[docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.vector_source]: ../../../usage/configuration/sources/vector.md
+[images.sources]: ../../../assets/sources.svg
 [url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature

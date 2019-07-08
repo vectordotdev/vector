@@ -180,17 +180,17 @@ issue, please:
 * [**Source code**][url.blackhole_sink_source]
 
 
-[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.starting]: https://docs.vector.dev/usage/administration/starting
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.blackhole_sink]: https://docs.vector.dev/assets/blackhole-sink.svg
+[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.event]: ../../../about/data-model.md#event
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.blackhole_sink]: ../../../assets/blackhole-sink.svg
 [url.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22+label%3A%22Type%3A+Bug%22
 [url.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22+label%3A%22Type%3A+Enhancement%22
 [url.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22

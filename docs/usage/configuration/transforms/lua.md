@@ -239,18 +239,18 @@ Finally, consider the following alternatives:
 * [**Lua Reference Manual**][url.lua_manual]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.data_model]: https://docs.vector.dev/about/data-model
-[docs.default_schema]: https://docs.vector.dev/about/data-model#default-schema
-[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.lua_transform]: https://docs.vector.dev/assets/lua-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.data_model]: ../../../about/data-model.md
+[docs.default_schema]: ../../../about/data-model.md#default-schema
+[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.lua_transform]: ../../../assets/lua-transform.svg
 [url.community]: https://vector.dev/community
 [url.lua]: https://www.lua.org/
 [url.lua_docs]: https://www.lua.org/manual/5.3/

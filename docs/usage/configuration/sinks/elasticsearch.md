@@ -414,19 +414,19 @@ issue, please:
 * [**Source code**][url.elasticsearch_sink_source]
 
 
-[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.data_model]: https://docs.vector.dev/about/data-model
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.guarantees]: https://docs.vector.dev/about/guarantees
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.starting]: https://docs.vector.dev/usage/administration/starting
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.elasticsearch_sink]: https://docs.vector.dev/assets/elasticsearch-sink.svg
-[images.sink-flow-partitioned]: https://docs.vector.dev/assets/sink-flow-partitioned.svg
+[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.data_model]: ../../../about/data-model.md
+[docs.event]: ../../../about/data-model.md#event
+[docs.guarantees]: ../../../about/guarantees.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
+[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
 [url.community]: https://vector.dev/community
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22

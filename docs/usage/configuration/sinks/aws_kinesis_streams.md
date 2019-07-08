@@ -432,18 +432,18 @@ issue, please:
 * [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
 
 
-[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.guarantees]: https://docs.vector.dev/about/guarantees
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.starting]: https://docs.vector.dev/usage/administration/starting
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.aws_kinesis_streams_sink]: https://docs.vector.dev/assets/aws_kinesis_streams-sink.svg
-[images.sink-flow-serial]: https://docs.vector.dev/assets/sink-flow-serial.svg
+[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.event]: ../../../about/data-model.md#event
+[docs.guarantees]: ../../../about/guarantees.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.starting]: ../../../usage/administration/starting.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.aws_kinesis_streams_sink]: ../../../assets/aws_kinesis_streams-sink.svg
+[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html

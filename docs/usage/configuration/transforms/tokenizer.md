@@ -249,16 +249,16 @@ Finally, consider the following alternatives:
 * [**Source code**][url.tokenizer_transform_source]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.tokenizer_transform]: https://docs.vector.dev/assets/tokenizer-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

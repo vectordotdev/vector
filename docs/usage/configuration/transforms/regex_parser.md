@@ -305,17 +305,17 @@ Finally, consider the following alternatives:
 * [**Rust Regex Syntax**][url.rust_regex_syntax]
 
 
-[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
-[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.performance]: https://docs.vector.dev/performance
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.regex_parser_transform]: https://docs.vector.dev/assets/regex_parser-transform.svg
+[docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
 [url.community]: https://vector.dev/community
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [url.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags

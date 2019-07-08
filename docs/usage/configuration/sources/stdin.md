@@ -150,13 +150,13 @@ issue, please:
 * [**Source code**][url.stdin_source_source]
 
 
-[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
-[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
-[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
-[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
-[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
-[images.stdin_source]: https://docs.vector.dev/assets/stdin-source.svg
+[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.log_event]: ../../../about/data-model.md#log
+[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../../usage/configuration/transforms
+[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[images.stdin_source]: ../../../assets/stdin-source.svg
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.stdin_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+stdin%22+label%3A%22Type%3A+Bug%22

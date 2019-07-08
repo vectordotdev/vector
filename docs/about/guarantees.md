@@ -111,24 +111,24 @@ We recommend [subscribing to our mailing list](https://vector.dev), which will
 keep you in the loop if this ever changes.
 
 
-[docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
-[docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
-[docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
-[docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
-[docs.console_sink]: https://docs.vector.dev/usage/configuration/sinks/console
-[docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
-[docs.event]: https://docs.vector.dev/about/data-model#event
-[docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
-[docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
-[docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
-[docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
-[docs.sources]: https://docs.vector.dev/usage/configuration/sources
-[docs.splunk_hec_sink]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
-[docs.statsd_source]: https://docs.vector.dev/usage/configuration/sources/statsd
-[docs.stdin_source]: https://docs.vector.dev/usage/configuration/sources/stdin
-[docs.syslog_source]: https://docs.vector.dev/usage/configuration/sources/syslog
-[docs.tcp_sink]: https://docs.vector.dev/usage/configuration/sinks/tcp
-[docs.tcp_source]: https://docs.vector.dev/usage/configuration/sources/tcp
-[docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
-[docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
+[docs.aws_cloudwatch_logs_sink]: ../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.aws_kinesis_streams_sink]: ../usage/configuration/sinks/aws_kinesis_streams.md
+[docs.aws_s3_sink]: ../usage/configuration/sinks/aws_s3.md
+[docs.blackhole_sink]: ../usage/configuration/sinks/blackhole.md
+[docs.console_sink]: ../usage/configuration/sinks/console.md
+[docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
+[docs.event]: ../about/data-model.md#event
+[docs.file_source]: ../usage/configuration/sources/file.md
+[docs.http_sink]: ../usage/configuration/sinks/http.md
+[docs.kafka_sink]: ../usage/configuration/sinks/kafka.md
+[docs.prometheus_sink]: ../usage/configuration/sinks/prometheus.md
+[docs.sinks]: ../usage/configuration/sinks
+[docs.sources]: ../usage/configuration/sources
+[docs.splunk_hec_sink]: ../usage/configuration/sinks/splunk_hec.md
+[docs.statsd_source]: ../usage/configuration/sources/statsd.md
+[docs.stdin_source]: ../usage/configuration/sources/stdin.md
+[docs.syslog_source]: ../usage/configuration/sources/syslog.md
+[docs.tcp_sink]: ../usage/configuration/sinks/tcp.md
+[docs.tcp_source]: ../usage/configuration/sources/tcp.md
+[docs.vector_sink]: ../usage/configuration/sinks/vector.md
+[docs.vector_source]: ../usage/configuration/sources/vector.md
