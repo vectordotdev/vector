@@ -36,7 +36,6 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
-    request_config: RequestConfig
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,7 +49,7 @@ type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<E
 pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
-    request_config: RequestConfig
+    request_config: RequestConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -106,8 +105,6 @@ pub enum CloudwatchError {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-
-
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
@@ -134,9 +131,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(
-        config: CloudwatchLogsSinkConfig,
-    ) -> Result<Self, String> {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -148,7 +143,7 @@ impl CloudwatchLogsPartitionSvc {
             rate_limit_duration_secs,
             rate_limit_num,
         };
-        
+
         Ok(Self {
             config,
             clients: HashMap::new(),
@@ -180,14 +175,17 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
             svc.clone()
         } else {
             let svc = {
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config, self.request_config).unwrap();
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config).unwrap();
                 let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
 
                 // TODO: add Buffer/Retry here
 
                 let rate = RateLimit::new(
                     timeout,
-                    Rate::new(rate_limit_num, Duration::from_secs(rate_limit_duration_secs)),
+                    Rate::new(
+                        rate_limit_num,
+                        Duration::from_secs(rate_limit_duration_secs),
+                    ),
                 );
                 let concurrency = ConcurrencyLimit::new(rate, in_flight_limit);
 
@@ -209,7 +207,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: &CloudwatchLogsSinkConfig, request_config: RequestConfig) -> Result<Self, String> {
+    pub fn new(config: &CloudwatchLogsSinkConfig) -> Result<Self, String> {
         let region = config.region.clone().try_into()?;
         let client = CloudWatchLogsClient::new(region);
 
@@ -219,7 +217,6 @@ impl CloudwatchLogsSvc {
             stream_name: config.stream_name.clone(),
             group_name: config.group_name.clone(),
             state: State::Idle,
-            request_config
         })
     }
 
@@ -350,7 +347,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 let (tx, rx) = oneshot::channel();
                 self.state = State::Put(rx);
 
-                debug!(message = "Submitting events.", amount_of_events = req.len());
+                debug!(message = "Submitting events.", count = req.len());
                 let fut = self
                     .put_logs(token, req)
                     .map_err(CloudwatchError::Put)
@@ -581,13 +578,8 @@ mod tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
         };
-        let request_config = RequestConfig {
-                in_flight_limit: 1,
-    timeout_secs: 5,
-    rate_limit_duration_secs: 1,
-    rate_limit_num: 5,
-        };
-        let svc = CloudwatchLogsSvc::new(&config, request_config).unwrap();
+
+        let svc = CloudwatchLogsSvc::new(&config).unwrap();
 
         let mut event = Event::from("hello world").into_log();
 
