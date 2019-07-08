@@ -31,8 +31,8 @@ assets = [
 members = [
   ".",
   "lib/file-source",
-  "lib/trace-metrics",
-  "lib/trace-limit",
+  "lib/tracing-metrics",
+  "lib/tracing-limit",
   "lib/codec",
 ]
 
@@ -40,7 +40,8 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
-trace-metrics = { path = "lib/trace-metrics" }
+tracing-metrics = { path = "lib/tracing-metrics" }
+tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
 futures = "0.1.25"

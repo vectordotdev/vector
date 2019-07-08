@@ -10,10 +10,10 @@
 //! ```
 //! # #[macro_use] extern crate tracing;
 //! # extern crate tracing_fmt;
-//! # extern crate trace_metrics;
+//! # extern crate tracing_metrics;
 //! # extern crate hotmic;
 //! # use hotmic::Receiver;
-//! # use trace_metrics::MetricsSubscriber;
+//! # use tracing_metrics::MetricsSubscriber;
 //! # use tracing_fmt::FmtSubscriber;
 //! // Get the metrics sink
 //! let mut receiver = Receiver::builder().build();
