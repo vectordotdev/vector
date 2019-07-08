@@ -465,7 +465,6 @@ mod integration_tests {
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 1);
-        println!("keys: {:?}", keys);
 
         let key = keys[0].clone();
         assert!(key.ends_with(".log"));
