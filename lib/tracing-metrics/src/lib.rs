@@ -13,7 +13,7 @@
 //! # extern crate tracing_metrics;
 //! # extern crate hotmic;
 //! # use hotmic::Receiver;
-//! # use tracin_metrics::MetricsSubscriber;
+//! # use tracing_metrics::MetricsSubscriber;
 //! # use tracing_fmt::FmtSubscriber;
 //! // Get the metrics sink
 //! let mut receiver = Receiver::builder().build();
