@@ -26,7 +26,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # REQUIRED
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
-
+  
   # OPTIONAL
   drop_invalid = true # no default
   field = "message" # default
@@ -35,11 +35,8 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "json_parser"
   inputs = ["<string>", ...]
-
-  # OPTIONAL
   drop_invalid = <bool>
   field = "<string>"
 ```
@@ -236,17 +233,17 @@ issue, please:
 * [**Source code**][url.json_parser_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.json_parser_transform]: ../../../assets/json_parser-transform.svg
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.correctness]: https://docs.vector.dev/correctness
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.json_parser_transform]: https://docs.vector.dev/assets/json_parser-transform.svg
 [url.community]: https://vector.dev/community
-[url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Bugs%22
-[url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Enhancements%22
+[url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Bug%22
+[url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Enhancement%22
 [url.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22
 [url.json_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

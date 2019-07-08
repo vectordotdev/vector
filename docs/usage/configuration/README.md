@@ -28,24 +28,8 @@ vector --config /etc/vector/vector.toml
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Set global options
 data_dir = "/var/lib/vector"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
@@ -53,27 +37,11 @@ data_dir = "/var/lib/vector"
   include      = ["/var/log/apache2/*.log"]    # supports globbing
   ignore_older = 86400                         # 1 day
 
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Structure and parse the data
 [transforms.apache_parser]
   inputs       = ["apache_logs"]
   type         = "regex_parser"                # fast/powerful regex
   regex        = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Sample the data to save on cost
 [transforms.apache_sampler]
@@ -82,28 +50,12 @@ data_dir = "/var/lib/vector"
   hash_field   = "request_id"                  # sample _entire_ requests
   rate         = 50                            # only keep 50%
 
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Send structured data to a short-term storage
 [sinks.es_cluster]
   inputs       = ["apache_sampler"]            # don't sample for S3
   type         = "elasticsearch"
   host         = "http://79.12.221.222:9200"   # local or external host
   index        = "vector-%Y-%m-%d"             # daily partitions
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
@@ -147,6 +99,7 @@ data_dir = "/var/lib/vector"
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
 | [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
+| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
 | [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
 | [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
@@ -246,43 +199,44 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
-[docs.add_fields_transform]: ../../usage/configuration/transforms/add_fields.md
-[docs.aws_cloudwatch_logs_sink]: ../../usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ../../usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ../../usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ../../usage/configuration/sinks/blackhole.md
-[docs.console_sink]: ../../usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ../../usage/configuration/sinks/elasticsearch.md
-[docs.field_filter_transform]: ../../usage/configuration/transforms/field_filter.md
-[docs.file_source]: ../../usage/configuration/sources/file.md
-[docs.grok_parser_transform]: ../../usage/configuration/transforms/grok_parser.md
-[docs.http_sink]: ../../usage/configuration/sinks/http.md
-[docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
-[docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
-[docs.log_event]: ../../about/data-model.md#log
-[docs.lua_transform]: ../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../about/data-model.md#metric
-[docs.operating_systems]: ../../setup/installation/operating-systems
-[docs.pipelines]: ../../usage/configuration/README.md#composition
-[docs.platforms]: ../../setup/installation/platforms
-[docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
-[docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
-[docs.remove_fields_transform]: ../../usage/configuration/transforms/remove_fields.md
-[docs.sampler_transform]: ../../usage/configuration/transforms/sampler.md
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources]: ../../usage/configuration/sources
-[docs.splunk_hec_sink]: ../../usage/configuration/sinks/splunk_hec.md
-[docs.starting.flags]: ../../usage/administration/starting.md#flags
-[docs.starting]: ../../usage/administration/starting.md
-[docs.statsd_source]: ../../usage/configuration/sources/statsd.md
-[docs.stdin_source]: ../../usage/configuration/sources/stdin.md
-[docs.syslog_source]: ../../usage/configuration/sources/syslog.md
-[docs.tcp_sink]: ../../usage/configuration/sinks/tcp.md
-[docs.tcp_source]: ../../usage/configuration/sources/tcp.md
-[docs.tokenizer_transform]: ../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../usage/configuration/transforms
-[docs.vector_sink]: ../../usage/configuration/sinks/vector.md
-[docs.vector_source]: ../../usage/configuration/sources/vector.md
+[docs.add_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/add_fields
+[docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
+[docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
+[docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
+[docs.console_sink]: https://docs.vector.dev/usage/configuration/sinks/console
+[docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
+[docs.field_filter_transform]: https://docs.vector.dev/usage/configuration/transforms/field_filter
+[docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
+[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
+[docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
+[docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
+[docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
+[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
+[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
+[docs.pipelines]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.platforms]: https://docs.vector.dev/setup/installation/platforms
+[docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
+[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
+[docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
+[docs.sampler_transform]: https://docs.vector.dev/usage/configuration/transforms/sampler
+[docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.splunk_hec_sink]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.starting.flags]: https://docs.vector.dev/usage/administration/starting#flags
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.statsd_source]: https://docs.vector.dev/usage/configuration/sources/statsd
+[docs.stdin_source]: https://docs.vector.dev/usage/configuration/sources/stdin
+[docs.syslog_source]: https://docs.vector.dev/usage/configuration/sources/syslog
+[docs.tcp_sink]: https://docs.vector.dev/usage/configuration/sinks/tcp
+[docs.tcp_source]: https://docs.vector.dev/usage/configuration/sources/tcp
+[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
+[docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/

@@ -23,9 +23,13 @@ how to do this.
 <% end -%>
 <% if component.sink? && component.batching? -%>
 
-### Buffering, Batching, & Partitioning
+### Buffers & Batches
 
+<%- if component.partition_options.any? %> 
 ![][images.sink-flow-partitioned]
+<%- else -%>
+![][images.sink-flow-serial]
+<%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers, batches, and
 partitions data as shown in the diagram above. You'll notice that Vector treats
@@ -59,20 +63,6 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `<%= component.options.batch_timeout.human_default %>`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `<%= component.options.batch_size.human_default %>`).
-
-#### Partitioning
-
-Partitioning is controlled via the <%= option_names(component.partition_options).to_sentence %>
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
-
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 <% end -%>
 <% if component.options.compression -%>
 
@@ -144,9 +134,25 @@ prevent Vector from starting is one sink is unhealthy, preventing the other
 healthy sinks from receiving data.
 <% end -%>
 <% end -%>
+<% if component.partition_options.any? -%>
+
+### Partitioning
+
+Partitioning is controlled via the <%= option_names(component.partition_options).to_sentence %>
+options and allows you to dynamically partition data. You'll notice that
+[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling dynamic partitioning. The interpolated result is effectively the
+internal batch partition key. Let's look at a few examples:
+
+| Value | Interpolation | Desc |
+|:------|:--------------|:-----|
+| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
+| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+<% end -%>
 <% if component.options.rate_limit_duration -%>
 
-### Rate Limiting
+### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
 downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
@@ -182,13 +188,14 @@ and result in deuplicate data downstream.
 <% if component.options.types && component.options.types.table? -%>
 
 ## Types
+
 You can coerce your extract values into types via the `types` table
 as shown in the examples above. The supported types are:
 
-| Type | Desription |
-| :--- | :--------- |
-| `string` | Coerces to a string. Generally not necessary since values are extracted as strings. |
-| `int` | Coerce to a 64 bit integer. |
-| `float` | Coerce to 64 bit floats. |
-| `bool`  | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
+| Type     | Desription                                                                            |
+|:---------|:--------------------------------------------------------------------------------------|
+| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
+| `int`    | Coerce to a 64 bit integer.                                                           |
+| `float`  | Coerce to 64 bit floats.                                                              |
+| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
 <% end -%>

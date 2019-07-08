@@ -36,11 +36,11 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
   group_name = "/var/log/my-log.log"
   region = "us-east-1"
   stream_name = "my-stream"
-
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, bytes
-
+  
   # OPTIONAL - Requests
   encoding = "json" # no default, enum: "json", "text"
   rate_limit_duration = 1 # default, seconds
@@ -49,9 +49,10 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
   request_timeout_secs = 30 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
-
+  
   # OPTIONAL - Buffer
   [sinks.my_aws_cloudwatch_logs_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -259,10 +260,10 @@ The `aws_cloudwatch_logs` sink batches [`log`][docs.log_event] events to [AWS Cl
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
-| `num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
 ## Examples
 
@@ -319,8 +320,9 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 
-### Buffering, Batching, & Partitioning
+### Buffers & Batches
 
+ 
 ![][images.sink-flow-partitioned]
 
 The `aws_cloudwatch_logs` sink buffers, batches, and
@@ -355,20 +357,6 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `1 bytes`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
-
-#### Partitioning
-
-Partitioning is controlled via the `group_name` and `stream_name`
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
-
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 
 ### Delivery Guarantee
 
@@ -405,7 +393,21 @@ Be careful when doing this if you have multiple sinks configured, as it will
 prevent Vector from starting is one sink is unhealthy, preventing the other
 healthy sinks from receiving data.
 
-### Rate Limiting
+### Partitioning
+
+Partitioning is controlled via the `group_name` and `stream_name`
+options and allows you to dynamically partition data. You'll notice that
+[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling dynamic partitioning. The interpolated result is effectively the
+internal batch partition key. Let's look at a few examples:
+
+| Value | Interpolation | Desc |
+|:------|:--------------|:-----|
+| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
+| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+
+### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
 downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
@@ -455,21 +457,21 @@ issue, please:
 * [**Service Limits**][url.https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.aws_cloudwatch_logs_sink]: ../../../assets/aws_cloudwatch_logs-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.guarantees]: https://docs.vector.dev/about/guarantees
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.aws_cloudwatch_logs_sink]: https://docs.vector.dev/assets/aws_cloudwatch_logs-sink.svg
+[images.sink-flow-partitioned]: https://docs.vector.dev/assets/sink-flow-partitioned.svg
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[url.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bugs%22
-[url.aws_cloudwatch_logs_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancements%22
+[url.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22
+[url.aws_cloudwatch_logs_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_cloudwatch_logs_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22
 [url.aws_cloudwatch_logs_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_logs.rs
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html

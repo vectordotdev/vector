@@ -45,7 +45,7 @@ if event["host"] == nil then
 end
 """
 
-
+  
   # OPTIONAL
   search_dirs = ["/etc/vector/lua"] # no default
 ```
@@ -53,12 +53,9 @@ end
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "lua"
   inputs = ["<string>", ...]
   source = "<string>"
-
-  # OPTIONAL
   search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
@@ -128,24 +125,8 @@ end
 Add a field to an event. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Add root level field
 event["new_field"] = "new value"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Add nested field
 event["parent.child"] = "nested value"
@@ -156,24 +137,8 @@ event["parent.child"] = "nested value"
 Remove a field from an event. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Remove root level field
 event["field"] = nil
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -184,24 +149,8 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Remove root level field
 event["field"] = nil
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -244,24 +193,8 @@ accessing, or removing nested fields is as simple as added a `.` in your key
 name:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Add nested field
 event["parent.child"] = "nested value"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -306,26 +239,26 @@ Finally, consider the following alternatives:
 * [**Lua Reference Manual**][url.lua_manual]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.data_model]: ../../../about/data-model.md
-[docs.default_schema]: ../../../about/data-model.md#default-schema
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.lua_transform]: ../../../assets/lua-transform.svg
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.data_model]: https://docs.vector.dev/about/data-model
+[docs.default_schema]: https://docs.vector.dev/about/data-model#default-schema
+[docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.lua_transform]: https://docs.vector.dev/assets/lua-transform.svg
 [url.community]: https://vector.dev/community
 [url.lua]: https://www.lua.org/
 [url.lua_docs]: https://www.lua.org/manual/5.3/
 [url.lua_manual]: http://www.lua.org/manual/5.1/manual.html
 [url.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
 [url.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
-[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bugs%22
-[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancements%22
+[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22
+[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22
 [url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
 [url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html

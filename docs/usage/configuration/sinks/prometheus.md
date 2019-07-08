@@ -33,12 +33,13 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
   # REQUIRED - General
   type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
-
+  
   # OPTIONAL - General
   address = "0.0.0.0:9598" # no default
-
+  
   # OPTIONAL - Buffer
   [sinks.my_prometheus_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -139,10 +140,10 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 | **OPTIONAL** - General | | |
 | `address` | `string` | The address to expose for scraping.<br />`no default` `example: "0.0.0.0:9598"` |
 | **OPTIONAL** - Buffer | | |
-| `type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
-| `num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
 ## How It Works
 
@@ -190,21 +191,21 @@ issue, please:
 * [**Source code**][url.prometheus_sink_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.prometheus_sink]: ../../../assets/prometheus-sink.svg
+[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.prometheus_sink]: https://docs.vector.dev/assets/prometheus-sink.svg
 [url.community]: https://vector.dev/community
 [url.new_prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_prometheus%22
 [url.prometheus]: https://prometheus.io/
-[url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Bugs%22
-[url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Enhancements%22
+[url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Bug%22
+[url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Enhancement%22
 [url.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22
 [url.prometheus_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

@@ -1,0 +1,244 @@
+<% component = metadata.transforms.log_to_metric %>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## Examples
+
+{% tabs %}
+{% tab title="Counting" %}
+This example demonstrates counting HTTP status codes.
+
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "host": "10.22.11.222",
+  "message": "Sent 200 in 54.2ms",
+  "status": 200
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can count the number of responses by status code:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+  
+  [[transforms.log_to_metric.metrics]]
+    type = "counter"
+    field = "status"
+    name = "response_total"
+    labels.status = "${event.status}" 
+    labels.host = "${event.host}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`metric` event][docs.metric_event] will be emitted with the following
+structure:
+
+```javascript
+{
+  "counter": {
+    "name": "response_total",
+    "val": 1.0,
+    "labels": {
+      "status": "200",
+      "host": "10.22.11.222"
+    }
+  }
+}
+```
+
+This metric will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
+be aggregates in the store itself.
+{% endtab %}
+{% tab title="Summing" %}
+In this example we'll demonstrate computing a sum. The scenario we've chosen
+is to compute the total of orders placed.
+
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "host": "10.22.11.222",
+  "message": "Order placed for $122.20",
+  "total": 122.2
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can reduce this log into a `counter` metric that increases by the
+field's value:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+  
+  [[transforms.log_to_metric.metrics]]
+    type = "counter"
+    field = "total"
+    name = "order_total"
+    increment_by_value = true
+    labels.host = "${event.host}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`metric` event][docs.metric_event] will be emitted with the following
+structure:
+
+```javascript
+{
+  "counter": {
+    "name": "order_total",
+    "val": 122.20,
+    "labels": {
+      "host": "10.22.11.222"
+    }
+  }
+}
+```
+
+This metric will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
+be aggregates in the store itself.
+{% endtab %}
+{% tab title="Gauges" %}
+In this example we'll demonstrate creating a gauge that represents the current
+CPU load verages.
+
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "host": "10.22.11.222",
+  "message": "CPU activity sample",
+  "1m_load_avg": 78.2,
+  "5m_load_avg": 56.2,
+  "15m_load_avg": 48.7
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can reduce this logs into multiple `gauge` metrics:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+  
+  [[transforms.log_to_metric.metrics]]
+    type = "gauge"
+    field = "1m_load_avg"
+    labels.host = "${event.host}"
+
+  [[transforms.log_to_metric.metrics]]
+    type = "gauge"
+    field = "5m_load_avg"
+    labels.host = "${event.host}"
+
+  [[transforms.log_to_metric.metrics]]
+    type = "gauge"
+    field = "15m_load_avg"
+    labels.host = "${event.host}"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Multiple [`metric` events][docs.metric_event] will be emitted with the following
+structure:
+
+```javascript
+[
+  {
+    "gauge": {
+      "name": "1m_load_avg",
+      "val": 78.2,
+      "labels": {
+        "host": "10.22.11.222"
+      }
+    }
+  },
+  {
+    "gauge": {
+      "name": "5m_load_avg",
+      "val": 56.2,
+      "labels": {
+        "host": "10.22.11.222"
+      }
+    }
+  },
+  {
+    "gauge": {
+      "name": "15m_load_avg",
+      "val": 48.7,
+      "labels": {
+        "host": "10.22.11.222"
+      }
+    }
+  }
+]
+```
+
+These metrics will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
+be aggregates in the store itself.
+{% endtab %}
+{% tab title="Timings" %}
+{% hint style="info" %}
+We are working on supporting timings and histograms. See
+[issue 540][url.issue_540] for more info.
+{% endtab %}
+{% endtabs %}
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+### Null Fields
+
+If the target log `field` contains a `null` value it will ignored, and a metric
+will not be emitted.
+
+### Reducing
+
+It's important to understand that this transform does not reduce multiple logs
+into a single metric. Instead, this transform converts logs into granular
+individual metrics that can then be reduced at the edge. Where the reduction
+happens depends on your metrics storage. For example, the
+[`prometheus` sink][docs.prometheus_sink] will reduce logs in the sink itself
+for the next scrape, while other metrics sinks will proceed to forward the
+individual metrics for reduction in the metrics storage itself.
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %>

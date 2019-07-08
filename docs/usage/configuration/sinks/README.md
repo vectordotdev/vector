@@ -38,23 +38,23 @@ Sinks are last in the [pipeline][docs.pipelines], responsible for sending
 [+ request a new sink][url.new_sink]
 
 
-[docs.aws_cloudwatch_logs_sink]: ../../../usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ../../../usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ../../../usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ../../../usage/configuration/sinks/blackhole.md
-[docs.console_sink]: ../../../usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ../../../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../../../about/data-model.md#event
-[docs.http_sink]: ../../../usage/configuration/sinks/http.md
-[docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.pipelines]: ../../../usage/configuration/README.md#composition
-[docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
-[docs.splunk_hec_sink]: ../../../usage/configuration/sinks/splunk_hec.md
-[docs.tcp_sink]: ../../../usage/configuration/sinks/tcp.md
-[docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
-[images.sinks]: ../../../assets/sinks.svg
+[docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
+[docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
+[docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
+[docs.console_sink]: https://docs.vector.dev/usage/configuration/sinks/console
+[docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
+[docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.pipelines]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
+[docs.splunk_hec_sink]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.tcp_sink]: https://docs.vector.dev/usage/configuration/sinks/tcp
+[docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
+[images.sinks]: https://docs.vector.dev/assets/sinks.svg
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/

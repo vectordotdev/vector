@@ -35,19 +35,22 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
-
+  
+  # REQUIRED - Requests
+  encoding = "ndjson" # enum: "ndjson", "text"
+  
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, bytes
-
+  
   # OPTIONAL - Object Names
   filename_append_uuid = true # default
+  filename_extension = "log" # default
   filename_time_format = "%s" # default
   key_prefix = "date=%F/" # default
-
+  
   # OPTIONAL - Requests
   compression = "gzip" # no default, must be: "gzip"
-  encoding = "ndjson" # no default, enum: "ndjson", "text"
   gzip = false # default
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -55,9 +58,10 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   request_timeout_secs = 30 # default, seconds
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
-
+  
   # OPTIONAL - Buffer
   [sinks.my_aws_s3_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -73,18 +77,21 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   bucket = "<string>"
   region = "<string>"
 
+  # REQUIRED - Requests
+  encoding = {"ndjson" | "text"}
+
   # OPTIONAL - Batching
   batch_size = <int>
   batch_timeout = <int>
 
   # OPTIONAL - Object Names
   filename_append_uuid = <bool>
+  filename_extension = <bool>
   filename_time_format = "<string>"
   key_prefix = "<string>"
 
   # OPTIONAL - Requests
   compression = "gzip"
-  encoding = {"ndjson" | "text"}
   gzip = <bool>
   rate_limit_duration = <int>
   rate_limit_num = <int>
@@ -135,54 +142,16 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   region = "us-east-1"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: bytes
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-
-  #
   # Requests
   #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson", "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   # The compression type to use before writing data.
   # 
@@ -190,14 +159,6 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   # * no default
   # * must be: "gzip"
   compression = "gzip"
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
@@ -247,6 +208,58 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   retry_backoff_secs = 5
 
   #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: bytes
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  # 
+  # * optional
+  # * default: "date=%F"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+
+  #
   # Buffer
   #
 
@@ -294,16 +307,18 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
+| **REQUIRED** - Requests | | |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`required` `enum: "ndjson", "text"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 300` `unit: bytes` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.<br />`default: true` |
+| `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
 | `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported.<br />`default: "%s"` |
 | `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported. <br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
 | `compression` | `string` | The compression type to use before writing data.<br />`no default` `enum: "gzip"` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`no default` `enum: "ndjson", "text"` |
 | `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth.<br />`default: false` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window.<br />`default: 5` |
@@ -312,10 +327,10 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
-| `num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
 ## Examples
 
@@ -375,8 +390,9 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 
-### Buffering, Batching, & Partitioning
+### Buffers & Batches
 
+ 
 ![][images.sink-flow-partitioned]
 
 The `aws_s3` sink buffers, batches, and
@@ -411,20 +427,6 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `300 bytes`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `10490000 bytes`).
-
-#### Partitioning
-
-Partitioning is controlled via the `bucket` and `key_prefix`
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
-
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 
 ### Compression
 
@@ -474,7 +476,21 @@ Be careful when doing this if you have multiple sinks configured, as it will
 prevent Vector from starting is one sink is unhealthy, preventing the other
 healthy sinks from receiving data.
 
-### Rate Limiting
+### Partitioning
+
+Partitioning is controlled via the `bucket` and `key_prefix`
+options and allows you to dynamically partition data. You'll notice that
+[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling dynamic partitioning. The interpolated result is effectively the
+internal batch partition key. Let's look at a few examples:
+
+| Value | Interpolation | Desc |
+|:------|:--------------|:-----|
+| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
+| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+
+### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
 downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
@@ -619,19 +635,19 @@ issue, please:
 * [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.default_schema]: ../../../about/data-model.md#default-schema
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.default_schema]: https://docs.vector.dev/about/data-model#default-schema
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.guarantees]: https://docs.vector.dev/about/guarantees
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.aws_s3_sink]: https://docs.vector.dev/assets/aws_s3-sink.svg
+[images.sink-flow-partitioned]: https://docs.vector.dev/assets/sink-flow-partitioned.svg
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [url.aws_athena]: https://aws.amazon.com/athena/
 [url.aws_athena_console]: https://console.aws.amazon.com/athena/home
@@ -639,8 +655,8 @@ issue, please:
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [url.aws_s3]: https://aws.amazon.com/s3/
 [url.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-[url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bugs%22
-[url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancements%22
+[url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22
+[url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22
 [url.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 [url.community]: https://vector.dev/community

@@ -38,7 +38,6 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "statsd"
   address = "<string>"
 ```
@@ -198,16 +197,16 @@ issue, please:
 * [**Source code**][url.statsd_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.statsd_source]: ../../../assets/statsd-source.svg
+[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.statsd_source]: https://docs.vector.dev/assets/statsd-source.svg
 [url.community]: https://vector.dev/community
 [url.new_statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_statsd%22
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bugs%22
-[url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancements%22
+[url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22
+[url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22
 [url.statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22
 [url.statsd_source_source]: https://github.com/timberio/vector/tree/master/src/sources/statsd/mod.rs

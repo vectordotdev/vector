@@ -28,13 +28,14 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
   inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   topic = "topic-1234"
-
+  
   # OPTIONAL - General
   encoding = "json" # no default, enum: "json", "text"
   key_field = "partition_key" # no default
-
+  
   # OPTIONAL - Buffer
   [sinks.my_kafka_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -165,10 +166,10 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 | `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`no default` `enum: "json", "text"` |
 | `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`no default` `example: "partition_key"` |
 | **OPTIONAL** - Buffer | | |
-| `type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
-| `num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 
 ## How It Works
 
@@ -227,21 +228,21 @@ issue, please:
 * [**Source code**][url.kafka_sink_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.kafka_sink]: ../../../assets/kafka-sink.svg
+[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.kafka_sink]: https://docs.vector.dev/assets/kafka-sink.svg
 [url.community]: https://vector.dev/community
 [url.kafka]: https://kafka.apache.org/
 [url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Bugs%22
-[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Enhancements%22
+[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Bug%22
+[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Enhancement%22
 [url.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22
 [url.kafka_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

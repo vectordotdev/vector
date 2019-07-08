@@ -28,15 +28,15 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   inputs = ["my-source-id"]
   encoding = "ndjson" # enum: "ndjson", "text"
   uri = "https://10.22.212.22:9000/endpoint"
-
+  
   # OPTIONAL - General
   compression = "gzip" # no default, must be: "gzip"
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
-
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 5 # default, bytes
-
+  
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
@@ -44,22 +44,25 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   request_timeout_secs = 30 # default, seconds
   retry_attempts = 10 # default
   retry_backoff_secs = 10 # default, seconds
-
+  
   # OPTIONAL - Basic auth
   [sinks.my_http_sink_id.basic_auth]
+    # OPTIONAL
     password = "password" # no default
     user = "username" # no default
-
+  
   # OPTIONAL - Buffer
   [sinks.my_http_sink_id.buffer]
+    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
     num_items = 500 # default
-
+  
   # OPTIONAL - Headers
   [sinks.my_http_sink_id.headers]
-    * = {name = "X-Powered-By", value = "Vector"} # no default
+    # OPTIONAL
+  X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -305,15 +308,15 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 10` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 10` `unit: seconds` |
 | **OPTIONAL** - Basic auth | | |
-| `password` | `string` | The basic authentication password.<br />`no default` `example: "password"` |
-| `user` | `string` | The basic authentication user name.<br />`no default` `example: "username"` |
+| `basic_auth.password` | `string` | The basic authentication password.<br />`no default` `example: "password"` |
+| `basic_auth.user` | `string` | The basic authentication user name.<br />`no default` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
-| `type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
-| `num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
+| `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 | **OPTIONAL** - Headers | | |
-| `*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: (see above)` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: (see above)` |
 
 ## Examples
 
@@ -337,9 +340,9 @@ Content-Length: 654
 
 ## How It Works
 
-### Buffering, Batching, & Partitioning
+### Buffers & Batches
 
-![][images.sink-flow-partitioned]
+![][images.sink-flow-serial]
 
 The `http` sink buffers, batches, and
 partitions data as shown in the diagram above. You'll notice that Vector treats
@@ -373,20 +376,6 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `5 bytes`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
-
-#### Partitioning
-
-Partitioning is controlled via the 
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
-
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 
 ### Compression
 
@@ -424,7 +413,7 @@ to this URI to determine the service's health before initializing the sink.
 This ensures that the service is reachable. You can require this check with
 the `--require-healthy` flag upon [starting][docs.starting] Vector.
 
-### Rate Limiting
+### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
 downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
@@ -482,24 +471,23 @@ issue, please:
 * [**Source code**][url.http_sink_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.http_sink]: ../../../assets/http-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.at_least_once_delivery]: https://docs.vector.dev/about/guarantees#at-least-once-delivery
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.event]: https://docs.vector.dev/about/data-model#event
+[docs.guarantees]: https://docs.vector.dev/about/guarantees
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.starting]: https://docs.vector.dev/usage/administration/starting
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.http_sink]: https://docs.vector.dev/assets/http-sink.svg
+[images.sink-flow-serial]: https://docs.vector.dev/assets/sink-flow-serial.svg
 [url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [url.community]: https://vector.dev/community
-[url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Bugs%22
-[url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancements%22
+[url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Bug%22
+[url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancement%22
 [url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22
 [url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 [url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+http
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -32,7 +32,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 [sinks.my_vector_source_id]
   # REQUIRED
   type = "vector" # must be: "vector"
-
+  
   # OPTIONAL
   address = "0.0.0.0:9000" # no default
   shutdown_timeout_secs = 30 # default, seconds
@@ -41,10 +41,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "vector"
-
-  # OPTIONAL
   address = "<string>"
   shutdown_timeout_secs = <int>
 ```
@@ -128,16 +125,16 @@ issue, please:
 * [**Source code**][url.vector_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.vector_source]: ../../../assets/vector-source.svg
+[docs.best_effort_delivery]: https://docs.vector.dev/about/guarantees#best-effort-delivery
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.vector_source]: https://docs.vector.dev/assets/vector-source.svg
 [url.community]: https://vector.dev/community
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.new_vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_vector%22
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bugs%22
-[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancements%22
+[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22
+[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22
 [url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22
 [url.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

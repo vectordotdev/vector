@@ -17,7 +17,7 @@ require 'net/http'
 #
 # 1. `docs` - signals an internal documentation link.
 # 2. `url` - signals an external URL.
-# 3. `imagea` - signals a link to an image asset.
+# 3. `images` - signals a link to an image asset.
 #
 # == Statically defined linked
 #
@@ -26,7 +26,7 @@ require 'net/http'
 #
 # == Dynamically defined linked
 #
-# To reduce the burder of having to manually define every link this class
+# To reduce the burden of having to manually define every link this class
 # implement dynamic readers:
 #
 # === /^docs\.(.*)_(sink|source|transform)$/
@@ -263,7 +263,7 @@ class Links
       when /^url\.(.*)_(sink|source|transform)_(bugs|enhancements)$/
         name = $1
         type = $2
-        issue_type = $3
+        issue_type = $3.singularize
         query = "is:open is:issue label:\"#{type.titleize}: #{name}\" label:\"Type: #{issue_type.titleize}\""
         VECTOR_ISSUES_ROOT + "?" + {"q" => query}.to_query
 

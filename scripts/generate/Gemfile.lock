@@ -8,6 +8,7 @@ GEM
       tzinfo (~> 1.1)
     citrus (3.0.2)
     concurrent-ruby (1.1.5)
+    differ (0.1.2)
     front_matter_parser (0.2.1)
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
@@ -26,6 +27,7 @@ PLATFORMS
 
 DEPENDENCIES
   activesupport
+  differ
   front_matter_parser
   paint
   toml-rb

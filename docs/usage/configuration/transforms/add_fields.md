@@ -26,10 +26,18 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
   # REQUIRED - General
   type = "add_fields" # must be: "add_fields"
   inputs = ["my-source-id"]
-
+  
   # REQUIRED - Fields
   [sinks.my_add_fields_transform_id.fields]
-    * = {name = "my_string_field", value = "string value"} # no default
+    # OPTIONAL
+  my_string_field = "string value"
+  my_env_var_field = "${ENV_VAR}"
+  my_int_field = 1
+  my_float_field = 1.2
+  my_bool_field = true
+  my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+  my_nested_fields = {key1 = "value1", key2 = "value2"}
+  my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -95,7 +103,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
 
 ## Examples
 
@@ -239,21 +247,21 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration]: ../../../usage/configuration
-[docs.data_model]: ../../../about/data-model.md
-[docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.add_fields_transform]: ../../../assets/add_fields-transform.svg
-[url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Bugs%22
-[url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancements%22
+[docs.config_composition]: https://docs.vector.dev/usage/configuration/README#composition
+[docs.config_value_types]: https://docs.vector.dev/usage/configuration/README#value-types
+[docs.configuration]: https://docs.vector.dev/usage/configuration
+[docs.data_model]: https://docs.vector.dev/about/data-model
+[docs.event_key_special_characters]: https://docs.vector.dev/about/data-model#special-characters
+[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
+[docs.monitoring_logs]: https://docs.vector.dev/usage/administration/monitoring#logs
+[docs.remove_fields_transform]: https://docs.vector.dev/usage/configuration/transforms/remove_fields
+[docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.troubleshooting]: https://docs.vector.dev/usage/guides/troubleshooting
+[images.add_fields_transform]: https://docs.vector.dev/assets/add_fields-transform.svg
+[url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Bug%22
+[url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancement%22
 [url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22
 [url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
 [url.community]: https://vector.dev/community
