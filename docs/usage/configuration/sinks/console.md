@@ -1,3 +1,5 @@
+
+
 ---
 description: Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
 ---
@@ -21,7 +23,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_console_sink_id]
   # REQUIRED - General
   type = "console" # must be: "console"
@@ -40,7 +42,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "console"
@@ -59,7 +61,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.console]
   #
   # General
@@ -205,23 +207,3 @@ issue, please:
 
 * [**Issues**][url.console_sink_issues] - [enhancements][url.console_sink_enhancements] - [bugs][url.console_sink_bugs]
 * [**Source code**][url.console_sink_source]
-
-
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.console_sink]: ../../../assets/console-sink.svg
-[url.community]: https://vector.dev/community
-[url.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22+label%3A%22Type%3A+Bugs%22
-[url.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22+label%3A%22Type%3A+Enhancements%22
-[url.console_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22
-[url.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

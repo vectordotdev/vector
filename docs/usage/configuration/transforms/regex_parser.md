@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to parse a field's value with a Regular Expression.
 ---
@@ -21,7 +23,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_regex_parser_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
@@ -39,7 +41,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "regex_parser"
@@ -57,7 +59,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.regex_parser]
   #
   # General
@@ -304,28 +306,3 @@ Finally, consider the following alternatives:
 * [**Source code**][url.regex_parser_transform_source]
 * [**Regex Tester**][url.regex_tester]
 * [**Rust Regex Syntax**][url.rust_regex_syntax]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../../performance.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
-[url.community]: https://vector.dev/community
-[url.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[url.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
-[url.regex_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22+label%3A%22Type%3A+Bugs%22
-[url.regex_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22+label%3A%22Type%3A+Enhancements%22
-[url.regex_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22
-[url.regex_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
-[url.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
-[url.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
-[url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

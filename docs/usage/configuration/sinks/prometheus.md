@@ -1,3 +1,5 @@
+
+
 ---
 description: Pulls `metric` events to Prometheus metrics service.
 ---
@@ -28,7 +30,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_prometheus_sink_id]
   # REQUIRED - General
   type = "prometheus" # must be: "prometheus"
@@ -46,7 +48,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "prometheus"
@@ -64,7 +66,7 @@ The `prometheus` sink pulls [`metric`][docs.metric_event] events to [Prometheus]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.prometheus]
   #
   # General
@@ -188,23 +190,3 @@ issue, please:
 
 * [**Issues**][url.prometheus_sink_issues] - [enhancements][url.prometheus_sink_enhancements] - [bugs][url.prometheus_sink_bugs]
 * [**Source code**][url.prometheus_sink_source]
-
-
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.prometheus_sink]: ../../../assets/prometheus-sink.svg
-[url.community]: https://vector.dev/community
-[url.new_prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_prometheus%22
-[url.prometheus]: https://prometheus.io/
-[url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Bugs%22
-[url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Enhancements%22
-[url.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22
-[url.prometheus_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

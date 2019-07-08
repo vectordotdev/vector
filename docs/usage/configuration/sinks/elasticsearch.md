@@ -1,3 +1,5 @@
+
+
 ---
 description: Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 ---
@@ -28,7 +30,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_elasticsearch_sink_id]
   # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
@@ -60,7 +62,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "elasticsearch"
@@ -92,7 +94,7 @@ The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.elasticsearch]
   #
   # General
@@ -410,28 +412,3 @@ issue, please:
 
 * [**Issues**][url.elasticsearch_sink_issues] - [enhancements][url.elasticsearch_sink_enhancements] - [bugs][url.elasticsearch_sink_bugs]
 * [**Source code**][url.elasticsearch_sink_source]
-
-
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.data_model]: ../../../about/data-model.md
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.community]: https://vector.dev/community
-[url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bugs%22
-[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancements%22
-[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
-[url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+elasticsearch
-[url.new_elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_elasticsearch%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
 ---
@@ -21,7 +23,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_tokenizer_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
@@ -38,7 +40,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "tokenizer"
@@ -55,7 +57,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.tokenizer]
   #
   # General
@@ -229,22 +231,3 @@ Finally, consider the following alternatives:
 
 * [**Issues**][url.tokenizer_transform_issues] - [enhancements][url.tokenizer_transform_enhancements] - [bugs][url.tokenizer_transform_bugs]
 * [**Source code**][url.tokenizer_transform_source]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
-[url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.tokenizer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Bugs%22
-[url.tokenizer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Enhancements%22
-[url.tokenizer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22
-[url.tokenizer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs

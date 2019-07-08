@@ -25,7 +25,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
 {% code-tabs %}
 {% code-tabs-item title="/etc/vector/vector.spec.toml" %}
-```coffeescript
+```toml
 <!--
      THIS FILE IS AUTOOGENERATED!
 
@@ -2292,6 +2292,3 @@ end
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-
-

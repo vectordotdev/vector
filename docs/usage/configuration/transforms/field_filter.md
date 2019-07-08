@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` and `metric` events and allows you to filter events by a field's value.
 ---
@@ -28,7 +30,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_field_filter_transform_id]
   # REQUIRED
   type = "field_filter" # must be: "field_filter"
@@ -38,7 +40,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "field_filter"
@@ -48,7 +50,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.field_filter]
   #
   # General
@@ -124,21 +126,3 @@ issue, please:
 
 * [**Issues**][url.field_filter_transform_issues] - [enhancements][url.field_filter_transform_enhancements] - [bugs][url.field_filter_transform_bugs]
 * [**Source code**][url.field_filter_transform_source]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.field_filter_transform]: ../../../assets/field_filter-transform.svg
-[url.community]: https://vector.dev/community
-[url.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bugs%22
-[url.field_filter_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancements%22
-[url.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22
-[url.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
-[url.issue_479]: https://github.com/timberio/vector/issues/479
-[url.new_field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_field_filter%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

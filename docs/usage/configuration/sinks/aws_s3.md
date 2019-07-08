@@ -1,3 +1,5 @@
+
+
 ---
 description: Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 ---
@@ -28,7 +30,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_aws_s3_sink_id]
   # REQUIRED - General
   type = "aws_s3" # must be: "aws_s3"
@@ -65,7 +67,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "aws_s3"
@@ -102,7 +104,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.aws_s3]
   #
   # General
@@ -617,37 +619,3 @@ issue, please:
 * [**Issues**][url.aws_s3_sink_issues] - [enhancements][url.aws_s3_sink_enhancements] - [bugs][url.aws_s3_sink_bugs]
 * [**Source code**][url.aws_s3_sink_source]
 * [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
-
-
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.default_schema]: ../../../about/data-model.md#default-schema
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[url.aws_athena]: https://aws.amazon.com/athena/
-[url.aws_athena_console]: https://console.aws.amazon.com/athena/home
-[url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
-[url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[url.aws_s3]: https://aws.amazon.com/s3/
-[url.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-[url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bugs%22
-[url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancements%22
-[url.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22
-[url.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-[url.community]: https://vector.dev/community
-[url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_s3
-[url.new_aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_aws_s3%22
-[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)

@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to add one or more fields.
 ---
@@ -21,7 +23,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_add_fields_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: "add_fields"
@@ -33,7 +35,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "add_fields"
@@ -45,7 +47,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.add_fields]
   #
   # General
@@ -237,26 +239,3 @@ Finally, consider the following alternatives:
 
 * [**Issues**][url.add_fields_transform_issues] - [enhancements][url.add_fields_transform_enhancements] - [bugs][url.add_fields_transform_bugs]
 * [**Source code**][url.add_fields_transform_source]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration]: ../../../usage/configuration
-[docs.data_model]: ../../../about/data-model.md
-[docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.add_fields_transform]: ../../../assets/add_fields-transform.svg
-[url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Bugs%22
-[url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancements%22
-[url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22
-[url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
-[url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.toml_array]: https://github.com/toml-lang/toml#array
-[url.toml_table]: https://github.com/toml-lang/toml#table

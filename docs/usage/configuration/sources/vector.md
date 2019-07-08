@@ -1,3 +1,5 @@
+
+
 ---
 description: Ingests data through another upstream Vector instance and outputs `log` events.
 ---
@@ -28,7 +30,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_vector_source_id]
   # REQUIRED
   type = "vector" # must be: "vector"
@@ -39,7 +41,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "vector"
@@ -50,7 +52,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.vector]
   #
   # General
@@ -126,18 +128,3 @@ issue, please:
 
 * [**Issues**][url.vector_source_issues] - [enhancements][url.vector_source_enhancements] - [bugs][url.vector_source_bugs]
 * [**Source code**][url.vector_source_source]
-
-
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.vector_source]: ../../../assets/vector-source.svg
-[url.community]: https://vector.dev/community
-[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.new_vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_vector%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bugs%22
-[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancements%22
-[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22
-[url.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

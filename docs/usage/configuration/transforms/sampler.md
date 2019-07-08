@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to sample events with a configurable rate.
 ---
@@ -28,7 +30,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_sampler_transform_id]
   # REQUIRED
   type = "sampler" # must be: "sampler"
@@ -40,7 +42,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "sampler"
@@ -52,7 +54,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.sampler]
   #
   # General
@@ -122,19 +124,3 @@ issue, please:
 
 * [**Issues**][url.sampler_transform_issues] - [enhancements][url.sampler_transform_enhancements] - [bugs][url.sampler_transform_bugs]
 * [**Source code**][url.sampler_transform_source]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.sampler_transform]: ../../../assets/sampler-transform.svg
-[url.community]: https://vector.dev/community
-[url.new_sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_sampler%22
-[url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bugs%22
-[url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancements%22
-[url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22
-[url.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

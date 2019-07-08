@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` and `metric` events and allows you to remove one or more event fields.
 ---
@@ -21,7 +23,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_remove_fields_transform_id]
   # REQUIRED
   type = "remove_fields" # must be: "remove_fields"
@@ -30,7 +32,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "remove_fields"
@@ -39,7 +41,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.remove_fields]
   #
   # General
@@ -107,20 +109,3 @@ Finally, consider the following alternatives:
 
 * [**Issues**][url.remove_fields_transform_issues] - [enhancements][url.remove_fields_transform_enhancements] - [bugs][url.remove_fields_transform_bugs]
 * [**Source code**][url.remove_fields_transform_source]
-
-
-[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.remove_fields_transform]: ../../../assets/remove_fields-transform.svg
-[url.community]: https://vector.dev/community
-[url.remove_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Bugs%22
-[url.remove_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Enhancements%22
-[url.remove_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22
-[url.remove_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/remove_fields.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

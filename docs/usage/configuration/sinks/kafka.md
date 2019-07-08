@@ -1,3 +1,5 @@
+
+
 ---
 description: Streams `log` events to Apache Kafka via the Kafka protocol.
 ---
@@ -21,7 +23,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_kafka_sink_id]
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
@@ -42,7 +44,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "kafka"
@@ -63,7 +65,7 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.kafka]
   #
   # General
@@ -225,23 +227,3 @@ issue, please:
 
 * [**Issues**][url.kafka_sink_issues] - [enhancements][url.kafka_sink_enhancements] - [bugs][url.kafka_sink_bugs]
 * [**Source code**][url.kafka_sink_source]
-
-
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.kafka_sink]: ../../../assets/kafka-sink.svg
-[url.community]: https://vector.dev/community
-[url.kafka]: https://kafka.apache.org/
-[url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Bugs%22
-[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Enhancements%22
-[url.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22
-[url.kafka_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

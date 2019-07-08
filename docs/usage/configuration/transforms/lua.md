@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to transform events with a full embedded Lua engine.
 ---
@@ -28,7 +30,7 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_lua_transform_id]
   # REQUIRED
   type = "lua" # must be: "lua"
@@ -51,7 +53,7 @@ end
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "lua"
@@ -63,7 +65,7 @@ end
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.lua]
   #
   # General
@@ -304,30 +306,3 @@ Finally, consider the following alternatives:
 * [**Issues**][url.lua_transform_issues] - [enhancements][url.lua_transform_enhancements] - [bugs][url.lua_transform_bugs]
 * [**Source code**][url.lua_transform_source]
 * [**Lua Reference Manual**][url.lua_manual]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.data_model]: ../../../about/data-model.md
-[docs.default_schema]: ../../../about/data-model.md#default-schema
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.lua_transform]: ../../../assets/lua-transform.svg
-[url.community]: https://vector.dev/community
-[url.lua]: https://www.lua.org/
-[url.lua_docs]: https://www.lua.org/manual/5.3/
-[url.lua_manual]: http://www.lua.org/manual/5.1/manual.html
-[url.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
-[url.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
-[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bugs%22
-[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancements%22
-[url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
-[url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
-[url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
-[url.new_lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_lua%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

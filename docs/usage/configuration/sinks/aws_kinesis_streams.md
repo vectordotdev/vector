@@ -1,3 +1,5 @@
+
+
 ---
 description: Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 ---
@@ -28,7 +30,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_aws_kinesis_streams_sink_id]
   # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
@@ -58,7 +60,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "aws_kinesis_streams"
@@ -88,7 +90,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.aws_kinesis_streams]
   #
   # General
@@ -443,33 +445,3 @@ issue, please:
 * [**Issues**][url.aws_kinesis_streams_sink_issues] - [enhancements][url.aws_kinesis_streams_sink_enhancements] - [bugs][url.aws_kinesis_streams_sink_bugs]
 * [**Source code**][url.aws_kinesis_streams_sink_source]
 * [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
-
-
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.event]: ../../../about/data-model.md#event
-[docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.aws_kinesis_streams_sink]: ../../../assets/aws_kinesis_streams-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
-[url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
-[url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-[url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
-[url.aws_kinesis_streams_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bugs%22
-[url.aws_kinesis_streams_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancements%22
-[url.aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22
-[url.aws_kinesis_streams_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
-[url.community]: https://vector.dev/community
-[url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_kinesis_streams
-[url.new_aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_aws_kinesis_streams%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

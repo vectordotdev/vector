@@ -1,3 +1,5 @@
+
+
 ---
 description: Accepts `log` events and allows you to parse a field value with Grok.
 ---
@@ -21,7 +23,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_grok_parser_transform_id]
   # REQUIRED
   type = "grok_parser" # must be: "grok_parser"
@@ -34,7 +36,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED
   type = "grok_parser"
@@ -47,7 +49,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.grok_parser]
   #
   # General
@@ -154,26 +156,3 @@ Finally, consider the following alternatives:
 * [**Source code**][url.grok_parser_transform_source]
 * [**Grok Debugger**][url.grok_debugger]
 * [**Grok Patterns**][url.grok_patterns]
-
-
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../../performance.md
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
-[url.community]: https://vector.dev/community
-[url.grok]: http://grokdebug.herokuapp.com/
-[url.grok_debugger]: http://grokdebug.herokuapp.com/
-[url.grok_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Bugs%22
-[url.grok_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Enhancements%22
-[url.grok_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22
-[url.grok_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
-[url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
-[url.rust_grok_library]: https://github.com/daschl/grok
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

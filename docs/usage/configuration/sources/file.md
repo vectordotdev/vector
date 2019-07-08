@@ -1,3 +1,5 @@
+
+
 ---
 description: Ingests data through one or more local files and outputs `log` events.
 ---
@@ -28,7 +30,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
-```coffeescript
+```toml
 [sinks.my_file_source_id]
   # REQUIRED - General
   type = "file" # must be: "file"
@@ -46,7 +48,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
+```toml
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "file"
@@ -64,7 +66,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
+```toml
 [sinks.file]
   #
   # General
@@ -262,22 +264,3 @@ issue, please:
 
 * [**Issues**][url.file_source_issues] - [enhancements][url.file_source_enhancements] - [bugs][url.file_source_bugs]
 * [**Source code**][url.file_source_source]
-
-
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms
-[docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.file_source]: ../../../assets/file-source.svg
-[url.community]: https://vector.dev/community
-[url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
-[url.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bugs%22
-[url.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancements%22
-[url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22
-[url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
-[url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
-[url.new_file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_file%22
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
