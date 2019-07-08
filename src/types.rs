@@ -87,6 +87,9 @@ impl Conversion {
     /// `value` is not currently a `ValueKind::Bytes`.
     pub fn convert(&self, value: ValueKind) -> Result<ValueKind, String> {
         let bytes = value.as_bytes();
+        if bytes == "-" {
+            return Ok(ValueKind::Bytes("nil".into()));
+        }
         match self {
             Conversion::Bytes => Ok(value),
             Conversion::Integer => String::from_utf8_lossy(&bytes)

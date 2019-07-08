@@ -116,10 +116,11 @@ pub fn parse(input: &str) -> Vec<&str> {
         escaped(is_not("]\\"), '\\', one_of("]\\")),
         tag("]"),
     );
+    let dash = tag("-");
 
     // fall back to returning the rest of the input, if any
     let remainder = verify(rest, |s: &str| s.len() > 0);
-    let field = alt((bracket, string, simple, remainder));
+    let field = alt((dash, bracket, string, simple, remainder));
 
     all_consuming(many0(terminated(field, space0)))(input)
         .expect("parser should always succeed")
@@ -192,6 +193,11 @@ mod tests {
             &["foo", "bar", "baz", ":", "quux"]
         );
         assert_eq!(parse("foo bar[baz quux"), &["foo", "bar", "[baz quux"]);
+    }
+
+    #[test]
+    fn dash_field() {
+        assert_eq!(parse("foo - bar"), &["foo", "-", "bar"]);
     }
 
     #[test]
@@ -268,5 +274,19 @@ mod tests {
         assert_eq!(log[&"flag".into()], ValueKind::Boolean(true));
         assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
         assert_eq!(log[&"rest".into()], ValueKind::Bytes("word".into()));
+    }
+
+    #[test]
+    fn tokenizer_keeps_dash_as_nil() {
+        let log = parse_log(
+            "1234 - foo",
+            "code who why",
+            None,
+            false,
+            &[("code", "integer"), ("who", "string"), ("why", "string")],
+        );
+        assert_eq!(log[&"code".into()], ValueKind::Integer(1234));
+        assert_eq!(log[&"who".into()], ValueKind::Bytes("nil".into()));
+        assert_eq!(log[&"why".into()], ValueKind::Bytes("foo".into()));
     }
 }
