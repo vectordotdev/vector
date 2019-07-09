@@ -109,15 +109,5 @@ class BatchingSink < Sink
       "type" => "int",
       "unit" => "seconds"
     })
-
-    # Common options - Buffer
-
-    # @options.buffer.* = Option.new({
-    #   "category" => "Requests",
-    #   "default" => @retry_attempts,
-    #   "description" => "A table that configures the sink specific buffer. See the [`*.buffer` document][sink_buffers].",
-    #   "null" => false,
-    #   "type" => "table"
-    # })
   end
 end

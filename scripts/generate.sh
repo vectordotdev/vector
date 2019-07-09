@@ -29,6 +29,7 @@ require_relative "generate/core_ext/object"
 require_relative "generate/core_ext/string"
 require_relative "generate/post_processors/component_presence_checker"
 require_relative "generate/post_processors/link_checker"
+require_relative "generate/post_processors/option_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/post_processors/toml_syntax_switcher"
 
@@ -38,7 +39,7 @@ require_relative "generate/post_processors/toml_syntax_switcher"
 
 def post_process(content, doc, links)
   content = PostProcessors::SectionSorter.sort!(content)
-  #content = PostProcessors::OptionReferencer.reference!(content)
+  content = PostProcessors::OptionReferencer.reference!(content)
   content = PostProcessors::LinkChecker.check!(content, doc, links)
   content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content
@@ -46,7 +47,7 @@ end
 
 def render(template, context)
   content = File.read(template)
-  renderer = ERB.new(content)
+  renderer = ERB.new(content, nil, '-')
   content = renderer.result(context.get_binding).lstrip.strip
 
   if template.end_with?(".md.erb")
@@ -146,8 +147,8 @@ docs.each do |doc|
   if content.include?("THIS FILE IS AUTOOGENERATED")
     say("Skipped - #{doc}", :blue)
   else
-    post_process(content, doc, metadata.links)
-    say("Processed - #{doc}", :green)
+    content = post_process(content, doc, metadata.links)
     File.write(doc, content)
+    say("Processed - #{doc}", :green)
   end
 end

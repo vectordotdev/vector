@@ -23,12 +23,10 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_grok_parser_transform_id]
-  # REQUIRED
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
   
-  # OPTIONAL
   drop_field = true # default
   field = "message" # default
 ```
@@ -41,46 +39,6 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   pattern = "<string>"
   drop_field = <bool>
   field = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.grok_parser]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "grok_parser"
-  type = "grok_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The Grok pattern
-  # 
-  # * required
-  # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  # If `true` will drop the `field` after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The field to execute the `pattern` against. Must be a `string` value.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

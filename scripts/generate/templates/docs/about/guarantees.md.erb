@@ -18,17 +18,17 @@ and [source][docs.sources].
 
 | Name | Description |
 | :--- | :---------- |
-<% metadata.sources.to_h.values.sort.each do |source| %>
+<%- metadata.sources.to_h.values.sort.each do |source| -%>
 | [`<%= source.name %>` source][docs.<%= source.id %>] | `<%= source.delivery_guarantee %>` |
-<% end %>
+<%- end -%>
 
 ### Sinks
 
 | Name | Description |
 | :--- | :---------- |
-<% metadata.sinks.to_h.values.sort.each do |sink| %>
+<%- metadata.sinks.to_h.values.sort.each do |sink| -%>
 | [`<%= sink.name %>` sink][docs.<%= sink.id %>] | `<%= sink.delivery_guarantee %>` |
-<% end %>
+<%- end -%>
 
 ## At Least Once Delivery
 
@@ -52,9 +52,9 @@ One of the unique advantages of the logging use case is that data is usually
 used for diagnostic purposes only. Therefore, losing the occassional event
 has little impact on your business. This affords you the opportunity to
 provision your pipeline towards performance, simplicity, and cost reduction.
-
-On the hand, if you're using your data to perform business critical functions,
-then data loss is not acceptable and therefore requires "at least once" deliery.
+On the other hand, if you're using your data to perform business critical
+functions, then data loss is not acceptable and therefore requires "at least
+once" deliery.
 
 To clarify, even though a source or sink is marked as "best effort" it does
 not mean Vector takes delivery lightly. In fact, once data is within the

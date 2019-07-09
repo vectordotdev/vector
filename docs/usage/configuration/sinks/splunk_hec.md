@@ -26,17 +26,15 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
-  
-  # OPTIONAL - General
-  host = "my-splunk-host.com" # no default
-  token = "A94A8FE5CCB19BA61C4C08" # no default
+  host = "my-splunk-host.com"
+  token = "A94A8FE5CCB19BA61C4C08"
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, bytes
   
   # OPTIONAL - Requests
-  encoding = "ndjson" # no default, enum: "ndjson", "text"
+  encoding = "ndjson" # default, enum: "ndjson", "text"
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
   request_in_flight_limit = 10 # default
@@ -46,7 +44,6 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
   
   # OPTIONAL - Buffer
   [sinks.my_splunk_hec_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -59,8 +56,6 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
   # REQUIRED - General
   type = "splunk_hec"
   inputs = ["<string>", ...]
-
-  # OPTIONAL - General
   host = "<string>"
   token = "<string>"
 
@@ -85,146 +80,6 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
     num_items = <int>
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.splunk_hec]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "splunk_hec"
-  type = "splunk_hec"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # Your Splunk HEC host.
-  # 
-  # * optional
-  # * no default
-  host = "my-splunk-host.com"
-
-  # Your Splunk HEC token.
-  # 
-  # * optional
-  # * no default
-  token = "A94A8FE5CCB19BA61C4C08"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: bytes
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 10
-  rate_limit_num = 10
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 10
-  request_in_flight_limit = 10
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 60
-  # * unit: seconds
-  request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Buffer
-  #
-
-  [sinks.splunk_hec.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -234,20 +89,19 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "splunk_hec"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - General | | |
-| `host` | `string` | Your Splunk HEC host.<br />`no default` `example: "my-splunk-host.com"` |
-| `token` | `string` | Your Splunk HEC token.<br />`no default` `example: "A94A8FE5CCB19BA61C4C08"` |
+| `host` | `string` | Your Splunk HEC host.<br />`required` `example: "my-splunk-host.com"` |
+| `token` | `string` | Your Splunk HEC token.<br />`required` `example: "A94A8FE5CCB19BA61C4C08"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`no default` `enum: "ndjson", "text"` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window.<br />`default: 10` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time.<br />`default: 10` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted.<br />`default: 60` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 5` `unit: seconds` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "ndjson", "text"` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |

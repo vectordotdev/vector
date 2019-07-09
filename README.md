@@ -147,7 +147,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`elasticsearch`**][docs.elasticsearch_sink] | Batches [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | Batches [`log`][docs.log_event] events to a generic HTTP endpoint. |
 | [**`kafka`**][docs.kafka_sink] | Streams [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
-| [**`prometheus`**][docs.prometheus_sink] | Pulls [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
+| [**`prometheus`**][docs.prometheus_sink] | Exposes [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.splunk_hec_sink] | Batches [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec]. |
 | [**`tcp`**][docs.tcp_sink] | Streams [`log`][docs.log_event] events to a TCP connection. |
 | [**`vector`**][docs.vector_sink] | Streams [`log`][docs.log_event] events to another downstream Vector instance. |

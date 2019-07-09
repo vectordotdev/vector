@@ -30,7 +30,6 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
   
   # OPTIONAL - Buffer
   [sinks.my_blackhole_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -51,71 +50,6 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.blackhole]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "blackhole"
-  type = "blackhole"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The number of events that must be received in order to print a summary of
-  # activity.
-  # 
-  # * required
-  # * no default
-  print_amount = "1000"
-
-  #
-  # Buffer
-  #
-
-  [sinks.blackhole.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

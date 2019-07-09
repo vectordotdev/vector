@@ -25,9 +25,9 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 [sinks.my_tcp_source_id]
   # REQUIRED - General
   type = "tcp" # must be: "tcp"
+  address = "0.0.0.0:9000"
   
   # OPTIONAL - General
-  address = "0.0.0.0:9000" # no default
   max_length = 102400 # default, bytes
   shutdown_timeout_secs = 30 # default, seconds
   
@@ -40,59 +40,14 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "tcp"
+  address = "<string>"
 
   # OPTIONAL - General
-  address = "<string>"
   max_length = <int>
   shutdown_timeout_secs = <int>
 
   # OPTIONAL - Context
   host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.tcp]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tcp"
-  type = "tcp"
-
-  # The address to bind the socket to.
-  # 
-  # * optional
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -103,8 +58,8 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "tcp"` |
+| `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
 | **OPTIONAL** - General | | |
-| `address` | `string` | The address to bind the socket to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 | **OPTIONAL** - Context | | |

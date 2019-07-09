@@ -26,49 +26,29 @@ and [source][docs.sources].
 
 | Name | Description |
 | :--- | :---------- |
-
 | [`file` source][docs.file_source] | `best_effort` |
-
 | [`statsd` source][docs.statsd_source] | `best_effort` |
-
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
-
 | [`syslog` source][docs.syslog_source] | `best_effort` |
-
 | [`tcp` source][docs.tcp_source] | `best_effort` |
-
 | [`vector` source][docs.vector_source] | `best_effort` |
-
 
 ### Sinks
 
 | Name | Description |
 | :--- | :---------- |
-
 | [`aws_cloudwatch_logs` sink][docs.aws_cloudwatch_logs_sink] | `at_least_once` |
-
 | [`aws_kinesis_streams` sink][docs.aws_kinesis_streams_sink] | `at_least_once` |
-
 | [`aws_s3` sink][docs.aws_s3_sink] | `at_least_once` |
-
 | [`blackhole` sink][docs.blackhole_sink] | `best_effort` |
-
 | [`console` sink][docs.console_sink] | `best_effort` |
-
 | [`elasticsearch` sink][docs.elasticsearch_sink] | `best_effort` |
-
 | [`http` sink][docs.http_sink] | `at_least_once` |
-
 | [`kafka` sink][docs.kafka_sink] | `at_least_once` |
-
 | [`prometheus` sink][docs.prometheus_sink] | `at_least_once` |
-
 | [`splunk_hec` sink][docs.splunk_hec_sink] | `at_least_once` |
-
 | [`tcp` sink][docs.tcp_sink] | `best_effort` |
-
 | [`vector` sink][docs.vector_sink] | `best_effort` |
-
 
 ## At Least Once Delivery
 
@@ -92,9 +72,9 @@ One of the unique advantages of the logging use case is that data is usually
 used for diagnostic purposes only. Therefore, losing the occassional event
 has little impact on your business. This affords you the opportunity to
 provision your pipeline towards performance, simplicity, and cost reduction.
-
-On the hand, if you're using your data to perform business critical functions,
-then data loss is not acceptable and therefore requires "at least once" deliery.
+On the other hand, if you're using your data to perform business critical
+functions, then data loss is not acceptable and therefore requires "at least
+once" deliery.
 
 To clarify, even though a source or sink is marked as "best effort" it does
 not mean Vector takes delivery lightly. In fact, once data is within the

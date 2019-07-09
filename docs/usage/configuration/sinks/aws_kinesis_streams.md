@@ -41,7 +41,7 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
   batch_timeout = 1 # default, bytes
   
   # OPTIONAL - Requests
-  encoding = "json" # no default, enum: "json", "text"
+  encoding = "json" # default, enum: "json", "text"
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
@@ -51,7 +51,6 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
   
   # OPTIONAL - Buffer
   [sinks.my_aws_kinesis_streams_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -88,146 +87,6 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
     num_items = <int>
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.aws_kinesis_streams]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_kinesis_streams"
-  type = "aws_kinesis_streams"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The AWS region of the target CloudWatch Logs stream resides.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  # The stream name of the target CloudWatch Logs stream.
-  # 
-  # * required
-  # * no default
-  stream_name = "my-stream"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: bytes
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json", "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Buffer
-  #
-
-  [sinks.aws_kinesis_streams.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -240,16 +99,16 @@ The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Ki
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`no default` `enum: "json", "text"` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 5` `unit: seconds` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json", "text"` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
@@ -429,7 +288,7 @@ issue, please:
 
 * [**Issues**][url.aws_kinesis_streams_sink_issues] - [enhancements][url.aws_kinesis_streams_sink_enhancements] - [bugs][url.aws_kinesis_streams_sink_bugs]
 * [**Source code**][url.aws_kinesis_streams_sink_source]
-* [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
+* [**Service Limits**][url.aws_kinesis_service_limits]
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
@@ -450,6 +309,7 @@ issue, please:
 [url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
+[url.aws_kinesis_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 [url.aws_kinesis_streams_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bug%22
 [url.aws_kinesis_streams_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22

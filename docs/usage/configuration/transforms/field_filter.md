@@ -30,7 +30,6 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_field_filter_transform_id]
-  # REQUIRED
   type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"
@@ -44,41 +43,6 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
   inputs = ["<string>", ...]
   field = "<string>"
   value = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.field_filter]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "field_filter"
-  type = "field_filter"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The target field to compare against the `value`.
-  # 
-  # * required
-  # * no default
-  field = "file"
-
-  # If the value of the specified `field` matches this value then the event will
-  # be permitted, otherwise it is dropped.
-  # 
-  # * required
-  # * no default
-  value = "/var/log/nginx.log"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

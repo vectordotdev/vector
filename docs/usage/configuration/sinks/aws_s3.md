@@ -50,7 +50,7 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   key_prefix = "date=%F/" # default
   
   # OPTIONAL - Requests
-  compression = "gzip" # no default, must be: "gzip"
+  compression = "gzip" # no default, must be: "gzip" (if supplied)
   gzip = false # default
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -61,7 +61,6 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
   
   # OPTIONAL - Buffer
   [sinks.my_aws_s3_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -108,194 +107,6 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
     num_items = <int>
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.aws_s3]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_s3"
-  type = "aws_s3"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-  # 
-  # * required
-  # * no default
-  bucket = "my-bucket"
-
-  # The AWS region of the target S3 bucket.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The compression type to use before writing data.
-  # 
-  # * optional
-  # * no default
-  # * must be: "gzip"
-  compression = "gzip"
-
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: bytes
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The extension to use in the object name.
-  # 
-  # * optional
-  # * default: "log"
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-
-  #
-  # Buffer
-  #
-
-  [sinks.aws_s3.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -305,27 +116,27 @@ The `aws_s3` sink batches [`log`][docs.log_event] events to [AWS S3][url.aws_s3]
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "aws_s3"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
+| `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`. See [Partitioning](#partitioning) for more info.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
 | **REQUIRED** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 300` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: bytes` |
 | **OPTIONAL** - Object Names | | |
-| `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases.<br />`default: true` |
+| `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
-| `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported.<br />`default: "%s"` |
-| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported. <br />`default: "date=%F"` |
+| `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
+| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) and [Partitioning](#partitioning) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
-| `compression` | `string` | The compression type to use before writing data.<br />`no default` `enum: "gzip"` |
-| `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth.<br />`default: false` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 5` `unit: seconds` |
+| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
@@ -442,9 +253,7 @@ type is described in more detail below:
 
 | Compression | Description |
 | :---------- | :---------- |
-
-| `gzip` |  |
-
+| `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
@@ -623,7 +432,7 @@ issue, please:
 
 * [**Issues**][url.aws_s3_sink_issues] - [enhancements][url.aws_s3_sink_enhancements] - [bugs][url.aws_s3_sink_bugs]
 * [**Source code**][url.aws_s3_sink_source]
-* [**Service Limits**][url.https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html]
+* [**Service Limits**][url.aws_s3_service_limits]
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
@@ -645,11 +454,13 @@ issue, please:
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [url.aws_s3]: https://aws.amazon.com/s3/
 [url.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+[url.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 [url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Bug%22
 [url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22
 [url.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
 [url.community]: https://vector.dev/community
+[url.gzip]: https://www.gzip.org/
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_s3
 [url.new_aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_aws_s3%22

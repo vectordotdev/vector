@@ -29,7 +29,6 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
   
   # REQUIRED - Fields
   [sinks.my_add_fields_transform_id.fields]
-    # OPTIONAL
   my_string_field = "string value"
   my_env_var_field = "${ENV_VAR}"
   my_int_field = 1
@@ -52,47 +51,6 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
     * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.add_fields]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Fields
-  #
-
-  [sinks.add_fields.fields]
-    # A key/value pair representing the new field to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
-    # 
-    # * optional
-    # * no default
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -103,7 +61,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields. See [Primitive Types](#primitive-types), [List Types](#list-types), and [ [transforms.<transform-id>.fields]](#transforms-transform-id-fields) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -228,7 +186,6 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
   
   # REQUIRED - Fields
   [sinks.my_add_fields_transform_id.fields]
-    # OPTIONAL
   my_string_field = "string value"
   my_env_var_field = "${ENV_VAR}"
   my_int_field = 1
@@ -251,47 +208,6 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
     * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.add_fields]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Fields
-  #
-
-  [sinks.add_fields.fields]
-    # A key/value pair representing the new field to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
-    # 
-    # * optional
-    # * no default
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -302,7 +218,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`no default` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields. See [Primitive Types](#primitive-types), [List Types](#list-types), and [ [transforms.<transform-id>.fields]](#transforms-transform-id-fields) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 

@@ -63,72 +63,6 @@ The `file` source ingests data through one or more local files and outputs [`log
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.file]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "file"
-  type = "file"
-
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
-  # over the `include` option.*
-  # 
-  # * required
-  # * no default
-  exclude = ["/var/log/nginx/access.log"]
-
-  # Array of file patterns to include. Globbing is supported.
-  # 
-  # * required
-  # * no default
-  include = ["/var/log/nginx/*.log"]
-
-  # Ignore files with a data modification date that does not exceed this age.
-  # 
-  # * optional
-  # * no default
-  # * unit: seconds
-  ignore_older = 86400
-
-  # The maximum number of a bytes a line can contain before being discarded. This
-  # protects against malformed lines or tailing incorrect files.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_line_bytes = 102400
-
-  # When `true` Vector will read from the beginning of new files, when `false`
-  # Vector will only read new data added to the file.
-  # 
-  # * optional
-  # * default: false
-  start_at_beginning = false
-
-  #
-  # Context
-  #
-
-  # The key name added to each event with the full path of the file.
-  # 
-  # * optional
-  # * default: "file"
-  file_key = "file"
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -140,12 +74,12 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
-| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age.<br />`no default` `example: 86400` `unit: seconds` |
+| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
-| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.<br />`default: false` |
+| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
 | **OPTIONAL** - Context | | |
-| `file_key` | `string` | The key name added to each event with the full path of the file.<br />`default: "file"` |
-| `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
+| `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 

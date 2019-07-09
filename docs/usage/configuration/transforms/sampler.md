@@ -30,13 +30,11 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_sampler_transform_id]
-  # REQUIRED
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
+  rate = ["field1", "field2"]
   
-  # OPTIONAL
   pass_list = ["[error]", "field2"] # no default
-  rate = ["field1", "field2"] # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -44,44 +42,8 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 [sinks.<sink-id>]
   type = "sampler"
   inputs = ["<string>", ...]
-  pass_list = ["<string>", ...]
   rate = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.sampler]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "sampler"
-  type = "sampler"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # A list of regular expression patterns to exclude events from sampling. If an
-  # event's `"message"` key matches _any_ of these patterns it will _not_ be
-  # sampled.
-  # 
-  # * optional
-  # * no default
-  pass_list = ["[error]", "field2"]
-
-  # The maximum number of events allowed per second.
-  # 
-  # * optional
-  # * no default
-  rate = ["field1", "field2"]
+  pass_list = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -93,9 +55,9 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "sampler"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: ["field1", "field2"]` |
 | **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
-| `rate` | `int` | The maximum number of events allowed per second.<br />`no default` `example: ["field1", "field2"]` |
 
 ## How It Works
 

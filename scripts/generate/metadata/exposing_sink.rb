@@ -3,5 +3,5 @@
 require_relative "option"
 require_relative "sink"
 
-class PullingSink < Sink
+class ExposingSink < Sink
 end

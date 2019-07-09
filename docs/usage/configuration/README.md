@@ -52,10 +52,10 @@ data_dir = "/var/lib/vector"
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-  inputs       = ["apache_sampler"]            # don't sample for S3
+  inputs       = ["apache_sampler"]            # only take sampled data
   type         = "elasticsearch"
   host         = "http://79.12.221.222:9200"   # local or external host
-  index        = "vector-%Y-%m-%d"             # daily partitions
+  index        = "vector-%Y-%m-%d"             # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
@@ -63,10 +63,10 @@ data_dir = "/var/lib/vector"
   type         = "aws_s3"
   region       = "us-east-1"
   bucket       = "my-log-archives"
-  key_prefix   = "date=%Y-%m-%d"               # daily partitions
+  key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
   batch_size   = 10000000                      # 10mb uncompressed
   gzip         = true                          # compress final objects
-  encoding     = "ndjson"
+  encoding     = "ndjson"                      # new line delimited JSON
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -76,7 +76,7 @@ data_dir = "/var/lib/vector"
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **OPTIONAL** | | |
-| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers. Please make sure the Vector project has write permissions to this dir.<br />`no default` `example: "/var/lib/vector"` |
+| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.<br />`no default` `example: "/var/lib/vector"` |
 
 ## Sources
 
@@ -120,7 +120,7 @@ data_dir = "/var/lib/vector"
 | [**`elasticsearch`**][docs.elasticsearch_sink] | Batches [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | Batches [`log`][docs.log_event] events to a generic HTTP endpoint. |
 | [**`kafka`**][docs.kafka_sink] | Streams [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
-| [**`prometheus`**][docs.prometheus_sink] | Pulls [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
+| [**`prometheus`**][docs.prometheus_sink] | Exposes [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.splunk_hec_sink] | Batches [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec]. |
 | [**`tcp`**][docs.tcp_sink] | Streams [`log`][docs.log_event] events to a TCP connection. |
 | [**`vector`**][docs.vector_sink] | Streams [`log`][docs.log_event] events to another downstream Vector instance. |
@@ -149,7 +149,7 @@ most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 Vector requires a `data_dir` value for on-disk operations. Currently, the only
 operation using this directory are Vector's on-disk buffers. Buffers, by
 default, are memory-based, but if you switch them to disk-based you'll need to
-specify a `data_directory`.
+specify a `data_dir`.
 
 ### Environment Variables
 

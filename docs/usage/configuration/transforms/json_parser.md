@@ -23,12 +23,10 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_json_parser_transform_id]
-  # REQUIRED
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
+  drop_invalid = true
   
-  # OPTIONAL
-  drop_invalid = true # no default
   field = "message" # default
 ```
 {% endcode-tabs-item %}
@@ -41,41 +39,6 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
   field = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.json_parser]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "json_parser"
-  type = "json_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # If `true` events with invalid JSON will be dropped, otherwise the event will
-  # be kept and passed through.
-  # 
-  # * optional
-  # * no default
-  drop_invalid = true
-
-  # The field decode as JSON. Must be a `string` value.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -85,9 +48,9 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "json_parser"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`required` `example: true` |
 | **OPTIONAL** | | |
-| `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through.<br />`no default` `example: true` |
-| `field` | `string` | The field decode as JSON. Must be a `string` value.<br />`default: "message"` |
+| `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
 ## Examples
 

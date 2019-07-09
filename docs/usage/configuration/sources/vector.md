@@ -30,11 +30,9 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_vector_source_id]
-  # REQUIRED
   type = "vector" # must be: "vector"
+  address = "0.0.0.0:9000"
   
-  # OPTIONAL
-  address = "0.0.0.0:9000" # no default
   shutdown_timeout_secs = 30 # default, seconds
 ```
 {% endcode-tabs-item %}
@@ -46,34 +44,6 @@ The `vector` source ingests data through another upstream Vector instance and ou
   shutdown_timeout_secs = <int>
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.vector]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "vector"
-  type = "vector"
-
-  # The TCP address to bind to.
-  # 
-  # * optional
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -82,8 +52,8 @@ The `vector` source ingests data through another upstream Vector instance and ou
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "vector"` |
+| `address` | `string` | The TCP address to bind to.<br />`required` `example: "0.0.0.0:9000"` |
 | **OPTIONAL** | | |
-| `address` | `string` | The TCP address to bind to.<br />`no default` `example: "0.0.0.0:9000"` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 
 ## How It Works

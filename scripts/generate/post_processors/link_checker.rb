@@ -32,7 +32,7 @@ module PostProcessors
       end
 
       def remove_link_footers(content)
-        parts = content.partition(/\[([a-zA-Z0-9_\-\. ]*)\]:/)
+        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\. ]*)\]:/)
         parts.first.strip
       end
     end
@@ -56,6 +56,7 @@ module PostProcessors
       verify_no_direct_links!
 
       link_names = content.scan(/\]\[([a-zA-Z0-9_\-\. ]*)\]/).flatten.uniq
+
       footer_links = []
 
       link_names.each do |link_name|
@@ -66,7 +67,7 @@ module PostProcessors
       <<~EOF
       #{content}
 
-
+      
       #{footer_links.sort.join("\n")}
       EOF
     end

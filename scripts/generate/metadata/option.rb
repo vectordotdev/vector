@@ -35,12 +35,16 @@ class Option
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @examples = hash["examples"] || []
-    @null = hash["null"].nil? ? true : hash["null"] == true
+    @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
     @category = hash["category"] || ((@options.nil? || inline?) ? "General" : @name.humanize)
+
+    if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
+      raise ArgumentError.new("#{self.class.name}#null must be a boolean")
+    end
 
     if !TYPES.include?(@type)
       raise "#{self.class.name}#type must be one of #{TYPES.to_sentence} for #{@name}, you passed: #{@type}"

@@ -34,7 +34,6 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   
   # OPTIONAL - Types
   [sinks.my_regex_parser_transform_id.types]
-    # OPTIONAL
   status = "int"
   duration = "float"
   success = "bool"
@@ -61,65 +60,6 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.regex_parser]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "regex_parser"
-  type = "regex_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
-  # 
-  # * required
-  # * no default
-  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # If the `field` should be dropped (removed) after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The field to parse.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [sinks.regex_parser.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
-    # 
-    # * optional
-    # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -134,7 +74,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
 ## Examples
 

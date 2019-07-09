@@ -2,10 +2,12 @@
 <% if opts[:array] %>[[<%= opts[:path] %>]]<% else %>[<%= opts[:path] %>]<% end %>
 <%- end -%>
 <%- spec.grouped.each do |title, options| -%>
+  <%- if spec.categories.length > 1 -%>
   <%- if opts[:titles] -%>
   #
   # <%= title %>
   #
+  <%- end -%>
 
   <%- end -%>
   <%- options.each do |option| -%>

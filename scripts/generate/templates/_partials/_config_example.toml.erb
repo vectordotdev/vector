@@ -1,6 +1,6 @@
 <% if opts[:array] %>[[<%= opts[:path] %>]]<% else %>[<%= opts[:path] %>]<% end %>
 <% example.grouped.each do |title, options| -%>
-  <%- if example.categories.length > 0 -%>
+  <%- if example.categories.length > 1 -%>
   # <%= title %>
   <%- end -%>
   <%- options.each do |option| -%>

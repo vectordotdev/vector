@@ -75,9 +75,9 @@ type is described in more detail below:
 
 | Compression | Description |
 | :---------- | :---------- |
-<% component.options.compression.enum.each do |compression| %>
-| `<%= compression %>` | <% compression_description(compression) %> |
-<% end %>
+<%- component.options.compression.enum.each do |compression| -%>
+| `<%= compression %>` | <%= compression_description(compression) %> |
+<%- end -%>
 <% end -%>
 <% if component.respond_to?(:delivery_guarantee) -%>
 

@@ -1,6 +1,6 @@
 require_relative "metadata/batching_sink"
+require_relative "metadata/exposing_sink"
 require_relative "metadata/links"
-require_relative "metadata/pulling_sink"
 require_relative "metadata/source"
 require_relative "metadata/streaming_sink"
 require_relative "metadata/transform"
@@ -56,8 +56,8 @@ class Metadata
         case sink_hash.fetch("egress_method")
         when "batching"
           BatchingSink.new(sink_hash)
-        when "pulling"
-          PullingSink.new(sink_hash)
+        when "exposing"
+          ExposingSink.new(sink_hash)
         when "streaming"
           StreamingSink.new(sink_hash)
         end

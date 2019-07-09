@@ -34,7 +34,6 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   
   # OPTIONAL - Types
   [sinks.my_tokenizer_transform_id.types]
-    # OPTIONAL
   status = "int"
   duration = "float"
   success = "bool"
@@ -61,65 +60,6 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.tokenizer]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tokenizer"
-  type = "tokenizer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The field names assigned to the resulting tokens, in order.
-  # 
-  # * required
-  # * no default
-  field_names = ["timestamp", "level", "message"]
-
-  # If `true` the `field` will be dropped after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The field to tokenize.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [sinks.tokenizer.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
-    # 
-    # * optional
-    # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -134,7 +74,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
 ## Examples
 

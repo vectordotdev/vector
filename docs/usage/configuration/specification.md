@@ -44,12 +44,9 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # Global options are relevant to Vector as a whole and apply to global behavior.
 #
 # Documentation: https://docs.vector.dev/usage/configuration
-#
-  # General
-  #
-
-  # The directory used for persisting Vector state, such as on-disk buffers.
-  # Please make sure the Vector project has write permissions to this dir.
+# The directory used for persisting Vector state, such as on-disk buffers, file
+  # checkpoints, and more. Please make sure the Vector project has write
+  # permissions to this dir.
   # 
   # * optional
   # * no default
@@ -127,10 +124,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   host_key = "host"
 
 [sources.statsd]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -185,6 +178,15 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * must be: "syslog"
   type = "syslog"
 
+  # The input mode.
+  # 
+  # * required
+  # * no default
+  # * enum: "tcp", "udp", "unix"
+  mode = "tcp"
+  mode = "udp"
+  mode = "unix"
+
   # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or
   # `udp`.
   # 
@@ -198,15 +200,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: 102400
   # * unit: bytes
   max_length = 102400
-
-  # The input mode.
-  # 
-  # * optional
-  # * no default
-  # * enum: "tcp", "udp", "unix"
-  mode = "tcp"
-  mode = "udp"
-  mode = "unix"
 
   # The unix socket path. *This should be absolute path.* Only relevant when
   # `mode` is `unix`.
@@ -239,7 +232,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
   # The address to bind the socket to.
   # 
-  # * optional
+  # * required
   # * no default
   address = "0.0.0.0:9000"
 
@@ -268,10 +261,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   host_key = "host"
 
 [sources.vector]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -281,7 +270,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 
   # The TCP address to bind to.
   # 
-  # * optional
+  # * required
   # * no default
   address = "0.0.0.0:9000"
 
@@ -327,7 +316,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # A key/value pair representing the new field to be added. Accepts all
     # supported types. Use `.` for adding nested fields.
     # 
-    # * optional
+    # * required
     # * no default
     my_string_field = "string value"
     my_env_var_field = "${ENV_VAR}"
@@ -339,10 +328,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     my_list = ["first", "second", "third"]
 
 [transforms.field_filter]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -371,10 +356,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   value = "/var/log/nginx.log"
 
 [transforms.grok_parser]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -408,10 +389,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   field = "message"
 
 [transforms.json_parser]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -429,7 +406,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # If `true` events with invalid JSON will be dropped, otherwise the event will
   # be kept and passed through.
   # 
-  # * optional
+  # * required
   # * no default
   drop_invalid = true
 
@@ -494,16 +471,12 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     [transforms.log_to_metric.metrics.labels]
       # Key/value pairs representing the metric labels.
       # 
-      # * optional
+      # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
 
 [transforms.lua]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -587,7 +560,7 @@ end
     # A definition of mapped field types. They key is the field name and the value
     # is the type. `strftime` specifiers are supported for the `timestamp` type.
     # 
-    # * optional
+    # * required
     # * no default
     # * enum: "string", "int", "float", "bool", "timestamp|strftime"
     status = "int"
@@ -599,10 +572,6 @@ end
     timestamp = "timestamp|%a %b %e %T %Y"
 
 [transforms.remove_fields]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -624,10 +593,6 @@ end
   fields = ["field1", "field2"]
 
 [transforms.sampler]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -642,6 +607,12 @@ end
   # * no default
   inputs = ["my-source-id"]
 
+  # The maximum number of events allowed per second.
+  # 
+  # * required
+  # * no default
+  rate = ["field1", "field2"]
+
   # A list of regular expression patterns to exclude events from sampling. If an
   # event's `"message"` key matches _any_ of these patterns it will _not_ be
   # sampled.
@@ -649,12 +620,6 @@ end
   # * optional
   # * no default
   pass_list = ["[error]", "field2"]
-
-  # The maximum number of events allowed per second.
-  # 
-  # * optional
-  # * no default
-  rate = ["field1", "field2"]
 
 [transforms.tokenizer]
   #
@@ -701,7 +666,7 @@ end
     # A definition of mapped field types. They key is the field name and the value
     # is the type. `strftime` specifiers are supported for the `timestamp` type.
     # 
-    # * optional
+    # * required
     # * no default
     # * enum: "string", "int", "float", "bool", "timestamp|strftime"
     status = "int"
@@ -782,7 +747,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * no default
+  # * default: "<dynamic>"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -919,7 +884,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * no default
+  # * default: "<dynamic>"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -1047,7 +1012,7 @@ end
   # 
   # * optional
   # * no default
-  # * must be: "gzip"
+  # * must be: "gzip" (if supplied)
   compression = "gzip"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
@@ -1266,21 +1231,21 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The encoding format used to serialize the events before writing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json", "text"
-  encoding = "json"
-  encoding = "text"
-
   # The standard stream to write to.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "stdout", "stderr"
   target = "stdout"
   target = "stderr"
+
+  # The encoding format used to serialize the events before writing.
+  # 
+  # * optional
+  # * default: "<dynamic>"
+  # * enum: "json", "text"
+  encoding = "json"
+  encoding = "text"
 
   #
   # Buffer
@@ -1494,7 +1459,7 @@ end
   # 
   # * optional
   # * no default
-  # * must be: "gzip"
+  # * must be: "gzip" (if supplied)
   compression = "gzip"
 
   # A URI that Vector can request in order to determine the service health.
@@ -1572,13 +1537,13 @@ end
   [sinks.http.basic_auth]
     # The basic authentication password.
     # 
-    # * optional
+    # * required
     # * no default
     password = "password"
 
     # The basic authentication user name.
     # 
-    # * optional
+    # * required
     # * no default
     user = "username"
 
@@ -1625,7 +1590,7 @@ end
   [sinks.http.headers]
     # A custom header to be added to each outgoing HTTP request.
     # 
-    # * optional
+    # * required
     # * no default
     X-Powered-By = "Vector"
 
@@ -1656,6 +1621,14 @@ end
   # * no default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
+  # The field name to use for the topic key. If unspecified, the key will be
+  # randomly generated. If the field does not exist on the event, a blank value
+  # will be used.
+  # 
+  # * required
+  # * no default
+  key_field = "partition_key"
+
   # The Kafka topic name to write events to.
   # 
   # * required
@@ -1665,18 +1638,10 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * no default
+  # * default: "<dynamic>"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
-
-  # The field name to use for the topic key. If unspecified, the key will be
-  # randomly generated. If the field does not exist on the event, a blank value
-  # will be used.
-  # 
-  # * optional
-  # * no default
-  key_field = "partition_key"
 
   #
   # Buffer
@@ -1735,7 +1700,7 @@ end
 
   # The address to expose for scraping.
   # 
-  # * optional
+  # * required
   # * no default
   address = "0.0.0.0:9598"
 
@@ -1796,13 +1761,13 @@ end
 
   # Your Splunk HEC host.
   # 
-  # * optional
+  # * required
   # * no default
   host = "my-splunk-host.com"
 
   # Your Splunk HEC token.
   # 
-  # * optional
+  # * required
   # * no default
   token = "A94A8FE5CCB19BA61C4C08"
 
@@ -1831,7 +1796,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * no default
+  # * default: "<dynamic>"
   # * enum: "ndjson", "text"
   encoding = "ndjson"
   encoding = "text"
@@ -1933,7 +1898,7 @@ end
 
   # The TCP address.
   # 
-  # * optional
+  # * required
   # * no default
   address = "92.12.333.224:5000"
 
@@ -1944,7 +1909,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * no default
+  # * default: "<dynamic>"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -2006,7 +1971,7 @@ end
 
   # The downstream Vector address.
   # 
-  # * optional
+  # * required
   # * no default
   address = "92.12.333.224:5000"
 

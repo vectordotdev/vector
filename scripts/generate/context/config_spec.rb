@@ -17,7 +17,7 @@ class Context
     def tags(option)
       tags = []
 
-      tags << (option.required? ? "required" : "optional")
+      tags << (option.required? && option.default.nil? ? "required" : "optional")
 
       if !option.default.nil?
         tags << "default: #{option.default.to_toml}"
@@ -33,7 +33,11 @@ class Context
         if option.enum.length > 1
           tags << "enum: #{option.enum.collect(&:to_toml).join(", ")}"
         else
-          tags << "must be: #{option.enum.first.to_toml}"
+          tag = "must be: #{option.enum.first.to_toml}"
+          if option.optional?
+            tag << " (if supplied)"
+          end
+          tags << tag
         end
       end
 

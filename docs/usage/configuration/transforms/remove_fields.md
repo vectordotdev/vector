@@ -23,7 +23,6 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_remove_fields_transform_id]
-  # REQUIRED
   type = "remove_fields" # must be: "remove_fields"
   inputs = ["my-source-id"]
   fields = ["field1", "field2"]
@@ -35,34 +34,6 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
   type = "remove_fields"
   inputs = ["<string>", ...]
   fields = ["<string>", ...]
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.remove_fields]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "remove_fields"
-  type = "remove_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The field names to drop.
-  # 
-  # * required
-  # * no default
-  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

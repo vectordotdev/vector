@@ -13,7 +13,7 @@ class Context
     def grouped
       @grouped ||=
         options.group_by do |option|
-          title = "#{option.required? ? "REQUIRED" : "OPTIONAL"}"
+          title = "#{option.required? && option.default.nil? ? "REQUIRED" : "OPTIONAL"}"
 
           if categories.length > 1
            "#{title} - #{option.category}"
@@ -40,7 +40,11 @@ class Context
         if option.enum.length > 1
           tags << "enum: #{option.enum.collect(&:to_toml).join(", ")}"
         else
-          tags << "must be: #{option.enum.first.to_toml}"
+          tag = "must be: #{option.enum.first.to_toml}"
+          if option.optional?
+            tag << " (if supplied)"
+          end
+          tags << tag
         end
       end
 

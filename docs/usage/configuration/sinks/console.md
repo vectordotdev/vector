@@ -26,14 +26,13 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
   # REQUIRED - General
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
+  target = "stdout" # enum: "stdout", "stderr"
   
   # OPTIONAL - General
-  encoding = "json" # no default, enum: "json", "text"
-  target = "stdout" # no default, enum: "stdout", "stderr"
+  encoding = "json" # default, enum: "json", "text"
   
   # OPTIONAL - Buffer
   [sinks.my_console_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -46,10 +45,10 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
   # REQUIRED - General
   type = "console"
   inputs = ["<string>", ...]
+  target = {"stdout" | "stderr"}
 
   # OPTIONAL - General
   encoding = {"json" | "text"}
-  target = {"stdout" | "stderr"}
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
@@ -57,80 +56,6 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.console]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "console"
-  type = "console"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The encoding format used to serialize the events before writing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json", "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The standard stream to write to.
-  # 
-  # * optional
-  # * no default
-  # * enum: "stdout", "stderr"
-  target = "stdout"
-  target = "stderr"
-
-  #
-  # Buffer
-  #
-
-  [sinks.console.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -142,9 +67,9 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "console"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout", "stderr"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before writing.<br />`no default` `enum: "json", "text"` |
-| `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`no default` `enum: "stdout", "stderr"` |
+| `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json", "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |

@@ -30,7 +30,6 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_lua_transform_id]
-  # REQUIRED
   type = "lua" # must be: "lua"
   inputs = ["my-source-id"]
   source = """
@@ -46,7 +45,6 @@ end
 """
 
   
-  # OPTIONAL
   search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
@@ -59,52 +57,6 @@ end
   search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.lua]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "lua"
-  type = "lua"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The inline Lua source to evaluate.
-  # 
-  # * required
-  # * no default
-  source = """
-require("script") # a `script.lua` file must be in your `search_dirs`
-
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\n$", "")
-  event["host"] = hostname
-end
-"""
-
-
-  # A list of directories search when loading a Lua file via the `require`
-  # function.
-  # 
-  # * optional
-  # * no default
-  search_dirs = ["/etc/vector/lua"]
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -114,9 +66,9 @@ end
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "lua"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `source` | `string` | The inline Lua source to evaluate.<br />`required` `example: (see above)` |
+| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
-| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function.<br />`no default` `example: ["/etc/vector/lua"]` |
+| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
 
 ## Examples
 

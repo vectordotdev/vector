@@ -27,15 +27,14 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  key_field = "partition_key"
   topic = "topic-1234"
   
   # OPTIONAL - General
-  encoding = "json" # no default, enum: "json", "text"
-  key_field = "partition_key" # no default
+  encoding = "json" # default, enum: "json", "text"
   
   # OPTIONAL - Buffer
   [sinks.my_kafka_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -49,11 +48,11 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
   type = "kafka"
   inputs = ["<string>", ...]
   bootstrap_servers = "<string>"
+  key_field = "<string>"
   topic = "<string>"
 
   # OPTIONAL - General
   encoding = {"json" | "text"}
-  key_field = "<string>"
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
@@ -61,94 +60,6 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.kafka]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "kafka"
-  type = "kafka"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself
-  # 
-  # * required
-  # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-
-  # The Kafka topic name to write events to.
-  # 
-  # * required
-  # * no default
-  topic = "topic-1234"
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json", "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The field name to use for the topic key. If unspecified, the key will be
-  # randomly generated. If the field does not exist on the event, a blank value
-  # will be used.
-  # 
-  # * optional
-  # * no default
-  key_field = "partition_key"
-
-  #
-  # Buffer
-  #
-
-  [sinks.kafka.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -161,10 +72,10 @@ The `kafka` sink streams [`log`][docs.log_event] events to [Apache Kafka][url.ka
 | `type` | `string` | The component type<br />`required` `enum: "kafka"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
+| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`required` `example: "partition_key"` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`no default` `enum: "json", "text"` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`no default` `example: "partition_key"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json", "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |

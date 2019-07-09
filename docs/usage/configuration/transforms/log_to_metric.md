@@ -29,11 +29,9 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   
   # REQUIRED - Metrics
   [[sinks.my_log_to_metric_transform_id.metrics]]
-    # REQUIRED
     type = "counter" # enum: "counter", "gauge"
     field = "duration"
     
-    # OPTIONAL
     increment_by_value = false # default
     name = "duration_total" # default
     labels = {host = "${HOSTNAME}", region = "us-east-1"}
@@ -55,69 +53,6 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     labels = {* = "<string>"}
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.log_to_metric]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "log_to_metric"
-  type = "log_to_metric"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Metrics
-  #
-
-  [[sinks.log_to_metric.metrics]]
-    # The metric type.
-    # 
-    # * required
-    # * no default
-    # * enum: "counter", "gauge"
-    type = "counter"
-    type = "gauge"
-
-    # The log field to use as the metric.
-    # 
-    # * required
-    # * no default
-    field = "duration"
-
-    # If `true` the metric will be incremented by the `field` value. If `false` the
-    # metric will be incremented by 1 regardless of the `field` value.
-    # 
-    # * optional
-    # * default: false
-    increment_by_value = false
-
-    # The name of the metric. Defaults to `<field>_total` for `counter` and
-    # `<field>` for `gauge`.
-    # 
-    # * optional
-    # * default: "<dynamic>"
-    name = "duration_total"
-
-    [sinks.log_to_metric.metrics.labels]
-      # Key/value pairs representing the metric labels.
-      # 
-      # * optional
-      # * no default
-      host = "${HOSTNAME}"
-      region = "us-east-1"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -129,10 +64,10 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Metrics | | |
 | `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge"` |
-| `metrics.field` | `string` | The log field to use as the metric.<br />`required` `example: "duration"` |
+| `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value.<br />`default: false` |
 | `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "<dynamic>"` |
-| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.<br />`no default` `example: (see above)` |
+| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels. See [Null Fields](#null-fields) and [Reducing](#reducing) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 

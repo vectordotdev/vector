@@ -30,7 +30,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   uri = "https://10.22.212.22:9000/endpoint"
   
   # OPTIONAL - General
-  compression = "gzip" # no default, must be: "gzip"
+  compression = "gzip" # no default, must be: "gzip" (if supplied)
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
   
   # OPTIONAL - Batching
@@ -47,13 +47,11 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   
   # OPTIONAL - Basic auth
   [sinks.my_http_sink_id.basic_auth]
-    # OPTIONAL
-    password = "password" # no default
-    user = "username" # no default
+    password = "password"
+    user = "username"
   
   # OPTIONAL - Buffer
   [sinks.my_http_sink_id.buffer]
-    # OPTIONAL
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
     max_size = 104900000 # no default
@@ -61,7 +59,6 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   
   # OPTIONAL - Headers
   [sinks.my_http_sink_id.headers]
-    # OPTIONAL
   X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
@@ -107,182 +104,6 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
     * = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.http]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "http"
-  type = "http"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The full URI to make HTTP requests to. This should include the protocol and
-  # host, but can also include the port, path, and any other valid part of a URI.
-  # 
-  # * required
-  # * no default
-  uri = "https://10.22.212.22:9000/endpoint"
-
-  # The compression strategy used to compress the payload before sending.
-  # 
-  # * optional
-  # * no default
-  # * must be: "gzip"
-  compression = "gzip"
-
-  # A URI that Vector can request in order to determine the service health.
-  # 
-  # * optional
-  # * no default
-  healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: bytes
-  batch_timeout = 5
-
-  #
-  # Requests
-  #
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 10
-  rate_limit_num = 10
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 10
-  request_in_flight_limit = 10
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 10
-  retry_attempts = 10
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 10
-  # * unit: seconds
-  retry_backoff_secs = 10
-
-  #
-  # Basic auth
-  #
-
-  [sinks.http.basic_auth]
-    # The basic authentication password.
-    # 
-    # * optional
-    # * no default
-    password = "password"
-
-    # The basic authentication user name.
-    # 
-    # * optional
-    # * no default
-    user = "username"
-
-  #
-  # Buffer
-  #
-
-  [sinks.http.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
-    # 
-    # * optional
-    # * no default
-    max_size = 104900000
-
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    num_items = 500
-
-  #
-  # Headers
-  #
-
-  [sinks.http.headers]
-    # A custom header to be added to each outgoing HTTP request.
-    # 
-    # * optional
-    # * no default
-    X-Powered-By = "Vector"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -292,31 +113,31 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "http"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `compression` | `string` | The compression strategy used to compress the payload before sending.<br />`no default` `enum: "gzip"` |
-| `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health.<br />`no default` `example: (see above)` |
+| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 5` `unit: bytes` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 5` `unit: bytes` |
 | **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window.<br />`default: 10` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time.<br />`default: 10` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests.<br />`default: 10` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again.<br />`default: 10` `unit: seconds` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` `unit: seconds` |
 | **OPTIONAL** - Basic auth | | |
-| `basic_auth.password` | `string` | The basic authentication password.<br />`no default` `example: "password"` |
-| `basic_auth.user` | `string` | The basic authentication user name.<br />`no default` `example: "username"` |
+| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
+| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 | **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`no default` `example: (see above)` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request. See [Authentication](#authentication), [Buffers & Batches](#buffers-batches), [Buffers types](#buffers-types), [Buffer overflow](#buffer-overflow), [Batch flushing](#batch-flushing), [Compression](#compression), [Encodings](#encodings), [Health Checks](#health-checks), [Rate Limits](#rate-limits), [Retry Policy](#retry-policy), and [Timeouts](#timeouts) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -395,9 +216,7 @@ type is described in more detail below:
 
 | Compression | Description |
 | :---------- | :---------- |
-
-| `gzip` |  |
-
+| `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
@@ -485,6 +304,7 @@ issue, please:
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [url.community]: https://vector.dev/community
+[url.gzip]: https://www.gzip.org/
 [url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Bug%22
 [url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancement%22
 [url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22

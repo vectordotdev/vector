@@ -107,8 +107,17 @@ it. You can change the encoding in the
 
 That's it! This tutorial demonstrates the _very_ basic [concepts][docs.concepts]
 of Vector. From here, you can start to think about the various
-[sources][docs.soures], [transforms][docs.transforms], and [sinks][docs.sinks]
+[sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks]
 you'll need to combine to create your pipelines.
 
 
-
+[docs.concepts]: ../../about/concepts.md
+[docs.configuration]: ../../usage/configuration
+[docs.console_sink]: ../../usage/configuration/sinks/console.md
+[docs.event]: ../../about/data-model.md#event
+[docs.installation]: ../../setup/installation
+[docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources]: ../../usage/configuration/sources
+[docs.stdin_source]: ../../usage/configuration/sources/stdin.md
+[docs.transforms]: ../../usage/configuration/transforms

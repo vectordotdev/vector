@@ -25,11 +25,11 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 [sinks.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: "syslog"
+  mode = "tcp" # enum: "tcp", "udp", "unix"
   
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
   max_length = 102400 # default, bytes
-  mode = "tcp" # no default, enum: "tcp", "udp", "unix"
   path = "/path/to/socket" # no default
   
   # OPTIONAL - Context
@@ -41,70 +41,15 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 [sinks.<sink-id>]
   # REQUIRED - General
   type = "syslog"
+  mode = {"tcp" | "udp" | "unix"}
 
   # OPTIONAL - General
   address = "<string>"
   max_length = <int>
-  mode = {"tcp" | "udp" | "unix"}
   path = "<string>"
 
   # OPTIONAL - Context
   host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.syslog]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "syslog"
-  type = "syslog"
-
-  # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or
-  # `udp`.
-  # 
-  # * optional
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  # The input mode.
-  # 
-  # * optional
-  # * no default
-  # * enum: "tcp", "udp", "unix"
-  mode = "tcp"
-  mode = "udp"
-  mode = "unix"
-
-  # The unix socket path. *This should be absolute path.* Only relevant when
-  # `mode` is `unix`.
-  # 
-  # * optional
-  # * no default
-  path = "/path/to/socket"
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -115,12 +60,11 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "syslog"` |
+| `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", "unix"` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or `udp`.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `mode` | `string` | The input mode.<br />`no default` `enum: "tcp", "udp", "unix"` |
-| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.
-<br />`no default` `example: "/path/to/socket"` |
+| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.<br />`no default` `example: "/path/to/socket"` |
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
 

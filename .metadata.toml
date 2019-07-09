@@ -22,9 +22,11 @@
 [options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
+null = true
 description = """\
-The directory used for persisting Vector state, such as on-disk buffers. \
-Please make sure the Vector project has write permissions to this dir.\
+The directory used for persisting Vector state, such as on-disk buffers, \
+file checkpoints, and more. Please make sure the Vector project has write \
+permissions to this dir.\
 """
 
 # ------------------------------------------------------------------------------
@@ -133,6 +135,7 @@ through_description = "standard input (STDIN)"
 [sources.stdin.options.max_length]
 type = "int"
 default = 102400
+null = true
 unit = "bytes"
 description = "The maxiumum bytes size of a message before it is discarded."
 
@@ -158,6 +161,7 @@ through_description = "the Syslog 5424 protocol"
 [sources.syslog.options.address]
 type = "string"
 examples = ["0.0.0.0:9000"]
+null = true
 description = """\
 The TCP or UDP address to listen on. Only relevant when `mode` is \
 `tcp` or `udp`.\
@@ -177,6 +181,7 @@ The key name added to each event representing the current host.\
 [sources.syslog.options.max_length]
 type = "int"
 default = 102400
+null = true
 unit = "bytes"
 description = """\
 The maximum bytes size of incoming messages before they are discarded.\
@@ -185,11 +190,13 @@ The maximum bytes size of incoming messages before they are discarded.\
 [sources.syslog.options.mode]
 type = "string"
 enum = ["tcp", "udp", "unix"]
+null = false
 description = "The input mode."
 
 [sources.syslog.options.path]
 type = "string"
 examples = ["/path/to/socket"]
+null = true
 description = """\
 The unix socket path. *This should be absolute path.* Only relevant \
 when `mode` is `unix`.
@@ -207,6 +214,7 @@ through_description = "the TCP protocol"
 [sources.tcp.options.address]
 type = "string"
 examples = ["0.0.0.0:9000"]
+null = false
 description = "The address to bind the socket to."
 
 [sources.tcp.options.host_key]
@@ -223,6 +231,7 @@ The key name added to each event representing the current host.\
 [sources.tcp.options.max_length]
 type = "int"
 default = 102400
+null = true
 unit = "bytes"
 description = """\
 The maximum bytes size of incoming messages before they are discarded.\
@@ -231,6 +240,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 [sources.tcp.options.shutdown_timeout_secs]
 type = "int"
 default = 30
+null = false
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\
@@ -249,11 +259,13 @@ through_description = "another upstream Vector instance"
 [sources.vector.options.address]
 type = "string"
 examples = ["0.0.0.0:9000"]
+null = false
 description = "The TCP address to bind to."
 
 [sources.vector.options.shutdown_timeout_secs]
 type = "int"
 default = 30
+null = false
 unit = "seconds"
 description = """\
 The timeout before a connection is forcefully closed during shutdown.\
@@ -280,6 +292,7 @@ event.\
 
 [transforms.add_fields.options.fields.options."*"]
 type = "*"
+null = false
 examples = [
   {name = "my_string_field", value = "string value"},
   {name = "my_env_var_field", value = "${ENV_VAR}"},
@@ -339,6 +352,7 @@ resources = [
 [transforms.grok_parser.options.drop_field]
 type = "bool"
 default = true
+null = false
 description = """\
 If `true` will drop the `field` after parsing.\
 """
@@ -346,6 +360,7 @@ If `true` will drop the `field` after parsing.\
 [transforms.grok_parser.options.field]
 type = "string"
 default = "message"
+null = false
 description = """\
 The field to execute the `pattern` against. Must be a `string` value.\
 """
@@ -370,6 +385,7 @@ resources = []
 [transforms.json_parser.options.drop_invalid]
 type = "bool"
 examples = [true]
+null = false
 description = """\
 If `true` events with invalid JSON will be dropped, otherwise the \
 event will be kept and passed through.\
@@ -378,6 +394,7 @@ event will be kept and passed through.\
 [transforms.json_parser.options.field]
 type = "string"
 default = "message"
+null = false
 description = """\
 The field decode as JSON. Must be a `string` value.\
 """
@@ -416,6 +433,7 @@ description = "The log field to use as the metric."
 [transforms.log_to_metric.options.metrics.options.increment_by_value]
 type = "bool"
 default = false
+null = false
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\
@@ -425,6 +443,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 type = "string"
 default = "<dynamic>"
 examples = ["duration_total"]
+null = false
 description = """\
 The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
@@ -432,8 +451,9 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 
 [transforms.log_to_metric.options.metrics.options.labels]
 type = "table"
-description = "Key/value pairs representing metric labels."
 display = "inline"
+null = true
+description = "Key/value pairs representing metric labels."
 
 [transforms.log_to_metric.options.metrics.options.labels.options."*"]
 type = "string"
@@ -441,6 +461,7 @@ examples = [
   {name = "host", value = "${HOSTNAME}"},
   {name = "region", value = "us-east-1"},
 ]
+null = false
 description = "Key/value pairs representing the metric labels."
 
 # ------------------------------------------------------------------------------
@@ -459,7 +480,6 @@ resources = [
 
 [transforms.lua.options.source]
 type = "string"
-description = "The inline Lua source to evaluate."
 examples = [
 """\
 require("script") # a `script.lua` file must be in your `search_dirs`
@@ -474,10 +494,12 @@ end\
 """
 ]
 null = false
+description = "The inline Lua source to evaluate."
 
 [transforms.lua.options.search_dirs]
 type = "[string]"
 examples = [["/etc/vector/lua"]]
+null = true
 description = """\
 A list of directories search when loading a Lua file via the `require` \
 function.\
@@ -499,27 +521,30 @@ resources = []
 [transforms.regex_parser.options.drop_field]
 type = "bool"
 default = true
+null = false
 description = "If the `field` should be dropped (removed) after parsing."
 
 [transforms.regex_parser.options.field]
 type = "string"
 default = "message"
+null = false
 description = "The field to parse."
 
 [transforms.regex_parser.options.regex]
 type = "string"
-description = """\
-The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
-"""
 examples = [
 """\
 ^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] "(?P<method>[\\w]+) (?P<path>.*)" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$\
 """
 ]
 null = false
+description = """\
+The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
+"""
 
 [transforms.regex_parser.options.types]
 type = "table"
+null = true
 description = "Key/Value pairs representing mapped field types."
 
 [transforms.regex_parser.options.types.options."*"]
@@ -534,6 +559,7 @@ examples = [
   {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
   {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
 ]
+null = false
 description = """\
 A definition of mapped field types. They key is the field name and the value \
 is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
@@ -575,6 +601,7 @@ output_types = ["log"]
 [transforms.sampler.options.pass_list]
 type = "[string]"
 examples = [["[error]", "field2"]]
+null = true
 description = """\
 A list of regular expression patterns to exclude events from sampling. \
 If an event's `"message"` key matches _any_ of these patterns it will \
@@ -584,6 +611,7 @@ _not_ be sampled.\
 [transforms.sampler.options.rate]
 type = "int"
 examples = [["field1", "field2"]]
+null = false
 description = "The maximum number of events allowed per second."
 
 ## TODO: Add regex synax docs?
@@ -603,6 +631,7 @@ output_types = ["log"]
 [transforms.tokenizer.options.field]
 type = "string"
 default = "message"
+null = false
 description = "The field to tokenize."
 
 [transforms.tokenizer.options.field_names]
@@ -614,10 +643,12 @@ description = "The field names assigned to the resulting tokens, in order."
 [transforms.tokenizer.options.drop_field]
 type = "bool"
 default = true
+null = false
 description = "If `true` the `field` will be dropped after parsing."
 
 [transforms.tokenizer.options.types]
 type = "table"
+null = true
 description = "Key/Value pairs representing mapped field types."
 
 [transforms.tokenizer.options.types.options."*"]
@@ -632,6 +663,7 @@ examples = [
   {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
   {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
 ]
+null = false
 description = """\
 A definition of mapped field types. They key is the field name and the value \
 is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
@@ -653,14 +685,16 @@ retry_attempts = 5
 retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
-service_limits_url = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
+service_limits_short_link = "aws_cw_logs_service_limits"
 service_provider = "AWS"
 write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html)"
 
 [sinks.aws_cloudwatch_logs.options.encoding]
 type = "string"
 category = "Requests"
+default = "<dynamic>"
 enum = ["json", "text"]
+null = true
 description = "The encoding format used to serialize the events before flushing."
 
 [sinks.aws_cloudwatch_logs.options.group_name]
@@ -699,14 +733,16 @@ retry_attempts = 5
 retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
-service_limits_url = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+service_limits_short_link = "aws_kinesis_service_limits"
 service_provider = "AWS"
 write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
 category = "Requests"
+default = "<dynamic>"
 enum = ["json", "text"]
+null = true
 description = "The encoding format used to serialize the events before flushing."
 
 [sinks.aws_kinesis_streams.options.region]
@@ -737,7 +773,7 @@ retry_attempts = 5
 retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
-service_limits_url = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+service_limits_short_link = "aws_s3_service_limits"
 service_provider = "AWS"
 write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
@@ -752,6 +788,7 @@ description = "The S3 bucket name. Do not include a leading `s3://` or a trailin
 type = "string"
 category = "Requests"
 enum = ["gzip"]
+null = true
 description = "The compression type to use before writing data."
 
 [sinks.aws_s3.options.encoding]
@@ -798,6 +835,7 @@ examples = [
   "date=%F/hour=%H/",
   "year=%Y/month=%m/day=%d/"
 ]
+null = true
 partition_key = true
 description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\". [`strftime` specifiers][url.strftime_specifiers] are supported. "
 
@@ -836,13 +874,16 @@ write_to_description = "the console, `STDOUT` or `STDERR`"
 
 [sinks.console.options.encoding]
 type = "string"
+default = "<dynamic>"
 enum = ["json", "text"]
+null = true
 description = "The encoding format used to serialize the events before writing."
 
 [sinks.console.options.target]
 type = "string"
 defaukt = "stdout"
 enum = ["stdout", "stderr"]
+null = false
 description = "The [standard stream][url.standard_streams] to write to."
 
 # ------------------------------------------------------------------------------
@@ -903,21 +944,25 @@ write_to_description = "a generic HTTP endpoint"
 
 [sinks.http.options.basic_auth]
 type = "table"
+null = true
 description = "Options for basic authentication."
 
 [sinks.http.options.basic_auth.options.password]
 type = "string"
 examples = ["password"]
+null = false
 description = "The basic authentication password."
 
 [sinks.http.options.basic_auth.options.user]
 type = "string"
 examples = ["username"]
+null = false
 description = "The basic authentication user name."
 
 [sinks.http.options.compression]
 type = "string"
 enum = ["gzip"]
+null = true
 description = "The compression strategy used to compress the payload before sending."
 
 [sinks.http.options.encoding]
@@ -928,11 +973,13 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.http.options.headers]
 type = "table"
+null = true
 description = "Options for custom headers."
 
 [sinks.http.options.headers.options."*"]
 type = "string"
 examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
 description = "A custom header to be added to each outgoing HTTP request."
 
 [sinks.http.options.healthcheck_uri]
@@ -969,12 +1016,15 @@ to initially to bootstrap itself\
 
 [sinks.kafka.options.encoding]
 type = "string"
+default = "<dynamic>"
 enum = ["json", "text"]
+null = true
 description = "The encoding format used to serialize the events before flushing."
 
 [sinks.kafka.options.key_field]
 type = "string"
 examples = ["partition_key"]
+null = false
 description = """\
 The field name to use for the topic key. If unspecified, the key will be \
 randomly generated. If the field does not exist on the event, a blank value \
@@ -993,13 +1043,14 @@ description = "The Kafka topic name to write events to."
 [sinks.prometheus]
 beta = true
 delivery_guarantee = "at_least_once"
-egress_method = "pulling"
+egress_method = "exposing"
 input_types = ["metric"]
 write_to_description = "[Prometheus][url.prometheus] metrics service"
 
 [sinks.prometheus.options.address]
 type = "string"
 examples = ["0.0.0.0:9598"]
+null = false
 description = "The address to expose for scraping."
 
 # ------------------------------------------------------------------------------
@@ -1023,17 +1074,21 @@ write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
 [sinks.splunk_hec.options.encoding]
 type = "string"
 category = "Requests"
+default = "<dynamic>"
 enum = ["ndjson", "text"]
+null = true
 description = "The encoding format used to serialize the events before flushing."
 
 [sinks.splunk_hec.options.host]
 type = "string"
 examples = ["my-splunk-host.com"]
+null = false
 description = "Your Splunk HEC host."
 
 [sinks.splunk_hec.options.token]
 type = "string"
 examples = ["A94A8FE5CCB19BA61C4C08"]
+null = false
 description = "Your Splunk HEC token."
 
 # ------------------------------------------------------------------------------
@@ -1048,12 +1103,15 @@ write_to_description = "a TCP connection"
 [sinks.tcp.options.address]
 type = "string"
 examples = ["92.12.333.224:5000"]
+null = false
 description = "The TCP address."
 
 [sinks.tcp.options.encoding]
 type = "string"
 category = "Requests"
+default = "<dynamic>"
 enum = ["json", "text"]
+null = true
 description = "The encoding format used to serialize the events before flushing."
 
 # ------------------------------------------------------------------------------
@@ -1068,6 +1126,7 @@ write_to_description = "another downstream Vector instance"
 [sinks.vector.options.address]
 type = "string"
 examples = ["92.12.333.224:5000"]
+null = false
 description = "The downstream Vector address."
 
 # ------------------------------------------------------------------------------
@@ -1126,10 +1185,13 @@ aws_credential_process = "https://docs.aws.amazon.com/cli/latest/userguide/cli-c
 aws_cw_logs = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html"
 aws_cw_logs_group_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 aws_cw_logs_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region"
+aws_cw_logs_service_limits = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
 aws_cw_logs_stream_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
+aws_kinesis_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
 aws_s3 = "https://aws.amazon.com/s3/"
 aws_s3_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
+aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
 basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"
 big_query_streaming = "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
 cgroups_limit_resources = "https://the.binbashtheory.com/control-resources-cgroups/"

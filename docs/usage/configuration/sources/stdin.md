@@ -46,38 +46,6 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
-```coffeescript
-[sinks.stdin]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "stdin"
-  type = "stdin"
-
-  # The maxiumum bytes size of a message before it is discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

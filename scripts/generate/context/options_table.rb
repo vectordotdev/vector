@@ -13,7 +13,7 @@ class Context
     def grouped
       @grouped ||=
         options.group_by do |option|
-          title = "**#{option.required? ? "REQUIRED" : "OPTIONAL"}**"
+          title = "**#{option.required? && option.default.nil? ? "REQUIRED" : "OPTIONAL"}**"
 
           if categories.length > 1
            "#{title} - #{option.category}"
