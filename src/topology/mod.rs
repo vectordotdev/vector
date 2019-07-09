@@ -7,7 +7,6 @@ pub use self::config::Config;
 use crate::topology::builder::Pieces;
 
 use crate::buffers;
-use either::Either::{self, Left, Right};
 use futures::{
     future,
     sync::{mpsc, oneshot},
@@ -32,26 +31,20 @@ pub struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-#[derive(PartialEq)]
-pub enum Stage {
-    ConfigValidated,
-    HealthChecksPassed,
-}
-
 pub fn start(
     config: Config,
     rt: &mut tokio::runtime::Runtime,
     require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    start_or_validate(config, rt, None, require_healthy).right()
+    validate(&config).and_then(|pieces| start_validated(config, pieces, rt, require_healthy))
 }
 
-pub fn start_or_validate(
+pub fn start_validated(
     config: Config,
+    mut pieces: Pieces,
     rt: &mut tokio::runtime::Runtime,
-    exit_after: Option<Stage>,
     require_healthy: bool,
-) -> Either<bool, (RunningTopology, mpsc::UnboundedReceiver<()>)> {
+) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
 
     let mut running_topology = RunningTopology {
@@ -64,13 +57,28 @@ pub fn start_or_validate(
         abort_tx,
     };
 
-    let exit_after_success = exit_after.is_some();
-    let success =
-        running_topology.reload_config_and_respawn(config, rt, exit_after, require_healthy, true);
-    if success && !exit_after_success {
-        Right((running_topology, abort_rx))
-    } else {
-        Left(success && exit_after_success)
+    if !running_topology.run_healthchecks(&config, &mut pieces, rt, require_healthy) {
+        return None;
+    }
+
+    running_topology.spawn_all(config, pieces, rt);
+    Some((running_topology, abort_rx))
+}
+
+pub fn validate(config: &Config) -> Option<Pieces> {
+    match builder::build_pieces(config) {
+        Err(errors) => {
+            for error in errors {
+                error!("Configuration error: {}", error);
+            }
+            return None;
+        }
+        Ok((new_pieces, warnings)) => {
+            for warning in warnings {
+                error!("Configuration warning: {}", warning);
+            }
+            Some(new_pieces)
+        }
     }
 }
 
@@ -146,55 +154,44 @@ impl RunningTopology {
         .map_err(|_| ())
     }
 
-    pub fn reload_config_on_hot(
+    pub fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         rt: &mut tokio::runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
-        self.reload_config_and_respawn(new_config, rt, None, require_healthy, false)
-    }
-
-    fn reload_config_and_respawn(
-        &mut self,
-        new_config: Config,
-        rt: &mut tokio::runtime::Runtime,
-        exit_after: Option<Stage>,
-        require_healthy: bool,
-        initial_load: bool,
-    ) -> bool {
-        if !initial_load && self.config.data_dir != new_config.data_dir {
+        if self.config.data_dir != new_config.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
             return false;
         }
 
-        let mut new_pieces = match builder::build_pieces(&new_config) {
-            Err(errors) => {
-                for error in errors {
-                    error!("Configuration error: {}", error);
+        match validate(&new_config) {
+            Some(mut new_pieces) => {
+                if !self.run_healthchecks(&new_config, &mut new_pieces, rt, require_healthy) {
+                    return false;
                 }
-                return false;
-            }
-            Ok((new_pieces, warnings)) => {
-                for warning in warnings {
-                    error!("Configuration warning: {}", warning);
-                }
-                new_pieces
-            }
-        };
 
-        if exit_after == Some(Stage::ConfigValidated) {
-            info!("Config validated, exiting.");
-            return true;
+                self.spawn_all(new_config, new_pieces, rt);
+                true
+            }
+
+            None => false,
         }
+    }
 
-        // Healthchecks
+    fn run_healthchecks(
+        &mut self,
+        new_config: &Config,
+        pieces: &mut Pieces,
+        rt: &mut tokio::runtime::Runtime,
+        require_healthy: bool,
+    ) -> bool {
         let (_, sinks_to_change, sinks_to_add) =
             to_remove_change_add(&self.config.sinks, &new_config.sinks);
 
         let healthchecks = (&sinks_to_change | &sinks_to_add)
             .into_iter()
-            .map(|name| new_pieces.healthchecks.remove(&name).unwrap())
+            .map(|name| pieces.healthchecks.remove(&name).unwrap())
             .collect::<Vec<_>>();
         let healthchecks = futures::future::join_all(healthchecks).map(|_| ());
 
@@ -203,22 +200,16 @@ impl RunningTopology {
             let success = rt.block_on(healthchecks);
 
             if success.is_ok() {
-                info!("All healthchecks passed");
-
-                if exit_after == Some(Stage::HealthChecksPassed) {
-                    return true;
-                }
+                info!("All healthchecks passed.");
+                true
             } else {
-                error!("Sinks unhealthy");
-                return false;
+                error!("Sinks unhealthy.");
+                false
             }
         } else {
-            debug_assert!(exit_after != Some(Stage::HealthChecksPassed));
             rt.spawn(healthchecks);
+            true
         }
-
-        self.spawn_all(new_config, new_pieces, rt);
-        true
     }
 
     fn spawn_all(
@@ -579,7 +570,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -631,7 +622,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         // out2 should disconnect after the reload
         let output_lines2 = output_lines2.wait();
@@ -685,7 +676,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= 100);
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let send = send_lines(in_addr, input_lines2.clone().into_iter());
@@ -749,7 +740,7 @@ mod tests {
 
             wait_for(|| output_lines1.count() > 0);
 
-            topology.reload_config_on_hot(new_config, &mut rt, false);
+            topology.reload_config_and_respawn(new_config, &mut rt, false);
             wait_for(|| output_lines2.count() > 0);
 
             // Shut down server
@@ -835,7 +826,7 @@ mod tests {
         new_config.sources.remove(&"in".to_string());
         new_config.sinks[&"out".to_string()].inputs.clear();
 
-        assert!(!topology.reload_config_on_hot(new_config, &mut rt, false));
+        assert!(!topology.reload_config_and_respawn(new_config, &mut rt, false));
 
         // Shut down server
         block_on(topology.stop()).unwrap();
@@ -876,7 +867,7 @@ mod tests {
         new_config.add_source("in2", TcpConfig::new(in_addr));
         new_config.sinks[&"out".to_string()].inputs = vec!["in2".to_string()];
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -946,7 +937,7 @@ mod tests {
             shutdown_timeout_secs: 30,
         });
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
         wait_for_tcp(in_addr);
@@ -1024,7 +1015,7 @@ mod tests {
 
         wait_for(|| output_lines1.count() >= num_lines);
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1089,7 +1080,7 @@ mod tests {
         wait_for(|| output_lines1.count() >= 1);
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         // The sink gets rebuilt, causing it to open a new connection
         let output_lines1 = output_lines1.wait();
@@ -1159,7 +1150,7 @@ mod tests {
             pass_list: vec![],
         });
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         std::thread::sleep(std::time::Duration::from_millis(50));
 
@@ -1209,7 +1200,7 @@ mod tests {
 
         new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-        topology.reload_config_on_hot(new_config, &mut rt, false);
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         assert_eq!(
             topology.config.data_dir,
@@ -1272,7 +1263,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config_on_hot(config.clone(), &mut rt, true);
+            topology.reload_config_and_respawn(config.clone(), &mut rt, true);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 
@@ -1288,7 +1279,7 @@ mod tests {
 
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out2_addr.to_string()));
 
-            topology.reload_config_on_hot(config.clone(), &mut rt, true);
+            topology.reload_config_and_respawn(config.clone(), &mut rt, true);
             healthcheck_receiver.wait();
 
             let receive = receive_one(&out1_addr, &out2_addr);
@@ -1303,7 +1294,7 @@ mod tests {
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
 
-            topology.reload_config_on_hot(config.clone(), &mut rt, false);
+            topology.reload_config_and_respawn(config.clone(), &mut rt, false);
 
             let receive = receive_one(&out1_addr, &out2_addr);
 

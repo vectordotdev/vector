@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate tracing;
 
-use exitcode;
 use futures::{future, Future, Stream};
 use std::{
     cmp::{max, min},
@@ -11,7 +10,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-use topology::{Config, Stage};
+use topology::Config;
 use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
 use tracing_metrics::MetricsSubscriber;
@@ -28,11 +27,7 @@ struct Opts {
     #[structopt(short, long)]
     require_healthy: bool,
 
-    /// Exit on startup after health-checking sinks
-    #[structopt(short, long)]
-    healthchecks_only: bool,
-
-    /// Exit on startup after config verification
+    /// Exit on startup after config verification and optional healthchecks run
     #[structopt(short, long)]
     dry_run: bool,
 
@@ -96,7 +91,7 @@ fn main() {
 
         if let Some(threads) = opts.threads {
             if threads < 1 || threads > 4 {
-                error!("Parameter `threads` must be between 1 and 4 (inclusive).");
+                error!("The `threads` argument must be between 1 and 4 (inclusive).");
                 std::process::exit(exitcode::CONFIG);
             }
         }
@@ -151,30 +146,28 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let (exit_after, require_healthy) = if opts.dry_run {
+        if opts.dry_run {
             info!("Dry run enabled, exiting after config validation.");
-            if opts.healthchecks_only {
-                info!("Ignoring `--healthchecks-only` due to more strong option `--dry-run`.");
-            }
+        }
 
-            (Some(Stage::ConfigValidated), opts.require_healthy)
-        } else if opts.healthchecks_only {
-            info!("Healthchecks only enabled, exiting after healtchecks have run.");
-            (Some(Stage::HealthChecksPassed), true)
-        } else {
-            (None, opts.require_healthy)
-        };
-
-        let result = topology::start_or_validate(config, &mut rt, exit_after, require_healthy);
-        let (mut topology, mut graceful_crash) = result.right_or_else(|success: bool| {
-            let exit_code = if success {
-                exitcode::OK
-            } else {
-                exitcode::CONFIG
-            };
-
-            std::process::exit(exit_code);
+        let pieces = topology::validate(&config).unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
         });
+
+        if opts.dry_run && !opts.require_healthy {
+            info!("Config validated, exiting.");
+            std::process::exit(exitcode::OK);
+        }
+
+        let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
+        let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
+
+        if opts.dry_run {
+            info!("Healthchecks passed, exiting.");
+            std::process::exit(exitcode::OK);
+        }
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -218,7 +211,7 @@ fn main() {
             let config = vector::topology::Config::load(file);
             let config = handle_config_errors(config);
 
-            let success = topology.reload_config_on_hot(config, &mut rt, opts.require_healthy);
+            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
             if !success {
                 error!("Reload aborted.");
             }
