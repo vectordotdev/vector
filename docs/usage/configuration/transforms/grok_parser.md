@@ -27,7 +27,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
+  
   # OPTIONAL
   drop_field = true # default
   field = "message" # default
@@ -36,12 +36,9 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "grok_parser"
   inputs = ["<string>", ...]
   pattern = "<string>"
-
-  # OPTIONAL
   drop_field = <bool>
   field = "<string>"
 ```
@@ -170,8 +167,8 @@ Finally, consider the following alternatives:
 [url.community]: https://vector.dev/community
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.grok_debugger]: http://grokdebug.herokuapp.com/
-[url.grok_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Bugs%22
-[url.grok_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Enhancements%22
+[url.grok_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Bug%22
+[url.grok_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Enhancement%22
 [url.grok_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22
 [url.grok_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 [url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns

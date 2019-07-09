@@ -45,7 +45,7 @@ if event["host"] == nil then
 end
 """
 
-
+  
   # OPTIONAL
   search_dirs = ["/etc/vector/lua"] # no default
 ```
@@ -53,12 +53,9 @@ end
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "lua"
   inputs = ["<string>", ...]
   source = "<string>"
-
-  # OPTIONAL
   search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
@@ -128,24 +125,8 @@ end
 Add a field to an event. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Add root level field
 event["new_field"] = "new value"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Add nested field
 event["parent.child"] = "nested value"
@@ -156,24 +137,8 @@ event["parent.child"] = "nested value"
 Remove a field from an event. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Remove root level field
 event["field"] = nil
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -184,24 +149,8 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Remove root level field
 event["field"] = nil
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -244,24 +193,8 @@ accessing, or removing nested fields is as simple as added a `.` in your key
 name:
 
 ```lua
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
-
 # Add nested field
 event["parent.child"] = "nested value"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/transforms/lua.md.erb
--->
 
 # Remove nested field
 event["parent.child"] = nil
@@ -324,8 +257,8 @@ Finally, consider the following alternatives:
 [url.lua_manual]: http://www.lua.org/manual/5.1/manual.html
 [url.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
 [url.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
-[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bugs%22
-[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancements%22
+[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Bug%22
+[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22+label%3A%22Type%3A+Enhancement%22
 [url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
 [url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html

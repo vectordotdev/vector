@@ -383,6 +383,67 @@ The field decode as JSON. Must be a `string` value.\
 """
 
 # ------------------------------------------------------------------------------
+# transforms.log_to_metric
+# ------------------------------------------------------------------------------
+[transforms.log_to_metric]
+allow_you_to_description = "convert logs into one or more metrics"
+function_categories = ["convert"]
+guides = []
+input_types = ["log"]
+output_types = ["metric"]
+resources = []
+
+[transforms.log_to_metric.options.metrics]
+type = "[table]"
+null = false
+description = """\
+A table of key/value pairs representing the keys to be added to the \
+event.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.type]
+type = "string"
+enum = ["counter", "gauge"]
+null = false
+description = "The metric type."
+
+[transforms.log_to_metric.options.metrics.options.field]
+type = "string"
+examples = ["duration"]
+null = false
+description = "The log field to use as the metric."
+
+[transforms.log_to_metric.options.metrics.options.increment_by_value]
+type = "bool"
+default = false
+description = """\
+If `true` the metric will be incremented by the `field` value. If `false` \
+the metric will be incremented by 1 regardless of the `field` value.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.name]
+type = "string"
+default = "<dynamic>"
+examples = ["duration_total"]
+description = """\
+The name of the metric. Defaults to `<field>_total` for `counter` and \
+`<field>` for `gauge`.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.labels]
+type = "table"
+description = "Key/value pairs representing metric labels."
+display = "inline"
+
+[transforms.log_to_metric.options.metrics.options.labels.options."*"]
+type = "string"
+examples = [
+  {name = "host", value = "${HOSTNAME}"},
+  {name = "region", value = "us-east-1"},
+]
+description = "Key/value pairs representing the metric labels."
+
+# ------------------------------------------------------------------------------
 # transforms.lua
 # ------------------------------------------------------------------------------
 [transforms.lua]
@@ -434,11 +495,6 @@ guides = []
 input_types = ["log"]
 output_types = ["log"]
 resources = []
-
-[transforms.regex_parser.options.drop_failed]
-type = "bool"
-default = false
-description = "If `true`, events that fail to properly parse will be dropped."
 
 [transforms.regex_parser.options.drop_field]
 type = "bool"
@@ -702,24 +758,35 @@ description = "The compression type to use before writing data."
 type = "string"
 category = "Requests"
 enum = ["ndjson", "text"]
+null = false
 description = "The encoding format used to serialize the events before flushing."
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"
 category = "Object Names"
 default = true
+null = false
 description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
+
+[sinks.aws_s3.options.filename_extension]
+type = "bool"
+category = "Object Names"
+default = "log"
+null = false
+description = "The extension to use in the object name."
 
 [sinks.aws_s3.options.filename_time_format]
 type = "string"
 category = "Object Names"
 default = "%s"
+null = false
 description = "The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported."
 
 [sinks.aws_s3.options.gzip]
 type = "bool"
 category = "Requests"
 default = false
+null = false
 description = "Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth."
 
 [sinks.aws_s3.options.key_prefix]

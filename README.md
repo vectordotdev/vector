@@ -125,6 +125,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
 | [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
+| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
 | [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
 | [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
@@ -205,6 +206,7 @@ the License.
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
 [docs.metric_event]: https://docs.vector.dev/about/data-model#metric
 [docs.performance]: https://docs.vector.dev/performance

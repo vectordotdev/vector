@@ -24,6 +24,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
 | [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
+| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
 | [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
 | [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
@@ -39,6 +40,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
 [docs.log_event]: ../../../about/data-model.md#log
+[docs.log_to_metric_transform]: ../../../usage/configuration/transforms/log_to_metric.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.pipelines]: ../../../usage/configuration/README.md#composition

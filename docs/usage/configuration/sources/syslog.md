@@ -25,13 +25,13 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 [sinks.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: "syslog"
-
+  
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
   max_length = 102400 # default, bytes
   mode = "tcp" # no default, enum: "tcp", "udp", "unix"
   path = "/path/to/socket" # no default
-
+  
   # OPTIONAL - Context
   host_key = "host" # default
 ```
@@ -223,7 +223,7 @@ issue, please:
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.syslog_5424]: https://tools.ietf.org/html/rfc5424
-[url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Bugs%22
-[url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Enhancements%22
+[url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Bug%22
+[url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Enhancement%22
 [url.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22
 [url.syslog_source_source]: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs

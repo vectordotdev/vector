@@ -27,14 +27,21 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-
+  
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-
+  
   # OPTIONAL - Types
   [sinks.my_tokenizer_transform_id.types]
-    * = {name = "status", value = "int"} # no default, enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # OPTIONAL
+  status = "int"
+  duration = "float"
+  success = "bool"
+  timestamp = "timestamp|%s"
+  timestamp = "timestamp|%+"
+  timestamp = "timestamp|%F"
+  timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -127,7 +134,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`no default` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
 ## Examples
 
@@ -175,29 +182,40 @@ A few things to note about the output:
 1. The `message` field was overwritten.
 2. The `ident` field was dropped since it contained a `"-"` value.
 3. All values are strings, we have plans to add type coercion.
-4. [Special wrapper characters](#special-characters) were dropped, such as wrapping `[...]` and `"..."` characters.
+4. [Special wrapper characters](#special-characters) were dropped, such as
+   wrapping `[...]` and `"..."` characters.
 
 
 ## How It Works
 
 ## Types
+
 You can coerce your extract values into types via the `types` table
 as shown in the examples above. The supported types are:
 
-| Type | Desription |
-| :--- | :--------- |
-| `string` | Coerces to a string. Generally not necessary since values are extracted as strings. |
-| `int` | Coerce to a 64 bit integer. |
-| `float` | Coerce to 64 bit floats. |
-| `bool`  | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
+| Type     | Desription                                                                            |
+|:---------|:--------------------------------------------------------------------------------------|
+| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
+| `int`    | Coerce to a 64 bit integer.                                                           |
+| `float`  | Coerce to 64 bit floats.                                                              |
+| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
+
+### Blank Values
+
+Both `" "` and `"-"` are considered blank values and their mapped field will
+be set to `null`.
 
 ### Special Characters
 
-In order to extract raw values and remove wrapping characters, we must treat certain characters as special. These characters will be discarded:
+In order to extract raw values and remove wrapping characters, we must treat
+certain characters as special. These characters will be discarded:
 
-* `"..."` - Is used tp wrap phrases. Spaces are preserved, but the wrapping quotes will be discarded.
-* `[...]` - Is used to wrap phrases. Spaces are preserved, but the wrapping brackers will be discarded.
-* `\` - Can be used to escape the above characters, making them literal.
+* `"..."` - Quotes are used tp wrap phrases. Spaces are preserved, but the
+  wrapping quotes will be discarded.
+* `[...]` - Brackets are used to wrap phrases. Spaces are preserved, but the
+  wrapping brackets will be discarded.
+* `\` - Can be used to escape the above characters, Vector will treat them as
+  literal.
 
 ## Troubleshooting
 
@@ -244,7 +262,7 @@ Finally, consider the following alternatives:
 [url.community]: https://vector.dev/community
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.tokenizer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Bugs%22
-[url.tokenizer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Enhancements%22
+[url.tokenizer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Bug%22
+[url.tokenizer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Enhancement%22
 [url.tokenizer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22
 [url.tokenizer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/tokenizer.rs

@@ -3,10 +3,13 @@
 class Option
   include Comparable
 
+  TYPES = ["*", "bool", "float", "int", "string", "[string]", "table", "[table]"]
+
   attr_reader :name,
     :category,
     :default,
     :description,
+    :display,
     :enum,
     :examples,
     :null,
@@ -27,8 +30,8 @@ class Option
     end
 
     @name = hash.fetch("name")
-    @category = hash["category"] || (@options.nil? ? "General" : @name.humanize)
     @default = hash["default"]
+    @display = hash["display"]
     @description = hash.fetch("description")
     @enum = hash["enum"]
     @examples = hash["examples"] || []
@@ -36,6 +39,12 @@ class Option
     @partition_key = hash["partition_key"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
+
+    @category = hash["category"] || ((@options.nil? || inline?) ? "General" : @name.humanize)
+
+    if !TYPES.include?(@type)
+      raise "#{self.class.name}#type must be one of #{TYPES.to_sentence} for #{@name}, you passed: #{@type}"
+    end
 
     if @examples.empty?
       if !@enum.nil?
@@ -49,7 +58,7 @@ class Option
       raise "#{self.class.name}#examples is required if a #default is not specified for #{@name}"
     end
 
-    if @name == "*"
+    if wildcard?
       if !@examples.any? { |example| example.is_a?(Hash) }
         raise "#{self.class.name}#examples must be a hash with name/value keys when the name is \"*\""
       end
@@ -58,6 +67,10 @@ class Option
 
   def <=>(other_option)
     sort_token <=> other_option.sort_token
+  end
+
+  def array?(inner_type)
+    type == "[#{inner_type}]"
   end
 
   def get_relevant_sections(sections)
@@ -69,6 +82,10 @@ class Option
 
   def human_default
     "#{default} #{unit}"
+  end
+
+  def inline?
+    display == "inline"
   end
 
   def optional?
@@ -118,5 +135,9 @@ class Option
 
   def table?
     type == "table"
+  end
+
+  def wildcard?
+    name == "*"
   end
 end

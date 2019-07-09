@@ -34,12 +34,12 @@ The `file` source ingests data through one or more local files and outputs [`log
   type = "file" # must be: "file"
   exclude = ["/var/log/nginx/access.log"]
   include = ["/var/log/nginx/*.log"]
-
+  
   # OPTIONAL - General
   ignore_older = 86400 # no default, seconds
   max_line_bytes = 102400 # default, bytes
   start_at_beginning = false # default
-
+  
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
@@ -181,11 +181,6 @@ context. You can further parse the `"message"` key with a
 
 ## How It Works
 
-### Delivery Guarantee
-
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
-
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
@@ -199,6 +194,11 @@ read more about how we identify file in the Identification section.
 Each event is augmented with contextual fields controlled by the `file_key`
 and `host_key` options. Please see the descriptions for each respective option.
 
+### Delivery Guarantee
+
+Due to the nature of this component, it offers a
+[**best effort** delivery guarantee][docs.best_effort_delivery].
+
 ### File Deletions
 
 If a file is deleted Vector will flush the current buffer and stop tailing
@@ -209,8 +209,8 @@ the file.
 Vector identifies files by creating a [cyclic redundancy check (CRC)][url.crc]
 on the first 256 bytes of the file. This serves as a fingerprint to uniquely
 identify the file. This strategy avoids the common pitfalls of using device and
-inode names since inode names, allowing Vector to [properly tail files in the 
-event of rotation][docs.correctness].
+inode names since inode names can be reused across files. This enables Vector
+to [properly tail files in the event of rotation][docs.correctness].
 
 ### File Rotation
 
@@ -274,8 +274,8 @@ issue, please:
 [images.file_source]: ../../../assets/file-source.svg
 [url.community]: https://vector.dev/community
 [url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
-[url.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bugs%22
-[url.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancements%22
+[url.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22
+[url.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22
 [url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22
 [url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)

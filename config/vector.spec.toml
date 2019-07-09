@@ -419,6 +419,66 @@
   # * default: "message"
   field = "message"
 
+[transforms.log_to_metric]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "log_to_metric"
+  type = "log_to_metric"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Metrics
+  #
+
+  [[transforms.log_to_metric.metrics]]
+    # The metric type.
+    # 
+    # * required
+    # * no default
+    # * enum: "counter", "gauge"
+    type = "counter"
+    type = "gauge"
+
+    # The log field to use as the metric.
+    # 
+    # * required
+    # * no default
+    field = "duration"
+
+    # If `true` the metric will be incremented by the `field` value. If `false` the
+    # metric will be incremented by 1 regardless of the `field` value.
+    # 
+    # * optional
+    # * default: false
+    increment_by_value = false
+
+    # The name of the metric. Defaults to `<field>_total` for `counter` and
+    # `<field>` for `gauge`.
+    # 
+    # * optional
+    # * default: "<dynamic>"
+    name = "duration_total"
+
+    [transforms.log_to_metric.metrics.labels]
+      # Key/value pairs representing the metric labels.
+      # 
+      # * optional
+      # * no default
+      host = "${HOSTNAME}"
+      region = "us-east-1"
+
 [transforms.lua]
   #
   # General
@@ -486,12 +546,6 @@ end
   # * required
   # * no default
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # If `true`, events that fail to properly parse will be dropped.
-  # 
-  # * optional
-  # * default: false
-  drop_failed = false
 
   # If the `field` should be dropped (removed) after parsing.
   # 
@@ -958,54 +1012,16 @@ end
   region = "us-east-1"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: bytes
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-
-  #
   # Requests
   #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson", "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   # The compression type to use before writing data.
   # 
@@ -1013,14 +1029,6 @@ end
   # * no default
   # * must be: "gzip"
   compression = "gzip"
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
@@ -1068,6 +1076,58 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: bytes
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  # 
+  # * optional
+  # * default: "date=%F"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
 
   #
   # Buffer
@@ -1965,3 +2025,6 @@ end
     # * optional
     # * default: 500
     num_items = 500
+
+
+

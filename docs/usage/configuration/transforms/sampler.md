@@ -33,7 +33,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
   # REQUIRED
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
-
+  
   # OPTIONAL
   pass_list = ["[error]", "field2"] # no default
   rate = ["field1", "field2"] # no default
@@ -42,11 +42,8 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "sampler"
   inputs = ["<string>", ...]
-
-  # OPTIONAL
   pass_list = ["<string>", ...]
   rate = <int>
 ```
@@ -133,8 +130,8 @@ issue, please:
 [images.sampler_transform]: ../../../assets/sampler-transform.svg
 [url.community]: https://vector.dev/community
 [url.new_sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_sampler%22
-[url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bugs%22
-[url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancements%22
+[url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22
+[url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22
 [url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22
 [url.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

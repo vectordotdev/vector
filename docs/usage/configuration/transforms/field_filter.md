@@ -40,7 +40,6 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED
   type = "field_filter"
   inputs = ["<string>", ...]
   field = "<string>"
@@ -135,8 +134,8 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.field_filter_transform]: ../../../assets/field_filter-transform.svg
 [url.community]: https://vector.dev/community
-[url.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bugs%22
-[url.field_filter_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancements%22
+[url.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bug%22
+[url.field_filter_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancement%22
 [url.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22
 [url.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 [url.issue_479]: https://github.com/timberio/vector/issues/479

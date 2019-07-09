@@ -28,24 +28,8 @@ vector --config /etc/vector/vector.toml
 {% code-tabs %}
 {% code-tabs-item title="vector.toml" %}
 ```coffeescript
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Set global options
 data_dir = "/var/lib/vector"
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
@@ -53,27 +37,11 @@ data_dir = "/var/lib/vector"
   include      = ["/var/log/apache2/*.log"]    # supports globbing
   ignore_older = 86400                         # 1 day
 
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Structure and parse the data
 [transforms.apache_parser]
   inputs       = ["apache_logs"]
   type         = "regex_parser"                # fast/powerful regex
   regex        = '^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$'
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Sample the data to save on cost
 [transforms.apache_sampler]
@@ -82,28 +50,12 @@ data_dir = "/var/lib/vector"
   hash_field   = "request_id"                  # sample _entire_ requests
   rate         = 50                            # only keep 50%
 
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
-
 # Send structured data to a short-term storage
 [sinks.es_cluster]
   inputs       = ["apache_sampler"]            # don't sample for S3
   type         = "elasticsearch"
   host         = "http://79.12.221.222:9200"   # local or external host
   index        = "vector-%Y-%m-%d"             # daily partitions
-
-<!--
-     THIS FILE IS AUTOOGENERATED!
-
-     To make changes please edit the template located at:
-
-     scripts/generate/templates/docs/usage/configuration/README.md.erb
--->
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
@@ -147,6 +99,7 @@ data_dir = "/var/lib/vector"
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
 | [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
+| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
 | [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
 | [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
@@ -260,6 +213,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
 [docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
 [docs.log_event]: ../../about/data-model.md#log
+[docs.log_to_metric_transform]: ../../usage/configuration/transforms/log_to_metric.md
 [docs.lua_transform]: ../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../about/data-model.md#metric
 [docs.operating_systems]: ../../setup/installation/operating-systems

@@ -7,11 +7,12 @@
 | <%= title %> | | |
 <% end -%>
 <% options.each do |option| -%>
+<%- name = opts[:path] ? "#{opts[:path]}.#{option.name}" : option.name -%>
 <% if !option.options.nil? -%>
-<%= options_table(option.options, header: false, path: option.name, titles: false) %>
+<%= options_table(option.options, header: false, path: name, titles: false) %>
 <% else -%>
-<% tags = table.option_tags(option) -%>
-| `<%= option.name %>` | `<%= option.type %>` | <%= option.description %><% if tags.any? %><br /><%= tags(tags) %><% end %> |
+<%- tags = table.option_tags(option) -%>
+| `<%= name %>` | `<%= option.type %>` | <%= option.description %><% if tags.any? %><br /><%= tags(tags) %><% end %> |
 <% end -%>
 <% end -%>
 <% end -%>
