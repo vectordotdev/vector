@@ -568,13 +568,34 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("stream-{event.log_stream}");
+        let stream = interpolate("abcd-{event.log_stream}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
         let expected = CloudwatchKey {
-            stream: "stream-stream".into(),
+            stream: "abcd-stream".into(),
+            group: "group".into(),
+        };
+
+        assert_eq!(key, expected)
+    }
+
+    #[test]
+    fn partition_event_with_postfix() {
+        let mut event = Event::from("hello world");
+
+        event
+            .as_mut_log()
+            .insert_implicit("log_stream".into(), "stream".into());
+
+        let stream = interpolate("{event.log_stream}-abcd");
+        let group = "group".into();
+
+        let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
+
+        let expected = CloudwatchKey {
+            stream: "stream-abcd".into(),
             group: "group".into(),
         };
 
