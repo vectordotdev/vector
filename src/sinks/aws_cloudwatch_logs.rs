@@ -6,6 +6,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
+use regex::bytes::{Captures, Regex};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
@@ -38,10 +39,13 @@ pub struct CloudwatchLogsSvc {
     group_name: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 enum Partition {
+    /// A static field that doesn't create dynamic partitions
     Static(Bytes),
-    Field(Atom),
+    /// Represents the ability to extract a key/value from the event
+    /// via the provided interpolated stream name.
+    Field(Regex, Bytes, Atom),
 }
 
 type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<Event>>;
@@ -120,7 +124,7 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
                     batch_size,
                     Duration::from_secs(batch_timeout),
                 )
-                .with_flat_map(move |event| partition(event, &log_group, &log_stream));
+                .with_flat_map(move |event| iter_ok(partition(event, &log_group, &log_stream)));
             Box::new(svc_sink)
         };
 
@@ -175,7 +179,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
             svc.clone()
         } else {
             let svc = {
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config).unwrap();
+                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
                 let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
 
                 // TODO: add Buffer/Retry here
@@ -207,15 +211,18 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: &CloudwatchLogsSinkConfig) -> Result<Self, String> {
+    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> Result<Self, String> {
         let region = config.region.clone().try_into()?;
         let client = CloudWatchLogsClient::new(region);
+
+        let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
+        let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
 
         Ok(CloudwatchLogsSvc {
             client,
             encoding: config.encoding.clone(),
-            stream_name: config.stream_name.clone(),
-            group_name: config.group_name.clone(),
+            stream_name,
+            group_name,
             state: State::Idle,
         })
     }
@@ -361,18 +368,19 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-struct CloudwatchKey {
+pub struct CloudwatchKey {
     group: Bytes,
     stream: Bytes,
 }
 
 fn interpolate(s: &str) -> Partition {
-    use regex::Regex;
     let r = Regex::new(r"\{event\.(?P<key>\D+)\}").unwrap();
 
-    if let Some(cap) = r.captures(s) {
+    if let Some(cap) = r.captures(s.as_bytes()) {
         if let Some(m) = cap.name("key") {
-            return Partition::Field(m.as_str().into());
+            // TODO(lucio): clean up unwrap
+            let key = String::from_utf8(Vec::from(m.as_bytes())).unwrap();
+            return Partition::Field(r, s.into(), key.into());
         }
     }
 
@@ -383,19 +391,20 @@ fn partition(
     event: Event,
     group: &Bytes,
     stream: &Partition,
-) -> impl futures::Stream<Item = PartitionInnerBuffer<Event, CloudwatchKey>, Error = ()> {
+) -> Option<PartitionInnerBuffer<Event, CloudwatchKey>> {
     let stream = match stream {
         Partition::Static(g) => g.clone(),
-        Partition::Field(key) => {
+        Partition::Field(regex, stream, key) => {
             if let Some(val) = event.as_log().get(&key) {
-                val.as_bytes().clone()
+                let cap = regex.replace(stream, |_cap: &Captures| val.as_bytes().clone());
+                Bytes::from(&cap[..])
             } else {
                 warn!(
                     message =
                         "Event key does not exist on the event and the event will be dropped.",
                     key = field::debug(key)
                 );
-                return iter_ok(vec![]);
+                return None;
             }
         }
     };
@@ -405,7 +414,7 @@ fn partition(
         group: group.clone(),
     };
 
-    iter_ok(vec![PartitionInnerBuffer::new(event, key)])
+    Some(PartitionInnerBuffer::new(event, key))
 }
 
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
@@ -493,22 +502,25 @@ mod tests {
         event::{self, Event, ValueKind},
         region::RegionOrEndpoint,
     };
-    use futures::Stream;
     use std::collections::HashMap;
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn interpolate_event() {
-        let partition = interpolate("{event.some_key}");
-
-        assert_eq!(partition, Partition::Field("some_key".into()));
+        if let Partition::Field(_, _, key) = interpolate("{event.some_key}") {
+            assert_eq!(key, "some_key".to_string());
+        } else {
+            panic!("Expected Partition::Field");
+        }
     }
 
     #[test]
     fn interpolate_static() {
-        let partition = interpolate("static_key");
-
-        assert_eq!(partition, Partition::Static("static_key".into()));
+        if let Partition::Static(key) = interpolate("static_key") {
+            assert_eq!(key, "static_key".to_string());
+        } else {
+            panic!("Expected Partition::Static");
+        }
     }
 
     #[test]
@@ -517,13 +529,7 @@ mod tests {
         let stream = Partition::Static("stream".into());
         let group = "group".into();
 
-        let (_event, key) = partition(event, &group, &stream)
-            .wait()
-            .into_iter()
-            .next()
-            .unwrap()
-            .unwrap()
-            .into_parts();
+        let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -541,16 +547,10 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = Partition::Field("log_stream".into());
+        let stream = interpolate("{event.log_stream}");
         let group = "group".into();
 
-        let (_event, key) = partition(event, &group, &stream)
-            .wait()
-            .into_iter()
-            .next()
-            .unwrap()
-            .unwrap()
-            .into_parts();
+        let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -561,13 +561,34 @@ mod tests {
     }
 
     #[test]
+    fn partition_event_with_prefix() {
+        let mut event = Event::from("hello world");
+
+        event
+            .as_mut_log()
+            .insert_implicit("log_stream".into(), "stream".into());
+
+        let stream = interpolate("stream-{event.log_stream}");
+        let group = "group".into();
+
+        let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
+
+        let expected = CloudwatchKey {
+            stream: "stream-stream".into(),
+            group: "group".into(),
+        };
+
+        assert_eq!(key, expected)
+    }
+
+    #[test]
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = Partition::Field("log_stream".into());
+        let stream = interpolate("{event.log_stream}");
         let group = "group".into();
 
-        let stream_val = partition(event, &group, &stream).wait().into_iter().next();
+        let stream_val = partition(event, &group, &stream);
 
         assert!(stream_val.is_none());
     }
@@ -578,8 +599,12 @@ mod tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
         };
+        let key = CloudwatchKey {
+            stream: "stream".into(),
+            group: "group".into(),
+        };
 
-        let svc = CloudwatchLogsSvc::new(&config).unwrap();
+        let svc = CloudwatchLogsSvc::new(&config, &key).unwrap();
 
         let mut event = Event::from("hello world").into_log();
 
@@ -610,7 +635,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         region::RegionOrEndpoint,
-        test_util::{block_on, random_lines_with_stream},
+        test_util::{block_on, random_lines_with_stream, random_string},
         topology::config::SinkConfig,
     };
     use futures::Sink;
@@ -619,11 +644,12 @@ mod integration_tests {
         CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, GetLogEventsRequest,
     };
 
-    const STREAM_NAME: &'static str = "test-1";
-    const GROUP_NAME: &'static str = "router";
+    const GROUP_NAME: &'static str = "vector-cw";
 
     #[test]
     fn cloudwatch_insert_log_event() {
+        let stream_name = gen_stream();
+
         let region = Region::Custom {
             name: "localstack".into(),
             endpoint: "http://localhost:6000".into(),
@@ -631,7 +657,7 @@ mod integration_tests {
         ensure_group(region.clone());
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: STREAM_NAME.into(),
+            stream_name: stream_name.clone().into(),
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
@@ -647,11 +673,9 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = STREAM_NAME.into();
+        request.log_stream_name = stream_name.clone().into();
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
 
         let client = CloudWatchLogsClient::new(region);
 
@@ -668,6 +692,73 @@ mod integration_tests {
     }
 
     #[test]
+    fn cloudwatch_insert_log_event_partitioned() {
+        let stream_name = gen_stream();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+        ensure_group(region.clone());
+
+        let config = CloudwatchLogsSinkConfig {
+            group_name: GROUP_NAME.into(),
+            stream_name: format!("{}-{{event.key}}", stream_name).into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+
+        let (sink, _) = config.build(Acker::Null).unwrap();
+
+        let timestamp = chrono::Utc::now();
+
+        let (input_lines, _) = random_lines_with_stream(100, 10);
+
+        let events = input_lines
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let mut event = Event::from(e);
+                let stream = format!("{}", (i % 2));
+                event
+                    .as_mut_log()
+                    .insert_implicit("key".into(), stream.into());
+                event
+            })
+            .collect::<Vec<_>>();
+
+        let pump = sink.send_all(iter_ok(events));
+        block_on(pump).unwrap();
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = format!("{}-0", stream_name);
+        request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some(timestamp.timestamp_millis());
+
+        let client = CloudWatchLogsClient::new(region);
+
+        let response = block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        let expected_output = input_lines
+            .clone()
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| i % 2 == 0)
+            .map(|(_, e)| e)
+            .collect::<Vec<_>>();
+
+        assert_eq!(output_lines, expected_output);
+    }
+
+    #[test]
     fn cloudwatch_healthcheck() {
         let region = Region::Custom {
             name: "localstack".into(),
@@ -676,7 +767,7 @@ mod integration_tests {
         ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
-            stream_name: STREAM_NAME.into(),
+            stream_name: "test-stream".into(),
             group_name: GROUP_NAME.into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
@@ -699,4 +790,7 @@ mod integration_tests {
         };
     }
 
+    fn gen_stream() -> String {
+        format!("test-{}", random_string(10).to_lowercase())
+    }
 }
