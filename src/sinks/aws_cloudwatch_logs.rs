@@ -664,11 +664,13 @@ mod integration_tests {
     use rusoto_logs::{
         CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupRequest, GetLogEventsRequest,
     };
+    use tokio::runtime::current_thread::Runtime;
 
     const GROUP_NAME: &'static str = "vector-cw";
 
     #[test]
     fn cloudwatch_insert_log_event() {
+        let mut rt = Runtime::new().unwrap();
         let stream_name = gen_stream();
 
         let region = Region::Custom {
@@ -691,7 +693,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -700,7 +702,7 @@ mod integration_tests {
 
         let client = CloudWatchLogsClient::new(region);
 
-        let response = block_on(client.get_log_events(request)).unwrap();
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
 
         let events = response.events.unwrap();
 
@@ -714,13 +716,16 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_insert_log_event_partitioned() {
+        let mut rt = Runtime::new().unwrap();
         let stream_name = gen_stream();
 
         let region = Region::Custom {
             name: "localstack".into(),
             endpoint: "http://localhost:6000".into(),
         };
-        ensure_group(region.clone());
+
+        let client = CloudWatchLogsClient::new(region.clone());
+        ensure_group(region);
 
         let config = CloudwatchLogsSinkConfig {
             group_name: GROUP_NAME.into(),
@@ -750,16 +755,14 @@ mod integration_tests {
             .collect::<Vec<_>>();
 
         let pump = sink.send_all(iter_ok(events));
-        block_on(pump).unwrap();
+        rt.block_on(pump).unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = format!("{}-0", stream_name);
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let client = CloudWatchLogsClient::new(region);
-
-        let response = block_on(client.get_log_events(request)).unwrap();
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
 
         let events = response.events.unwrap();
 
