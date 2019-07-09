@@ -668,118 +668,136 @@ mod integration_tests {
 
     const GROUP_NAME: &'static str = "vector-cw";
 
+    // This test includes both the single partition test
+    // and the partitioned test. The reason that we must include
+    // both in here is due to the fact that `rusoto` uses a shared
+    // client internally. This shared client with lazily create a
+    // background task to actually dispatch all the requests. This background
+    // task is spawned onto the current executor at time of the request. This is
+    // a `hyper` client. Since, `rusoto` uses a shared client when the second test
+    // starts roughly at the same time as the other it will use this shared client.
+    // If the first test is not done yet and the runtime that was created for that first
+    // test has not been dropped, the second test will be able to submit a request. If
+    // the first test has _finished_ and the runtime has been _dropped_ then the background
+    // task is gone. This will then cause the hyper client in the second test to be unable to
+    // send the request down the channel to the background task because its now gone. We combine
+    // both tests to ensure that we can use the same runtime and it will only get dropped after both
+    // tests have run.
     #[test]
-    fn cloudwatch_insert_log_event() {
+    fn cloudwatch_insert_log_event_and_partitioned() {
         let mut rt = Runtime::new().unwrap();
-        let stream_name = gen_stream();
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
-        ensure_group(region.clone());
+        // Run single partition test
+        {
+            let stream_name = gen_stream();
 
-        let config = CloudwatchLogsSinkConfig {
-            stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            ..Default::default()
-        };
+            let region = Region::Custom {
+                name: "localstack".into(),
+                endpoint: "http://localhost:6000".into(),
+            };
+            ensure_group(region.clone());
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+            let config = CloudwatchLogsSinkConfig {
+                stream_name: stream_name.clone().into(),
+                group_name: GROUP_NAME.into(),
+                region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+                ..Default::default()
+            };
 
-        let timestamp = chrono::Utc::now();
+            let (sink, _) = config.build(Acker::Null).unwrap();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+            let timestamp = chrono::Utc::now();
 
-        let pump = sink.send_all(events);
-        rt.block_on(pump).unwrap();
+            let (input_lines, events) = random_lines_with_stream(100, 11);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+            let pump = sink.send_all(events);
+            rt.block_on(pump).unwrap();
 
-        let client = CloudWatchLogsClient::new(region);
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = stream_name.clone().into();
+            request.log_group_name = GROUP_NAME.into();
+            request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+            let client = CloudWatchLogsClient::new(region);
 
-        let events = response.events.unwrap();
+            let response = rt.block_on(client.get_log_events(request)).unwrap();
 
-        let output_lines = events
-            .into_iter()
-            .map(|e| e.message.unwrap())
-            .collect::<Vec<_>>();
+            let events = response.events.unwrap();
 
-        assert_eq!(output_lines, input_lines);
-    }
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
 
-    #[test]
-    fn cloudwatch_insert_log_event_partitioned() {
-        let mut rt = Runtime::new().unwrap();
-        let stream_name = gen_stream();
+            assert_eq!(output_lines, input_lines);
+        }
 
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:6000".into(),
-        };
+        // Run multi partition test
+        {
+            let stream_name = gen_stream();
 
-        let client = CloudWatchLogsClient::new(region.clone());
-        ensure_group(region);
+            let region = Region::Custom {
+                name: "localstack".into(),
+                endpoint: "http://localhost:6000".into(),
+            };
 
-        let config = CloudwatchLogsSinkConfig {
-            group_name: GROUP_NAME.into(),
-            stream_name: format!("{}-{{event.key}}", stream_name).into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
-            ..Default::default()
-        };
+            let client = CloudWatchLogsClient::new(region.clone());
+            ensure_group(region);
 
-        let (sink, _) = config.build(Acker::Null).unwrap();
+            let config = CloudwatchLogsSinkConfig {
+                group_name: GROUP_NAME.into(),
+                stream_name: format!("{}-{{event.key}}", stream_name).into(),
+                region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+                ..Default::default()
+            };
 
-        let timestamp = chrono::Utc::now();
+            let (sink, _) = config.build(Acker::Null).unwrap();
 
-        let (input_lines, _) = random_lines_with_stream(100, 10);
+            let timestamp = chrono::Utc::now();
 
-        let events = input_lines
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(i, e)| {
-                let mut event = Event::from(e);
-                let stream = format!("{}", (i % 2));
-                event
-                    .as_mut_log()
-                    .insert_implicit("key".into(), stream.into());
-                event
-            })
-            .collect::<Vec<_>>();
+            let (input_lines, _) = random_lines_with_stream(100, 10);
 
-        let pump = sink.send_all(iter_ok(events));
-        rt.block_on(pump).unwrap();
+            let events = input_lines
+                .clone()
+                .into_iter()
+                .enumerate()
+                .map(|(i, e)| {
+                    let mut event = Event::from(e);
+                    let stream = format!("{}", (i % 2));
+                    event
+                        .as_mut_log()
+                        .insert_implicit("key".into(), stream.into());
+                    event
+                })
+                .collect::<Vec<_>>();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = format!("{}-0", stream_name);
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+            let pump = sink.send_all(iter_ok(events));
+            rt.block_on(pump).unwrap();
 
-        let response = rt.block_on(client.get_log_events(request)).unwrap();
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = format!("{}-0", stream_name);
+            request.log_group_name = GROUP_NAME.into();
+            request.start_time = Some(timestamp.timestamp_millis());
 
-        let events = response.events.unwrap();
+            let response = rt.block_on(client.get_log_events(request)).unwrap();
 
-        let output_lines = events
-            .into_iter()
-            .map(|e| e.message.unwrap())
-            .collect::<Vec<_>>();
+            let events = response.events.unwrap();
 
-        let expected_output = input_lines
-            .clone()
-            .into_iter()
-            .enumerate()
-            .filter(|(i, _)| i % 2 == 0)
-            .map(|(_, e)| e)
-            .collect::<Vec<_>>();
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
 
-        assert_eq!(output_lines, expected_output);
+            let expected_output = input_lines
+                .clone()
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| i % 2 == 0)
+                .map(|(_, e)| e)
+                .collect::<Vec<_>>();
+
+            assert_eq!(output_lines, expected_output);
+        }
     }
 
     #[test]
