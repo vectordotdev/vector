@@ -235,6 +235,18 @@ jobs:
           name: Verify installation
           command: vector --version
 
+  verify-deb-10:
+    docker:
+      - image: timberiodev/vector-verifier-deb-10:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
   verify-systemd:
     machine: true
     steps:
@@ -415,6 +427,7 @@ release-requires: &release-requires
     - verify-centos-7
     - verify-deb-8
     - verify-deb-9
+    - verify-deb-10
     - verify-ubuntu-16-04
     - verify-ubuntu-18-04
     - verify-ubuntu-19-04
@@ -458,6 +471,9 @@ workflows:
           <<: *release-workflow-filters
           <<: *verify-requires
       - verify-deb-9:
+          <<: *release-workflow-filters
+          <<: *verify-requires
+      - verify-deb-10:
           <<: *release-workflow-filters
           <<: *verify-requires
       - verify-ubuntu-16-04:
