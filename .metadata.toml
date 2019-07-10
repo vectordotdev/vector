@@ -441,7 +441,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 
 [transforms.log_to_metric.options.metrics.options.name]
 type = "string"
-default = "<dynamic>"
+default = "dynamic"
 examples = ["duration_total"]
 null = false
 description = """\
@@ -692,7 +692,7 @@ write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogE
 [sinks.aws_cloudwatch_logs.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -740,7 +740,7 @@ write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -874,7 +874,7 @@ write_to_description = "the console, `STDOUT` or `STDERR`"
 
 [sinks.console.options.encoding]
 type = "string"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before writing."
@@ -1016,7 +1016,7 @@ to initially to bootstrap itself\
 
 [sinks.kafka.options.encoding]
 type = "string"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -1074,7 +1074,7 @@ write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
 [sinks.splunk_hec.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["ndjson", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -1109,7 +1109,7 @@ description = "The TCP address."
 [sinks.tcp.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
+default = "dynamic"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."

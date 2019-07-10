@@ -69,7 +69,7 @@ The `console` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_ev
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout", "stderr"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "json", "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |

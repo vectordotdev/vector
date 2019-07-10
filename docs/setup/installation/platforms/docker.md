@@ -36,10 +36,10 @@ systemctl start vector
 
 ## Configuring
 
-You'll notice in the [Installation](#installation) sectiiono a custom
+You'll notice in the [Installation](#installation) section a custom
 configuration is mounted with the `-v` flag. This is how we recommend
 cusomtizing conofiguration in the Docker environment. Alternatively,
-you can extend the `timberio/vector` images to `COPY` your custom config
+you can extend the `timberio/vector` images and `COPY` your custom config
 into your own image.
 
 You can learn more about configuring Vector in the

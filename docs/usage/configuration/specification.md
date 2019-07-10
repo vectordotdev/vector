@@ -465,7 +465,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # `<field>` for `gauge`.
     # 
     # * optional
-    # * default: "<dynamic>"
+    # * default: "dynamic"
     name = "duration_total"
 
     [transforms.log_to_metric.metrics.labels]
@@ -747,7 +747,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -884,7 +884,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -1242,7 +1242,7 @@ end
   # The encoding format used to serialize the events before writing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -1638,7 +1638,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
@@ -1796,7 +1796,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "ndjson", "text"
   encoding = "ndjson"
   encoding = "text"
@@ -1909,7 +1909,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * default: "dynamic"
   # * enum: "json", "text"
   encoding = "json"
   encoding = "text"
