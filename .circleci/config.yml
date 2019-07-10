@@ -235,6 +235,18 @@ jobs:
           name: Verify installation
           command: vector --version
 
+  verify-deb-10:
+    docker:
+      - image: timberiodev/vector-verifier-deb-10:latest
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify installation
+          command: vector --version
+
   verify-systemd:
     machine: true
     steps:
