@@ -13,6 +13,7 @@ echo "Dsitributing .deb package via Package Cloud"
 # Debian
 package_cloud push timberio/packages/debian/jessie target/artifacts/*.deb
 package_cloud push timberio/packages/debian/stretch target/artifacts/*.deb
+package_cloud push timberio/packages/debian/buster target/artifacts/*.deb
 
 # Ubuntu
 package_cloud push timberio/packages/ubuntu/xenial target/artifacts/*.deb
