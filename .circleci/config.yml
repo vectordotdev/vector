@@ -393,7 +393,7 @@ test-filters: &test-filters
 release-workflow-filters: &release-workflow-filters
   filters:
     branches:
-      only: /.*/
+      only: master
     tags:
       only: /v.*/
 
@@ -485,25 +485,25 @@ workflows:
       - verify-ubuntu-19-04:
           <<: *release-workflow-filters
           <<: *verify-requires
-      # - release-deb:
-      #     <<: *tag-release-workflow-filters
-      #     <<: *release-requires
-      # - release-github:
-      #     <<: *tag-release-workflow-filters
-      #     <<: *release-requires
-      # - release-rpm:
-      #     <<: *tag-release-workflow-filters
-      #     <<: *release-requires
-      # - release-s3:
-      #     <<: *release-workflow-filters
-      #     <<: *release-requires
-      # # Installs directly from S3
-      # - release-docker:
-      #     <<: *tag-release-workflow-filters
-      #     requires:
-      #       - release-s3
-      # # Installs directly from S3
-      # - release-homebrew:
-      #     <<: *tag-release-workflow-filters
-      #     requires:
-      #       - release-s3
+      - release-deb:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-github:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-rpm:
+          <<: *tag-release-workflow-filters
+          <<: *release-requires
+      - release-s3:
+          <<: *release-workflow-filters
+          <<: *release-requires
+      # Installs directly from S3
+      - release-docker:
+          <<: *tag-release-workflow-filters
+          requires:
+            - release-s3
+      # Installs directly from S3
+      - release-homebrew:
+          <<: *tag-release-workflow-filters
+          requires:
+            - release-s3
