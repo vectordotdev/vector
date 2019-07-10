@@ -8,6 +8,7 @@ pub mod blackhole;
 pub mod clickhouse;
 pub mod console;
 pub mod elasticsearch;
+pub mod file;
 pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

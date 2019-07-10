@@ -1,7 +1,10 @@
 use crate::Event;
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use std::fs::File;
+use std::io::Read;
 use std::mem;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
@@ -94,6 +97,13 @@ pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = V
         }
         Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
     })
+}
+
+pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    let mut file = File::open(path).unwrap();
+    let mut output = String::new();
+    file.read_to_string(&mut output).unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
 }
 
 pub fn wait_for(f: impl Fn() -> bool) {
