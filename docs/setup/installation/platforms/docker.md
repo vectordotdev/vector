@@ -21,7 +21,7 @@ docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian-slim" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-slim:latest
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

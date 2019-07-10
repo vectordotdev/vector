@@ -17,7 +17,7 @@ architectures. If you don't see an architecture, then we recommend
 [building Vector from source][docs.from_source].
 
 {% tabs %}
-{% tab title=Latest %}
+{% tab title="Latest" %}
 "Latest" represents the latest stable release.
 
 | Architecture | Channel | Notes |
