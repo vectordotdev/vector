@@ -393,7 +393,7 @@ test-filters: &test-filters
 release-workflow-filters: &release-workflow-filters
   filters:
     branches:
-      only: master
+      only: /.*/
     tags:
       only: /v.*/
 
@@ -427,6 +427,7 @@ release-requires: &release-requires
     - verify-centos-7
     - verify-deb-8
     - verify-deb-9
+    - verify-deb-10
     - verify-ubuntu-16-04
     - verify-ubuntu-18-04
     - verify-ubuntu-19-04
@@ -472,6 +473,9 @@ workflows:
       - verify-deb-9:
           <<: *release-workflow-filters
           <<: *verify-requires
+      - verify-deb-10:
+          <<: *release-workflow-filters
+          <<: *verify-requires
       - verify-ubuntu-16-04:
           <<: *release-workflow-filters
           <<: *verify-requires
@@ -481,25 +485,25 @@ workflows:
       - verify-ubuntu-19-04:
           <<: *release-workflow-filters
           <<: *verify-requires
-      - release-deb:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
-      - release-github:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
-      - release-rpm:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
-      - release-s3:
-          <<: *release-workflow-filters
-          <<: *release-requires
-      # Installs directly from S3
-      - release-docker:
-          <<: *tag-release-workflow-filters
-          requires:
-            - release-s3
-      # Installs directly from S3
-      - release-homebrew:
-          <<: *tag-release-workflow-filters
-          requires:
-            - release-s3
+      # - release-deb:
+      #     <<: *tag-release-workflow-filters
+      #     <<: *release-requires
+      # - release-github:
+      #     <<: *tag-release-workflow-filters
+      #     <<: *release-requires
+      # - release-rpm:
+      #     <<: *tag-release-workflow-filters
+      #     <<: *release-requires
+      # - release-s3:
+      #     <<: *release-workflow-filters
+      #     <<: *release-requires
+      # # Installs directly from S3
+      # - release-docker:
+      #     <<: *tag-release-workflow-filters
+      #     requires:
+      #       - release-s3
+      # # Installs directly from S3
+      # - release-homebrew:
+      #     <<: *tag-release-workflow-filters
+      #     requires:
+      #       - release-s3
