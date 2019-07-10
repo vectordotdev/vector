@@ -1,3 +1,4 @@
+use crate::FilePosition;
 use std::fs;
 use std::io::{self, BufRead, Seek};
 use std::os::unix::fs::MetadataExt;
@@ -14,10 +15,11 @@ use std::time;
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: Option<io::BufReader<fs::File>>,
-    previous_size: u64,
+    reader: io::BufReader<fs::File>,
+    file_position: FilePosition,
     devno: u64,
     inode: u64,
+    is_dead: bool,
 }
 
 impl FileWatcher {
@@ -28,67 +30,46 @@ impl FileWatcher {
     /// None if the path does not exist or is not readable by cernan.
     pub fn new(
         path: PathBuf,
-        start_at_beginning: bool,
+        file_position: FilePosition,
         ignore_before: Option<time::SystemTime>,
-    ) -> io::Result<FileWatcher> {
-        match fs::File::open(&path) {
-            Ok(f) => {
-                let metadata = f.metadata()?;
-                let mut rdr = io::BufReader::new(f);
+    ) -> Result<FileWatcher, io::Error> {
+        let f = fs::File::open(&path)?;
+        let metadata = f.metadata()?;
+        let mut rdr = io::BufReader::new(f);
 
-                let too_old = if let (Some(ignore_before), Ok(mtime)) =
-                    (ignore_before, metadata.modified())
-                {
-                    mtime < ignore_before
-                } else {
-                    false
-                };
+        let too_old = if let (Some(ignore_before), Ok(modified_time)) =
+            (ignore_before, metadata.modified())
+        {
+            modified_time < ignore_before
+        } else {
+            false
+        };
 
-                if !start_at_beginning || too_old {
-                    assert!(rdr.seek(io::SeekFrom::End(0)).is_ok());
-                }
+        let file_position = if too_old {
+            rdr.seek(io::SeekFrom::End(0)).unwrap()
+        } else {
+            rdr.seek(io::SeekFrom::Start(file_position)).unwrap()
+        };
 
-                Ok(FileWatcher {
-                    path: path,
-                    findable: true,
-                    reader: Some(rdr),
-                    previous_size: 0,
-                    devno: metadata.dev(),
-                    inode: metadata.ino(),
-                })
-            }
-            Err(e) => match e.kind() {
-                io::ErrorKind::NotFound => {
-                    let fw = {
-                        FileWatcher {
-                            path: path,
-                            findable: true,
-                            reader: None,
-                            previous_size: 0,
-                            devno: 0,
-                            inode: 0,
-                        }
-                    };
-                    Ok(fw)
-                }
-                _ => Err(e),
-            },
-        }
+        Ok(FileWatcher {
+            path: path,
+            findable: true,
+            reader: rdr,
+            file_position: file_position,
+            devno: metadata.dev(),
+            inode: metadata.ino(),
+            is_dead: false,
+        })
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
-        assert!(self.reader.is_some());
         let metadata = fs::metadata(&path)?;
-        let (devno, inode) = (metadata.dev(), metadata.ino());
-        if (devno, inode) != (self.devno, self.inode) {
-            let old_reader = self.reader.as_mut().unwrap();
-            let position = old_reader.seek(io::SeekFrom::Current(0))?;
-            let f = fs::File::open(&path)?;
-            let mut new_reader = io::BufReader::new(f);
-            new_reader.seek(io::SeekFrom::Start(position))?;
-            self.reader = Some(new_reader);
-            self.devno = devno;
-            self.inode = inode;
+        if (metadata.dev(), metadata.ino()) != (self.devno, self.inode) {
+            let mut new_reader = io::BufReader::new(fs::File::open(&path)?);
+            new_reader.seek(io::SeekFrom::Start(self.file_position))?;
+            self.reader = new_reader;
+            self.devno = metadata.dev();
+            self.inode = metadata.ino();
         }
         self.path = path;
         Ok(())
@@ -103,11 +84,15 @@ impl FileWatcher {
     }
 
     pub fn set_dead(&mut self) {
-        self.reader = None;
+        self.is_dead = true;
     }
 
     pub fn dead(&self) -> bool {
-        self.reader.is_none()
+        self.is_dead
+    }
+
+    pub fn get_file_position(&self) -> FilePosition {
+        self.file_position
     }
 
     /// Read a single line from the underlying file
@@ -118,56 +103,21 @@ impl FileWatcher {
     pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
         //ensure buffer is re-initialized
         buffer.clear();
-        if let Some(ref mut reader) = self.reader {
-            // Every read we detect the current_size of the file and compare
-            // against the previous_size. There are three cases to consider:
-            //
-            //  * current_size > previous_size
-            //  * current_size == previous_size
-            //  * current_size < previous_size
-            //
-            // In the last case we must consider that the file has been
-            // truncated and we can no longer trust our seek position
-            // in-file. We MUST seek back to position 0. This is the _simplest_
-            // case to handle.
-            //
-            // Consider the equality case. It's possible that NO WRITES have
-            // come into the file _or_ that the file has been truncated and
-            // coincidentally the new writes exactly match the byte size of the
-            // previous writes. THESE WRITES WILL BE LOST.
-            //
-            // Now the greater than inequality. All of the equality
-            // considerations hold for this case. Also, consider if a write
-            // straddles the line between previous_size and current_size. Then
-            // we will be UNABLE to determine the proper start index of this
-            // write and we WILL return a partial write of length
-            // absolute_write_idx - previous_size.
-            let current_size = reader.get_ref().metadata().unwrap().size();
-            if self.previous_size <= current_size {
-                self.previous_size = current_size;
-                // match here on error, if metadata doesn't match up open_at_start
-                // new reader and let it catch on the next looparound
-                match read_until_with_max_size(reader, b'\n', &mut buffer, max_size) {
-                    Ok(0) => {
-                        if !self.file_findable() {
-                            self.set_dead();
-                        }
-                        Ok(0)
-                    }
-                    Ok(sz) => Ok(sz),
-                    Err(e) => {
-                        if let io::ErrorKind::NotFound = e.kind() {
-                            self.set_dead();
-                        }
-                        Err(e)
-                    }
+        let reader = &mut self.reader;
+        let file_position = &mut self.file_position;
+        match read_until_with_max_size(reader, file_position, b'\n', &mut buffer, max_size) {
+            Ok(sz) => {
+                if sz == 0 && !self.file_findable() {
+                    self.set_dead();
                 }
-            } else {
-                self.set_dead();
-                Ok(0)
+                Ok(sz)
             }
-        } else {
-            Ok(0)
+            Err(e) => {
+                if let io::ErrorKind::NotFound = e.kind() {
+                    self.set_dead();
+                }
+                Err(e)
+            }
         }
     }
 }
@@ -177,6 +127,7 @@ impl FileWatcher {
 // in that line, and then starts again on the next line.
 fn read_until_with_max_size<R: BufRead + ?Sized>(
     r: &mut R,
+    p: &mut FilePosition,
     delim: u8,
     buf: &mut Vec<u8>,
     max_size: usize,
@@ -208,6 +159,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
             }
         };
         r.consume(used);
+        *p += used as u64; // do this at exactly same time
         total_read += used;
 
         if !discarding && buf.len() > max_size {
@@ -232,51 +184,47 @@ mod test {
     #[test]
     fn test_read_until_with_max_size() {
         let mut buf = Cursor::new(&b"12"[..]);
+        let mut pos = 0;
         let mut v = Vec::new();
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
-            2
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        assert_eq!(pos, 2);
+        assert_eq!(p, 2);
         assert_eq!(v, b"12");
 
         let mut buf = Cursor::new(&b"1233"[..]);
+        let mut pos = 0;
         let mut v = Vec::new();
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
-            3
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        assert_eq!(pos, 3);
+        assert_eq!(p, 3);
         assert_eq!(v, b"12");
         v.truncate(0);
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
-            1
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        assert_eq!(pos, 4);
+        assert_eq!(p, 1);
         assert_eq!(v, b"");
         v.truncate(0);
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'3', &mut v, 1000).unwrap(),
-            0
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        assert_eq!(pos, 4);
+        assert_eq!(p, 0);
         assert_eq!(v, []);
 
         let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
+        let mut pos = 0;
         let mut v = Vec::new();
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
-            6
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        assert_eq!(pos, 6);
+        assert_eq!(p, 6);
         assert_eq!(v, b"short");
         v.truncate(0);
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
-            28
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        assert_eq!(pos, 34);
+        assert_eq!(p, 28);
         assert_eq!(v, b"exact size");
         v.truncate(0);
-        assert_eq!(
-            read_until_with_max_size(&mut buf, b'\n', &mut v, 10).unwrap(),
-            12
-        );
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        assert_eq!(pos, 46);
+        assert_eq!(p, 12);
         assert_eq!(v, []);
     }
 }

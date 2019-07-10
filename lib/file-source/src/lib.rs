@@ -1,15 +1,17 @@
 #[macro_use]
+extern crate scan_fmt;
+#[macro_use]
 extern crate tracing;
 
-pub mod file_server;
+mod file_server;
 mod file_watcher;
 
 pub use self::file_server::FileServer;
+type FileFingerprint = u64;
+type FilePosition = u64;
 
 #[cfg(test)]
 mod test {
-    extern crate tempdir;
-
     use self::file_watcher::FileWatcher;
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -175,16 +177,6 @@ mod test {
         }
     }
 
-    // file_watcher switches files whenever the inode / devno pair changes for
-    // the path under inspection. This function replicates a check that
-    // file_watcher does internally.
-    fn file_id(fp: &fs::File) -> (u64, u64) {
-        let metadata = fp.metadata().unwrap();
-        let dev = metadata.dev();
-        let ino = metadata.ino();
-        (dev, ino)
-    }
-
     // Interpret all FWActions, including truncation
     //
     // In the presence of truncation we cannot accurately determine which writes
@@ -199,11 +191,10 @@ mod test {
     // time, recording the total number of reads/writes. The SUT reads should be
     // bounded below by the model reads, bounded above by the writes.
     fn experiment(actions: Vec<FWAction>) {
-        let dir = tempdir::TempDir::new("file_watcher_qc").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
-        let mut fp_id = file_id(&fp);
-        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -229,8 +220,6 @@ mod test {
                         .open(&path)
                         .unwrap();
                     assert_eq!(fp.metadata().unwrap().size(), 0);
-                    let cur_file_id = file_id(&fp);
-                    assert_eq!(cur_file_id, fp_id);
                     assert!(path.exists());
                 }
                 FWAction::Pause(ps) => delay(ps),
@@ -252,7 +241,6 @@ mod test {
                         }
                     }
                     fp = fs::File::create(&path).expect("could not create");
-                    fp_id = file_id(&fp);
                     fwfiles.insert(0, FWFile::new());
                     read_index += 1;
                 }
@@ -292,10 +280,10 @@ mod test {
     // model and SUT should agree exactly. To that end, we confirm that every
     // read from SUT exactly matches the reads from the model.
     fn experiment_no_truncations(actions: Vec<FWAction>) {
-        let dir = tempdir::TempDir::new("file_watcher_qc").unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
-        let mut fw = FileWatcher::new(path.clone(), false, None).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
