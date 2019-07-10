@@ -1,0 +1,14 @@
+syntax = "proto3";
+package vector;
+
+import "event.proto";
+
+service VectorService {
+  rpc WriteEvents(WriteEventsRequest) returns (WriteEventsResponse) {}
+}
+
+message WriteEventsRequest {
+  repeated event.EventWrapper events = 1;
+}
+
+message WriteEventsResponse {}

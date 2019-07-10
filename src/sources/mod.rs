@@ -1,6 +1,7 @@
 use futures::Future;
 
 pub mod file;
+pub mod grpc;
 pub mod statsd;
 pub mod stdin;
 pub mod syslog;
