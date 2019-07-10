@@ -780,19 +780,37 @@ mod integration_tests {
             request.start_time = Some(timestamp.timestamp_millis());
 
             let response = rt.block_on(client.get_log_events(request)).unwrap();
-
             let events = response.events.unwrap();
-
             let output_lines = events
                 .into_iter()
                 .map(|e| e.message.unwrap())
                 .collect::<Vec<_>>();
-
             let expected_output = input_lines
                 .clone()
                 .into_iter()
                 .enumerate()
                 .filter(|(i, _)| i % 2 == 0)
+                .map(|(_, e)| e)
+                .collect::<Vec<_>>();
+
+            assert_eq!(output_lines, expected_output);
+
+            let mut request = GetLogEventsRequest::default();
+            request.log_stream_name = format!("{}-1", stream_name);
+            request.log_group_name = GROUP_NAME.into();
+            request.start_time = Some(timestamp.timestamp_millis());
+
+            let response = rt.block_on(client.get_log_events(request)).unwrap();
+            let events = response.events.unwrap();
+            let output_lines = events
+                .into_iter()
+                .map(|e| e.message.unwrap())
+                .collect::<Vec<_>>();
+            let expected_output = input_lines
+                .clone()
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| i % 2 == 1)
                 .map(|(_, e)| e)
                 .collect::<Vec<_>>();
 
