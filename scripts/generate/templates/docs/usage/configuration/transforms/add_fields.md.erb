@@ -54,7 +54,8 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-While unrealistic, this example demonstrates the various accepted [types][docs.config_value_types].
+While unrealistic, this example demonstrates the various accepted
+[types][docs.config_value_types].
 
 ## How It Works [[sort]]
 
@@ -62,7 +63,9 @@ While unrealistic, this example demonstrates the various accepted [types][docs.c
 
 ### Arrays
 
-The `add_fields` transform will support [TOML arrays][url.toml_array]. Keep in mind that the values must be simple type (not tables), and each value must the same type. You cannot mix types:
+The `add_fields` transform will support [TOML arrays][url.toml_array]. Keep in
+mind that the values must be simple type (not tables), and each value must the
+same type. You cannot mix types:
 
 ```
 [transforms.<transform-id>]
@@ -74,11 +77,16 @@ The `add_fields` transform will support [TOML arrays][url.toml_array]. Keep in m
 
 ### Complex Transforming
 
-The `add_fields` transform is designed for simple key additions. If you need more complex transforming then we recommend using a more versatile transform like the [`lua` transform][docs.lua_transform].
+The `add_fields` transform is designed for simple key additions. If you need
+more complex transforming then we recommend using a more versatile transform
+like the [`lua` transform][docs.lua_transform].
 
 ### Environment Variables
 
-As described in the [Configuration document][docs.configuration], Vector will interpolate environment variables in your configuration file. This can be helpful when adding fields, such as adding a `"host"` field as shown in the example.
+As described in the [Configuration document][docs.configuration], Vector will
+interpolate environment variables in your configuration file. This can be
+helpful when adding fields, such as adding a `"host"` field as shown in the
+example.
 
 ### Key Conflicts
 
@@ -86,7 +94,9 @@ Keys specified in this transform will replace existing keys.
 
 ### Nested Fields
 
-The `add_fields` transform will support dotted keys or [TOML tables][url.toml_table]. We recommend the dotted key syntax since it is less verbose for this usecase:
+The `add_fields` transform will support dotted keys or [TOML
+tables][url.toml_table]. We recommend the dotted key syntax since it is less
+verbose for this usecase:
 
 ```
 [transforms.<transform-id>]
@@ -102,19 +112,25 @@ See the [`remove_fields` transform][docs.remove_fields_transform].
 
 ### Special Characters
 
-Aside from the [special characters][docs.event_key_special_characters] listed in the [Data Model][docs.data_model] doc, Vector does not restrict the characters allowed in keys. You can wrap key names in `" "` quote to preserve spaces and use `\` to escape quotes.
+Aside from the [special characters][docs.event_key_special_characters] listed in
+the [Data Model][docs.data_model] doc, Vector does not restrict the characters
+allowed in keys. You can wrap key names in `" "` quote to preserve spaces and
+use `\` to escape quotes.
 
 ### Types
 
-All supported [configuration value types][docs.config_value_types] are accepted. For convenience, here's what that means:
+All supported [configuration value types][docs.config_value_types] are accepted.
+For convenience, here's what that means:
 
 #### Primitive Types
 
-All [primitive TOML types (`string`, `int`, `float`, `boolean`,) are supported as shown in the [Config file example](#config-file).
+All [primitive TOML types (`string`, `int`, `float`, `boolean`,) are supported
+as shown in the [Config file example](#config-file).
 
 #### List Types
 
-[TOML arrays][url.toml_array]. Keep in mind that the values must be simple type (not tables), and each value must the same type. You cannot mix types:
+[TOML arrays][url.toml_array]. Keep in mind that the values must be simple type
+(not tables), and each value must the same type. You cannot mix types:
 
 ```
 [transforms.<transform-id>]

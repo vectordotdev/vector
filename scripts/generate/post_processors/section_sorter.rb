@@ -24,15 +24,14 @@ module PostProcessors
     end
 
     def sort!
-      new_content = content.clone
+      new_content = "#{content}"
 
       parts.each do |part|
         sorted_content = part[:content].split(/\n#{part[:depth]}# /).sort.join("\n#{part[:depth]}# ")
-        new_content.gsub!(part[:content], sorted_content)
+        new_content.replace!(part[:content], sorted_content)
       end
 
-      new_content.gsub!(/ \[\[sort\]\]/, "")
-
+      new_content.replace!(" [[sort]]", "")
       new_content
     end
 
@@ -46,9 +45,9 @@ module PostProcessors
             
             part = 
               content.
-                split("\n#{depth} #{title} #{sort_flag}").
+                split("\n#{depth} #{title} #{sort_flag}\n").
                 last.
-                split("\n#{depth} ").
+                split(/\n#{depth} .*\n/).
                 first
 
             {title: title, depth: depth, content: part}

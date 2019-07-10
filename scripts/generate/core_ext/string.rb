@@ -21,4 +21,12 @@ class String
       gsub(/\[([^\]]+)\]\(([^) ]+)\)/, '\1').
       gsub(/\[([^\]]+)\]\[([^) ]+)\]/, '\1')
   end
+
+  def replace(match, sub)
+    gsub match, match => sub
+  end
+
+  def replace!(match, sub)
+    gsub! match, match => sub
+  end
 end
