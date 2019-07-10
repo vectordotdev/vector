@@ -48,7 +48,7 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Option<Bytes>) -> Option<Event> {
-        match proto::EventWrapper::decode(frame).map(Event::from) {
+        match proto::event::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 trace!(
                     message = "Received one event.",

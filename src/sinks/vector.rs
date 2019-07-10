@@ -60,7 +60,7 @@ pub fn vector_healthcheck(addr: SocketAddr) -> super::Healthcheck {
 }
 
 fn encode_event(event: Event) -> Result<Bytes, ()> {
-    let event = proto::EventWrapper::from(event);
+    let event = proto::event::EventWrapper::from(event);
     let event_len = event.encoded_len() as u32;
     let full_len = event_len + 4;
 

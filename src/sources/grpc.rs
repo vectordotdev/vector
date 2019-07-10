@@ -1,6 +1,6 @@
 use crate::{
     event::{
-        proto::{server, WriteEventsRequest, WriteEventsResponse},
+        proto::grpc::{server, WriteEventsRequest, WriteEventsResponse},
         Event,
     },
     topology::config::SourceConfig,
@@ -76,7 +76,7 @@ mod tests {
     use super::*;
     use crate::{
         event::{
-            proto::{client::VectorService, WriteEventsRequest},
+            proto::grpc::{client::VectorService, WriteEventsRequest},
             Event,
         },
         test_util::{next_addr, random_events_with_stream, CollectCurrent},

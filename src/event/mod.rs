@@ -1,18 +1,18 @@
-use self::proto::{event_wrapper::Event as EventProto, metric::Metric as MetricProto, Log};
+pub mod metric;
+pub mod proto;
+
+pub use metric::Metric;
+pub use proto::{event, grpc};
+
+use self::proto::event::{
+    event_wrapper::Event as EventProto, gauge, metric::Metric as MetricProto, value, Log,
+};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
-
-pub mod metric;
-
-pub use metric::Metric;
-
-pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
-}
 
 lazy_static! {
     pub static ref MESSAGE: Atom = Atom::from("message");
@@ -277,16 +277,16 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-fn decode_value(input: proto::Value) -> Option<Value> {
+fn decode_value(input: event::Value) -> Option<Value> {
     let explicit = input.explicit;
     let value = match input.kind {
-        Some(proto::value::Kind::RawBytes(data)) => Some(ValueKind::Bytes(data.into())),
-        Some(proto::value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
+        Some(value::Kind::RawBytes(data)) => Some(ValueKind::Bytes(data.into())),
+        Some(value::Kind::Timestamp(ts)) => Some(ValueKind::Timestamp(
             chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
         )),
-        Some(proto::value::Kind::Integer(value)) => Some(ValueKind::Integer(value)),
-        Some(proto::value::Kind::Float(value)) => Some(ValueKind::Float(value)),
-        Some(proto::value::Kind::Boolean(value)) => Some(ValueKind::Boolean(value)),
+        Some(value::Kind::Integer(value)) => Some(ValueKind::Integer(value)),
+        Some(value::Kind::Float(value)) => Some(ValueKind::Float(value)),
+        Some(value::Kind::Boolean(value)) => Some(ValueKind::Boolean(value)),
         None => {
             error!("encoded event contains unknown value kind");
             None
@@ -298,8 +298,8 @@ fn decode_value(input: proto::Value) -> Option<Value> {
     })
 }
 
-impl From<proto::EventWrapper> for Event {
-    fn from(proto: proto::EventWrapper) -> Self {
+impl From<event::EventWrapper> for Event {
+    fn from(proto: event::EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
         match event {
@@ -341,9 +341,9 @@ impl From<proto::EventWrapper> for Event {
                     }
                     MetricProto::Gauge(gauge) => {
                         let direction = match gauge.direction() {
-                            proto::gauge::Direction::None => None,
-                            proto::gauge::Direction::Plus => Some(metric::Direction::Plus),
-                            proto::gauge::Direction::Minus => Some(metric::Direction::Minus),
+                            gauge::Direction::None => None,
+                            gauge::Direction::Plus => Some(metric::Direction::Plus),
+                            gauge::Direction::Minus => Some(metric::Direction::Minus),
                         };
                         Event::Metric(Metric::Gauge {
                             name: gauge.name,
@@ -361,32 +361,26 @@ impl From<proto::EventWrapper> for Event {
     }
 }
 
-impl From<Event> for proto::EventWrapper {
+impl From<Event> for event::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
             Event::Log(LogEvent { structured }) => {
                 let structured = structured
                     .into_iter()
                     .map(|(k, v)| {
-                        let value = proto::Value {
+                        let value = event::Value {
                             explicit: v.explicit,
                             kind: match v.value {
-                                ValueKind::Bytes(b) => {
-                                    Some(proto::value::Kind::RawBytes(b.to_vec()))
-                                }
+                                ValueKind::Bytes(b) => Some(value::Kind::RawBytes(b.to_vec())),
                                 ValueKind::Timestamp(ts) => {
-                                    Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
+                                    Some(value::Kind::Timestamp(prost_types::Timestamp {
                                         seconds: ts.timestamp(),
                                         nanos: ts.timestamp_subsec_nanos() as i32,
                                     }))
                                 }
-                                ValueKind::Integer(value) => {
-                                    Some(proto::value::Kind::Integer(value))
-                                }
-                                ValueKind::Float(value) => Some(proto::value::Kind::Float(value)),
-                                ValueKind::Boolean(value) => {
-                                    Some(proto::value::Kind::Boolean(value))
-                                }
+                                ValueKind::Integer(value) => Some(value::Kind::Integer(value)),
+                                ValueKind::Float(value) => Some(value::Kind::Float(value)),
+                                ValueKind::Boolean(value) => Some(value::Kind::Boolean(value)),
                             },
                         };
                         (k.to_string(), value)
@@ -395,37 +389,37 @@ impl From<Event> for proto::EventWrapper {
 
                 let event = EventProto::Log(Log { structured });
 
-                proto::EventWrapper { event: Some(event) }
+                event::EventWrapper { event: Some(event) }
             }
             Event::Metric(Metric::Counter {
                 name,
                 val,
                 sampling,
             }) => {
-                let counter = proto::Counter {
+                let counter = event::Counter {
                     name,
                     val,
                     sampling: sampling.unwrap_or(0f32),
                 };
-                let event = EventProto::Metric(proto::Metric {
+                let event = EventProto::Metric(event::Metric {
                     metric: Some(MetricProto::Counter(counter)),
                 });
-                proto::EventWrapper { event: Some(event) }
+                event::EventWrapper { event: Some(event) }
             }
             Event::Metric(Metric::Timer {
                 name,
                 val,
                 sampling,
             }) => {
-                let timer = proto::Timer {
+                let timer = event::Timer {
                     name,
                     val,
                     sampling: sampling.unwrap_or(0f32),
                 };
-                let event = EventProto::Metric(proto::Metric {
+                let event = EventProto::Metric(event::Metric {
                     metric: Some(MetricProto::Timer(timer)),
                 });
-                proto::EventWrapper { event: Some(event) }
+                event::EventWrapper { event: Some(event) }
             }
             Event::Metric(Metric::Gauge {
                 name,
@@ -433,27 +427,27 @@ impl From<Event> for proto::EventWrapper {
                 direction,
             }) => {
                 let direction = match direction {
-                    None => proto::gauge::Direction::None,
-                    Some(metric::Direction::Plus) => proto::gauge::Direction::Plus,
-                    Some(metric::Direction::Minus) => proto::gauge::Direction::Minus,
+                    None => event::gauge::Direction::None,
+                    Some(metric::Direction::Plus) => event::gauge::Direction::Plus,
+                    Some(metric::Direction::Minus) => event::gauge::Direction::Minus,
                 }
                 .into();
-                let gauge = proto::Gauge {
+                let gauge = event::Gauge {
                     name,
                     val,
                     direction,
                 };
-                let event = EventProto::Metric(proto::Metric {
+                let event = EventProto::Metric(event::Metric {
                     metric: Some(MetricProto::Gauge(gauge)),
                 });
-                proto::EventWrapper { event: Some(event) }
+                event::EventWrapper { event: Some(event) }
             }
             Event::Metric(Metric::Set { name, val }) => {
-                let set = proto::Set { name, val };
-                let event = EventProto::Metric(proto::Metric {
+                let set = event::Set { name, val };
+                let event = EventProto::Metric(event::Metric {
                     metric: Some(MetricProto::Set(set)),
                 });
-                proto::EventWrapper { event: Some(event) }
+                event::EventWrapper { event: Some(event) }
             }
         }
     }
