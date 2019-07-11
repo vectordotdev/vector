@@ -81,6 +81,7 @@ prost-derive = "0.5"
 prost-types = "0.5"
 
 # External libs
+atty = "0.2"
 derivative = "1.0"
 chrono = "0.4.6"
 rand = "0.5.5"

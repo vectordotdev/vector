@@ -214,6 +214,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
         }
 
         drop(spans);
+        #[allow(deprecated)]
         self.inner.drop_span(id.clone());
     }
 }
