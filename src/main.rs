@@ -41,6 +41,31 @@ struct Opts {
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
+
+    /// Disable ansi formating for log output.
+    #[structopt(long)]
+    color: Option<Color>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Color {
+    Ansi,
+    None,
+}
+
+impl std::str::FromStr for Color {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ansi" => Ok(Color::Ansi),
+            "none" => Ok(Color::None),
+            s => Err(format!(
+                "{} is not a valid option, expected `ansi` or `none`",
+                s
+            )),
+        }
+    }
 }
 
 fn main() {
@@ -69,7 +94,17 @@ fn main() {
         levels.push_str(&additional_level);
     };
 
+    let color = if let Some(color) = &opts.color {
+        match color {
+            Color::Ansi => true,
+            Color::None => false,
+        }
+    } else {
+        atty::is(atty::Stream::Stdout)
+    };
+
     let subscriber = tracing_fmt::FmtSubscriber::builder()
+        .with_ansi(color)
         .with_filter(tracing_fmt::filter::EnvFilter::from(levels.as_str()))
         .finish();
     tracing_env_logger::try_init().expect("init log adapter");

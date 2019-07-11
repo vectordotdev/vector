@@ -140,8 +140,8 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
         self.inner.clone_span(id)
     }
 
-    fn drop_span(&self, id: Id) {
-        self.inner.drop_span(id.clone());
+    fn try_close(&self, id: Id) -> bool {
+        self.inner.try_close(id.clone())
     }
 }
 
