@@ -374,7 +374,7 @@ pub struct CloudwatchKey {
 }
 
 fn interpolate(s: &str) -> Partition {
-    let r = Regex::new(r"\{event\.(?P<key>\D+)\}").unwrap();
+    let r = Regex::new(r"\{\{(?P<key>\D+)\}\}").unwrap();
 
     if let Some(cap) = r.captures(s.as_bytes()) {
         if let Some(m) = cap.name("key") {
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn interpolate_event() {
-        if let Partition::Field(_, _, key) = interpolate("{event.some_key}") {
+        if let Partition::Field(_, _, key) = interpolate("{{some_key}}") {
             assert_eq!(key, "some_key".to_string());
         } else {
             panic!("Expected Partition::Field");
@@ -547,7 +547,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("{event.log_stream}");
+        let stream = interpolate("{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -568,7 +568,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("abcd-{event.log_stream}");
+        let stream = interpolate("abcd-{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -589,7 +589,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("{event.log_stream}-abcd");
+        let stream = interpolate("{{log_stream}}-abcd");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -606,7 +606,7 @@ mod tests {
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = interpolate("{event.log_stream}");
+        let stream = interpolate("{{log_stream}}");
         let group = "group".into();
 
         let stream_val = partition(event, &group, &stream);
@@ -746,7 +746,7 @@ mod integration_tests {
 
             let config = CloudwatchLogsSinkConfig {
                 group_name: GROUP_NAME.into(),
-                stream_name: format!("{}-{{event.key}}", stream_name).into(),
+                stream_name: format!("{}-{{{{key}}}}", stream_name).into(),
                 region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
                 ..Default::default()
             };
