@@ -3,6 +3,7 @@ use crate::event::{self, Event, ValueKind};
 use crate::types::{parse_conversion_map, Conversion};
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
@@ -118,7 +119,10 @@ impl Transform for RegexParser {
                 }
                 return Some(event);
             } else {
-                debug!(message = "No fields captured from regex");
+                warn!(
+                    message = "Regex pattern failed to match.",
+                    field = &truncate_string_at(&String::from_utf8_lossy(&value), 60)[..],
+                );
             }
         } else {
             debug!(
@@ -132,6 +136,14 @@ impl Transform for RegexParser {
         } else {
             Some(event)
         }
+    }
+}
+
+fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
+    if s.len() >= maxlen {
+        format!("{}[...]", &s[..maxlen - 5]).into()
+    } else {
+        s.into()
     }
 }
 
