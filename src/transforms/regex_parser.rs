@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::event::{self, Event, ValueKind};
-use crate::types::{parse_conversion_map, Conversion};
+use crate::types::{parse_check_conversion_map, Conversion};
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -26,7 +26,7 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
 
         let regex = Regex::new(&self.regex).map_err(|err| err.to_string())?;
 
-        let types = parse_conversion_map(
+        let types = parse_check_conversion_map(
             &self.types,
             &regex
                 .capture_names()
