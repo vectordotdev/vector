@@ -1,5 +1,4 @@
 use crate::sinks::util::Batch;
-use bytes::Bytes;
 use futures::{
     future::Either, stream::FuturesUnordered, sync::oneshot, Async, AsyncSink, Future, Poll, Sink,
     StartSend, Stream,
@@ -7,26 +6,27 @@ use futures::{
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
+    hash::Hash,
     time::{Duration, Instant},
 };
 use tokio::timer::Delay;
 
-pub trait Partition {
-    fn partition(&self) -> Bytes;
+pub trait Partition<K> {
+    fn partition(&self) -> K;
 }
 
 // TODO: Make this a concrete type
-type LingerDelay = Box<dyn Future<Item = LingerState, Error = ()> + Send + 'static>;
+type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send + 'static>;
 
-pub struct PartitionedBatchSink<B, S> {
+pub struct PartitionedBatchSink<B, S, K> {
     batch: B,
     sink: S,
-    partitions: HashMap<Bytes, B>,
+    partitions: HashMap<K, B>,
     config: Config,
     closing: bool,
     sending: VecDeque<B>,
-    lingers: FuturesUnordered<LingerDelay>,
-    linger_handles: HashMap<Bytes, oneshot::Sender<Bytes>>,
+    lingers: FuturesUnordered<LingerDelay<K>>,
+    linger_handles: HashMap<K, oneshot::Sender<K>>,
 }
 
 #[derive(Copy, Debug, Clone)]
@@ -36,12 +36,15 @@ struct Config {
     min_size: usize,
 }
 
-enum LingerState {
-    Elapsed(Bytes),
+enum LingerState<K> {
+    Elapsed(K),
     Canceled,
 }
 
-impl<B, S> PartitionedBatchSink<B, S> {
+impl<B, S, K> PartitionedBatchSink<B, S, K>
+where
+    K: Eq + Hash + Clone + Send + 'static,
+{
     pub fn new(sink: S, batch: B, max_size: usize) -> Self {
         let config = Config {
             max_linger: None,
@@ -91,7 +94,7 @@ impl<B, S> PartitionedBatchSink<B, S> {
         self.sink
     }
 
-    pub fn set_linger(&mut self, partition: Bytes) {
+    pub fn set_linger(&mut self, partition: K) {
         if let Some(max_linger) = self.config.max_linger {
             let (tx, rx) = oneshot::channel();
             let partition_clone = partition.clone();
@@ -116,11 +119,12 @@ impl<B, S> PartitionedBatchSink<B, S> {
     }
 }
 
-impl<B, S> Sink for PartitionedBatchSink<B, S>
+impl<B, S, K> Sink for PartitionedBatchSink<B, S, K>
 where
     B: Batch,
     S: Sink<SinkItem = B>,
-    B::Input: Partition,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
 {
     type SinkItem = B::Input;
     type SinkError = S::SinkError;
@@ -210,6 +214,7 @@ where
                 if let Some(linger_cancel) = self.linger_handles.remove(&partition) {
                     linger_cancel
                         .send(partition.clone())
+                        .map_err(|_| ())
                         .expect("Linger deadline should be removed on elapsed.");
                 }
 
@@ -235,7 +240,7 @@ where
     }
 }
 
-impl<B, S> fmt::Debug for PartitionedBatchSink<B, S> {
+impl<B, S, K> fmt::Debug for PartitionedBatchSink<B, S, K> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("PartitionedBatchSink")
             .field("max_linger", &self.config.max_linger)
@@ -248,6 +253,7 @@ impl<B, S> fmt::Debug for PartitionedBatchSink<B, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use futures::{Future, Sink};
     use std::time::Duration;
     use tokio_test::clock;
@@ -410,31 +416,31 @@ mod tests {
         B,
     }
 
-    impl Partition for Partitions {
+    impl Partition<Bytes> for Partitions {
         fn partition(&self) -> Bytes {
             format!("{:?}", self).into()
         }
     }
 
-    impl Partition for usize {
+    impl Partition<Bytes> for usize {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for u8 {
+    impl Partition<Bytes> for u8 {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for i32 {
+    impl Partition<Bytes> for i32 {
         fn partition(&self) -> Bytes {
             "key".into()
         }
     }
 
-    impl Partition for Vec<i32> {
+    impl Partition<Bytes> for Vec<i32> {
         fn partition(&self) -> Bytes {
             "key".into()
         }

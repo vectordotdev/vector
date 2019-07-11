@@ -122,7 +122,7 @@ pub struct InnerBuffer {
     key: Bytes,
 }
 
-impl Partition for InnerBuffer {
+impl Partition<Bytes> for InnerBuffer {
     fn partition(&self) -> Bytes {
         self.key.clone()
     }

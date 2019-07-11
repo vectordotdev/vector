@@ -9,11 +9,12 @@ use futures::{
     future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
 };
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::time::Duration;
 use tower::Service;
 
 pub use batch::{Batch, BatchSink};
-pub use buffer::{Buffer, Compression};
+pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use partition::{Partition, PartitionedBatchSink};
 
 pub trait SinkExt<T>
@@ -38,14 +39,15 @@ where
         BatchSink::new_min(self, batch, min, Some(delay))
     }
 
-    fn partitioned_batched_with_min(
+    fn partitioned_batched_with_min<K>(
         self,
         batch: T,
         min: usize,
         delay: Duration,
-    ) -> PartitionedBatchSink<T, Self>
+    ) -> PartitionedBatchSink<T, Self, K>
     where
         T: Batch,
+        K: Eq + Hash + Clone + Send + 'static,
     {
         PartitionedBatchSink::with_linger(self, batch, min, min, delay)
     }
