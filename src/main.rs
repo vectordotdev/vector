@@ -42,7 +42,13 @@ struct Opts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
-    /// Disable ansi formating for log output.
+    /// Control when ANSI terminal formatting is used.
+    ///
+    /// By default `vector` will try and detect if `stdout` is a terminal, if it is
+    /// ANSI will be enabled. Otherwise it will be disabled. By providing this flag with
+    /// the `--color ansi` option will always enable ANSI terminal formatting.
+    ///
+    /// Options: `ansi` or `none`
     #[structopt(long)]
     color: Option<Color>,
 }
