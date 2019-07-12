@@ -49,6 +49,10 @@
 "Log" refers to an individual log event. This is a type of
 [Vector event][docs.metric_event].
 
+## Lucio
+
+A sporty Italian that bleeds Rust, is a core member of the Vector team, and does not approve of New York pizza.
+
 ## Metric
 
 "Metric" refers to an individual data unit used to represent a point in time
