@@ -30,31 +30,29 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
 
     let metric = match metric_type {
         "c" => {
-            let count = if let Some(s) = parts.get(2) {
+            let sample_rate = if let Some(s) = parts.get(2) {
                 1.0 / sanitize_sampling(parse_sampling(s)?)
             } else {
                 1.0
             };
             let val: f32 = parts[0].parse()?;
-            let metric = Metric::Counter {
+            Metric::Counter {
                 name: sanitize_key(key),
-                val: val * count,
-            };
-            metric
+                val: val * sample_rate,
+            }
         }
         "h" | "ms" => {
-            let count = if let Some(s) = parts.get(2) {
+            let sample_rate = if let Some(s) = parts.get(2) {
                 1.0 / sanitize_sampling(parse_sampling(s)?)
             } else {
                 1.0
             };
             let val: f32 = parts[0].parse()?;
-            let metric = Metric::Timer {
+            Metric::Timer {
                 name: sanitize_key(key),
-                val: val * count,
-                count,
-            };
-            metric
+                val,
+                sample_rate: sample_rate as u32,
+            }
         }
         "g" => {
             let val = if parts[0]
@@ -203,8 +201,8 @@ mod test {
             parse("glork:320|ms|@0.1"),
             Ok(Metric::Timer {
                 name: "glork".into(),
-                val: 3200.0,
-                count: 10.0
+                val: 320.0,
+                sample_rate: 10
             }),
         );
     }

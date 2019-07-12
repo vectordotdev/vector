@@ -43,7 +43,7 @@ message Counter {
 message Timer {
   string name = 1;
   float val = 2;
-  float count = 3;
+  uint32 sample_rate = 3;
 }
 
 message Gauge {

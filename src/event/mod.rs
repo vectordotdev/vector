@@ -322,7 +322,7 @@ impl From<proto::EventWrapper> for Event {
                     MetricProto::Timer(timer) => Event::Metric(Metric::Timer {
                         name: timer.name,
                         val: timer.val,
-                        count: timer.count,
+                        sample_rate: timer.sample_rate,
                     }),
                     MetricProto::Gauge(gauge) => {
                         let direction = match gauge.direction() {
@@ -389,8 +389,16 @@ impl From<Event> for proto::EventWrapper {
                 });
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric::Timer { name, val, count }) => {
-                let timer = proto::Timer { name, val, count };
+            Event::Metric(Metric::Timer {
+                name,
+                val,
+                sample_rate,
+            }) => {
+                let timer = proto::Timer {
+                    name,
+                    val,
+                    sample_rate,
+                };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Timer(timer)),
                 });

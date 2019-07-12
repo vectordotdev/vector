@@ -7,7 +7,7 @@ pub enum Metric {
     Timer {
         name: String,
         val: f32,
-        count: f32,
+        sample_rate: u32,
     },
     Gauge {
         name: String,
