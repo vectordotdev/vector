@@ -56,6 +56,7 @@
     * [vector source](usage/configuration/sources/vector.md)
   * [Transforms](usage/configuration/transforms/README.md)
     * [add\_fields transform](usage/configuration/transforms/add_fields.md)
+    * [coercer transform](usage/configuration/transforms/coercer.md)
     * [field\_filter transform](usage/configuration/transforms/field_filter.md)
     * [grok\_parser transform](usage/configuration/transforms/grok_parser.md)
     * [json\_parser transform](usage/configuration/transforms/json_parser.md)

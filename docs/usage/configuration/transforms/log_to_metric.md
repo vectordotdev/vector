@@ -316,12 +316,20 @@ issue, please:
 2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
+
+### Alternatives
+
+Finally, consider the following alternatives:
+
+* [`coercer` transform][docs.coercer_transform]
+
 ## Resources
 
 * [**Issues**][url.log_to_metric_transform_issues] - [enhancements][url.log_to_metric_transform_enhancements] - [bugs][url.log_to_metric_transform_bugs]
 * [**Source code**][url.log_to_metric_transform_source]
 
 
+[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log

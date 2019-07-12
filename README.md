@@ -122,6 +122,7 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
+| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce event fields into fixed types. |
 | [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
 | [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
 | [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
@@ -186,6 +187,7 @@ the License.
 [docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 [docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
+[docs.coercer_transform]: https://docs.vector.dev/usage/configuration/transforms/coercer
 [docs.concepts]: https://docs.vector.dev/about/concepts
 [docs.configuration]: https://docs.vector.dev/usage/configuration
 [docs.console_sink]: https://docs.vector.dev/usage/configuration/sinks/console

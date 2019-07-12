@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - aws_s3: Add `filename_extension` options.
 - aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` synatx for extracting values from events.
+- coercer: New transform to convert fields into specified types.
 
 ### Changed
   - [configuration] Empty inputs are treated as errors instead of warnings [#506]

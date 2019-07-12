@@ -1,6 +1,7 @@
 use crate::Event;
 
 pub mod add_fields;
+pub mod coercer;
 pub mod field_filter;
 pub mod grok_parser;
 pub mod json_parser;
