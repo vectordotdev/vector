@@ -33,7 +33,7 @@ impl TransformConfig for JsonParserConfig {
     }
 }
 
-struct JsonParser {
+pub struct JsonParser {
     field: Atom,
     drop_invalid: bool,
     drop_field: bool,
@@ -391,4 +391,18 @@ mod test {
             1234.into()
         );
     }
+
+    // #[test]
+    // fn json_parser_array() {
+    //     let mut parser = JsonParser::from(JsonParserConfig {
+    //         ..Default::default()
+    //     });
+
+    //     let event = Event::from(
+    //         r#"{
+
+    //         }"#,
+    //     );
+    //     let event = parser.transform(event).unwrap();
+    // }
 }
