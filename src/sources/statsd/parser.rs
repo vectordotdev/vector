@@ -76,19 +76,17 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             } else {
                 parts[0][1..].parse()?
             };
-            let metric = Metric::Gauge {
+            Metric::Gauge {
                 name: sanitize_key(key),
                 val,
                 direction: parse_direction(parts[0])?,
-            };
-            metric
+            }
         }
         "s" => {
-            let metric = Metric::Set {
+            Metric::Set {
                 name: sanitize_key(key),
                 val: parts[0].into(),
-            };
-            metric
+            }
         }
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };
