@@ -1,12 +1,14 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use vector::buffers::Acker;
-use vector::test_util::{
-    block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
+use vector::{
+    buffers::Acker,
+    test_util::{
+        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
+        wait_for_tcp,
+    },
+    topology::{self, config},
+    Event, {sinks, sources},
 };
-use vector::topology::{self, config};
-use vector::Event;
-use vector::{sinks, sources};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
@@ -15,6 +17,10 @@ struct PanicSink;
 impl config::SinkConfig for PanicSink {
     fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
+    }
+
+    fn input_type(&self) -> config::DataType {
+        config::DataType::Log
     }
 }
 
@@ -81,6 +87,10 @@ impl config::SinkConfig for ErrorSink {
     fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
+
+    fn input_type(&self) -> config::DataType {
+        config::DataType::Log
+    }
 }
 
 impl Sink for ErrorSink {
@@ -141,9 +151,13 @@ fn test_sink_error() {
 struct ErrorSourceConfig;
 
 #[typetag::serde(name = "tcp")]
-impl vector::topology::config::SourceConfig for ErrorSourceConfig {
+impl config::SourceConfig for ErrorSourceConfig {
     fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
         Ok(Box::new(future::err(())))
+    }
+
+    fn output_type(&self) -> config::DataType {
+        config::DataType::Log
     }
 }
 
@@ -189,11 +203,15 @@ fn test_source_error() {
 struct PanicSourceConfig;
 
 #[typetag::serde(name = "tcp")]
-impl vector::topology::config::SourceConfig for PanicSourceConfig {
+impl config::SourceConfig for PanicSourceConfig {
     fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))
+    }
+
+    fn output_type(&self) -> config::DataType {
+        config::DataType::Log
     }
 }
 
