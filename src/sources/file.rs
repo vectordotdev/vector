@@ -1,4 +1,7 @@
-use crate::event::{self, Event};
+use crate::{
+    event::{self, Event},
+    topology::config::{DataType, SourceConfig},
+};
 use bytes::Bytes;
 use file_source::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
@@ -48,10 +51,14 @@ impl Default for FileConfig {
 }
 
 #[typetag::serde(name = "file")]
-impl crate::topology::config::SourceConfig for FileConfig {
+impl SourceConfig for FileConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         // TODO: validate paths
         Ok(file_source(self, out))
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

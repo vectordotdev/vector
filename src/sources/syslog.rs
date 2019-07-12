@@ -1,5 +1,8 @@
 use super::util::TcpSource;
-use crate::event::{self, Event};
+use crate::{
+    event::{self, Event},
+    topology::config::{DataType, SourceConfig},
+};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -49,7 +52,7 @@ impl SyslogConfig {
 }
 
 #[typetag::serde(name = "syslog")]
-impl crate::topology::config::SourceConfig for SyslogConfig {
+impl SourceConfig for SyslogConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
@@ -65,6 +68,10 @@ impl crate::topology::config::SourceConfig for SyslogConfig {
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, out)),
             Mode::Unix { path } => Ok(unix(path, self.max_length, host_key, out)),
         }
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

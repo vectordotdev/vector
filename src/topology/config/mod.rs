@@ -27,9 +27,7 @@ pub enum DataType {
 pub trait SourceConfig: core::fmt::Debug {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<sources::Source, String>;
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn output_type(&self) -> DataType;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
