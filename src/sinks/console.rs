@@ -1,10 +1,15 @@
 use super::util::SinkExt;
-use crate::buffers::Acker;
-use crate::event::{self, Event};
+use crate::{
+    buffers::Acker,
+    event::{self, Event},
+    topology::config::{DataType, SinkConfig},
+};
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
-use tokio::codec::{FramedWrite, LinesCodec};
-use tokio::io;
+use tokio::{
+    codec::{FramedWrite, LinesCodec},
+    io,
+};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -35,7 +40,7 @@ pub enum Encoding {
 }
 
 #[typetag::serde(name = "console")]
-impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
+impl SinkConfig for ConsoleSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let encoding = self.encoding.clone();
 
@@ -50,6 +55,10 @@ impl crate::topology::config::SinkConfig for ConsoleSinkConfig {
             .with(move |event| encode_event(event, &encoding));
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

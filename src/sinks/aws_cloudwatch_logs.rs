@@ -1,8 +1,9 @@
-use crate::buffers::Acker;
 use crate::{
+    buffers::Acker,
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt},
+    topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
@@ -15,10 +16,7 @@ use rusoto_logs::{
     PutLogEventsResponse,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fmt;
-use std::time::Duration;
+use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{
     buffer::Buffer,
@@ -107,7 +105,7 @@ pub enum CloudwatchError {
 }
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
-impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
+impl SinkConfig for CloudwatchLogsSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
@@ -131,6 +129,10 @@ impl crate::topology::config::SinkConfig for CloudwatchLogsSinkConfig {
         let healthcheck = healthcheck(self.clone())?;
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

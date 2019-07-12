@@ -6,6 +6,7 @@ use crate::{
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
+    topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use futures::{Future, Sink};
@@ -51,13 +52,17 @@ fn default_host_field() -> Atom {
 }
 
 #[typetag::serde(name = "splunk_hec")]
-impl crate::topology::config::SinkConfig for HecSinkConfig {
+impl SinkConfig for HecSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healtcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
         Ok((sink, healtcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

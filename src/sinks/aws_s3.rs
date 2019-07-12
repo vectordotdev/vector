@@ -6,6 +6,7 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
+    topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -79,12 +80,16 @@ impl Default for Compression {
 }
 
 #[typetag::serde(name = "aws_s3")]
-impl crate::topology::config::SinkConfig for S3SinkConfig {
+impl SinkConfig for S3SinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

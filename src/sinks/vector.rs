@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     event::proto,
     sinks::{tcp::TcpSink, util::SinkExt},
+    topology::config::{DataType, SinkConfig},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -24,7 +25,7 @@ impl VectorSinkConfig {
 }
 
 #[typetag::serde(name = "vector")]
-impl crate::topology::config::SinkConfig for VectorSinkConfig {
+impl SinkConfig for VectorSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let addr = self
             .address
@@ -37,6 +38,10 @@ impl crate::topology::config::SinkConfig for VectorSinkConfig {
         let healthcheck = super::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

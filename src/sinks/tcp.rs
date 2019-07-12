@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     sinks::util::SinkExt,
+    topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
@@ -40,7 +41,7 @@ impl TcpSinkConfig {
 }
 
 #[typetag::serde(name = "tcp")]
-impl crate::topology::config::SinkConfig for TcpSinkConfig {
+impl SinkConfig for TcpSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let addr = self
             .address
@@ -53,6 +54,10 @@ impl crate::topology::config::SinkConfig for TcpSinkConfig {
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

@@ -46,9 +46,7 @@ pub trait SinkConfig: core::fmt::Debug {
         acker: crate::buffers::Acker,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn input_type(&self) -> DataType;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
