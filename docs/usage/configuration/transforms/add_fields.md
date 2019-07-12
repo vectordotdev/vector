@@ -61,7 +61,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields. See [Arrays](#arrays), [ [transforms.<transform-id>.fields]](#transforms-transform-id-fields), [Complex Transforming](#complex-transforming), [Environment Variables](#environment-variables), [Nested Fields](#nested-fields), [Removing Fields](#removing-fields), [Special Characters](#special-characters), [Primitive Types](#primitive-types), and [List Types](#list-types) for more info.<br />`required` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`required` `example: (see above)` |
 
 ## Examples
 

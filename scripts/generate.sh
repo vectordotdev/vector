@@ -38,10 +38,10 @@ require_relative "generate/post_processors/toml_syntax_switcher"
 #
 
 def post_process(content, doc, links)
+  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::OptionReferencer.reference!(content)
   content = PostProcessors::LinkChecker.check!(content, doc, links)
-  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content
 end
 

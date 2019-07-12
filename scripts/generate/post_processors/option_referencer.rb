@@ -14,7 +14,8 @@ module PostProcessors
         content.scan(/\[\[references:(.*)\]\]/).collect do |matches|
           option = matches.first
           how_it_works = content.split("\n## How It Works").last.split("\n## ").first
-          sections_with_references = how_it_works.split(/`#{option}`/)[0..-2]
+
+          sections_with_references = how_it_works.split("`#{option}`")[0..-2]
           titles =
             sections_with_references.collect do |section|
               match = section.scan(/\n#* (.*)\n/).last

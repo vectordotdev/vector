@@ -67,7 +67,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value.<br />`default: false` |
 | `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "dynamic"` |
-| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels. See [Environment Variables](#environment-variables), [Null Fields](#null-fields), and [Reducing](#reducing) for more info.<br />`required` `example: (see above)` |
+| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.<br />`required` `example: (see above)` |
 
 ## Examples
 
