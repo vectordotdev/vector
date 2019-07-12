@@ -711,7 +711,9 @@ mod integration_tests {
             let (input_lines, events) = random_lines_with_stream(100, 11);
 
             let pump = sink.send_all(events);
-            rt.block_on(pump).unwrap();
+            let (sink, _) = rt.block_on(pump).unwrap();
+            // drop the sink so it closes all its connections
+            drop(sink);
 
             let mut request = GetLogEventsRequest::default();
             request.log_stream_name = stream_name.clone().into();
@@ -772,7 +774,9 @@ mod integration_tests {
                 .collect::<Vec<_>>();
 
             let pump = sink.send_all(iter_ok(events));
-            rt.block_on(pump).unwrap();
+            let (sink, _) = rt.block_on(pump).unwrap();
+            // drop the sink so it closes all its connections
+            drop(sink);
 
             let mut request = GetLogEventsRequest::default();
             request.log_stream_name = format!("{}-0", stream_name);
