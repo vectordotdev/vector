@@ -82,12 +82,10 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 direction: parse_direction(parts[0])?,
             }
         }
-        "s" => {
-            Metric::Set {
-                name: sanitize_key(key),
-                val: parts[0].into(),
-            }
-        }
+        "s" => Metric::Set {
+            name: sanitize_key(key),
+            val: parts[0].into(),
+        },
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };
     Ok(metric)
