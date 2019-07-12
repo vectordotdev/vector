@@ -9,6 +9,11 @@ pub enum Metric {
         val: f32,
         sample_rate: u32,
     },
+    Histogram {
+        name: String,
+        val: f32,
+        sample_rate: u32,
+    },
     Gauge {
         name: String,
         val: f32,

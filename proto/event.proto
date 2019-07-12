@@ -32,6 +32,7 @@ message Metric {
     Timer timer = 2;
     Gauge gauge = 3;
     Set set = 4;
+    Histogram histogram = 5;
   }
 }
 
@@ -60,4 +61,10 @@ message Gauge {
 message Set {
   string name = 1;
   string val = 2;
+}
+
+message Histogram {
+  string name = 1;
+  float val = 2;
+  uint32 sample_rate = 3;
 }

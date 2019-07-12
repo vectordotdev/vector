@@ -41,16 +41,27 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 val: val * sample_rate,
             }
         }
-        "h" | "ms" => {
+        "ms" => {
             let sample_rate = if let Some(s) = parts.get(2) {
                 1.0 / sanitize_sampling(parse_sampling(s)?)
             } else {
                 1.0
             };
-            let val: f32 = parts[0].parse()?;
             Metric::Timer {
                 name: sanitize_key(key),
-                val,
+                val: parts[0].parse()?,
+                sample_rate: sample_rate as u32,
+            }
+        }
+        "h" => {
+            let sample_rate = if let Some(s) = parts.get(2) {
+                1.0 / sanitize_sampling(parse_sampling(s)?)
+            } else {
+                1.0
+            };
+            Metric::Histogram {
+                name: sanitize_key(key),
+                val: parts[0].parse()?,
                 sample_rate: sample_rate as u32,
             }
         }
@@ -196,10 +207,22 @@ mod test {
     }
 
     #[test]
-    fn timer() {
+    fn sampled_timer() {
         assert_eq!(
             parse("glork:320|ms|@0.1"),
             Ok(Metric::Timer {
+                name: "glork".into(),
+                val: 320.0,
+                sample_rate: 10
+            }),
+        );
+    }
+
+    #[test]
+    fn sampled_histogram() {
+        assert_eq!(
+            parse("glork:320|h|@0.1"),
+            Ok(Metric::Histogram {
                 name: "glork".into(),
                 val: 320.0,
                 sample_rate: 10
