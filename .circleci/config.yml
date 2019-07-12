@@ -87,7 +87,7 @@ jobs:
       - checkout
       - run:
           name: Test
-          command: cargo test --all --features docker -- --test-threads 4
+          command: cargo test --all --features docker cloudwatch_insert_log_event_and_partitioned -- --test-threads 4 --nocapture
       - store_test_results:
           path: ./test-results
 

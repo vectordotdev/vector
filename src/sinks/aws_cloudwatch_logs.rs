@@ -687,6 +687,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_and_partitioned() {
         let mut rt = Runtime::new().unwrap();
 
+        println!("starting non partition test");
         // Run single partition test
         {
             let stream_name = gen_stream();
@@ -713,6 +714,8 @@ mod integration_tests {
             let pump = sink.send_all(events);
             rt.block_on(pump).unwrap();
 
+            println!("done pumping items through");
+
             let mut request = GetLogEventsRequest::default();
             request.log_stream_name = stream_name.clone().into();
             request.log_group_name = GROUP_NAME.into();
@@ -721,6 +724,8 @@ mod integration_tests {
             let client = CloudWatchLogsClient::new(region);
 
             let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+            println!("got get logs response");
 
             let events = response.events.unwrap();
 
@@ -732,6 +737,7 @@ mod integration_tests {
             assert_eq!(output_lines, input_lines);
         }
 
+        println!("entering partition test");
         // Run multi partition test
         {
             let stream_name = gen_stream();
@@ -774,12 +780,17 @@ mod integration_tests {
             let pump = sink.send_all(iter_ok(events));
             rt.block_on(pump).unwrap();
 
+            println!("done sending items");
+
             let mut request = GetLogEventsRequest::default();
             request.log_stream_name = format!("{}-0", stream_name);
             request.log_group_name = GROUP_NAME.into();
             request.start_time = Some(timestamp.timestamp_millis());
 
             let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+            println!("collected logs from partition 0");
+
             let events = response.events.unwrap();
             let output_lines = events
                 .into_iter()
@@ -801,6 +812,9 @@ mod integration_tests {
             request.start_time = Some(timestamp.timestamp_millis());
 
             let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+            println!("collected logs from partition 1");
+
             let events = response.events.unwrap();
             let output_lines = events
                 .into_iter()
