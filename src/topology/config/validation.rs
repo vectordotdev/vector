@@ -235,41 +235,6 @@ mod test {
 
     #[test]
     fn detects_type_mismatches() {
-        // Define a "minimal" Metric-typed sink so our example config can trigger a type error. As
-        // soon as we've actually implemented a Metric-typed sink or transform, we can get rid of
-        // this and just use one of those.
-        // TODO: remove all this once we have an actual non-Log component
-        use crate::{
-            buffers::Acker,
-            sinks::{
-                blackhole::{BlackholeConfig, BlackholeSink},
-                Healthcheck, RouterSink,
-            },
-            topology::config::DataType,
-        };
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Deserialize, Serialize, Debug)]
-        pub struct MetricsSinkConfig;
-
-        #[typetag::serde(name = "metrics_sink")]
-        impl crate::topology::config::SinkConfig for MetricsSinkConfig {
-            fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), String> {
-                Ok((
-                    Box::new(BlackholeSink::new(
-                        BlackholeConfig { print_amount: 1 },
-                        acker,
-                    )),
-                    Box::new(futures::future::ok(())),
-                ))
-            }
-
-            fn input_type(&self) -> DataType {
-                DataType::Metric
-            }
-        }
-        // End of stuff to delete
-
         let badly_typed = Config::load(
             r#"
             [sources.in]
@@ -277,7 +242,7 @@ mod test {
             address = "127.0.0.1:1235"
 
             [sinks.out]
-            type = "metrics_sink"
+            type = "prometheus"
             inputs = ["in"]
           "#
             .as_bytes(),
