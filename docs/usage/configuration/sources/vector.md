@@ -67,6 +67,15 @@ Due to the nature of this component, it offers a
 
 Data is encoded via Vector's [event protobuf][url.event_proto] before it is sent over the wire.
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Message Acking
 
 Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost.
@@ -96,6 +105,7 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

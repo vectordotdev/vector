@@ -34,13 +34,13 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   
   # OPTIONAL - Types
   [sinks.my_tokenizer_transform_id.types]
-  status = "int"
-  duration = "float"
-  success = "bool"
-  timestamp = "timestamp|%s"
-  timestamp = "timestamp|%+"
-  timestamp = "timestamp|%F"
-  timestamp = "timestamp|%a %b %e %T %Y"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -74,7 +74,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type. See [Environment Variables](#environment-variables) for more info.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
 ## Examples
 
@@ -128,6 +128,15 @@ A few things to note about the output:
 
 ## How It Works
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ## Types
 
 You can coerce your extract values into types via the `types` table
@@ -176,11 +185,8 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-
 * [`grok_parser` transform][docs.grok_parser_transform]
-
 * [`lua` transform][docs.lua_transform]
-
 * [`regex_parser` transform][docs.regex_parser_transform]
 
 ## Resources
@@ -190,6 +196,7 @@ Finally, consider the following alternatives:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md

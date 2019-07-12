@@ -82,6 +82,15 @@ The `prometheus` sink exposes [`metric`][docs.metric_event] events to [Prometheu
 This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
 if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Health Checks
 
 Upon [starting][docs.starting], Vector will perform a simple health check
@@ -123,6 +132,7 @@ issue, please:
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.event]: ../../../about/data-model.md#event
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

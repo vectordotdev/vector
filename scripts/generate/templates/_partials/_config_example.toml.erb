@@ -13,7 +13,7 @@
     <%- else -%>
       <%- if option.wildcard? -%>
         <%- option.examples.each do |e| -%>
-<%= e.fetch("name") %> = <%= e.fetch("value").to_toml %>
+  <%= e.fetch("name") %> = <%= e.fetch("value").to_toml %>
         <%- end -%>
       <%- else -%>
         <%- first_example = option.examples.first -%>

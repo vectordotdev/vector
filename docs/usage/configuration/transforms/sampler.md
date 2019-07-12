@@ -61,7 +61,14 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 
 ## How It Works
 
+### Environment Variables
 
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ## Troubleshooting
 
@@ -84,6 +91,7 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources

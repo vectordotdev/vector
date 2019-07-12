@@ -75,6 +75,15 @@ The `vector` sink streams [`log`][docs.log_event] events to another downstream V
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.best_effort_delivery].
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Health Checks
 
 Upon [starting][docs.starting], Vector will perform a simple health check
@@ -116,6 +125,7 @@ issue, please:
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.event]: ../../../about/data-model.md#event
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

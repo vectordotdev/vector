@@ -113,8 +113,6 @@ event["parent.child"] = nil
 
 ## How It Works
 
-
-
 ### Dropping Events
 
 To drop events, simply set the `event` variable to `nil`. For example:
@@ -124,6 +122,15 @@ if event["message"].match(str, "debug") then
   event = nil
 end
 ```
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ### Global Variables
 
@@ -177,11 +184,8 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-
 * [`grok_parser` transform][docs.grok_parser_transform]
-
 * [`regex_parser` transform][docs.regex_parser_transform]
-
 * [`tokenizer` transform][docs.tokenizer_transform]
 
 ## Resources
@@ -192,6 +196,7 @@ Finally, consider the following alternatives:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model.md
 [docs.default_schema]: ../../../about/data-model.md#default-schema
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md

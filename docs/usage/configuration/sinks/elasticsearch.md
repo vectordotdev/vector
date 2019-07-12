@@ -183,6 +183,15 @@ Batches are flushed when 1 of 2 conditions are met:
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.best_effort_delivery].
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Health Checks
 
 Upon [starting][docs.starting], Vector will perform a simple health check
@@ -274,6 +283,7 @@ issue, please:
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model.md
 [docs.event]: ../../../about/data-model.md#event
 [docs.guarantees]: ../../../about/guarantees.md

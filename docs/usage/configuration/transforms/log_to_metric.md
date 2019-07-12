@@ -67,7 +67,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value.<br />`default: false` |
 | `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "dynamic"` |
-| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels. See [Null Fields](#null-fields) and [Reducing](#reducing) for more info.<br />`required` `example: (see above)` |
+| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels. See [Environment Variables](#environment-variables), [Null Fields](#null-fields), and [Reducing](#reducing) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -278,7 +278,14 @@ We are working on supporting timings and histograms. See
 
 ## How It Works
 
+### Environment Variables
 
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ### Null Fields
 
@@ -316,6 +323,7 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

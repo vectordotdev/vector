@@ -94,6 +94,15 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
 if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Line Delimiters
 
 Each line is read until a new line delimiter (the `0xA` byte) is found.
@@ -119,6 +128,7 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md

@@ -27,8 +27,8 @@ module PostProcessors
       new_content = "#{content}"
 
       parts.each do |part|
-        sorted_content = part[:content].split(/\n#{part[:depth]}# /).sort.join("\n#{part[:depth]}# ")
-        new_content.replace!(part[:content], sorted_content)
+        sorted_content = part[:content].split(/\n#{part[:depth]}# /).sort.join("\n#{part[:depth]}# ").lstrip.strip
+        new_content.replace!(part[:content], "\n" + sorted_content + "\n")
       end
 
       new_content.replace!(" [[sort]]", "")

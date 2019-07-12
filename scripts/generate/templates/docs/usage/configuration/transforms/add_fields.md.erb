@@ -46,7 +46,8 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
   "field3": 2.0,
   "field4": true,
   "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6": ["item1", "item2"],
+  "field6.0": "item1",
+  "field6.1": "item2",
   "field7.nested": "nested value",
   "field8": "my.hostname.com"
 }
@@ -80,13 +81,6 @@ same type. You cannot mix types:
 The `add_fields` transform is designed for simple key additions. If you need
 more complex transforming then we recommend using a more versatile transform
 like the [`lua` transform][docs.lua_transform].
-
-### Environment Variables
-
-As described in the [Configuration document][docs.configuration], Vector will
-interpolate environment variables in your configuration file. This can be
-helpful when adding fields, such as adding a `"host"` field as shown in the
-example.
 
 ### Key Conflicts
 

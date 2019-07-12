@@ -57,11 +57,18 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 ## How It Works
 
-
-
 ### Debugging
 
 We recommend the [Grok debugger][url.grok_debugger] for Grok testing.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ### Patterns
 
@@ -96,11 +103,8 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-
 * [`lua` transform][docs.lua_transform]
-
 * [`regex_parser` transform][docs.regex_parser_transform]
-
 * [`tokenizer` transform][docs.tokenizer_transform]
 
 ## Resources
@@ -112,6 +116,7 @@ Finally, consider the following alternatives:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

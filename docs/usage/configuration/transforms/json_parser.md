@@ -130,8 +130,6 @@ option.
 
 ## How It Works
 
-
-
 ### Chaining / Unwrapping
 
 Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSON.
@@ -143,6 +141,15 @@ The `json_parser` source has been involved in the following correctness tests:
 * [`wrapped_json_correctness`][url.wrapped_json_correctness_test]
 
 Learn more in the [Correctness][docs.correctness] sections.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ### Invalid JSON
 
@@ -197,6 +204,7 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

@@ -59,7 +59,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   
   # OPTIONAL - Headers
   [sinks.my_http_sink_id.headers]
-  X-Powered-By = "Vector"
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -137,7 +137,7 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 | `buffer.max_size` | `int` | Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.<br />`no default` `example: 104900000` |
 | `buffer.num_items` | `int` | Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.<br />`default: 500` |
 | **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request. See [Authentication](#authentication), [Buffers & Batches](#buffers-batches), [Buffers types](#buffers-types), [Buffer overflow](#buffer-overflow), [Batch flushing](#batch-flushing), [Compression](#compression), [Encodings](#encodings), [Health Checks](#health-checks), [Rate Limits](#rate-limits), [Retry Policy](#retry-policy), and [Timeouts](#timeouts) for more info.<br />`required` `example: (see above)` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request. See [Authentication](#authentication), [Buffers & Batches](#buffers-batches), [Buffers types](#buffers-types), [Buffer overflow](#buffer-overflow), [Batch flushing](#batch-flushing), [Compression](#compression), [Encodings](#encodings), [Environment Variables](#environment-variables), [Health Checks](#health-checks), [Rate Limits](#rate-limits), [Retry Policy](#retry-policy), and [Timeouts](#timeouts) for more info.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -234,6 +234,15 @@ the following options:
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
 
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
+
 ### Health Checks
 
 If the `healthcheck_uri` option is provided, Vector will issue a request
@@ -292,6 +301,7 @@ issue, please:
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.event]: ../../../about/data-model.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model.md#log

@@ -29,14 +29,14 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
   
   # REQUIRED - Fields
   [sinks.my_add_fields_transform_id.fields]
-  my_string_field = "string value"
-  my_env_var_field = "${ENV_VAR}"
-  my_int_field = 1
-  my_float_field = 1.2
-  my_bool_field = true
-  my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
-  my_nested_fields = {key1 = "value1", key2 = "value2"}
-  my_list = ["first", "second", "third"]
+    my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_nested_fields = {key1 = "value1", key2 = "value2"}
+    my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -99,7 +99,8 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
   "field3": 2.0,
   "field4": true,
   "field5": <timestamp:2019-05-27T07:32:00Z>,
-  "field6": ["item1", "item2"],
+  "field6.0": "item1",
+  "field6.1": "item2",
   "field7.nested": "nested value",
   "field8": "my.hostname.com"
 }
@@ -111,8 +112,6 @@ While unrealistic, this example demonstrates the various accepted
 [types][docs.config_value_types].
 
 ## How It Works
-
-
 
 ### Arrays
 
@@ -136,10 +135,12 @@ like the [`lua` transform][docs.lua_transform].
 
 ### Environment Variables
 
-As described in the [Configuration document][docs.configuration], Vector will
-interpolate environment variables in your configuration file. This can be
-helpful when adding fields, such as adding a `"host"` field as shown in the
-example.
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ### Key Conflicts
 
@@ -212,7 +213,6 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-
 * [`remove_fields` transform][docs.remove_fields_transform]
 
 ## Resources
@@ -223,7 +223,7 @@ Finally, consider the following alternatives:
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration]: ../../../usage/configuration
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model.md
 [docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
 [docs.log_event]: ../../../about/data-model.md#log

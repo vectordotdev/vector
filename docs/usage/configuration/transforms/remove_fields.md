@@ -49,7 +49,14 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 
 ## How It Works
 
+### Environment Variables
 
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ## Troubleshooting
 
@@ -70,7 +77,6 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-
 * [`add_fields` transform][docs.add_fields_transform]
 
 ## Resources
@@ -81,6 +87,7 @@ Finally, consider the following alternatives:
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

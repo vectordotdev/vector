@@ -59,8 +59,6 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 
 ## How It Works
 
-
-
 ### Complex Comparisons
 
 The `field_filter` transform is designed for simple equality filtering, it is
@@ -68,6 +66,15 @@ not designed for complex comparisons. There are plans to build a `filter`
 transform that accepts more complex filtering.
 
 We've opened [issue 479][url.issue_479] for more complex filtering.
+
+### Environment Variables
+
+Environment variables are supported through all of Vector's configuration.
+Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
+and the variable will be replaced before loading the configuration.
+
+You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+section.
 
 ## Troubleshooting
 
@@ -90,6 +97,7 @@ issue, please:
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
+[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.metric_event]: ../../../about/data-model.md#metric
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

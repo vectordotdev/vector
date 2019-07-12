@@ -15,7 +15,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-<% component.alternatives.each do |alternative| %>
+<%- component.alternatives.each do |alternative| -%>
 * [`<%= alternative.name %>` <%= alternative.type %>][docs.<%= alternative.id %>]
-<% end -%>
-<% end -%>
+<%- end -%>
+<%- end -%>
