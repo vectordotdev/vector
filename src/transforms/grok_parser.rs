@@ -1,9 +1,12 @@
 use super::Transform;
 use crate::event::{self, Event};
+use crate::types::{parse_conversion_map, Conversion};
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
+use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -13,6 +16,7 @@ pub struct GrokParserConfig {
     pub field: Option<Atom>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
+    pub types: HashMap<Atom, String>,
 }
 
 #[typetag::serde(name = "grok_parser")]
@@ -22,6 +26,8 @@ impl crate::topology::config::TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
+        let types = parse_conversion_map(&self.types)?;
+
         grok.compile(&self.pattern, true)
             .map_err(|err| format!("Grok pattern failed to compile: {}", err))
             .map::<Box<dyn Transform>, _>(|p| {
@@ -29,6 +35,7 @@ impl crate::topology::config::TransformConfig for GrokParserConfig {
                     pattern: p,
                     field: field.clone(),
                     drop_field: self.drop_field,
+                    types,
                 })
             })
     }
@@ -38,6 +45,7 @@ pub struct GrokParser {
     pattern: Pattern,
     field: Atom,
     drop_field: bool,
+    types: HashMap<Atom, Conversion>,
 }
 
 impl Transform for GrokParser {
@@ -48,7 +56,18 @@ impl Transform for GrokParser {
         if let Some(value) = value {
             if let Some(matches) = self.pattern.match_against(&value) {
                 for (name, value) in matches.iter() {
-                    event.insert_explicit(name.into(), value.into());
+                    let name: Atom = name.into();
+                    let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
+                    match conv.convert(value.into()) {
+                        Ok(value) => event.insert_explicit(name, value),
+                        Err(err) => {
+                            debug!(
+                                message = "Could not convert types.",
+                                name = &name[..],
+                                error = &field::display(err),
+                            );
+                        }
+                    }
                 }
 
                 if self.drop_field {
@@ -76,12 +95,19 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
-    fn parse_log(event: &str, pattern: &str, field: Option<&str>, drop_field: bool) -> LogEvent {
+    fn parse_log(
+        event: &str,
+        pattern: &str,
+        field: Option<&str>,
+        drop_field: bool,
+        types: &[(&str, &str)],
+    ) -> LogEvent {
         let event = Event::from(event);
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
             field: field.map(|s| s.into()),
             drop_field,
+            types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build()
         .unwrap();
@@ -95,6 +121,7 @@ mod tests {
             "%{HTTPD_COMMONLOG}",
             None,
             true,
+            &[],
         );
 
         let expected = json!({
@@ -120,6 +147,7 @@ mod tests {
             "%{HTTPD_COMMONLOG}",
             None,
             true,
+            &[],
         );
 
         assert_eq!(2, event.keys().count());
@@ -137,6 +165,7 @@ mod tests {
             "%{HTTPD_COMMONLOG}",
             None,
             false,
+            &[],
         );
 
         let expected = json!({
@@ -158,7 +187,13 @@ mod tests {
 
     #[test]
     fn grok_parser_does_nothing_on_missing_field() {
-        let event = parse_log("i am the only field", "^(?<foo>.*)", Some("bar"), false);
+        let event = parse_log(
+            "i am the only field",
+            "^(?<foo>.*)",
+            Some("bar"),
+            false,
+            &[],
+        );
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
@@ -166,5 +201,31 @@ mod tests {
             event[&event::MESSAGE]
         );
         assert!(event[&event::TIMESTAMP].to_string_lossy().len() > 0);
+    }
+
+    #[test]
+    fn grok_parser_coerces_types() {
+        let event = parse_log(
+            r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
+            "%{HTTPD_COMMONLOG}",
+            None,
+            true,
+            &[("response", "int"), ("bytes", "int")],
+        );
+
+        let expected = json!({
+            "clientip": "109.184.11.34",
+            "ident": "-",
+            "auth": "-",
+            "timestamp": "12/Dec/2015:18:32:56 +0100",
+            "verb": "GET",
+            "request": "/administrator/",
+            "httpversion": "1.1",
+            "rawrequest": "",
+            "response": 200,
+            "bytes": 4263,
+        });
+
+        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
     }
 }

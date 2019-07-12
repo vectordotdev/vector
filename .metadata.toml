@@ -399,6 +399,29 @@ examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:messa
 null = false
 description = "The [Grok pattern][url.grok_patterns]"
 
+[transforms.grok_parser.options.types]
+type = "table"
+null = true
+description = "Key/Value pairs representing mapped field types."
+
+[transforms.grok_parser.options.types.options."*"]
+type = "string"
+enum = ["string", "int", "float", "bool", "timestamp|strftime"]
+examples = [
+  {name = "status", value = "int"},
+  {name = "duration", value = "float"},
+  {name = "success", value = "bool"},
+  {name = "timestamp", value = "timestamp|%s", comment = "unix"},
+  {name = "timestamp", value = "timestamp|%+", comment = "iso8601 (date and time)"},
+  {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
+  {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
+]
+null = false
+description = """\
+A definition of mapped field types. They key is the field name and the value \
+is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+"""
+
 # ------------------------------------------------------------------------------
 # transforms.json_parser
 # ------------------------------------------------------------------------------

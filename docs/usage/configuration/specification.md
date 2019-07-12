@@ -379,6 +379,10 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   value = "/var/log/nginx.log"
 
 [transforms.grok_parser]
+  #
+  # General
+  #
+
   # The component type
   # 
   # * required
@@ -410,6 +414,25 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * optional
   # * default: "message"
   field = "message"
+
+  #
+  # Types
+  #
+
+  [transforms.grok_parser.types]
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # 
+    # * required
+    # * no default
+    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 
 [transforms.json_parser]
   # The component type
