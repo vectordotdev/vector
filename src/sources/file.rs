@@ -15,12 +15,14 @@ pub struct FileConfig {
     pub exclude: Vec<PathBuf>,
     pub file_key: Option<String>,
     pub start_at_beginning: bool,
-    pub ignore_older: Option<u64>,
+    pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
     pub fingerprint_bytes: usize,
     pub ignored_header_bytes: usize,
     pub host_key: Option<String>,
+    pub data_dir: PathBuf,
+    pub glob_minimum_cooldown: u64, // millis
 }
 
 fn default_max_line_bytes() -> usize {
@@ -39,6 +41,8 @@ impl Default for FileConfig {
             fingerprint_bytes: 256,
             ignored_header_bytes: 0,
             host_key: None,
+            data_dir: PathBuf::new(),
+            glob_minimum_cooldown: 1000, // millis
         }
     }
 }
@@ -57,6 +61,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
     let ignore_before = config
         .ignore_older
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
+    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
     let file_server = FileServer {
         include: config.include.clone(),
@@ -67,6 +72,8 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         max_line_bytes: config.max_line_bytes,
         fingerprint_bytes: config.fingerprint_bytes,
         ignored_header_bytes: config.ignored_header_bytes,
+        data_dir: config.data_dir.clone(),
+        glob_minimum_cooldown: glob_minimum_cooldown,
     };
 
     let file_key = config.file_key.clone();
@@ -147,9 +154,11 @@ mod tests {
     use tempfile::tempdir;
     use tokio::util::FutureExt;
 
-    fn test_default_file_config() -> file::FileConfig {
+    fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint_bytes: 8,
+            data_dir: dir.path().to_path_buf(),
+            glob_minimum_cooldown: 0, // millis
             ..Default::default()
         }
     }
@@ -193,7 +202,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..test_default_file_config()
+            ..test_default_file_config(&dir)
         };
 
         let source = file::file_source(&config, tx);
@@ -255,7 +264,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..test_default_file_config()
+            ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, tx);
 
@@ -324,7 +333,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ..test_default_file_config()
+            ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, tx);
 
@@ -395,7 +404,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
             exclude: vec![dir.path().join("a.*.txt")],
-            ..test_default_file_config()
+            ..test_default_file_config(&dir)
         };
 
         let source = file::file_source(&config, tx);
@@ -457,7 +466,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                ..test_default_file_config()
+                ..test_default_file_config(&dir)
             };
 
             let source = file::file_source(&config, tx);
@@ -487,7 +496,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: Some("source".to_string()),
-                ..test_default_file_config()
+                ..test_default_file_config(&dir)
             };
 
             let source = file::file_source(&config, tx);
@@ -517,7 +526,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: None,
-                ..test_default_file_config()
+                ..test_default_file_config(&dir)
             };
 
             let source = file::file_source(&config, tx);
@@ -551,26 +560,48 @@ mod tests {
     }
 
     #[test]
-    fn file_start_position() {
-        // Default (start from end)
+    fn file_start_position_server_restart() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        writeln!(&mut file, "zeroth line").unwrap();
+        sleep();
+
+        // First time server runs it picks up existing lines.
         {
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let (trigger, tripwire) = Tripwire::new();
-            let dir = tempdir().unwrap();
-            let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
-                ..test_default_file_config()
-            };
-
             let source = file::file_source(&config, tx);
-
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
-            let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
-
+            sleep();
             writeln!(&mut file, "first line").unwrap();
+            sleep();
+
+            drop(trigger);
+            shutdown_on_idle(rt);
+
+            let received = wait_with_timeout(rx.collect());
+            let lines = received
+                .into_iter()
+                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .collect::<Vec<_>>();
+            assert_eq!(lines, vec!["zeroth line", "first line"]);
+        }
+        // Restart server, read file from checkpoint.
+        {
+            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let source = file::file_source(&config, tx);
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let (trigger, tripwire) = Tripwire::new();
+            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
             sleep();
             writeln!(&mut file, "second line").unwrap();
             sleep();
@@ -585,30 +616,21 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
-
-        // Start from beginning
+        // Restart server, read files from beginning.
         {
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
-            let (tx, rx) = futures::sync::mpsc::channel(10);
-            let (trigger, tripwire) = Tripwire::new();
-            let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 start_at_beginning: true,
-                ..test_default_file_config()
+                ..test_default_file_config(&dir)
             };
-
+            let (tx, rx) = futures::sync::mpsc::channel(10);
             let source = file::file_source(&config, tx);
-
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
-            let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
-
-            writeln!(&mut file, "first line").unwrap();
             sleep();
-            writeln!(&mut file, "second line").unwrap();
-
+            writeln!(&mut file, "third line").unwrap();
             sleep();
 
             drop(trigger);
@@ -619,97 +641,160 @@ mod tests {
                 .into_iter()
                 .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
                 .collect::<Vec<_>>();
-            assert_eq!(lines, vec!["first line", "second line"]);
+            assert_eq!(
+                lines,
+                vec!["zeroth line", "first line", "second line", "third line"]
+            );
         }
+    }
+    #[test]
+    fn file_start_position_server_restart_with_file_rotation() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
 
-        // Start from beginning (but ignore old files)
+        let path = dir.path().join("file");
+        let path_for_old_file = dir.path().join("file.old");
+        // Run server first time, collect some lines.
         {
-            use std::os::unix::io::AsRawFd;
-            use std::time::{Duration, SystemTime};
-
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let (trigger, tripwire) = Tripwire::new();
-            let dir = tempdir().unwrap();
-            let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
-                start_at_beginning: true,
-                ignore_older: Some(1000),
-                ..test_default_file_config()
-            };
-
             let source = file::file_source(&config, tx);
-
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
-            let before_path = dir.path().join("before");
-            let mut before_file = File::create(&before_path).unwrap();
-            let after_path = dir.path().join("after");
-            let mut after_file = File::create(&after_path).unwrap();
-
-            writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
-            writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
-
-            {
-                // Set the modified times
-                let before = SystemTime::now() - Duration::from_secs(1010);
-                let after = SystemTime::now() - Duration::from_secs(990);
-
-                let before_time = libc::timeval {
-                    tv_sec: before
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as _,
-                    tv_usec: 0,
-                };
-                let before_times = [before_time, before_time];
-
-                let after_time = libc::timeval {
-                    tv_sec: after
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as _,
-                    tv_usec: 0,
-                };
-                let after_times = [after_time, after_time];
-
-                unsafe {
-                    libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
-                    libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
-                }
-            }
-
+            let mut file = File::create(&path).unwrap();
             sleep();
-            writeln!(&mut before_file, "second line").unwrap();
-            writeln!(&mut after_file, "_second line").unwrap();
-
+            writeln!(&mut file, "first line").unwrap();
             sleep();
 
             drop(trigger);
             shutdown_on_idle(rt);
 
             let received = wait_with_timeout(rx.collect());
-            let before_lines = received
-                .iter()
-                .filter(|event| {
-                    event.as_log()[&"file".into()]
-                        .to_string_lossy()
-                        .ends_with("before")
-                })
+            let lines = received
+                .into_iter()
                 .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
                 .collect::<Vec<_>>();
-            let after_lines = received
-                .iter()
-                .filter(|event| {
-                    event.as_log()[&"file".into()]
-                        .to_string_lossy()
-                        .ends_with("after")
-                })
-                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
-                .collect::<Vec<_>>();
-            assert_eq!(before_lines, vec!["second line"]);
-            assert_eq!(after_lines, vec!["_first line", "_second line"]);
+            assert_eq!(lines, vec!["first line"]);
         }
+        // Perform 'file rotation' to archive old lines.
+        fs::rename(&path, &path_for_old_file).unwrap();
+        // Restart the server and make sure it does not re-read the old file
+        // even though it has a new name.
+        {
+            let (tx, rx) = futures::sync::mpsc::channel(10);
+            let source = file::file_source(&config, tx);
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let (trigger, tripwire) = Tripwire::new();
+            rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+            let mut file = File::create(&path).unwrap();
+            sleep();
+            writeln!(&mut file, "second line").unwrap();
+            sleep();
+
+            drop(trigger);
+            shutdown_on_idle(rt);
+
+            let received = wait_with_timeout(rx.collect());
+            let lines = received
+                .into_iter()
+                .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+                .collect::<Vec<_>>();
+            assert_eq!(lines, vec!["second line"]);
+        }
+    }
+
+    #[test]
+    fn file_start_position_ignore_old_files() {
+        use std::os::unix::io::AsRawFd;
+        use std::time::{Duration, SystemTime};
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            ignore_older: Some(1000),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, tx);
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let before_path = dir.path().join("before");
+        let mut before_file = File::create(&before_path).unwrap();
+        let after_path = dir.path().join("after");
+        let mut after_file = File::create(&after_path).unwrap();
+
+        writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
+        writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
+
+        {
+            // Set the modified times
+            let before = SystemTime::now() - Duration::from_secs(1010);
+            let after = SystemTime::now() - Duration::from_secs(990);
+
+            let before_time = libc::timeval {
+                tv_sec: before
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as _,
+                tv_usec: 0,
+            };
+            let before_times = [before_time, before_time];
+
+            let after_time = libc::timeval {
+                tv_sec: after
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as _,
+                tv_usec: 0,
+            };
+            let after_times = [after_time, after_time];
+
+            unsafe {
+                libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
+                libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+            }
+        }
+
+        sleep();
+        writeln!(&mut before_file, "second line").unwrap();
+        writeln!(&mut after_file, "_second line").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(rx.collect());
+        let before_lines = received
+            .iter()
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
+                    .ends_with("before")
+            })
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .collect::<Vec<_>>();
+        let after_lines = received
+            .iter()
+            .filter(|event| {
+                event.as_log()[&"file".into()]
+                    .to_string_lossy()
+                    .ends_with("after")
+            })
+            .map(|event| event.as_log()[&event::MESSAGE].to_string_lossy())
+            .collect::<Vec<_>>();
+        assert_eq!(before_lines, vec!["second line"]);
+        assert_eq!(after_lines, vec!["_first line", "_second line"]);
     }
 
     #[test]
@@ -721,7 +806,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             max_line_bytes: 10,
-            ..test_default_file_config()
+            ..test_default_file_config(&dir)
         };
 
         let source = file::file_source(&config, tx);

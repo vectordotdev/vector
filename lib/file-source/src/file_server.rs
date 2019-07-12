@@ -1,11 +1,11 @@
-use crate::file_watcher::FileWatcher;
+use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition};
 use bytes::Bytes;
 use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Seek, SeekFrom};
-use std::path::PathBuf;
+use std::io::{self, Read, Seek};
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
 use std::time;
 use tracing::field;
@@ -28,9 +28,9 @@ pub struct FileServer {
     pub max_line_bytes: usize,
     pub fingerprint_bytes: usize,
     pub ignored_header_bytes: usize,
+    pub data_dir: PathBuf,
+    pub glob_minimum_cooldown: time::Duration,
 }
-
-type FileFingerprint = u64;
 
 /// `FileServer` as Source
 ///
@@ -51,6 +51,7 @@ impl FileServer {
         mut chans: impl Sink<SinkItem = (Bytes, String), SinkError = ()>,
         shutdown: std::sync::mpsc::Receiver<()>,
     ) {
+        let mut read_from_beginning = self.start_at_beginning;
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
@@ -58,30 +59,47 @@ impl FileServer {
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
-        let mut start_of_run = true;
+
+        let mut checkpointer = Checkpointer::new(&self.data_dir);
+        checkpointer.read_checkpoints(self.ignore_before);
+
         // Alright friends, how does this work?
         //
         // We want to avoid burning up users' CPUs. To do this we sleep after
         // reading lines out of files. But! We want to be responsive as well. We
         // keep track of a 'backoff_cap' to decide how long we'll wait in any
         // given loop. This cap grows each time we fail to read lines in an
-        // exponential fashion to some hard-coded cap.
+        // exponential fashion to some hard-coded cap. To reduce time using glob,
+        // we do not re-scan for major file changes (new files, moves, deletes),
+        // or write new checkpoints, on every iteration.
+        let mut next_glob_time = time::Instant::now();
         loop {
-            let mut global_bytes_read: usize = 0;
-            // glob poll
-            let exclude_patterns = self
-                .exclude
-                .iter()
-                .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
-                .collect::<Vec<_>>();
-            for (_file_id, watcher) in &mut fp_map {
-                watcher.set_file_findable(false); // assume not findable until found
-            }
-            for include_pattern in &self.include {
-                for entry in glob(include_pattern.to_str().expect("no ability to glob"))
-                    .expect("Failed to read glob pattern")
-                {
-                    if let Ok(path) = entry {
+            // Glob find files to follow, but not too often.
+            let now_time = time::Instant::now();
+            if next_glob_time <= now_time {
+                // Schedule the next glob time.
+                next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
+
+                // Write any stored checkpoints (uses glob to find old checkpoints).
+                checkpointer
+                    .write_checkpoints()
+                    .map_err(|e| warn!("Problem writing checkpoints: {:?}", e))
+                    .ok();
+
+                // Search (glob) for files to detect major file changes.
+                let exclude_patterns = self
+                    .exclude
+                    .iter()
+                    .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
+                    .collect::<Vec<_>>();
+                for (_file_id, watcher) in &mut fp_map {
+                    watcher.set_file_findable(false); // assume not findable until found
+                }
+                for include_pattern in &self.include {
+                    for path in glob(include_pattern.to_str().expect("no ability to glob"))
+                        .expect("Failed to read glob pattern")
+                        .filter_map(Result::ok)
+                    {
                         if exclude_patterns
                             .iter()
                             .any(|e| e.matches(path.to_str().unwrap()))
@@ -89,7 +107,7 @@ impl FileServer {
                             continue;
                         }
 
-                        if let Some(file_id) =
+                        if let Ok(file_id) =
                             self.get_fingerprint_of_file(&path, &mut fingerprint_buffer)
                         {
                             if let Some(watcher) = fp_map.get_mut(&file_id) {
@@ -123,32 +141,29 @@ impl FileServer {
                                         ) {
                                             if old_modified_time < new_modified_time {
                                                 info!(
-                                                    message = "Switching to watch most recently modified file.",
-                                                    new_modified_time = field::debug(&new_modified_time),
-                                                    old_modified_time = field::debug(&old_modified_time),
-                                                    );
+                                                        message = "Switching to watch most recently modified file.",
+                                                        new_modified_time = field::debug(&new_modified_time),
+                                                        old_modified_time = field::debug(&old_modified_time),
+                                                        );
                                                 watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                             }
                                         }
                                     }
                                 }
                             } else {
-                                // unknown (new) file fingerprint
-                                let read_file_from_beginning = if start_of_run {
-                                    self.start_at_beginning
+                                // untracked file fingerprint
+                                let file_position = if read_from_beginning {
+                                    0
                                 } else {
-                                    true
+                                    checkpointer.get_checkpoint(file_id).unwrap_or(0)
                                 };
-                                if let Ok(mut watcher) = FileWatcher::new(
-                                    path,
-                                    read_file_from_beginning,
-                                    self.ignore_before,
-                                ) {
+                                if let Ok(mut watcher) =
+                                    FileWatcher::new(path, file_position, self.ignore_before)
+                                {
                                     info!(
                                         message = "Found file to watch.",
                                         path = field::debug(&watcher.path),
-                                        start_at_beginning = field::debug(&self.start_at_beginning),
-                                        start_of_run = field::debug(&start_of_run),
+                                        file_position = field::debug(&file_position),
                                     );
                                     watcher.set_file_findable(true);
                                     fp_map.insert(file_id, watcher);
@@ -157,9 +172,13 @@ impl FileServer {
                         }
                     }
                 }
+                // This special flag only applies to first iteration on startup.
+                read_from_beginning = false;
             }
-            // line polling
-            for (_file_id, watcher) in &mut fp_map {
+
+            // Collect lines by polling files.
+            let mut global_bytes_read: usize = 0;
+            for (&file_id, watcher) in &mut fp_map {
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
                     if sz > 0 {
@@ -185,7 +204,10 @@ impl FileServer {
                         break;
                     }
                 }
-                global_bytes_read = global_bytes_read.saturating_add(bytes_read);
+                if bytes_read > 0 {
+                    global_bytes_read = global_bytes_read.saturating_add(bytes_read);
+                    checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                }
             }
 
             // A FileWatcher is dead when the underlying file has disappeared.
@@ -220,8 +242,6 @@ impl FileServer {
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return,
             }
-
-            start_of_run = false;
         }
     }
 
@@ -229,19 +249,110 @@ impl FileServer {
         &self,
         path: &PathBuf,
         buffer: &mut Vec<u8>,
-    ) -> Option<FileFingerprint> {
+    ) -> Result<FileFingerprint, io::Error> {
         let i = self.ignored_header_bytes as u64;
         let b = self.fingerprint_bytes;
         buffer.resize(b, 0u8);
-        if let Ok(mut fp) = fs::File::open(path) {
-            if fp.seek(SeekFrom::Start(i)).is_ok() && fp.read_exact(&mut buffer[..b]).is_ok() {
-                let fingerprint = crc::crc64::checksum_ecma(&buffer[..b]);
-                Some(fingerprint)
-            } else {
-                None
+        let mut fp = fs::File::open(path)?;
+        fp.seek(io::SeekFrom::Start(i))?;
+        fp.read_exact(&mut buffer[..b])?;
+        let fingerprint = crc::crc64::checksum_ecma(&buffer[..b]);
+        Ok(fingerprint)
+    }
+}
+
+pub struct Checkpointer {
+    directory: PathBuf,
+    glob_string: String,
+    checkpoints: HashMap<FileFingerprint, FilePosition>,
+}
+
+impl Checkpointer {
+    pub fn new(data_dir: &Path) -> Checkpointer {
+        let directory = data_dir.join("checkpoints");
+        let glob_string = directory.join("*").to_string_lossy().into_owned();
+        Checkpointer {
+            directory: directory,
+            glob_string: glob_string,
+            checkpoints: HashMap::new(),
+        }
+    }
+
+    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
+        self.directory.join(format!("{:x}.{}", fng, pos))
+    }
+    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
+        let file_name = &path.file_name().unwrap().to_string_lossy();
+        scan_fmt!(file_name, "{x}.{}", [hex FileFingerprint], FilePosition).unwrap()
+    }
+
+    pub fn set_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
+        self.checkpoints.insert(fng, pos);
+    }
+
+    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
+        self.checkpoints.get(&fng).cloned()
+    }
+
+    pub fn write_checkpoints(&mut self) -> Result<(), io::Error> {
+        fs::remove_dir_all(&self.directory).ok();
+        fs::create_dir_all(&self.directory)?;
+        for (&fng, &pos) in self.checkpoints.iter() {
+            fs::File::create(self.encode(fng, pos))?;
+        }
+        Ok(())
+    }
+
+    pub fn read_checkpoints(&mut self, ignore_before: Option<time::SystemTime>) {
+        for path in glob(&self.glob_string).unwrap().flatten() {
+            if let Some(ignore_before) = ignore_before {
+                if let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified()) {
+                    if modified < ignore_before {
+                        fs::remove_file(path).ok();
+                        continue;
+                    }
+                }
             }
-        } else {
-            None
+            let (fng, pos) = self.decode(&path);
+            self.checkpoints.insert(fng, pos);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Checkpointer, FileFingerprint, FilePosition};
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_checkpointer_basics() {
+        let fingerprint: FileFingerprint = 0x1234567890abcdef;
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(&data_dir.path());
+        assert_eq!(
+            chkptr.decode(&chkptr.encode(fingerprint, position)),
+            (fingerprint, position)
+        );
+        chkptr.set_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+    }
+    #[test]
+    fn test_checkpointer_restart() {
+        let fingerprint: FileFingerprint = 0x1234567890abcdef;
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            chkptr.set_checkpoint(fingerprint, position);
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+            chkptr.write_checkpoints().ok();
+        }
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+            chkptr.read_checkpoints(None);
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
     }
 }
