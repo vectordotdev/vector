@@ -492,7 +492,6 @@ fn handle_errors(
 }
 
 #[cfg(test)]
-#[cfg(feature = "toomanyfd")]
 mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
