@@ -778,7 +778,8 @@ mod integration_tests {
                 .collect::<Vec<_>>();
 
             let pump = sink.send_all(iter_ok(events));
-            rt.block_on(pump).unwrap();
+            let (s, _) = rt.block_on(pump).unwrap();
+            drop(s);
 
             println!("done sending items");
 
