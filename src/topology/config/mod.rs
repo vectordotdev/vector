@@ -19,6 +19,7 @@ pub struct Config {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
+    Any,
     Log,
     Metric,
 }
