@@ -1,6 +1,9 @@
 use super::Transform;
-use crate::event::{self, Event};
-use crate::types::{parse_check_conversion_map, Conversion};
+use crate::{
+    event::{self, Event},
+    topology::config::{DataType, TransformConfig},
+    types::{parse_check_conversion_map, Conversion},
+};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag},
@@ -25,7 +28,7 @@ pub struct TokenizerConfig {
 }
 
 #[typetag::serde(name = "tokenizer")]
-impl crate::topology::config::TransformConfig for TokenizerConfig {
+impl TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
@@ -40,6 +43,14 @@ impl crate::topology::config::TransformConfig for TokenizerConfig {
             drop_field,
             types,
         )))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

@@ -1,5 +1,8 @@
 use super::Transform;
-use crate::event::{self, Event, ValueKind};
+use crate::{
+    event::{self, Event, ValueKind},
+    topology::config::{DataType, TransformConfig},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
@@ -16,9 +19,17 @@ pub struct JsonParserConfig {
 }
 
 #[typetag::serde(name = "json_parser")]
-impl crate::topology::config::TransformConfig for JsonParserConfig {
+impl TransformConfig for JsonParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(JsonParser::from(self.clone())))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

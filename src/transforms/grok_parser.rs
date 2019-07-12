@@ -1,6 +1,9 @@
 use super::Transform;
-use crate::event::{self, Event};
-use crate::types::{parse_conversion_map, Conversion};
+use crate::{
+    event::{self, Event},
+    topology::config::{DataType, TransformConfig},
+    types::{parse_conversion_map, Conversion},
+};
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -20,7 +23,7 @@ pub struct GrokParserConfig {
 }
 
 #[typetag::serde(name = "grok_parser")]
-impl crate::topology::config::TransformConfig for GrokParserConfig {
+impl TransformConfig for GrokParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
@@ -38,6 +41,14 @@ impl crate::topology::config::TransformConfig for GrokParserConfig {
                     types,
                 })
             })
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

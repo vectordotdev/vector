@@ -1,5 +1,8 @@
 use super::Transform;
-use crate::event::Event;
+use crate::{
+    event::Event,
+    topology::config::{DataType, TransformConfig},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -11,12 +14,20 @@ pub struct LuaConfig {
 }
 
 #[typetag::serde(name = "lua")]
-impl crate::topology::config::TransformConfig for LuaConfig {
+impl TransformConfig for LuaConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
         })
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

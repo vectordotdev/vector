@@ -1,6 +1,9 @@
 use super::Transform;
-use crate::event::{self, Event, ValueKind};
-use crate::types::{parse_check_conversion_map, Conversion};
+use crate::{
+    event::{self, Event, ValueKind},
+    topology::config::{DataType, TransformConfig},
+    types::{parse_check_conversion_map, Conversion},
+};
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -20,7 +23,7 @@ pub struct RegexParserConfig {
 }
 
 #[typetag::serde(name = "regex_parser")]
-impl crate::topology::config::TransformConfig for RegexParserConfig {
+impl TransformConfig for RegexParserConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
@@ -41,6 +44,14 @@ impl crate::topology::config::TransformConfig for RegexParserConfig {
             self.drop_failed,
             types,
         )))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

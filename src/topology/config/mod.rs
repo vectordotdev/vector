@@ -60,13 +60,9 @@ pub struct TransformOuter {
 pub trait TransformConfig: core::fmt::Debug {
     fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn input_type(&self) -> DataType;
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn output_type(&self) -> DataType;
 }
 
 // Helper methods for programming construction during tests

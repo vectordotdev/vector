@@ -1,5 +1,8 @@
 use super::Transform;
-use crate::event::{Event, ValueKind};
+use crate::{
+    event::{Event, ValueKind},
+    topology::config::{DataType, TransformConfig},
+};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -17,9 +20,17 @@ pub struct AddFields {
 }
 
 #[typetag::serde(name = "augmenter")]
-impl crate::topology::config::TransformConfig for AddFieldsConfig {
+impl TransformConfig for AddFieldsConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 
