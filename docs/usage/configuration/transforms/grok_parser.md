@@ -30,7 +30,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
-
+  
   # OPTIONAL - Types
   [sinks.my_grok_parser_transform_id.types]
     status = "int"
@@ -103,6 +103,18 @@ We plan to add a [performance test][docs.performance] for this in the future.
 While this is still plenty fast for most use cases we recommend using the
 [`regex_parser` transform][docs.regex_parser_transform] if you are experiencing
 performance issues.
+
+### Types
+
+You can coerce your extract values into types via the `types` table
+as shown in the examples above. The supported types are:
+
+| Type     | Desription                                                                            |
+|:---------|:--------------------------------------------------------------------------------------|
+| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
+| `int`    | Coerce to a 64 bit integer.                                                           |
+| `float`  | Coerce to 64 bit floats.                                                              |
+| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
 
 ## Troubleshooting
 
