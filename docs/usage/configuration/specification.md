@@ -187,8 +187,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   mode = "udp"
   mode = "unix"
 
-  # The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or
-  # `udp`.
+  # The TCP or UDP address to listen on.
   # 
   # * optional
   # * no default
@@ -814,15 +813,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -951,15 +948,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1136,15 +1131,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1198,15 +1191,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1269,15 +1260,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1407,15 +1396,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1569,15 +1556,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1665,15 +1650,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1726,15 +1709,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1863,15 +1844,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1936,15 +1915,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
@@ -1997,15 +1974,13 @@ end
     when_full = "block"
     when_full = "drop_newest"
 
-    # Only relevant when `type` is `disk`. The maximum size of the buffer on the
-    # disk.
+    # The maximum size of the buffer on the disk.
     # 
     # * optional
     # * no default
     max_size = 104900000
 
-    # Only relevant when `type` is `memory`. The maximum number of events allowed
-    # in the buffer.
+    # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500

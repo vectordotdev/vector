@@ -11,8 +11,7 @@
 <% if !option.options.nil? -%>
 <%= options_table(option.options, header: false, path: name, titles: false) %>
 <% else -%>
-<%- tags = table.option_tags(option) -%>
-| `<%= name %>` | `<%= option.type %>` | <%= option.description.strip %>[[references:<%= option.name %>]]<% if tags.any? %><br /><%= tags(tags) %><% end %> |
+| `<%= name %>` | `<%= option.type %>` | <%= table.option_description(option) %> |
 <% end -%>
 <% end -%>
 <% end -%>

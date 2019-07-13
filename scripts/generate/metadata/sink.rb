@@ -71,7 +71,7 @@ class Sink < Component
     }
 
     buffer_options["max_size"] = {
-      "description" => "Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.",
+      "description" => "The maximum size of the buffer on the disk.",
       "examples" => [104900000],
       "null" => true,
       "relevant_when" => {"type" => "disk"},
@@ -79,7 +79,7 @@ class Sink < Component
     }
 
     buffer_options["num_items"] = {
-      "description" => "Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.",
+      "description" => "The maximum number of [events][docs.event] allowed in the buffer.",
       "default" => 500,
       "null" => true,
       "relevant_when" => {"type" => "memory"},

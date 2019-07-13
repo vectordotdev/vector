@@ -62,9 +62,9 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 | `type` | `string` | The component type<br />`required` `enum: "syslog"` |
 | `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", "unix"` |
 | **OPTIONAL** - General | | |
-| `address` | `string` | The TCP or UDP address to listen on. Only relevant when `mode` is `tcp` or `udp`.<br />`no default` `example: "0.0.0.0:9000"` |
+| `address` | `string` | The TCP or UDP address to listen on.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`.<br />`no default` `example: "/path/to/socket"` |
+| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`. Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
 

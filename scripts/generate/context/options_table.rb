@@ -57,5 +57,24 @@ class Context
 
       tags
     end
+
+    def option_description(option)
+      description = option.description.strip
+
+      if option.relevant_when
+        conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
+        description << " Only relevant when #{conditions.to_sentence}"
+      end
+
+      description << "[[references:#{option.name}]]"
+
+      tags = option_tags(option)
+      if tags.any?
+        tags_markdown = tags.collect { |tag| "`#{tag}`" }.join(" ")
+        description << "<br />#{tags_markdown}"
+      end
+
+      description
+    end
   end
 end
