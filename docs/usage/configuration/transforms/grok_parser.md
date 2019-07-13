@@ -23,6 +23,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_grok_parser_transform_id]
+  # REQUIRED - General
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -32,7 +33,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   field = "message" # default
   
   # OPTIONAL - Types
-  [sinks.my_grok_parser_transform_id.types]
+  [transforms.my_grok_parser_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -45,6 +46,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [transforms.<transform-id>]
+  # REQUIRED - General
   type = "grok_parser"
   inputs = ["<string>", ...]
   pattern = "<string>"
@@ -54,7 +56,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   field = "<string>"
 
   # OPTIONAL - Types
-  [sinks.<sink-id>.types]
+  [transforms.<transform-id>.types]
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
