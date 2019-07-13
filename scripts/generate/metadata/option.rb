@@ -15,6 +15,7 @@ class Option
     :null,
     :options,
     :partition_key,
+    :relevant_when,
     :type,
     :unit
 
@@ -37,6 +38,7 @@ class Option
     @examples = hash["examples"] || []
     @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
+    @relevant_when = hash["relevant_when"]
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
@@ -44,6 +46,10 @@ class Option
 
     if !@null.is_a?(TrueClass) && !@null.is_a?(FalseClass)
       raise ArgumentError.new("#{self.class.name}#null must be a boolean")
+    end
+
+    if !@relevant_when.nil? && !@relevant_when.is_a?(Hash)
+      raise ArgumentError.new("#{self.class.name}#null must be a hash of conditions")
     end
 
     if !TYPES.include?(@type)

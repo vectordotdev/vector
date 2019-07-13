@@ -30,7 +30,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
   max_length = 102400 # default, bytes
-  path = "/path/to/socket" # no default
+  path = "/path/to/socket" # no default, relevant when mode = "unix"
   
   # OPTIONAL - Context
   host_key = "host" # default

@@ -48,6 +48,12 @@ class Context
         end
       end
 
+      if option.relevant_when
+        conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }.to_sentence
+        tag = "relevant when #{conditions}"
+        tags << tag
+      end
+
       tags
     end
   end

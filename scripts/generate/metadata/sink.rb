@@ -74,6 +74,7 @@ class Sink < Component
       "description" => "Only relevant when `type` is `disk`. The maximum size of the buffer on the disk.",
       "examples" => [104900000],
       "null" => true,
+      "relevant_when" => {"type" => "disk"},
       "type" => "int"
     }
 
@@ -81,6 +82,7 @@ class Sink < Component
       "description" => "Only relevant when `type` is `memory`. The maximum number of [events][docs.event] allowed in the buffer.",
       "default" => 500,
       "null" => true,
+      "relevant_when" => {"type" => "memory"},
       "type" => "int"
     }
 

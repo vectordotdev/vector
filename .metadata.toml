@@ -197,6 +197,7 @@ description = "The input mode."
 type = "string"
 examples = ["/path/to/socket"]
 null = true
+relevant_when = {mode = "unix"}
 description = """\
 The unix socket path. *This should be absolute path.* Only relevant \
 when `mode` is `unix`.

@@ -39,8 +39,8 @@ The `prometheus` sink exposes [`metric`][docs.metric_event] events to [Prometheu
   [sinks.my_prometheus_sink_id.buffer]
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
-    max_size = 104900000 # no default
-    num_items = 500 # default
+    max_size = 104900000 # no default, relevant when type = "disk"
+    num_items = 500 # default, relevant when type = "memory"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
