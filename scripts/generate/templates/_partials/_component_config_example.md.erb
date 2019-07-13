@@ -1,12 +1,12 @@
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```toml
-<%= config_example(component.options.to_h.values.sort, path: "sinks.my_#{component.id}_id") %>
+<%= config_example(component.options.to_h.values.sort, path: "#{component.type.pluralize}.my_#{component.id}_id") %>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```toml
-<%= config_schema(component.options.to_h.values.sort, path: "sinks.<sink-id>") %>
+<%= config_schema(component.options.to_h.values.sort, path: "#{component.type.pluralize}.<#{component.type}-id>") %>
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -22,7 +22,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_regex_parser_transform_id]
+[transforms.my_regex_parser_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
@@ -33,7 +33,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   field = "message" # default
   
   # OPTIONAL - Types
-  [sinks.my_regex_parser_transform_id.types]
+  [transforms.my_regex_parser_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -45,7 +45,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   # REQUIRED - General
   type = "regex_parser"
   inputs = ["<string>", ...]
@@ -56,7 +56,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   field = "<string>"
 
   # OPTIONAL - Types
-  [sinks.<sink-id>.types]
+  [transforms.<transform-id>.types]
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}

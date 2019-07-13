@@ -22,13 +22,13 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_add_fields_transform_id]
+[transforms.my_add_fields_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: "add_fields"
   inputs = ["my-source-id"]
   
   # REQUIRED - Fields
-  [sinks.my_add_fields_transform_id.fields]
+  [transforms.my_add_fields_transform_id.fields]
     my_string_field = "string value"
     my_env_var_field = "${ENV_VAR}"
     my_int_field = 1
@@ -41,13 +41,13 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   # REQUIRED - General
   type = "add_fields"
   inputs = ["<string>", ...]
 
   # REQUIRED - Fields
-  [sinks.<sink-id>.fields]
+  [transforms.<transform-id>.fields]
     * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}

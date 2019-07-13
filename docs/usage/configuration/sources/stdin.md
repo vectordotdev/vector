@@ -22,7 +22,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_stdin_source_id]
+[sources.my_stdin_source_id]
   # REQUIRED - General
   type = "stdin" # must be: "stdin"
   
@@ -35,7 +35,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[sources.<source-id>]
   # REQUIRED - General
   type = "stdin"
 

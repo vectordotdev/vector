@@ -22,7 +22,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_json_parser_transform_id]
+[transforms.my_json_parser_transform_id]
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
@@ -32,7 +32,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   type = "json_parser"
   inputs = ["<string>", ...]
   drop_invalid = <bool>

@@ -14,18 +14,13 @@ tradeoffs or your usecase.
 The following matrix outlines the guarantee support for each [sink][docs.sinks]
 and [source][docs.sources].
 
-### Sources
-
 | Name | Description |
-| :--- | :---------- |
+|:-----|:------------|
+| **Sources** | |
 <%- metadata.sources.to_h.values.sort.each do |source| -%>
 | [`<%= source.name %>` source][docs.<%= source.id %>] | `<%= source.delivery_guarantee %>` |
 <%- end -%>
-
-### Sinks
-
-| Name | Description |
-| :--- | :---------- |
+| **Sinks** | |
 <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
 | [`<%= sink.name %>` sink][docs.<%= sink.id %>] | `<%= sink.delivery_guarantee %>` |
 <%- end -%>
@@ -37,6 +32,26 @@ Vector will be delivered at least once to the configured destination(s). While
 rare, it is possible for an event to be delivered more than once (see the
 [Does Vector support exactly once delivery](#does-vector-support-exactly-once-delivery)
 FAQ below).
+
+To achieve at least once delivery your source must be configured to use `disk`
+based buffers:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[sinks.my_sink_id]
+  # ...
+
+  [sinks.my_sink_id.buffer]
+    type = "disk"
+    when_full = "block"
+    max_size = 104900000 # 100MiB
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Each [sink][docs.sinks] documents the buffer options.
+
 
 ## Best Effort Delivery
 

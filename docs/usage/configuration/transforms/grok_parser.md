@@ -22,7 +22,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_grok_parser_transform_id]
+[transforms.my_grok_parser_transform_id]
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -33,7 +33,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   type = "grok_parser"
   inputs = ["<string>", ...]
   pattern = "<string>"

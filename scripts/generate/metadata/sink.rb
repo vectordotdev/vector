@@ -75,7 +75,8 @@ class Sink < Component
       "examples" => [104900000],
       "null" => true,
       "relevant_when" => {"type" => "disk"},
-      "type" => "int"
+      "type" => "int",
+      "unit" => "bytes"
     }
 
     buffer_options["num_items"] = {
@@ -83,7 +84,8 @@ class Sink < Component
       "default" => 500,
       "null" => true,
       "relevant_when" => {"type" => "memory"},
-      "type" => "int"
+      "type" => "int",
+      "unit" => "events"
     }
 
     buffer_option = Option.new({

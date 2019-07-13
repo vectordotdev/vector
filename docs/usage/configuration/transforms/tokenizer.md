@@ -22,7 +22,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_tokenizer_transform_id]
+[transforms.my_tokenizer_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
@@ -33,7 +33,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   field = "message" # default
   
   # OPTIONAL - Types
-  [sinks.my_tokenizer_transform_id.types]
+  [transforms.my_tokenizer_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -45,7 +45,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   # REQUIRED - General
   type = "tokenizer"
   inputs = ["<string>", ...]
@@ -56,7 +56,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   field = "<string>"
 
   # OPTIONAL - Types
-  [sinks.<sink-id>.types]
+  [transforms.<transform-id>.types]
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}

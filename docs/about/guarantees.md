@@ -22,21 +22,16 @@ tradeoffs or your usecase.
 The following matrix outlines the guarantee support for each [sink][docs.sinks]
 and [source][docs.sources].
 
-### Sources
-
 | Name | Description |
-| :--- | :---------- |
+|:-----|:------------|
+| **Sources** | |
 | [`file` source][docs.file_source] | `best_effort` |
 | [`statsd` source][docs.statsd_source] | `best_effort` |
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
 | [`syslog` source][docs.syslog_source] | `best_effort` |
 | [`tcp` source][docs.tcp_source] | `best_effort` |
 | [`vector` source][docs.vector_source] | `best_effort` |
-
-### Sinks
-
-| Name | Description |
-| :--- | :---------- |
+| **Sinks** | |
 | [`aws_cloudwatch_logs` sink][docs.aws_cloudwatch_logs_sink] | `at_least_once` |
 | [`aws_kinesis_streams` sink][docs.aws_kinesis_streams_sink] | `at_least_once` |
 | [`aws_s3` sink][docs.aws_s3_sink] | `at_least_once` |
@@ -57,6 +52,26 @@ Vector will be delivered at least once to the configured destination(s). While
 rare, it is possible for an event to be delivered more than once (see the
 [Does Vector support exactly once delivery](#does-vector-support-exactly-once-delivery)
 FAQ below).
+
+To achieve at least once delivery your source must be configured to use `disk`
+based buffers:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[sinks.my_sink_id]
+  # ...
+
+  [sinks.my_sink_id.buffer]
+    type = "disk"
+    when_full = "block"
+    max_size = 104900000 # 100MiB
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Each [sink][docs.sinks] documents the buffer options.
+
 
 ## Best Effort Delivery
 

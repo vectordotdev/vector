@@ -22,13 +22,13 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_log_to_metric_transform_id]
+[transforms.my_log_to_metric_transform_id]
   # REQUIRED - General
   type = "log_to_metric" # must be: "log_to_metric"
   inputs = ["my-source-id"]
   
   # REQUIRED - Metrics
-  [[sinks.my_log_to_metric_transform_id.metrics]]
+  [[transforms.my_log_to_metric_transform_id.metrics]]
     type = "counter" # enum: "counter", "gauge"
     field = "duration"
     
@@ -39,13 +39,13 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   # REQUIRED - General
   type = "log_to_metric"
   inputs = ["<string>", ...]
 
   # REQUIRED - Metrics
-  [[sinks.<sink-id>.metrics]]
+  [[transforms.<transform-id>.metrics]]
     type = {"counter" | "gauge"}
     field = "<string>"
     increment_by_value = <bool>

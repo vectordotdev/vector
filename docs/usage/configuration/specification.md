@@ -817,12 +817,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.aws_kinesis_streams]
@@ -952,12 +954,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.aws_s3]
@@ -1135,12 +1139,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.blackhole]
@@ -1195,12 +1201,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.console]
@@ -1264,12 +1272,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.elasticsearch]
@@ -1400,12 +1410,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.http]
@@ -1560,12 +1572,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
   #
@@ -1654,12 +1668,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.prometheus]
@@ -1713,12 +1729,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.splunk_hec]
@@ -1848,12 +1866,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.tcp]
@@ -1919,12 +1939,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 
 [sinks.vector]
@@ -1978,12 +2000,14 @@ end
     # 
     # * optional
     # * no default
+    # * unit: bytes
     max_size = 104900000
 
     # The maximum number of events allowed in the buffer.
     # 
     # * optional
     # * default: 500
+    # * unit: events
     num_items = 500
 ```
 {% endcode-tabs-item %}

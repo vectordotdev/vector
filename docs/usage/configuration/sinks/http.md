@@ -54,8 +54,8 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
   [sinks.my_http_sink_id.buffer]
     type = "memory" # default, enum: "memory", "disk"
     when_full = "block" # default, enum: "block", "drop_newest"
-    max_size = 104900000 # no default, relevant when type = "disk"
-    num_items = 500 # default, relevant when type = "memory"
+    max_size = 104900000 # no default, bytes, relevant when type = "disk"
+    num_items = 500 # default, events, relevant when type = "memory"
   
   # OPTIONAL - Headers
   [sinks.my_http_sink_id.headers]
@@ -134,8 +134,8 @@ The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoin
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` |
+| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
+| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Headers | | |
 | `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`required` `example: (see above)` |
 

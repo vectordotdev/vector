@@ -29,7 +29,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_field_filter_transform_id]
+[transforms.my_field_filter_transform_id]
   type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"
@@ -38,7 +38,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   type = "field_filter"
   inputs = ["<string>", ...]
   field = "<string>"

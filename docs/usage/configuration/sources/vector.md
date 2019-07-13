@@ -29,7 +29,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_vector_source_id]
+[sources.my_vector_source_id]
   type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
   
@@ -38,7 +38,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[sources.<source-id>]
   type = "vector"
   address = "<string>"
   shutdown_timeout_secs = <int>

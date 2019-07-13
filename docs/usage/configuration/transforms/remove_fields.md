@@ -22,7 +22,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_remove_fields_transform_id]
+[transforms.my_remove_fields_transform_id]
   type = "remove_fields" # must be: "remove_fields"
   inputs = ["my-source-id"]
   fields = ["field1", "field2"]
@@ -30,7 +30,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[transforms.<transform-id>]
   type = "remove_fields"
   inputs = ["<string>", ...]
   fields = ["<string>", ...]

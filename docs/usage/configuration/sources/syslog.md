@@ -22,7 +22,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_syslog_source_id]
+[sources.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: "syslog"
   mode = "tcp" # enum: "tcp", "udp", "unix"
@@ -38,7 +38,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
-[sinks.<sink-id>]
+[sources.<source-id>]
   # REQUIRED - General
   type = "syslog"
   mode = {"tcp" | "udp" | "unix"}
