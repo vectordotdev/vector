@@ -128,16 +128,30 @@ A few things to note about the output:
 
 ## How It Works
 
+### Blank Values
+
+Both `" "` and `"-"` are considered blank values and their mapped field will
+be set to `null`.
+
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before loading the configuration.
+and the variable will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
 
-## Types
+### Special Characters
+
+In order to extract raw values and remove wrapping characters, we must treat
+certain characters as special. These characters will be discarded:
+
+* `"..."` - Quotes are used tp wrap phrases. Spaces are preserved, but the wrapping quotes will be discarded.
+* `[...]` - Brackets are used to wrap phrases. Spaces are preserved, but the wrapping brackets will be discarded.
+* `\` - Can be used to escape the above characters, Vector will treat them as literal.
+
+### Types
 
 You can coerce your extract values into types via the `types` table
 as shown in the examples above. The supported types are:
@@ -148,23 +162,6 @@ as shown in the examples above. The supported types are:
 | `int`    | Coerce to a 64 bit integer.                                                           |
 | `float`  | Coerce to 64 bit floats.                                                              |
 | `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
-
-### Blank Values
-
-Both `" "` and `"-"` are considered blank values and their mapped field will
-be set to `null`.
-
-### Special Characters
-
-In order to extract raw values and remove wrapping characters, we must treat
-certain characters as special. These characters will be discarded:
-
-* `"..."` - Quotes are used tp wrap phrases. Spaces are preserved, but the
-  wrapping quotes will be discarded.
-* `[...]` - Brackets are used to wrap phrases. Spaces are preserved, but the
-  wrapping brackets will be discarded.
-* `\` - Can be used to escape the above characters, Vector will treat them as
-  literal.
 
 ## Troubleshooting
 

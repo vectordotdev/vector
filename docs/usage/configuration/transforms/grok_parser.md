@@ -57,6 +57,13 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 ## How It Works
 
+### Available Patterns
+
+Vector uses the Rust [`grok` library][url.rust_grok_library]. All patterns
+[listed here][url.grok_patterns] are supported. It is recommended to use
+maintained patterns when possible since they can be improved over time by
+the community.
+
 ### Debugging
 
 We recommend the [Grok debugger][url.grok_debugger] for Grok testing.
@@ -65,24 +72,18 @@ We recommend the [Grok debugger][url.grok_debugger] for Grok testing.
 
 Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before loading the configuration.
+and the variable will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
 
-### Patterns
-
-Vector uses the Rust [`grok` library][url.rust_grok_library]. All patterns
-[listed here][url.grok_patterns] are supported. It is recommended to use any
-maintained patterns when possible.
-
 ### Performance
 
-Grok is approximately 50% slower than it's Regex counterpart. We plan to add a
-[performance test][docs.performance] for this in the future. While this is
-still plenty fast for most use cases we recommend using the [`regex_parser`
-transform][docs.regex_parser_transform] if you are experiencing performance
-issues.
+Grok is approximately 50% slower than the [`regex_parser` transform][docs.regex_parser_transform].
+We plan to add a [performance test][docs.performance] for this in the future.
+While this is still plenty fast for most use cases we recommend using the
+[`regex_parser` transform][docs.regex_parser_transform] if you are experiencing
+performance issues.
 
 ## Troubleshooting
 

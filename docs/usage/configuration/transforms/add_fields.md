@@ -120,13 +120,25 @@ The `add_fields` transform will support [TOML arrays][url.toml_array]. Keep in
 mind that the values must be simple type (not tables), and each value must the
 same type. You cannot mix types:
 
-```
+```coffeescript
 [transforms.<transform-id>]
   # ...
   
   [transforms.<transform-id>.fields]
     my_array = ["first", "second", "third"]
 ```
+
+Results in:
+
+```json
+{
+  "my_array.0": "first",
+  "my_array.1": "second",
+  "my_array.2": "third"
+}
+```
+
+Learn more about how [`log` events][docs.data_model.log] are structured.
 
 ### Complex Transforming
 
@@ -138,7 +150,7 @@ like the [`lua` transform][docs.lua_transform].
 
 Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before loading the configuration.
+and the variable will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
@@ -158,8 +170,18 @@ verbose for this usecase:
   # ...
   
   [transforms.<transform-id>.fields]
-    parent.child.grandchild = "<value>"
+    parent.child.grandchild = "my_value"
 ```
+
+Results in:
+
+```json
+{
+  "parent.child.grandchild": "my_value"
+}
+```
+
+Learn more about how [`log` events][docs.data_model.log] are structured.
 
 ### Removing Fields
 
@@ -175,25 +197,8 @@ use `\` to escape quotes.
 ### Types
 
 All supported [configuration value types][docs.config_value_types] are accepted.
-For convenience, here's what that means:
-
-#### Primitive Types
-
-All [primitive TOML types (`string`, `int`, `float`, `boolean`,) are supported
-as shown in the [Config file example](#config-file).
-
-#### List Types
-
-[TOML arrays][url.toml_array]. Keep in mind that the values must be simple type
-(not tables), and each value must the same type. You cannot mix types:
-
-```
-[transforms.<transform-id>]
-  # ...
-  
-  [transforms.<transform-id>.fields]
-    my_array = ["first", "second", "third"]
-```
+This includes primitivate types (`string`, `int`, `float`, `boolean`) and
+special types, such as [arrays](#arrays) and [nested fields](#nested-fields).
 
 ## Troubleshooting
 

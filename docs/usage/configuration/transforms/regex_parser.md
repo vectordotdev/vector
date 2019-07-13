@@ -69,10 +69,10 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`.<br />`required` `example: (see above)` |
+| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
-| `field` | `string` | The field to parse.<br />`default: "message"` |
+| `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
 | `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
@@ -136,22 +136,10 @@ Things to note about the output:
 
 Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before loading the configuration.
+and the variable will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
-
-## Types
-
-You can coerce your extract values into types via the `types` table
-as shown in the examples above. The supported types are:
-
-| Type     | Desription                                                                            |
-|:---------|:--------------------------------------------------------------------------------------|
-| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
-| `int`    | Coerce to a 64 bit integer.                                                           |
-| `float`  | Coerce to 64 bit floats.                                                              |
-| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
 
 ### Failed Parsing
 
@@ -219,6 +207,18 @@ For example, to enable the case-insensitive flag you can write:
 More info can be found in the [Regex grouping and flags
 documentation][url.regex_grouping_and_flags].
 
+
+### Types
+
+You can coerce your extract values into types via the `types` table
+as shown in the examples above. The supported types are:
+
+| Type     | Desription                                                                            |
+|:---------|:--------------------------------------------------------------------------------------|
+| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
+| `int`    | Coerce to a 64 bit integer.                                                           |
+| `float`  | Coerce to 64 bit floats.                                                              |
+| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
 
 ## Troubleshooting
 
