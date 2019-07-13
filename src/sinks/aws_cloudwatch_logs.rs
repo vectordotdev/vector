@@ -684,6 +684,7 @@ mod integration_tests {
     // both tests to ensure that we can use the same runtime and it will only get dropped after both
     // tests have run.
     #[test]
+    #[ignore]
     fn cloudwatch_insert_log_event_and_partitioned() {
         let mut rt = Runtime::new().unwrap();
 
