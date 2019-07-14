@@ -6,7 +6,21 @@ class String
   end
 
   def continuize
-    self[0] = self[0].downcase
+    i = 0
+    
+    loop do
+      if i > self.length
+        break
+      end
+
+      if self[i] != "["
+        self[i] = self[i].downcase
+        break
+      end
+
+      i = i+1
+    end
+
     self
   end
 

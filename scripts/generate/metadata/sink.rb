@@ -115,6 +115,10 @@ class Sink < Component
     egress_method == "batching"
   end
 
+  def exposing?
+    egress_method == "exposing"
+  end
+
   def plural_write_verb
     case egress_method
     when "batching"

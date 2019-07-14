@@ -171,7 +171,7 @@ class Context
 
   def sink_description(sink)
     strip <<~EOF
-    #{sink.plural_write_verb.humanize} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
+    #{write_verb_link(sink)} #{event_type_links(sink.input_types).to_sentence} events to #{sink.write_to_description}.
     EOF
   end
 
@@ -189,6 +189,18 @@ class Context
     strip <<~EOF
     Accepts #{event_type_links(transform.input_types).to_sentence} events and allows you to #{transform.allow_you_to_description}.
     EOF
+  end
+
+  def write_verb_link(sink)
+    if sink.batching?
+      "[#{sink.plural_write_verb.humanize}](#buffers-and-batches)"
+    elsif sink.streaming?
+      "[#{sink.plural_write_verb.humanize}](#streaming)"
+    elsif sink.exposing?
+      "[#{sink.plural_write_verb.humanize}](#exposing-and-scraping)"
+    else
+      raise "Unhandled sink egress method: #{sink.egress_method.inspect}"
+    end
   end
 
   private

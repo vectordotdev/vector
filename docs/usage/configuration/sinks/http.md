@@ -15,7 +15,7 @@ description: Batches `log` events to a generic HTTP endpoint.
 ![][images.http_sink]
 
 
-The `http` sink batches [`log`][docs.log_event] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint.
 
 ## Config File
 
@@ -171,7 +171,6 @@ scheme][url.basic_auth].
 
 
 ### Buffers & Batches
-
 ![][images.sink-flow-serial]
 
 The `http` sink buffers, batches, and
@@ -246,9 +245,19 @@ section.
 ### Health Checks
 
 If the `healthcheck_uri` option is provided, Vector will issue a request
-to this URI to determine the service's health before initializing the sink.
-This ensures that the service is reachable. You can require this check with
-the `--require-healthy` flag upon [starting][docs.starting] Vector.
+to this URI to ensure Vector can properly community with the service. This
+helps to ensure that data will be successfully delivered after Vector is
+started.
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
+
+```bash
+vector --config /etc/vector/vector.toml --require-healthy
+```
+
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 
 ### Rate Limits
 
@@ -307,7 +316,6 @@ issue, please:
 [docs.log_event]: ../../../about/data-model.md#log
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.http_sink]: ../../../assets/http-sink.svg

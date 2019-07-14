@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_prometheus_sink_issues]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `prometheus` sink exposes [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service.
 
 ## Config File
 
@@ -68,7 +68,7 @@ The `prometheus` sink exposes [`metric`][docs.metric_event] events to [Prometheu
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "prometheus"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `address` | `string` | The address to expose for scraping.<br />`required` `example: "0.0.0.0:9598"` |
+| `address` | `string` | The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.<br />`required` `example: "0.0.0.0:9598"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
@@ -91,24 +91,28 @@ and the variable will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
 
+### Exposing & Scraping
+
+The `prometheus` sink exposes data for scraping.
+The `address` option determines the address and port the data is made available
+on. You'll need to configure your networking so that the configured port is
+accessible by the downstream service doing the scraping.
+
 ### Health Checks
 
 Upon [starting][docs.starting], Vector will perform a simple health check
 against this sink. The ensures that the downstream service is healthy and
-reachable. By default, if the health check fails an error will be logged and
-Vector will proceed to restart. Vector will continually check the health of
-the service on an interval until healthy.
-
-If you'd like to exit immediately when a service is unhealthy you can pass
-the `--require-healthy` flag:
+reachable.
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this if you have multiple sinks configured, as it will
-prevent Vector from starting is one sink is unhealthy, preventing the other
-healthy sinks from receiving data.
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 
 ## Troubleshooting
 

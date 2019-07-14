@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_elasticsearch_sink_issue
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `elasticsearch` sink batches [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
 ## Config File
 
@@ -141,7 +141,6 @@ Content-Length: 654
 ## How It Works
 
 ### Buffers & Batches
-
  
 ![][images.sink-flow-partitioned]
 
@@ -196,20 +195,17 @@ section.
 
 Upon [starting][docs.starting], Vector will perform a simple health check
 against this sink. The ensures that the downstream service is healthy and
-reachable. By default, if the health check fails an error will be logged and
-Vector will proceed to restart. Vector will continually check the health of
-the service on an interval until healthy.
-
-If you'd like to exit immediately when a service is unhealthy you can pass
-the `--require-healthy` flag:
+reachable.
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this if you have multiple sinks configured, as it will
-prevent Vector from starting is one sink is unhealthy, preventing the other
-healthy sinks from receiving data.
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 
 ### Nested Documents
 
@@ -221,15 +217,15 @@ document][docs.data_model].
 ### Partitioning
 
 Partitioning is controlled via the `index`
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
+options and allows you to dynamically partition data on the fly. You'll notice
+that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling this partitioning. The interpolated result is effectively the internal
+partition key. Let's look at a few examples:
 
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| Value          | Interpolation          | Desc                                   |
+|:---------------|:-----------------------|:---------------------------------------|
+| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
+| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
 | `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 
 ### Rate Limits

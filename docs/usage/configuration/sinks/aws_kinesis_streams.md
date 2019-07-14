@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_aws_kinesis_streams_sink
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `aws_kinesis_streams` sink batches [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
+The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
 ## Config File
 
@@ -167,7 +167,6 @@ within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 
 ### Buffers & Batches
-
 ![][images.sink-flow-serial]
 
 The `aws_kinesis_streams` sink buffers, batches, and
@@ -232,20 +231,17 @@ section.
 
 Upon [starting][docs.starting], Vector will perform a simple health check
 against this sink. The ensures that the downstream service is healthy and
-reachable. By default, if the health check fails an error will be logged and
-Vector will proceed to restart. Vector will continually check the health of
-the service on an interval until healthy.
-
-If you'd like to exit immediately when a service is unhealthy you can pass
-the `--require-healthy` flag:
+reachable.
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this if you have multiple sinks configured, as it will
-prevent Vector from starting is one sink is unhealthy, preventing the other
-healthy sinks from receiving data.
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 
 ### Rate Limits
 

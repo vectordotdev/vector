@@ -15,7 +15,7 @@ description: Batches `log` events to a Splunk HTTP Event Collector.
 ![][images.splunk_hec_sink]
 
 
-The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec].
+The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec].
 
 ## Config File
 
@@ -111,7 +111,6 @@ The `splunk_hec` sink batches [`log`][docs.log_event] events to a [Splunk HTTP E
 ## How It Works
 
 ### Buffers & Batches
-
 ![][images.sink-flow-serial]
 
 The `splunk_hec` sink buffers, batches, and
@@ -176,20 +175,17 @@ section.
 
 Upon [starting][docs.starting], Vector will perform a simple health check
 against this sink. The ensures that the downstream service is healthy and
-reachable. By default, if the health check fails an error will be logged and
-Vector will proceed to restart. Vector will continually check the health of
-the service on an interval until healthy.
-
-If you'd like to exit immediately when a service is unhealthy you can pass
-the `--require-healthy` flag:
+reachable.
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this if you have multiple sinks configured, as it will
-prevent Vector from starting is one sink is unhealthy, preventing the other
-healthy sinks from receiving data.
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 
 ### Rate Limits
 

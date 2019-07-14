@@ -18,11 +18,11 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 <% end -%>
-<% if component.sink? && component.batching? -%>
+<% if component.sink? -%>
+<% if component.batching? -%>
 
 ### Buffers & Batches
-
-<%- if component.partition_options.any? %> 
+<%- if component.partition_options.any? -%> 
 ![][images.sink-flow-partitioned]
 <%- else -%>
 ![][images.sink-flow-serial]
@@ -60,7 +60,22 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `<%= component.options.batch_timeout.human_default %>`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `<%= component.options.batch_size.human_default %>`).
-<% end -%>
+<% elsif component.streaming? -%>
+
+### Streaming
+
+The `<%= component.name %>` <%= component.type %> streams data on a real-time
+event-by-event basis. It does not buffer or batch data.
+<% elsif component.exposing? -%>
+
+### Exposing & Scraping
+
+The `<%= component.name %>` <%= component.type %> exposes data for scraping.
+The `address` option determines the address and port the data is made available
+on. You'll need to configure your networking so that the configured port is
+accessible by the downstream service doing the scraping.
+<%- end -%>
+<%- end -%>
 <% if component.options.compression -%>
 
 ### Compression
@@ -116,44 +131,41 @@ section.
 
 ### Health Checks
 
-<% if component.options.healthcheck_uri -%>
+<%- if component.options.healthcheck_uri -%>
 If the `healthcheck_uri` option is provided, Vector will issue a request
-to this URI to determine the service's health before initializing the sink.
-This ensures that the service is reachable. You can require this check with
-the `--require-healthy` flag upon [starting][docs.starting] Vector.
-<% else -%>
+to this URI to ensure Vector can properly community with the service. This
+helps to ensure that data will be successfully delivered after Vector is
+started.
+<%- else -%>
 Upon [starting][docs.starting], Vector will perform a simple health check
 against this sink. The ensures that the downstream service is healthy and
-reachable. By default, if the health check fails an error will be logged and
-Vector will proceed to restart. Vector will continually check the health of
-the service on an interval until healthy.
-
-If you'd like to exit immediately when a service is unhealthy you can pass
-the `--require-healthy` flag:
+reachable.
+<%- end -%>
+By default, if the health check fails an error will be logged and
+Vector will proceed to start. If you'd like to exit immediately upomn healt
+check failure, you can pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this if you have multiple sinks configured, as it will
-prevent Vector from starting is one sink is unhealthy, preventing the other
-healthy sinks from receiving data.
-<% end -%>
+Be careful when doing this, one unhealthy sink can prevent other healthy sinks
+from processing data at all.
 <% end -%>
 <% if component.partition_options.any? -%>
 
 ### Partitioning
 
 Partitioning is controlled via the <%= option_names(component.partition_options).to_sentence %>
-options and allows you to dynamically partition data. You'll notice that
-[`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling dynamic partitioning. The interpolated result is effectively the
-internal batch partition key. Let's look at a few examples:
+options and allows you to dynamically partition data on the fly. You'll notice
+that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
+enabling this partitioning. The interpolated result is effectively the internal
+partition key. Let's look at a few examples:
 
-| Value | Interpolation | Desc |
-|:------|:--------------|:-----|
-| `date=%F` | `date=2019-05-02` | Partitions data by the event's day. |
-| `date=%Y` | `date=2019` | Partitions data by the event's year. |
+| Value          | Interpolation          | Desc                                   |
+|:---------------|:-----------------------|:---------------------------------------|
+| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
+| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
 | `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
 <% end -%>
 <% if component.options.rate_limit_duration -%>
