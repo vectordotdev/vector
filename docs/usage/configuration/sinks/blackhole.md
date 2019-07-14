@@ -26,7 +26,7 @@ The `blackhole` sink streams [`log`][docs.log_event] and [`metric`][docs.metric_
   # REQUIRED - General
   type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
-  print_amount = "1000"
+  print_amount = 1000
   
   # OPTIONAL - Buffer
   [sinks.my_blackhole_sink_id.buffer]
