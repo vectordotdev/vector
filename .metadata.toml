@@ -857,7 +857,7 @@ benchmarking purposes\
 
 [sinks.blackhole.options.print_amount]
 type = "int"
-examples = ["1000"]
+examples = [1000]
 null = false
 description = "The number of events that must be received in order to print a summary of activity."
 
