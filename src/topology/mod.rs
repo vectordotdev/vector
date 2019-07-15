@@ -524,8 +524,8 @@ mod tests {
     use crate::sinks::tcp::TcpSinkConfig;
     use crate::sources::tcp::TcpConfig;
     use crate::test_util::{
-        block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for,
-        wait_for_tcp,
+        block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
+        wait_for, wait_for_tcp,
     };
     use crate::topology;
     use crate::topology::config::Config;
@@ -541,7 +541,7 @@ mod tests {
 
     #[test]
     fn topology_add_sink() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn topology_remove_sink() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -646,7 +646,7 @@ mod tests {
 
     #[test]
     fn topology_change_sink() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -705,7 +705,7 @@ mod tests {
         let out2_addr = next_addr();
 
         for _ in 0..10 {
-            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let mut rt = runtime();
 
             let output_lines1 = receive(&out1_addr);
             let output_lines2 = receive(&out2_addr);
@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn topology_add_source() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -801,7 +801,7 @@ mod tests {
 
     #[test]
     fn topology_remove_source() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -839,7 +839,7 @@ mod tests {
 
     #[test]
     fn topology_remove_source_add_source_with_same_port() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -891,7 +891,7 @@ mod tests {
 
     #[test]
     fn topology_change_source() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let in_addr = next_addr();
         let out_addr = next_addr();
@@ -980,7 +980,7 @@ mod tests {
 
     #[test]
     fn topology_add_transform() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -1039,7 +1039,7 @@ mod tests {
 
     #[test]
     fn topology_remove_transform() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -1104,7 +1104,7 @@ mod tests {
 
     #[test]
     fn topology_change_transform() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let num_lines: usize = 100;
 
@@ -1187,7 +1187,7 @@ mod tests {
 
     #[test]
     fn topology_doesnt_reload_new_data_dir() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         use std::path::Path;
 
@@ -1247,7 +1247,7 @@ mod tests {
                 })
         }
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let in_addr = next_addr();
         let out1_addr = next_addr();

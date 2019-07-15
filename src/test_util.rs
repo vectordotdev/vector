@@ -6,7 +6,7 @@ use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
 use tokio::codec::{FramedRead, FramedWrite, LinesCodec};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 use tokio::util::FutureExt;
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
@@ -93,9 +93,13 @@ where
     R: Send + 'static,
     E: Send + 'static,
 {
-    let mut rt = Runtime::new().unwrap();
+    let mut rt = runtime();
 
     rt.block_on(future)
+}
+
+pub fn runtime() -> Runtime {
+    Builder::new().core_threads(1).build().unwrap()
 }
 
 pub fn wait_for_tcp(addr: SocketAddr) {
@@ -172,7 +176,7 @@ impl Receiver {
 }
 
 pub fn receive(addr: &SocketAddr) -> Receiver {
-    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = runtime();
 
     let listener = TcpListener::bind(addr).unwrap();
 
