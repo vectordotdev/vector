@@ -86,6 +86,7 @@
   * [Monitoring](usage/administration/monitoring.md)
   * [Tuning](usage/administration/tuning.md)
   * [Updating](usage/administration/updating.md)
+  * [Validating](usage/administration/validating.md)
   * [Env Vars](usage/administration/env-vars.md)
 * [Guides](usage/guides/README.md)
   * [Troubleshooting Guide](usage/guides/troubleshooting.md)

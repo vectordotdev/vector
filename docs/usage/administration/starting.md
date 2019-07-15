@@ -36,12 +36,13 @@ brew services start vector
 | **Required** |  |  |
 | `-c, --config <path>` | Path the Vector [configuration file][docs.configuration]. |
 | **Optional** |  |  |
+| `-d, --dry-run` | Vector will [validate configuration][docs.validating] and exit. | 
 | `-q, --quiet` | Raises the log level to `warn`. |
-| `-qq` | Raises the log level to `error`. |
+| `-qq` | Raises the log level to `error`, the highest level possible. |
 | `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks. |
 | `-t, --threads` | Limits the number of internal threads Vector can spawn. See the [Limiting Resources][docs.agent_role.limiting-resources] in the [Agent role][docs.agent_role] documentation. |
 | `-v, --verbose` | Drops the log level to `debug`. |
-| `-vv` | Drops the log level to `trace`. |
+| `-vv` | Drops the log level to `trace`, the lowest level possible. |
 
 ## Daemonizing
 
@@ -54,5 +55,6 @@ daemonize and manage your processes. Vector provides a
 [docs.agent_role.limiting-resources]: ../../setup/deployment/roles/agent.md#limiting-resources
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
 [docs.configuration]: ../../usage/configuration
+[docs.validating]: ../../usage/administration/validating.md
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [url.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service
