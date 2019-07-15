@@ -134,6 +134,14 @@ file more than once, even if it matches multiple patterns. You can read more
 about how we identify file in the [Identification](#file-identification)
 section.
 
+### Checkpointing
+
+Vector checkpoints the current read position in the file after each successful
+read. This ensures that Vector resumes where it left off if restarted,
+preventing data from being read twice. The checkpoint positions are stored in
+the data directory which is specified via the
+[global `data_dir` option][docs.configuration.data-directory].
+
 ### Context
 
 By default, the `file` source will add context
@@ -190,7 +198,7 @@ recommend:
 ### Globbing
 
 [Globbing][url.globbing] is supported in all provided file paths, files will
-be [autodiscovered](#auto_discovery) continually at a rate defined by the
+be [autodiscovered](#auto-discovery) continually at a rate defined by the
 `glob_minimum_cooldown` option.
 
 ### Line Delimiters
@@ -199,9 +207,12 @@ Each line is read until a new line delimiter (the `0xA` byte) or `EOF` is found.
 
 ### Read Position
 
-Vector defaults to reading new data only. Only data added to the file after
-Vector starts tailing the file will be collected. To read from the beginning
-of the file set the `start_at_beginning` option to true.
+By default, Vector will read new data only for newly discovered files, similar
+to the `tail` command. You can read from the beginning of the file by setting
+the `start_at_beginning` option to `true`.
+
+Previously discovered files will be [checkpointed](#checkpointing), and the
+read position will resume from the last checkpoint.
 
 ## Troubleshooting
 
@@ -224,6 +235,7 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.configuration.data-directory]: ../../../usage/configuration#data-directory
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model.md#log
