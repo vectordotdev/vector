@@ -6,12 +6,14 @@ description: Vector environment variables
 
 Vector recognizes the following environment variables:
 
-| Name | Description |
-| :--- | :---------- |
-| `LOG="info"` | Sets Vector's [log level][docs.monitoring.logs]. |
-| `RUST_BACKTRACE=full` | Enables backtraces for logging errors. |
+| Name                        | Description                                                                      |
+|:----------------------------|:---------------------------------------------------------------------------------|
+| `AWS_ACCESS_KEY_ID=xxx`     | Used for AWS authentication. See relevant AWS [sinks][docs.sinks] for more info. |
+| `AWS_SECRET_ACCESS_KEY=xxx` | Used for AWS authentication. See relevant AWS [sinks][docs.sinks] for more info. |
+| `LOG="info"`                | Sets Vector's [log level][docs.monitoring.logs].                                 |
+| `RUST_BACKTRACE=full`       | Enables backtraces for logging errors.                                           |
 
-More oprtions can be set with [flags][docs.starting.flags] when
+More options can be set with [flags][docs.starting.flags] when
 [starting][docs.starting] Vector.
 
 

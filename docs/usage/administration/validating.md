@@ -19,7 +19,7 @@ vector --config /etc/vector/vector.toml --dry-run --require-healthy
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-If validate fails, Vector will exit with a `78`, and if validate succeeds
+If validation fails, Vector will exit with a `78`, and if validation succeeds
 Vector will exit with a `0`.
 
 You'll notice in the second example above you can pass the `--require-healthy`
@@ -27,7 +27,7 @@ flag to also run health checks for all defined sinks.
 
 This operation is useful to validate configuration changes before going live.
 
-## Validation Checks
+## Checks
 
 For clarify, Vector validates the following:
 
