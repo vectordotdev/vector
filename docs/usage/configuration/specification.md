@@ -1173,7 +1173,7 @@ end
   # 
   # * required
   # * no default
-  print_amount = "1000"
+  print_amount = 1000
 
   #
   # Buffer

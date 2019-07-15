@@ -65,7 +65,7 @@ Batches are flushed when 1 of 2 conditions are met:
 ### Streaming
 
 The `<%= component.name %>` <%= component.type %> streams data on a real-time
-event-by-event basis. It does not buffer or batch data.
+event-by-event basis. It does not batch data.
 <% elsif component.exposing? -%>
 
 ### Exposing & Scraping
@@ -122,8 +122,8 @@ the following options:
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
-Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before being evaluated.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.

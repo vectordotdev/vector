@@ -236,8 +236,8 @@ the following options:
 ### Environment Variables
 
 Environment variables are supported through all of Vector's configuration.
-Simply add `${MY_ENV_VAR}` or `$MY_ENV_VAR` in your Vector configuration file
-and the variable will be replaced before being evaluated.
+Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
+will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
