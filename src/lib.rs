@@ -1,5 +1,7 @@
 #![allow(clippy::new_without_default, clippy::needless_pass_by_value)]
 
+// DO NOT MERGE
+
 #[macro_use]
 extern crate tracing;
 #[macro_use]
