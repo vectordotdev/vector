@@ -134,7 +134,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
     for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
-            warnings.push(format!(
+            errors.push(format!(
                 "{} {:?} has no inputs",
                 capitalize(output_type),
                 name

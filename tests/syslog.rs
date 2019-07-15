@@ -31,7 +31,7 @@ fn test_tcp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     wait_for_tcp(in_addr);
 
@@ -71,7 +71,7 @@ fn test_udp_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let input_lines = random_lines(100)
         .enumerate()
@@ -128,7 +128,7 @@ fn test_unix_stream_syslog() {
 
     let output_lines = receive(&out_addr);
 
-    let (topology, _crash) = topology::start(Ok(config), &mut rt, false).unwrap();
+    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     // Wait for server to accept traffic
     while let Err(_) = std::os::unix::net::UnixStream::connect(&in_path) {}
 

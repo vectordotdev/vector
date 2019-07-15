@@ -115,6 +115,7 @@ bytesize = "1.0.0"
 grok = "1.0.0"
 nom = "5.0.0-beta2"
 uuid = { version = "0.7", features = ["serde", "v4"] }
+exitcode = "1.1.2"
 
 [build-dependencies]
 prost-build = "0.4.0"

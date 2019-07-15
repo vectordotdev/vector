@@ -73,7 +73,7 @@ pub trait TransformConfig: core::fmt::Debug {
     }
 }
 
-// Helper methods for programming contstruction during tests
+// Helper methods for programming construction during tests
 impl Config {
     pub fn empty() -> Self {
         Self {

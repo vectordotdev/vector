@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## v0.4.0-dev
 
 ### Added
+  - [configuration] Added `--dry-run` and `--healthchecks-only` options [#233]
 
 - aws_s3: Add `filename_extension` options.
 - aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` synatx for extracting values from events.
 
 ### Changed
+  - [configuration] Empty inputs are treated as errors instead of warnings [#506]
 
 - aws_cloudwatch_logs: Now partitions events by `log_group`/`log_stream`.
 
@@ -31,4 +33,3 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## v0.3.X
 
 The CHANGELOG for v0.3.X releases can be found in the [v0.3 branch](https://github.com/timberio/vector/blob/v0.3/CHANGELOG.md).
-

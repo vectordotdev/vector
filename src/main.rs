@@ -10,6 +10,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+use topology::Config;
 use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
 use tracing_metrics::MetricsSubscriber;
@@ -25,6 +26,10 @@ struct Opts {
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long)]
     require_healthy: bool,
+
+    /// Exit on startup after config verification and optional healthchecks run
+    #[structopt(short, long)]
+    dry_run: bool,
 
     /// Serve internal metrics from the given address
     #[structopt(short, long)]
@@ -128,8 +133,8 @@ fn main() {
 
         if let Some(threads) = opts.threads {
             if threads < 1 || threads > 4 {
-                error!("thread must be between 1 and 4 (inclusive)");
-                std::process::exit(1);
+                error!("The `threads` argument must be between 1 and 4 (inclusive).");
+                std::process::exit(exitcode::CONFIG);
             }
         }
 
@@ -141,7 +146,7 @@ fn main() {
         let file = if let Some(file) = open_config(&opts.config_path) {
             file
         } else {
-            std::process::exit(1);
+            std::process::exit(exitcode::CONFIG);
         };
 
         trace!(
@@ -150,6 +155,7 @@ fn main() {
         );
 
         let config = vector::topology::Config::load(file);
+        let config = handle_config_errors(config);
 
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
@@ -182,9 +188,28 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let (mut topology, mut graceful_crash) =
-            topology::start(config, &mut rt, opts.require_healthy)
-                .unwrap_or_else(|| std::process::exit(1));
+        if opts.dry_run {
+            info!("Dry run enabled, exiting after config validation.");
+        }
+
+        let pieces = topology::validate(&config).unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
+
+        if opts.dry_run && !opts.require_healthy {
+            info!("Config validated, exiting.");
+            std::process::exit(exitcode::OK);
+        }
+
+        let result = topology::start_validated(config, pieces, &mut rt, opts.require_healthy);
+        let (mut topology, mut graceful_crash) = result.unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
+
+        if opts.dry_run {
+            info!("Healthchecks passed, exiting.");
+            std::process::exit(exitcode::OK);
+        }
 
         let sigint = Signal::new(SIGINT).flatten_stream();
         let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -226,10 +251,11 @@ fn main() {
 
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
+            let config = handle_config_errors(config);
 
-            let success = topology.reload_config(config, &mut rt, opts.require_healthy, false);
+            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
             if !success {
-                error!("Reload aborted");
+                error!("Reload aborted.");
             }
         };
 
@@ -259,19 +285,33 @@ fn main() {
     });
 }
 
+fn handle_config_errors(config: Result<Config, Vec<String>>) -> Config {
+    match config {
+        Err(errors) => {
+            for error in errors {
+                error!("Configuration error: {}", error);
+            }
+            std::process::exit(exitcode::CONFIG);
+        }
+        Ok(config) => {
+            return config;
+        }
+    }
+}
+
 fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
         Err(e) => {
             if let std::io::ErrorKind::NotFound = e.kind() {
                 error!(
-                    message = "Config file not found in path",
+                    message = "Config file not found in path.",
                     path = field::display(path.display()),
                 );
                 None
             } else {
                 error!(
-                    message = "Error opening config file",
+                    message = "Error opening config file.",
                     error = field::display(e),
                 );
                 None
