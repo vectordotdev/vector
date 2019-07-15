@@ -51,10 +51,23 @@ highly recommend that you use a utility like [Systemd][url.systemd] to
 daemonize and manage your processes. Vector provides a
 [`vector.service` file][url.vector_systemd_file] for Systemd.
 
+## Exit Codes
+
+If Vector fails to start it will exit with one of the preferred exit codes
+as defined by `sysexits.h`. A full list of exit codes can be found in the
+[`exitcodes` Rust crate][url.exit_codes]. The relevant codes that Vector uses
+are:
+
+| Code | Description |
+|:-----|:------------|
+| `0`  | No error. |
+| `78` | Bad [configuration][docs.configuration]. |
+
 
 [docs.agent_role.limiting-resources]: ../../setup/deployment/roles/agent.md#limiting-resources
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
 [docs.configuration]: ../../usage/configuration
 [docs.validating]: ../../usage/administration/validating.md
+[url.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [url.vector_systemd_file]: https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service
