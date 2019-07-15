@@ -63,6 +63,7 @@
     * [lua transform](usage/configuration/transforms/lua.md)
     * [regex\_parser transform](usage/configuration/transforms/regex_parser.md)
     * [remove\_fields transform](usage/configuration/transforms/remove_fields.md)
+    * [sampler transform](usage/configuration/transforms/sampler.md)
     * [tokenizer transform](usage/configuration/transforms/tokenizer.md)
   * [Sinks](usage/configuration/sinks/README.md)
     * [aws\_cloudwatch\_logs sink](usage/configuration/sinks/aws_cloudwatch_logs.md)
