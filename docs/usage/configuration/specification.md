@@ -634,7 +634,7 @@ end
   # 
   # * required
   # * no default
-  rate = ["field1", "field2"]
+  rate = 10
 
   # A list of regular expression patterns to exclude events from sampling. If an
   # event's `"message"` key matches _any_ of these patterns it will _not_ be

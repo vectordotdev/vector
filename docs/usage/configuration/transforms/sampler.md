@@ -32,7 +32,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 [transforms.my_sampler_transform_id]
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
-  rate = ["field1", "field2"]
+  rate = 10
   
   pass_list = ["[error]", "field2"] # no default
 ```
@@ -55,7 +55,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `enum: "sampler"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: ["field1", "field2"]` |
+| `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: 10` |
 | **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 

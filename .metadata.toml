@@ -638,7 +638,7 @@ _not_ be sampled.\
 
 [transforms.sampler.options.rate]
 type = "int"
-examples = [["field1", "field2"]]
+examples = [10]
 null = false
 description = "The maximum number of events allowed per second."
 
