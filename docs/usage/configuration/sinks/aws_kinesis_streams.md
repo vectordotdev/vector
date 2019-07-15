@@ -18,7 +18,7 @@ description: Batches `log` events to AWS Kinesis Data Stream via the `PutRecords
 The `aws_kinesis_streams` sink is in beta. Please see the current
 [enhancements][url.aws_kinesis_streams_sink_enhancements] and
 [bugs][url.aws_kinesis_streams_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_aws_kinesis_streams_sink_issues]
+We kindly ask that you [add any missing issues][url.new_aws_kinesis_streams_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -167,6 +167,7 @@ within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 
 ### Buffers & Batches
+
 ![][images.sink-flow-serial]
 
 The `aws_kinesis_streams` sink buffers, batches, and
@@ -320,5 +321,4 @@ issue, please:
 [url.community]: https://vector.dev/community
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [url.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_kinesis_streams
-[url.new_aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_aws_kinesis_streams%22
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

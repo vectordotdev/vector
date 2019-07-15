@@ -64,6 +64,10 @@ class Component
     beta == true
   end
 
+  def context_options
+    options.to_h.values.sort.select(&:context?)
+  end
+
   def partition_options
     options.to_h.values.sort.select(&:partition_key?)
   end

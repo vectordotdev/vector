@@ -171,6 +171,7 @@ scheme][url.basic_auth].
 
 
 ### Buffers & Batches
+
 ![][images.sink-flow-serial]
 
 The `http` sink buffers, batches, and
@@ -214,7 +215,7 @@ and cost. This is controlled via the `compression` option. Each compression
 type is described in more detail below:
 
 | Compression | Description |
-| :---------- | :---------- |
+|:------------|:------------|
 | `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
 
 ### Delivery Guarantee

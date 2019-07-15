@@ -111,6 +111,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 ## How It Works
 
 ### Buffers & Batches
+
 ![][images.sink-flow-serial]
 
 The `splunk_hec` sink buffers, batches, and

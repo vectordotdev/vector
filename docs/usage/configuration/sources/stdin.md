@@ -57,7 +57,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 | **OPTIONAL** - General | | |
 | `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.<br />`default: 102400` `unit: bytes` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 
@@ -88,6 +88,12 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 {% endcode-tabs %}
 
 ## How It Works
+
+### Context
+
+By default, the `stdin` source will add context
+keys to your events via the `host_key`
+options.
 
 ### Delivery Guarantee
 

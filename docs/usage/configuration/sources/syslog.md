@@ -66,7 +66,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
 | `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`. Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 
@@ -100,6 +100,12 @@ Vector only extracts the `"timestamp"` and `"host"` fields and leaves the `"mess
 {% endcode-tabs %}
 
 ## How It Works
+
+### Context
+
+By default, the `syslog` source will add context
+keys to your events via the `host_key`
+options.
 
 ### Delivery Guarantee
 

@@ -18,7 +18,7 @@ description: Ingests data through another upstream Vector instance and outputs `
 The `vector` sink is in beta. Please see the current
 [enhancements][url.vector_source_enhancements] and
 [bugs][url.vector_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_vector_source_issues]
+We kindly ask that you [add any missing issues][url.new_vector_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -112,7 +112,7 @@ issue, please:
 [images.vector_source]: ../../../assets/vector-source.svg
 [url.community]: https://vector.dev/community
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.new_vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_vector%22
+[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Source%3A+vector
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22
 [url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22

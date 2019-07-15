@@ -18,7 +18,7 @@ description: Accepts `log` events and allows you to transform events with a full
 The `lua` sink is in beta. Please see the current
 [enhancements][url.lua_transform_enhancements] and
 [bugs][url.lua_transform_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_lua_transform_issues]
+We kindly ask that you [add any missing issues][url.new_lua_transform_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -219,5 +219,5 @@ Finally, consider the following alternatives:
 [url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
 [url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
-[url.new_lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_lua%22
+[url.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Transform%3A+lua
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

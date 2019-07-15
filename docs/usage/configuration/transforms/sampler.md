@@ -18,7 +18,7 @@ description: Accepts `log` events and allows you to sample events with a configu
 The `sampler` sink is in beta. Please see the current
 [enhancements][url.sampler_transform_enhancements] and
 [bugs][url.sampler_transform_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_sampler_transform_issues]
+We kindly ask that you [add any missing issues][url.new_sampler_transform_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -99,7 +99,7 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sampler_transform]: ../../../assets/sampler-transform.svg
 [url.community]: https://vector.dev/community
-[url.new_sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_sampler%22
+[url.new_sampler_transform_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Transform%3A+sampler
 [url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22
 [url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22
 [url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22

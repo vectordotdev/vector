@@ -18,7 +18,7 @@ description: Ingests data through the StatsD UDP protocol and outputs `log` even
 The `statsd` sink is in beta. Please see the current
 [enhancements][url.statsd_source_enhancements] and
 [bugs][url.statsd_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_statsd_source_issues]
+We kindly ask that you [add any missing issues][url.new_statsd_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -192,7 +192,7 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.statsd_source]: ../../../assets/statsd-source.svg
 [url.community]: https://vector.dev/community
-[url.new_statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_statsd%22
+[url.new_statsd_source_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Source%3A+statsd
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22
 [url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22

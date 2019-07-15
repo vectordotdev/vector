@@ -18,7 +18,7 @@ description: Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 The `elasticsearch` sink is in beta. Please see the current
 [enhancements][url.elasticsearch_sink_enhancements] and
 [bugs][url.elasticsearch_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_elasticsearch_sink_issues]
+We kindly ask that you [add any missing issues][url.new_elasticsearch_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -141,6 +141,7 @@ Content-Length: 654
 ## How It Works
 
 ### Buffers & Batches
+
  
 ![][images.sink-flow-partitioned]
 
@@ -298,6 +299,5 @@ issue, please:
 [url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
 [url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+elasticsearch
-[url.new_elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_elasticsearch%22
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

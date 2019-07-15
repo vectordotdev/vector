@@ -83,6 +83,10 @@ class Option
     type == "[#{inner_type}]"
   end
 
+  def context?
+    category.downcase == "context"
+  end
+
   def get_relevant_sections(sections)
     sections.select do |section|
       section.referenced_options.include?(name) ||

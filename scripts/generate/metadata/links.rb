@@ -138,7 +138,12 @@ class Links
     def check!(path_or_url)
       parts = path_or_url.split("#")
       raw_path_or_url = parts.first
-      section = parts.last
+      section = parts.length > 1 ? parts.last : nil
+
+      if raw_path_or_url.start_with?("../")
+        path_parts = raw_path_or_url.split(File::SEPARATOR).select { |part| part != ".." }
+        raw_path_or_url = "/" + File.join(path_parts)
+      end
 
       if raw_path_or_url.start_with?("/")
         check_file!(raw_path_or_url, section)
@@ -173,12 +178,20 @@ class Links
 
       uri = URI.parse(url)
       req = Net::HTTP.new(uri.host, uri.port)
+      req.open_timeout = 500
+      req.read_timeout = 1000
+      req.ssl_timeout = 1000
       req.use_ssl = true if uri.scheme == 'https'
       path = uri.path == "" ? "/" : uri.path
-      res = req.request_head(path)
-      result = res.code.to_i != 404
-      @checked_urls[url] = result
-      result
+
+      begin
+        res = req.request_head(path)
+        result = res.code.to_i != 404
+        @checked_urls[url] = result
+        result
+      rescue Errno::ECONNREFUSED
+        return false
+      end
     end
 
     def check_url!(url)

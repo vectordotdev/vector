@@ -18,7 +18,7 @@ description: Ingests data through one or more local files and outputs `log` even
 The `file` sink is in beta. Please see the current
 [enhancements][url.file_source_enhancements] and
 [bugs][url.file_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_file_source_issues]
+We kindly ask that you [add any missing issues][url.new_file_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -81,7 +81,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
 | `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
-| `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files.<br />`default: 1000` `unit: milliseconds` |
+| `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) for more info.<br />`default: 1000` `unit: milliseconds` |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
@@ -127,15 +127,18 @@ context. You can further parse the `"message"` key with a
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
-patterns. If a new file is added that matches any of the supplied patterns,
-Vector will begin tailing it. Vector maintains a unique list of files and will
-not tail a file more than once, even if it matches multiple patterns. You can
-read more about how we identify file in the Identification section.
+patterns. The frequency is controlled via the `glob_minimum_cooldown` option. 
+If a new file is added that matches any of the supplied patterns, Vector will
+begin tailing it. Vector maintains a unique list of files and will not tail a
+file more than once, even if it matches multiple patterns. You can read more
+about how we identify file in the [Identification](#file-identification)
+section.
 
 ### Context
 
-Each event is augmented with contextual fields controlled by the `file_key`
-and `host_key` options. Please see the descriptions for each respective option.
+By default, the `file` source will add context
+keys to your events via the `file_key` and `host_key`
+options.
 
 ### Delivery Guarantee
 
@@ -235,5 +238,5 @@ issue, please:
 [url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22
 [url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
-[url.new_file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+new_file%22
+[url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Source%3A+file
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

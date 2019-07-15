@@ -63,7 +63,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host.<br />`default: "host"` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 
@@ -94,6 +94,12 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 {% endcode-tabs %}
 
 ## How It Works
+
+### Context
+
+By default, the `tcp` source will add context
+keys to your events via the `host_key`
+options.
 
 ### Delivery Guarantee
 

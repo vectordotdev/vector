@@ -1,4 +1,4 @@
-<% if component.sink? && component.service_provider == "AWS" -%>
+<%- if component.sink? && component.service_provider == "AWS" -%>
 ### Authentication
 
 Vector checks for AWS credentials in the following order:
@@ -17,11 +17,11 @@ In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
-<% end -%>
-<% if component.sink? -%>
-<% if component.batching? -%>
+<%- end -%>
+<%- if component.sink? && component.batching? -%>
 
 ### Buffers & Batches
+
 <%- if component.partition_options.any? -%> 
 ![][images.sink-flow-partitioned]
 <%- else -%>
@@ -60,23 +60,8 @@ Batches are flushed when 1 of 2 conditions are met:
 
 1. The batch age meets or exceeds the configured `batch_timeout` (default: `<%= component.options.batch_timeout.human_default %>`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `<%= component.options.batch_size.human_default %>`).
-<% elsif component.streaming? -%>
-
-### Streaming
-
-The `<%= component.name %>` <%= component.type %> streams data on a real-time
-event-by-event basis. It does not batch data.
-<% elsif component.exposing? -%>
-
-### Exposing & Scraping
-
-The `<%= component.name %>` <%= component.type %> exposes data for scraping.
-The `address` option determines the address and port the data is made available
-on. You'll need to configure your networking so that the configured port is
-accessible by the downstream service doing the scraping.
 <%- end -%>
-<%- end -%>
-<% if component.options.compression -%>
+<%- if component.options.compression -%>
 
 ### Compression
 
@@ -86,11 +71,19 @@ and cost. This is controlled via the `compression` option. Each compression
 type is described in more detail below:
 
 | Compression | Description |
-| :---------- | :---------- |
+|:------------|:------------|
 <%- component.options.compression.enum.each do |compression| -%>
 | `<%= compression %>` | <%= compression_description(compression) %> |
 <%- end -%>
-<% end -%>
+<%- end -%>
+<% if component.context_options.any? -%>
+
+### Context
+
+By default, the `<%= component.name %>` <%= component.type %> will add context
+keys to your events via the <%= option_names(component.context_options).to_sentence %>
+options.
+<%- end -%>
 <% if component.respond_to?(:delivery_guarantee) -%>
 
 ### Delivery Guarantee
@@ -114,10 +107,10 @@ the following options:
 
 | Encoding | Description |
 | :------- | :---------- |
-<% component.options.encoding.enum.each do |encoding| -%>
+<%- component.options.encoding.enum.each do |encoding| -%>
 | `<%= encoding %>` | <%= encoding_description(encoding) %> |
-<% end -%>
-<% end -%>
+<%- end -%>
+<%- end -%>
 
 ### Environment Variables
 
@@ -127,6 +120,15 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
+<%- if component.sink? && component.exposing? -%>
+
+### Exposing & Scraping
+
+The `<%= component.name %>` <%= component.type %> exposes data for scraping.
+The `address` option determines the address and port the data is made available
+on. You'll need to configure your networking so that the configured port is
+accessible by the downstream service doing the scraping.
+<%- end -%>
 <% if component.sink? -%>
 
 ### Health Checks
@@ -151,8 +153,8 @@ vector --config /etc/vector/vector.toml --require-healthy
 
 Be careful when doing this, one unhealthy sink can prevent other healthy sinks
 from processing data at all.
-<% end -%>
-<% if component.partition_options.any? -%>
+<%- end -%>
+<%- if component.partition_options.any? -%>
 
 ### Partitioning
 
@@ -167,8 +169,8 @@ partition key. Let's look at a few examples:
 | `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
 | `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
 | `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
-<% end -%>
-<% if component.options.rate_limit_duration -%>
+<%- end -%>
+<%- if component.options.rate_limit_duration -%>
 
 ### Rate Limits
 
@@ -182,16 +184,23 @@ more than the specified number of requests are in-flight at any given time.
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
 with the Vector team by [opening an issie][url.new_<%= component.id %>_issue].
-<% end -%>
-<% if component.options.retry_attempts -%>
+<%- end -%>
+<%- if component.options.retry_attempts -%>
 
 ### Retry Policy
 
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
-<% end -%>
-<% if component.options.request_timeout_secs -%>
+<%- end -%>
+<%- if component.sink? && component.streaming? -%>
+
+### Streaming
+
+The `<%= component.name %>` <%= component.type %> streams data on a real-time
+event-by-event basis. It does not batch data.
+<%- end -%>
+<%- if component.options.request_timeout_secs -%>
 
 ### Timeouts
 
@@ -202,8 +211,8 @@ This can be adjsuted with the `request_timeout_secs` option.
 It is highly recommended that you do not lower value below the service's
 internal timeout, as this could create orphaned requests, pile on retries,
 and result in deuplicate data downstream.
-<% end -%>
-<% if component.options.types && component.options.types.table? -%>
+<%- end -%>
+<%- if component.options.types && component.options.types.table? -%>
 
 ### Types
 
@@ -216,4 +225,4 @@ as shown in the examples above. The supported types are:
 | `int`    | Coerce to a 64 bit integer.                                                           |
 | `float`  | Coerce to 64 bit floats.                                                              |
 | `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
-<% end -%>
+<%- end -%>

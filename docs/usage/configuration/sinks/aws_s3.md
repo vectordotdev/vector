@@ -18,7 +18,7 @@ description: Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 The `aws_s3` sink is in beta. Please see the current
 [enhancements][url.aws_s3_sink_enhancements] and
 [bugs][url.aws_s3_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_aws_s3_sink_issues]
+We kindly ask that you [add any missing issues][url.new_aws_s3_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -199,6 +199,7 @@ within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 
 ### Buffers & Batches
+
  
 ![][images.sink-flow-partitioned]
 
@@ -248,7 +249,7 @@ and cost. This is controlled via the `compression` option. Each compression
 type is described in more detail below:
 
 | Compression | Description |
-| :---------- | :---------- |
+|:------------|:------------|
 | `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
 
 ### Delivery Guarantee
@@ -466,7 +467,6 @@ issue, please:
 [url.gzip]: https://www.gzip.org/
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_s3
-[url.new_aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+new_aws_s3%22
 [url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -18,7 +18,7 @@ description: Accepts `log` and `metric` events and allows you to filter events b
 The `field_filter` sink is in beta. Please see the current
 [enhancements][url.field_filter_transform_enhancements] and
 [bugs][url.field_filter_transform_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_field_filter_transform_issues]
+We kindly ask that you [add any missing issues][url.new_field_filter_transform_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
@@ -111,5 +111,5 @@ issue, please:
 [url.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22
 [url.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 [url.issue_479]: https://github.com/timberio/vector/issues/479
-[url.new_field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+new_field_filter%22
+[url.new_field_filter_transform_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Transform%3A+field_filter
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
