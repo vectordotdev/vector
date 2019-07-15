@@ -219,5 +219,5 @@ Finally, consider the following alternatives:
 [url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
 [url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
-[url.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Transform%3A+lua
+[url.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

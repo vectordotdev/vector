@@ -238,5 +238,5 @@ issue, please:
 [url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22
 [url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
-[url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Source%3A+file
+[url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+file
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

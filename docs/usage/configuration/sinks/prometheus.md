@@ -146,7 +146,7 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.prometheus_sink]: ../../../assets/prometheus-sink.svg
 [url.community]: https://vector.dev/community
-[url.new_prometheus_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+prometheus
+[url.new_prometheus_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+prometheus
 [url.prometheus]: https://prometheus.io/
 [url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Bug%22
 [url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Enhancement%22

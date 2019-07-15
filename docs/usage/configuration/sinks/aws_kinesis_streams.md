@@ -320,5 +320,5 @@ issue, please:
 [url.aws_kinesis_streams_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_kinesis_streams.rs
 [url.community]: https://vector.dev/community
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_kinesis_streams
+[url.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_kinesis_streams
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

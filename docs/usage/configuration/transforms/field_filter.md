@@ -111,5 +111,5 @@ issue, please:
 [url.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22
 [url.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 [url.issue_479]: https://github.com/timberio/vector/issues/479
-[url.new_field_filter_transform_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Transform%3A+field_filter
+[url.new_field_filter_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter
 [url.search_forum]: https://forum.vector.dev/search?expanded=true

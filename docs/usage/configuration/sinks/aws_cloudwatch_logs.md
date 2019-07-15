@@ -340,6 +340,6 @@ issue, please:
 [url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [url.community]: https://vector.dev/community
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+aws_cloudwatch_logs
+[url.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

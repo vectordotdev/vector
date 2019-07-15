@@ -259,7 +259,7 @@ should supply to the `host` and `token` options.
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg
 [url.community]: https://vector.dev/community
-[url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+splunk_hec
+[url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector

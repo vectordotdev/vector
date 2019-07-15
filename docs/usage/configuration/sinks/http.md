@@ -328,5 +328,5 @@ issue, please:
 [url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancement%22
 [url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22
 [url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
-[url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels%5B%5D=Sink%3A+http
+[url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
