@@ -17,10 +17,21 @@ as possible to contribute while still protecting users of Vector.
    git commit -sm 'My commit message'
    ```
 
-2. Open a pull request.
+2. Open a pull request. The pull request title must follow the format outlined
+   in the [conventional commits spec](https://www.conventionalcommits.org).
+
 3. At least one Vector team member must approve your work before merging.
 
 ## FAQ
+
+### What is convetional commits?
+
+[Covnentional commits](https://www.conventionalcommits.org) is a standardized
+format for commit messages. Vector only requires this format for commits on
+the `master` branch. And because Vector squashes commits before merging
+branches, this means that only the pull request title must conform to this
+format. Vector performs a pull request check to verify the pull request title
+in case you forget.
 
 ### What is a DCO?
 
