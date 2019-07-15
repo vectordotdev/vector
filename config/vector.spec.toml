@@ -65,6 +65,14 @@
   # * no default
   include = ["/var/log/nginx/*.log"]
 
+  # Delay between file discovery calls. This controls the interval at which
+  # Vector searches for files.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  glob_minimum_cooldown = 1000
+
   # Ignore files with a data modification date that does not exceed this age.
   # 
   # * optional

@@ -56,6 +56,16 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
 """
 
+[sources.file.options.glob_minimum_cooldown]
+type = "int"
+default = 1000
+null = false
+unit = "milliseconds"
+description = """\
+Delay between file discovery calls. This controls the interval at which \
+Vector searches for files.\
+"""
+
 [sources.file.options.ignore_older]
 type = "int"
 unit = "seconds"
