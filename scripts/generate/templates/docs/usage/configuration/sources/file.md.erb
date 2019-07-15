@@ -66,11 +66,14 @@ the file.
 
 ### File Identification
 
-Vector identifies files by creating a [cyclic redundancy check (CRC)][url.crc]
-on the first 256 bytes of the file. This serves as a fingerprint to uniquely
-identify the file. This strategy avoids the common pitfalls of using device and
-inode names since inode names can be reused across files. This enables Vector
-to [properly tail files in the event of rotation][docs.correctness].
+By default, Vector identifies files by creating a [cyclic redundancy check
+(CRC)][url.crc] on the first 256 bytes of the file. This serves as a
+fingerprint to uniquely identify the file. The amount of bytes read can be
+controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
+
+This strategy avoids the common pitfalls of using device and inode names since
+inode names can be reused across files. This enables Vector to [properly tail
+files in the event of rotation][docs.correctness].
 
 ### File Rotation
 

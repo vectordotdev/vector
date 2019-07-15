@@ -56,6 +56,26 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
 """
 
+[sources.file.options.file_key]
+type = "string"
+category = "Context"
+null = false
+default = "file"
+section = "context"
+description = """\
+The key name added to each event with the full path of the file.\
+"""
+
+[sources.file.options.fingerprint_bytes]
+type = "int"
+default = 256
+null = false
+unit = "bytes"
+description = """\
+The number of bytes read off the head of the file to generate a unique \
+fingerprint.\
+"""
+
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
@@ -66,6 +86,17 @@ Delay between file discovery calls. This controls the interval at which \
 Vector searches for files.\
 """
 
+[sources.file.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
 [sources.file.options.ignore_older]
 type = "int"
 unit = "seconds"
@@ -73,6 +104,16 @@ null = true
 examples = [86400]
 description = """\
 Ignore files with a data modification date that does not exceed this age.\
+"""
+
+[sources.file.options.ignored_header_bytes]
+type = "int"
+default = 0
+null = false
+unit = "bytes"
+description = """\
+The number of bytes to skipe ahead (or ignore) when generating a unique \
+fingerprint. This is helpful if all files share a common header.\
 """
 
 [sources.file.options.max_line_bytes]
@@ -93,27 +134,6 @@ default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
 `false` Vector will only read new data added to the file.\
-"""
-
-[sources.file.options.file_key]
-type = "string"
-category = "Context"
-null = false
-default = "file"
-section = "context"
-description = """\
-The key name added to each event with the full path of the file.\
-"""
-
-[sources.file.options.host_key]
-name = "host_key"
-type = "string"
-category = "Context"
-null = false
-default = "host"
-section = "context"
-description = """\
-The key name added to each event representing the current host.\
 """
 
 # ------------------------------------------------------------------------------

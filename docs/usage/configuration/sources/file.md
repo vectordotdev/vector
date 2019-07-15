@@ -36,8 +36,10 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
+  fingerprint_bytes = 256 # default, bytes
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
+  ignored_header_bytes = 0 # default, bytes
   max_line_bytes = 102400 # default, bytes
   start_at_beginning = false # default
   
@@ -55,8 +57,10 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["<string>", ...]
 
   # OPTIONAL - General
+  fingerprint_bytes = <int>
   glob_minimum_cooldown = <int>
   ignore_older = <int>
+  ignored_header_bytes = <int>
   max_line_bytes = <int>
   start_at_beginning = <bool>
 
@@ -76,8 +80,10 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
+| `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
 | `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files.<br />`default: 1000` `unit: milliseconds` |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |
+| `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
 | `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
 | **OPTIONAL** - Context | | |
@@ -152,11 +158,14 @@ the file.
 
 ### File Identification
 
-Vector identifies files by creating a [cyclic redundancy check (CRC)][url.crc]
-on the first 256 bytes of the file. This serves as a fingerprint to uniquely
-identify the file. This strategy avoids the common pitfalls of using device and
-inode names since inode names can be reused across files. This enables Vector
-to [properly tail files in the event of rotation][docs.correctness].
+By default, Vector identifies files by creating a [cyclic redundancy check
+(CRC)][url.crc] on the first 256 bytes of the file. This serves as a
+fingerprint to uniquely identify the file. The amount of bytes read can be
+controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
+
+This strategy avoids the common pitfalls of using device and inode names since
+inode names can be reused across files. This enables Vector to [properly tail
+files in the event of rotation][docs.correctness].
 
 ### File Rotation
 

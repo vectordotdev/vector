@@ -65,6 +65,14 @@
   # * no default
   include = ["/var/log/nginx/*.log"]
 
+  # The number of bytes read off the head of the file to generate a unique
+  # fingerprint.
+  # 
+  # * optional
+  # * default: 256
+  # * unit: bytes
+  fingerprint_bytes = 256
+
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
   # 
@@ -79,6 +87,14 @@
   # * no default
   # * unit: seconds
   ignore_older = 86400
+
+  # The number of bytes to skipe ahead (or ignore) when generating a unique
+  # fingerprint. This is helpful if all files share a common header.
+  # 
+  # * optional
+  # * default: 0
+  # * unit: bytes
+  ignored_header_bytes = 0
 
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
