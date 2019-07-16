@@ -140,9 +140,9 @@ impl Graph {
             .collect::<Vec<String>>();
         while let Some(node) = no_incoming.pop() {
             let outgoing = edges
-                .clone()
-                .into_iter()
+                .iter()
                 .filter(|(tail, _head)| *tail == node)
+                .cloned()
                 .collect::<Vec<_>>();
             for edge in outgoing {
                 edges.remove(&edge);
