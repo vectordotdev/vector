@@ -3,7 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt},
-    templating::{parse_template, Template},
+    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
@@ -101,7 +101,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let batch_size = self.batch_size.unwrap_or(1000);
 
         let log_group = self.group_name.clone().into();
-        let log_stream = parse_template(&self.stream_name);
+        let log_stream = Template::from(self.stream_name.as_str());
 
         let svc = CloudwatchLogsPartitionSvc::new(self.clone())?;
 
@@ -501,7 +501,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = parse_template("{{log_stream}}");
+        let stream = Template::from("{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -522,7 +522,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = parse_template("abcd-{{log_stream}}");
+        let stream = Template::from("abcd-{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -543,7 +543,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = parse_template("{{log_stream}}-abcd");
+        let stream = Template::from("{{log_stream}}-abcd");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -560,7 +560,7 @@ mod tests {
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = parse_template("{{log_stream}}");
+        let stream = Template::from("{{log_stream}}");
         let group = "group".into();
 
         let stream_val = partition(event, &group, &stream);

@@ -5,25 +5,24 @@ use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Clone)]
 pub enum Template {
-    /// A static field that doesn't create dynamic partitions
     Static(Bytes),
-    /// Represents the ability to extract a key/value from the event
-    /// via the provided interpolated stream name.
-    Field(Regex, Bytes, Atom),
+    Dynamic(Regex, Bytes, Atom),
 }
 
-pub fn parse_template(src: &str) -> Template {
-    let r = Regex::new(r"\{\{(?P<key>\D+)\}\}").unwrap();
+impl From<&str> for Template {
+    fn from(src: &str) -> Template {
+        let r = Regex::new(r"\{\{(?P<key>\D+)\}\}").unwrap();
 
-    if let Some(cap) = r.captures(src.as_bytes()) {
-        if let Some(m) = cap.name("key") {
-            // TODO(lucio): clean up unwrap
-            let key = String::from_utf8(Vec::from(m.as_bytes())).unwrap();
-            return Template::Field(r, src.into(), key.into());
+        if let Some(cap) = r.captures(src.as_bytes()) {
+            if let Some(m) = cap.name("key") {
+                // TODO(lucio): clean up unwrap
+                let key = String::from_utf8(Vec::from(m.as_bytes())).unwrap();
+                return Template::Dynamic(r, src.into(), key.into());
+            }
         }
-    }
 
-    Template::Static(src.into())
+        Template::Static(src.into())
+    }
 }
 
 impl Template {
@@ -31,9 +30,9 @@ impl Template {
     pub fn render(&self, event: &Event) -> Result<Bytes, &Atom> {
         match self {
             Template::Static(g) => Ok(g.clone()),
-            Template::Field(regex, stream, key) => {
+            Template::Dynamic(regex, src, key) => {
                 if let Some(val) = event.as_log().get(&key) {
-                    let cap = regex.replace(stream, |_cap: &Captures| val.as_bytes().clone());
+                    let cap = regex.replace(src, |_cap: &Captures| val.as_bytes().clone());
                     Ok(Bytes::from(&cap[..]))
                 } else {
                     Err(key)
@@ -48,17 +47,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn interpolate_event() {
-        if let Template::Field(_, _, key) = parse_template("{{some_key}}") {
+    fn parse_dynamic() {
+        if let Template::Dynamic(_, _, key) = Template::from("{{some_key}}") {
             assert_eq!(key, "some_key".to_string());
         } else {
-            panic!("Expected Template::Field");
+            panic!("Expected Template::Dynamic");
         }
     }
 
     #[test]
-    fn interpolate_static() {
-        if let Template::Static(key) = parse_template("static_key") {
+    fn parse_static() {
+        if let Template::Static(key) = Template::from("static_key") {
             assert_eq!(key, "static_key".to_string());
         } else {
             panic!("Expected Template::Static");
@@ -66,7 +65,7 @@ mod tests {
     }
 
     #[test]
-    fn partition_static() {
+    fn render_static() {
         let event = Event::from("hello world");
         let template = Template::Static("foo".into());
 
@@ -74,42 +73,42 @@ mod tests {
     }
 
     #[test]
-    fn partition_event() {
+    fn render_dynamic() {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
-        let template = parse_template("{{log_stream}}");
+        let template = Template::from("{{log_stream}}");
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
     }
 
     #[test]
-    fn partition_event_with_prefix() {
+    fn render_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
-        let template = parse_template("abcd-{{log_stream}}");
+        let template = Template::from("abcd-{{log_stream}}");
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
     }
 
     #[test]
-    fn partition_event_with_postfix() {
+    fn render_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
-        let template = parse_template("{{log_stream}}-abcd");
+        let template = Template::from("{{log_stream}}-abcd");
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
     }
 
     #[test]
-    fn partition_no_key_event() {
+    fn render_dynamic_missing_key() {
         let event = Event::from("hello world");
-        let template = parse_template("{{log_stream}}");
+        let template = Template::from("{{log_stream}}");
 
         assert_eq!(Err(&Atom::from("log_stream")), template.render(&event));
     }
