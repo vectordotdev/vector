@@ -47,7 +47,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             } else {
                 1.0
             };
-            Metric::Timer {
+            Metric::Histogram {
                 name: sanitize_key(key),
                 val: parts[0].parse()?,
                 sample_rate: sample_rate as u32,
@@ -188,10 +188,10 @@ mod test {
     }
 
     #[test]
-    fn sampled_timer() {
+    fn sampled_histogram() {
         assert_eq!(
             parse("glork:320|ms|@0.1"),
-            Ok(Metric::Timer {
+            Ok(Metric::Histogram {
                 name: "glork".into(),
                 val: 320.0,
                 sample_rate: 10

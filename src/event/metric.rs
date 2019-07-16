@@ -4,7 +4,7 @@ pub enum Metric {
         name: String,
         val: f32,
     },
-    Timer {
+    Histogram {
         name: String,
         val: f32,
         sample_rate: u32,

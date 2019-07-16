@@ -29,7 +29,7 @@ message Value {
 message Metric {
   oneof metric {
     Counter counter = 1;
-    Timer timer = 2;
+    Histogram histogram = 2;
     Gauge gauge = 3;
     Set set = 4;
   }
@@ -40,7 +40,7 @@ message Counter {
   float val = 2;
 }
 
-message Timer {
+message Histogram {
   string name = 1;
   float val = 2;
   uint32 sample_rate = 3;
