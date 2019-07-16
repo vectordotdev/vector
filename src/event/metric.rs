@@ -3,12 +3,11 @@ pub enum Metric {
     Counter {
         name: String,
         val: f32,
-        sampling: Option<f32>,
     },
     Timer {
         name: String,
         val: f32,
-        sampling: Option<f32>,
+        sample_rate: u32,
     },
     Gauge {
         name: String,

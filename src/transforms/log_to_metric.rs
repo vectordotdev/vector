@@ -109,7 +109,6 @@ impl Transform for LogToMetric {
                                 output.push(Event::Metric(Metric::Counter {
                                     name: counter.sanitized_name.to_string(),
                                     val,
-                                    sampling: None,
                                 }));
                             } else {
                                 trace!("failed to parse counter value");
@@ -118,7 +117,6 @@ impl Transform for LogToMetric {
                             output.push(Event::Metric(Metric::Counter {
                                 name: counter.sanitized_name.to_string(),
                                 val: 1.0,
-                                sampling: None,
                             }));
                         };
                     }
@@ -170,7 +168,6 @@ mod tests {
             Metric::Counter {
                 name: "status_total".into(),
                 val: 1.0,
-                sampling: None
             }
         );
     }
@@ -200,7 +197,6 @@ mod tests {
             Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
-                sampling: None
             }
         );
     }
@@ -254,7 +250,6 @@ mod tests {
             Metric::Counter {
                 name: "amount_total".into(),
                 val: 33.99,
-                sampling: None
             }
         );
     }
@@ -366,7 +361,6 @@ mod tests {
             Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
-                sampling: None
             }
         );
         assert_eq!(
@@ -374,7 +368,6 @@ mod tests {
             Metric::Counter {
                 name: "status_total".into(),
                 val: 1.0,
-                sampling: None
             }
         );
     }
