@@ -16,6 +16,7 @@ pub mod metrics;
 pub mod region;
 pub mod sinks;
 pub mod sources;
+pub mod templating;
 pub mod test_util;
 pub mod topology;
 pub mod transforms;
