@@ -315,30 +315,15 @@ impl From<proto::EventWrapper> for Event {
             EventProto::Metric(proto) => {
                 let metric = proto.metric.unwrap();
                 match metric {
-                    MetricProto::Counter(counter) => {
-                        let sampling = if counter.sampling == 0f32 {
-                            None
-                        } else {
-                            Some(counter.sampling)
-                        };
-                        Event::Metric(Metric::Counter {
-                            name: counter.name,
-                            val: counter.val,
-                            sampling,
-                        })
-                    }
-                    MetricProto::Timer(timer) => {
-                        let sampling = if timer.sampling == 0f32 {
-                            None
-                        } else {
-                            Some(timer.sampling)
-                        };
-                        Event::Metric(Metric::Timer {
-                            name: timer.name,
-                            val: timer.val,
-                            sampling,
-                        })
-                    }
+                    MetricProto::Counter(counter) => Event::Metric(Metric::Counter {
+                        name: counter.name,
+                        val: counter.val,
+                    }),
+                    MetricProto::Histogram(hist) => Event::Metric(Metric::Histogram {
+                        name: hist.name,
+                        val: hist.val,
+                        sample_rate: hist.sample_rate,
+                    }),
                     MetricProto::Gauge(gauge) => {
                         let direction = match gauge.direction() {
                             proto::gauge::Direction::None => None,
@@ -397,33 +382,25 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric::Counter {
-                name,
-                val,
-                sampling,
-            }) => {
-                let counter = proto::Counter {
-                    name,
-                    val,
-                    sampling: sampling.unwrap_or(0f32),
-                };
+            Event::Metric(Metric::Counter { name, val }) => {
+                let counter = proto::Counter { name, val };
                 let event = EventProto::Metric(proto::Metric {
                     metric: Some(MetricProto::Counter(counter)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric::Timer {
+            Event::Metric(Metric::Histogram {
                 name,
                 val,
-                sampling,
+                sample_rate,
             }) => {
-                let timer = proto::Timer {
+                let hist = proto::Histogram {
                     name,
                     val,
-                    sampling: sampling.unwrap_or(0f32),
+                    sample_rate,
                 };
                 let event = EventProto::Metric(proto::Metric {
-                    metric: Some(MetricProto::Timer(timer)),
+                    metric: Some(MetricProto::Histogram(hist)),
                 });
                 proto::EventWrapper { event: Some(event) }
             }

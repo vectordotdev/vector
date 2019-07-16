@@ -29,24 +29,31 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     let metric_type = parts[1];
 
     let metric = match metric_type {
-        "c" => Metric::Counter {
-            name: sanitize_key(key),
-            val: parts[0].parse()?,
-            sampling: if let Some(s) = parts.get(2) {
-                Some(parse_sampling(s)?)
+        "c" => {
+            let sample_rate = if let Some(s) = parts.get(2) {
+                1.0 / sanitize_sampling(parse_sampling(s)?)
             } else {
-                None
-            },
-        },
-        "h" | "ms" => Metric::Timer {
-            name: sanitize_key(key),
-            val: parts[0].parse()?,
-            sampling: if let Some(s) = parts.get(2) {
-                Some(parse_sampling(s)?)
+                1.0
+            };
+            let val: f32 = parts[0].parse()?;
+            Metric::Counter {
+                name: sanitize_key(key),
+                val: val * sample_rate,
+            }
+        }
+        unit @ "h" | unit @ "ms" => {
+            let sample_rate = if let Some(s) = parts.get(2) {
+                1.0 / sanitize_sampling(parse_sampling(s)?)
             } else {
-                None
-            },
-        },
+                1.0
+            };
+            let val: f32 = parts[0].parse()?;
+            Metric::Histogram {
+                name: sanitize_key(key),
+                val: convert_to_base_units(unit, val),
+                sample_rate: sample_rate as u32,
+            }
+        }
         "g" => Metric::Gauge {
             name: sanitize_key(key),
             val: if parts[0]
@@ -105,6 +112,21 @@ fn sanitize_key(key: &str) -> String {
     s.into()
 }
 
+fn sanitize_sampling(sampling: f32) -> f32 {
+    if sampling == 0.0 {
+        1.0
+    } else {
+        sampling
+    }
+}
+
+fn convert_to_base_units(unit: &str, val: f32) -> f32 {
+    match unit {
+        "ms" => val / 1000.0,
+        _ => val,
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     Malformed(&'static str),
@@ -137,7 +159,7 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use super::{parse, sanitize_key};
+    use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::{metric::Direction, Metric};
 
     #[test]
@@ -147,7 +169,6 @@ mod test {
             Ok(Metric::Counter {
                 name: "foo".into(),
                 val: 1.0,
-                sampling: None
             }),
         );
     }
@@ -158,20 +179,42 @@ mod test {
             parse("bar:2|c|@0.1"),
             Ok(Metric::Counter {
                 name: "bar".into(),
-                val: 2.0,
-                sampling: Some(0.1)
+                val: 20.0,
             }),
         );
     }
 
     #[test]
-    fn timer() {
+    fn zero_sampled_counter() {
+        assert_eq!(
+            parse("bar:2|c|@0"),
+            Ok(Metric::Counter {
+                name: "bar".into(),
+                val: 2.0,
+            }),
+        );
+    }
+
+    #[test]
+    fn sampled_timer() {
         assert_eq!(
             parse("glork:320|ms|@0.1"),
-            Ok(Metric::Timer {
+            Ok(Metric::Histogram {
+                name: "glork".into(),
+                val: 0.320,
+                sample_rate: 10
+            }),
+        );
+    }
+
+    #[test]
+    fn sampled_histogram() {
+        assert_eq!(
+            parse("glork:320|h|@0.1"),
+            Ok(Metric::Histogram {
                 name: "glork".into(),
                 val: 320.0,
-                sampling: Some(0.1)
+                sample_rate: 10
             }),
         );
     }
@@ -224,5 +267,12 @@ mod test {
         assert_eq!("foo-bar-baz", sanitize_key("foo/bar/baz"));
         assert_eq!("foo_bar_baz", sanitize_key("foo bar  baz"));
         assert_eq!("foo.__bar_.baz", sanitize_key("foo. @& bar_$!#.baz"));
+    }
+
+    #[test]
+    fn sanitizing_sampling() {
+        assert_eq!(1.0, sanitize_sampling(0.0));
+        assert_eq!(2.5, sanitize_sampling(2.5));
+        assert_eq!(-5.0, sanitize_sampling(-5.0));
     }
 }
