@@ -55,7 +55,8 @@ impl FromStr for Conversion {
     }
 }
 
-pub fn parse_conversion_map(
+/// Helper function to parse a conversion map and check against a list of names
+pub fn parse_check_conversion_map(
     types: &HashMap<Atom, String>,
     names: &Vec<Atom>,
 ) -> Result<HashMap<Atom, Conversion>, String> {
@@ -70,6 +71,13 @@ pub fn parse_conversion_map(
         }
     }
 
+    parse_conversion_map(types)
+}
+
+/// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
+pub fn parse_conversion_map(
+    types: &HashMap<Atom, String>,
+) -> Result<HashMap<Atom, Conversion>, String> {
     types
         .into_iter()
         .map(|(field, typename)| {

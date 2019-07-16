@@ -12,3 +12,11 @@
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+
+  # OPTIONAL - Types
+  [transforms.my_grok_parser_transform.types]
+    level = "int"
+    timestamp = "timestamp|%s" # unix
+    timestamp = "timestamp|%+" # iso8601 (date and time)
+    timestamp = "timestamp|%F" # iso8601 (date)
+    timestamp = "timestamp|%a %b %e %T %Y" # custom strftime format

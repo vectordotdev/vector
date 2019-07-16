@@ -23,22 +23,41 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_grok_parser_transform_id]
+  # REQUIRED - General
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
   
+  # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+  
+  # OPTIONAL - Types
+  [transforms.my_grok_parser_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [transforms.<transform-id>]
+  # REQUIRED - General
   type = "grok_parser"
   inputs = ["<string>", ...]
   pattern = "<string>"
+
+  # OPTIONAL - General
   drop_field = <bool>
   field = "<string>"
+
+  # OPTIONAL - Types
+  [transforms.<transform-id>.types]
+    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -47,13 +66,15 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** | | |
+| **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "grok_parser"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
+| **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
+| **OPTIONAL** - Types | | |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
 
 ## How It Works
 
@@ -84,6 +105,37 @@ We plan to add a [performance test][docs.performance] for this in the future.
 While this is still plenty fast for most use cases we recommend using the
 [`regex_parser` transform][docs.regex_parser_transform] if you are experiencing
 performance issues.
+
+### Types
+
+By default, extracted (parsed) fields all contain `string` values. You can
+coerce these values into types via the `types` table as shown in the
+[Config File](#config-file) example above. For example:
+
+```coffeescript
+[transforms.my_transform_id]
+  # ...
+
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+
+The available types are:
+
+| Type        | Desription                                                                                                          |
+|:------------|:--------------------------------------------------------------------------------------------------------------------|
+| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
+| `float`     | Coerce to 64 bit floats.                                                                                            |
+| `int`       | Coerce to a 64 bit integer.                                                                                         |
+| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
+| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][url.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 
@@ -138,3 +190,4 @@ Finally, consider the following alternatives:
 [url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [url.rust_grok_library]: https://github.com/daschl/grok
 [url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

@@ -210,15 +210,34 @@ documentation][url.regex_grouping_and_flags].
 
 ### Types
 
-You can coerce your extract values into types via the `types` table
-as shown in the examples above. The supported types are:
+By default, extracted (parsed) fields all contain `string` values. You can
+coerce these values into types via the `types` table as shown in the
+[Config File](#config-file) example above. For example:
 
-| Type     | Desription                                                                            |
-|:---------|:--------------------------------------------------------------------------------------|
-| `string` | Coerces to a string. Generally not necessary since values are extracted as strings.   |
-| `int`    | Coerce to a 64 bit integer.                                                           |
-| `float`  | Coerce to 64 bit floats.                                                              |
-| `bool`   | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced. |
+```coffeescript
+[transforms.my_transform_id]
+  # ...
+
+  # OPTIONAL - Types
+  [transforms.my_transform_id.types]
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+
+The available types are:
+
+| Type        | Desription                                                                                                          |
+|:------------|:--------------------------------------------------------------------------------------------------------------------|
+| `bool`      | Coerces to a `true`/`false` boolean. The `1`/`0` and `t`/`f` values are also coerced.                               |
+| `float`     | Coerce to 64 bit floats.                                                                                            |
+| `int`       | Coerce to a 64 bit integer.                                                                                         |
+| `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
+| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][url.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 
