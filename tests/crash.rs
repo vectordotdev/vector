@@ -2,7 +2,7 @@ use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::buffers::Acker;
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
 use vector::Event;
@@ -50,7 +50,7 @@ fn test_sink_panic() {
     );
     config.add_sink("panic", &["in"], PanicSink);
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
@@ -60,7 +60,7 @@ fn test_sink_panic() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = tokio::runtime::Runtime::new().unwrap();
+    let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
 
     std::panic::take_hook();
@@ -115,7 +115,7 @@ fn test_sink_error() {
     );
     config.add_sink("error", &["in"], ErrorSink);
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -125,7 +125,7 @@ fn test_sink_error() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = tokio::runtime::Runtime::new().unwrap();
+    let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
 
     assert!(crash.wait().next().is_some());
@@ -163,7 +163,7 @@ fn test_source_error() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -173,7 +173,7 @@ fn test_source_error() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = tokio::runtime::Runtime::new().unwrap();
+    let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
 
     assert!(crash.wait().next().is_some());
@@ -213,7 +213,7 @@ fn test_source_panic() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -224,7 +224,7 @@ fn test_source_panic() {
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     let send = send_lines(in_addr, input_lines.clone().into_iter());
-    let mut rt2 = tokio::runtime::Runtime::new().unwrap();
+    let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
     std::panic::take_hook();
 

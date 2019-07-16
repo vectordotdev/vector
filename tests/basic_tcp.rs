@@ -6,7 +6,7 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
 use vector::test_util::{
-    block_on, next_addr, random_lines, receive, send_lines, shutdown_on_idle, wait_for_tcp,
+    block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle, wait_for_tcp,
 };
 use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
@@ -26,7 +26,7 @@ fn test_pipe() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -70,7 +70,7 @@ fn test_sample() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -180,7 +180,7 @@ fn test_merge() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines = receive(&out_addr);
 
@@ -242,7 +242,7 @@ fn test_fork() {
         sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
@@ -292,7 +292,7 @@ fn test_merge_and_fork() {
         sinks::tcp::TcpSinkConfig::new(out_addr2.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
@@ -377,7 +377,7 @@ fn test_merge_and_fork_json() {
 
     let config: config::Config = serde_json::from_str(&config).unwrap();
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
 
     let output_lines1 = receive(&out_addr1);
     let output_lines2 = receive(&out_addr2);
@@ -437,8 +437,8 @@ fn test_reconnect() {
         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
     );
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let output_rt = tokio::runtime::Runtime::new().unwrap();
+    let mut rt = runtime();
+    let output_rt = runtime();
 
     let (output_trigger, output_tripwire) = Tripwire::new();
     let output_listener = TcpListener::bind(&out_addr).unwrap();
