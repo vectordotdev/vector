@@ -200,6 +200,7 @@ fn paths_rec(nodes: &HashMap<String, Node>, node: &str, mut path: Vec<String>) -
 mod test {
     use super::Graph;
     use crate::topology::config::DataType;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn detects_cycles() {
@@ -257,15 +258,79 @@ mod test {
     fn doesnt_allow_any_into_log_or_metric() {
         let mut graph = Graph::default();
         graph.add_source("any_source", DataType::Any);
-        graph.add_sink("log_sink", DataType::Log, vec!["any_source"]);
-        graph.add_sink("metric_sink", DataType::Metric, vec!["any_source"]);
+        graph.add_transform(
+            "log_to_any",
+            DataType::Log,
+            DataType::Any,
+            vec!["any_source"],
+        );
+        graph.add_transform(
+            "any_to_log",
+            DataType::Any,
+            DataType::Log,
+            vec!["any_source"],
+        );
+        graph.add_sink(
+            "log_sink",
+            DataType::Log,
+            vec!["any_source", "log_to_any", "any_to_log"],
+        );
+        graph.add_sink(
+            "metric_sink",
+            DataType::Metric,
+            vec!["any_source", "log_to_any"],
+        );
 
         assert_eq!(
             Err(vec![
                 "Data type mismatch between any_source (Any) and log_sink (Log)".into(),
+                "Data type mismatch between any_source (Any) and log_to_any (Log)".into(),
                 "Data type mismatch between any_source (Any) and metric_sink (Metric)".into(),
+                "Data type mismatch between log_to_any (Any) and log_sink (Log)".into(),
+                "Data type mismatch between log_to_any (Any) and metric_sink (Metric)".into(),
             ]),
             graph.typecheck()
         );
+    }
+
+    #[test]
+    fn allows_both_directions_for_metrics() {
+        let mut graph = Graph::default();
+        graph.add_source("log_source", DataType::Log);
+        graph.add_source("metric_source", DataType::Metric);
+        graph.add_transform(
+            "log_to_log",
+            DataType::Log,
+            DataType::Log,
+            vec!["log_source"],
+        );
+        graph.add_transform(
+            "metric_to_metric",
+            DataType::Metric,
+            DataType::Metric,
+            vec!["metric_source"],
+        );
+        graph.add_transform(
+            "any_to_any",
+            DataType::Any,
+            DataType::Any,
+            vec!["log_to_log", "metric_to_metric"],
+        );
+        graph.add_transform(
+            "any_to_log",
+            DataType::Any,
+            DataType::Log,
+            vec!["any_to_any"],
+        );
+        graph.add_transform(
+            "any_to_metric",
+            DataType::Any,
+            DataType::Metric,
+            vec!["any_to_any"],
+        );
+        graph.add_sink("log_sink", DataType::Log, vec!["any_to_log"]);
+        graph.add_sink("metric_sink", DataType::Metric, vec!["any_to_metric"]);
+
+        assert_eq!(Ok(()), graph.typecheck());
     }
 }
