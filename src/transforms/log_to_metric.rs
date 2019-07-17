@@ -200,25 +200,31 @@ mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{event::metric::Metric, transforms::Transform, Event};
 
+    fn parse_config(s: &str) -> LogToMetricConfig {
+        toml::from_str(s).unwrap()
+    }
+
+    fn create_event(key: &str, value: &str) -> Event {
+        let mut log = Event::from("i am a log");
+        log.as_mut_log().insert_explicit(key.into(), value.into());
+        log
+    }
+
     #[test]
     fn count_http_status_codes() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
             field = "status"
             labels = {status = "#{event.status}", host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("status".into(), "42".into());
-
+        let event = create_event("status", "42");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Counter {
@@ -230,7 +236,7 @@ mod tests {
 
     #[test]
     fn count_exceptions() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -238,16 +244,12 @@ mod tests {
             name = "exception_total"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("backtrace".into(), "message".into());
-
+        let event = create_event("backtrace", "message");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Counter {
@@ -259,7 +261,7 @@ mod tests {
 
     #[test]
     fn count_exceptions_no_match() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -267,22 +269,18 @@ mod tests {
             name = "exception_total"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("success".into(), "42".into());
-
+        let event = create_event("success", "42");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event);
 
-        let metric = transform.transform(log);
         assert!(metric.is_none());
     }
 
     #[test]
     fn sum_order_amounts() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -291,16 +289,12 @@ mod tests {
             increment_by_value = true
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("amount".into(), "33.99".into());
-
+        let event = create_event("amount", "33.99");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Counter {
@@ -312,7 +306,7 @@ mod tests {
 
     #[test]
     fn memory_usage_gauge() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "gauge"
@@ -320,16 +314,12 @@ mod tests {
             name = "memory_rss_bytes"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("memory_rss".into(), "123".into());
-
+        let event = create_event("memory_rss", "123");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Gauge {
@@ -342,7 +332,7 @@ mod tests {
 
     #[test]
     fn parse_failure() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -351,20 +341,17 @@ mod tests {
             increment_by_value = true
             labels = {status = "#{event.status}", host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("status".into(), "not a number".into());
-
+        let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(&config);
-        assert!(transform.transform(log).is_none());
+
+        assert!(transform.transform(event).is_none());
     }
 
     #[test]
     fn missing_field() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -372,20 +359,17 @@ mod tests {
             name = "status_total"
             labels = {status = "#{event.status}", host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("not foo".into(), "not a number".into());
-
+        let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(&config);
-        assert!(transform.transform(log).is_none());
+
+        assert!(transform.transform(event).is_none());
     }
 
     #[test]
     fn multiple_metrics() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "counter"
@@ -398,19 +382,20 @@ mod tests {
             name = "exception_total"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
+        let mut event = Event::from("i am a log");
+        event
+            .as_mut_log()
             .insert_explicit("status".into(), "42".into());
-        log.as_mut_log()
+        event
+            .as_mut_log()
             .insert_explicit("backtrace".into(), "message".into());
 
         let mut transform = LogToMetric::new(&config);
 
         let mut output = Vec::new();
-        transform.transform_into(&mut output, log);
+        transform.transform_into(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
@@ -430,7 +415,7 @@ mod tests {
 
     #[test]
     fn user_ip_set() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "set"
@@ -438,16 +423,12 @@ mod tests {
             name = "unique_user_ip"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("user_ip".into(), "1.2.3.4".into());
-
+        let event = create_event("user_ip", "1.2.3.4");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Set {
@@ -459,23 +440,19 @@ mod tests {
 
     #[test]
     fn response_time_histogram() {
-        let config: LogToMetricConfig = toml::from_str(
+        let config = parse_config(
             r##"
             [[metrics]]
             type = "histogram"
             field = "response_time"
             labels = {host = "#{event.host}"}
             "##,
-        )
-        .unwrap();
+        );
 
-        let mut log = Event::from("i am a log");
-        log.as_mut_log()
-            .insert_explicit("response_time".into(), "2.5".into());
-
+        let event = create_event("response_time", "2.5");
         let mut transform = LogToMetric::new(&config);
+        let metric = transform.transform(event).unwrap();
 
-        let metric = transform.transform(log).unwrap();
         assert_eq!(
             metric.into_metric(),
             Metric::Histogram {
