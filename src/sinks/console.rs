@@ -100,10 +100,9 @@ mod test {
         let event = Event::Metric(Metric::Counter {
             name: "foos".into(),
             val: 100.0,
-            sampling: None,
         });
         assert_eq!(
-            Ok(r#"{"type":"counter","name":"foos","val":100.0,"sampling":null}"#.to_string()),
+            Ok(r#"{"type":"counter","name":"foos","val":100.0}"#.to_string()),
             encode_event(event, &None)
         );
     }
