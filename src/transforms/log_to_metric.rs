@@ -38,9 +38,31 @@ pub struct GaugeConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
+pub struct SetConfig {
+    field: Atom,
+    #[serde(skip)]
+    sanitized_name: Atom,
+    name: Option<Atom>,
+    labels: IndexMap<Atom, String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub struct HistogramConfig {
+    field: Atom,
+    #[serde(skip)]
+    sanitized_name: Atom,
+    name: Option<Atom>,
+    labels: IndexMap<Atom, String>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
     Counter(CounterConfig),
+    Histogram(HistogramConfig),
     Gauge(GaugeConfig),
+    Set(SetConfig),
 }
 
 fn default_increment_by_value() -> bool {
@@ -79,12 +101,17 @@ impl LogToMetric {
                     };
                     counter.sanitized_name = Atom::from(name);
                 }
+                MetricConfig::Histogram(ref mut hist) => {
+                    let name = hist.name.as_ref().unwrap_or(&hist.field).to_string();
+                    hist.sanitized_name = Atom::from(name);
+                }
                 MetricConfig::Gauge(ref mut gauge) => {
-                    let name = match &gauge.name {
-                        Some(s) => s.to_string(),
-                        None => gauge.field.to_string(),
-                    };
+                    let name = gauge.name.as_ref().unwrap_or(&gauge.field).to_string();
                     gauge.sanitized_name = Atom::from(name);
+                }
+                MetricConfig::Set(ref mut set) => {
+                    let name = set.name.as_ref().unwrap_or(&set.field).to_string();
+                    set.sanitized_name = Atom::from(name);
                 }
             }
         }
@@ -109,7 +136,7 @@ impl Transform for LogToMetric {
                 MetricConfig::Counter(counter) => {
                     if let Some(val) = event.get(&counter.field) {
                         if counter.increment_by_value {
-                            if let Ok(val) = val.to_string_lossy().parse::<f32>() {
+                            if let Ok(val) = val.to_string_lossy().parse() {
                                 output.push(Event::Metric(Metric::Counter {
                                     name: counter.sanitized_name.to_string(),
                                     val,
@@ -125,6 +152,19 @@ impl Transform for LogToMetric {
                         };
                     }
                 }
+                MetricConfig::Histogram(hist) => {
+                    if let Some(val) = event.get(&hist.field) {
+                        if let Ok(val) = val.to_string_lossy().parse() {
+                            output.push(Event::Metric(Metric::Histogram {
+                                name: hist.sanitized_name.to_string(),
+                                val,
+                                sample_rate: 1,
+                            }));
+                        } else {
+                            trace!("failed to parse histogram value");
+                        }
+                    }
+                }
                 MetricConfig::Gauge(gauge) => {
                     if let Some(val) = event.get(&gauge.field) {
                         if let Ok(val) = val.to_string_lossy().parse() {
@@ -135,6 +175,18 @@ impl Transform for LogToMetric {
                             }));
                         } else {
                             trace!("failed to parse gauge value");
+                        }
+                    }
+                }
+                MetricConfig::Set(set) => {
+                    if let Some(val) = event.get(&set.field) {
+                        if let Ok(val) = val.to_string_lossy().parse() {
+                            output.push(Event::Metric(Metric::Set {
+                                name: set.sanitized_name.to_string(),
+                                val,
+                            }));
+                        } else {
+                            trace!("failed to parse set value");
                         }
                     }
                 }
@@ -372,6 +424,64 @@ mod tests {
             Metric::Counter {
                 name: "status_total".into(),
                 val: 1.0,
+            }
+        );
+    }
+
+    #[test]
+    fn user_ip_set() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "set"
+            field = "user_ip"
+            name = "unique_user_ip"
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("user_ip".into(), "1.2.3.4".into());
+
+        let mut transform = LogToMetric::new(&config);
+
+        let metric = transform.transform(log).unwrap();
+        assert_eq!(
+            metric.into_metric(),
+            Metric::Set {
+                name: "unique_user_ip".into(),
+                val: "1.2.3.4".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn response_time_histogram() {
+        let config: LogToMetricConfig = toml::from_str(
+            r##"
+            [[metrics]]
+            type = "histogram"
+            field = "response_time"
+            labels = {host = "#{event.host}"}
+            "##,
+        )
+        .unwrap();
+
+        let mut log = Event::from("i am a log");
+        log.as_mut_log()
+            .insert_explicit("response_time".into(), "2.5".into());
+
+        let mut transform = LogToMetric::new(&config);
+
+        let metric = transform.transform(log).unwrap();
+        assert_eq!(
+            metric.into_metric(),
+            Metric::Histogram {
+                name: "response_time".into(),
+                val: 2.5,
+                sample_rate: 1,
             }
         );
     }
