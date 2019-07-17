@@ -6,6 +6,7 @@ use crate::{
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
+    topology::config::{DataType, SinkConfig},
 };
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
@@ -69,7 +70,7 @@ pub struct BasicAuth {
 }
 
 #[typetag::serde(name = "http")]
-impl crate::topology::config::SinkConfig for HttpSinkConfig {
+impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         validate_headers(&self.headers)?;
         let sink = http(self.clone(), acker)?;
@@ -80,6 +81,10 @@ impl crate::topology::config::SinkConfig for HttpSinkConfig {
         } else {
             Ok((sink, Box::new(future::ok(()))))
         }
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

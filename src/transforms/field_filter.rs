@@ -1,5 +1,8 @@
 use super::Transform;
-use crate::Event;
+use crate::{
+    topology::config::{DataType, TransformConfig},
+    Event,
+};
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -11,12 +14,20 @@ pub struct FieldFilterConfig {
 }
 
 #[typetag::serde(name = "field_filter")]
-impl crate::topology::config::TransformConfig for FieldFilterConfig {
+impl TransformConfig for FieldFilterConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),
         )))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

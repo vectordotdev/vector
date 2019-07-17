@@ -1,5 +1,9 @@
 use super::util::TcpSource;
-use crate::{event::proto, Event};
+use crate::{
+    event::proto,
+    topology::config::{DataType, SourceConfig},
+    Event,
+};
 use bytes::{Bytes, BytesMut};
 use futures::sync::mpsc;
 use prost::Message;
@@ -30,10 +34,14 @@ impl VectorConfig {
 }
 
 #[typetag::serde(name = "vector")]
-impl crate::topology::config::SourceConfig for VectorConfig {
+impl SourceConfig for VectorConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         let vector = VectorSource;
         vector.run(self.address, self.shutdown_timeout_secs, out)
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

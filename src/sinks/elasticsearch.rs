@@ -6,6 +6,7 @@ use crate::{
         retries::FixedRetryPolicy,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
+    topology::config::{DataType, SinkConfig},
 };
 use chrono::format::strftime::StrftimeItems;
 use chrono::Utc;
@@ -39,12 +40,16 @@ pub struct ElasticSearchConfig {
 }
 
 #[typetag::serde(name = "elasticsearch")]
-impl crate::topology::config::SinkConfig for ElasticSearchConfig {
+impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = es(self.clone(), acker);
         let healtcheck = healthcheck(self.host.clone());
 
         Ok((sink, healtcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

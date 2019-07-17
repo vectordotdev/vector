@@ -1,5 +1,9 @@
 use super::Transform;
-use crate::{event::metric::Metric, Event};
+use crate::{
+    event::metric::Metric,
+    topology::config::{DataType, TransformConfig},
+    Event,
+};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -48,17 +52,17 @@ pub struct LogToMetric {
 }
 
 #[typetag::serde(name = "log_to_metric")]
-impl crate::topology::config::TransformConfig for LogToMetricConfig {
+impl TransformConfig for LogToMetricConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(LogToMetric::new(self)))
     }
 
-    fn input_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Log
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 
-    fn output_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn output_type(&self) -> DataType {
+        DataType::Metric
     }
 }
 

@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     sinks::util::MetadataFuture,
+    topology::config::{DataType, SinkConfig},
 };
 use futures::{
     future::{self, poll_fn, IntoFuture},
@@ -46,11 +47,15 @@ pub struct KafkaSink {
 }
 
 #[typetag::serde(name = "kafka")]
-impl crate::topology::config::SinkConfig for KafkaSinkConfig {
+impl SinkConfig for KafkaSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

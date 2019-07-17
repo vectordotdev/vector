@@ -1,5 +1,8 @@
 use super::Transform;
-use crate::Event;
+use crate::{
+    topology::config::{DataType, TransformConfig},
+    Event,
+};
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -14,9 +17,17 @@ pub struct RemoveFields {
 }
 
 #[typetag::serde(name = "remove_fields")]
-impl crate::topology::config::TransformConfig for RemoveFieldsConfig {
+impl TransformConfig for RemoveFieldsConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

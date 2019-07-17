@@ -1,5 +1,8 @@
-use crate::buffers::Acker;
-use crate::event::{self, Event};
+use crate::{
+    buffers::Acker,
+    event::{self, Event},
+    topology::config::{DataType, SinkConfig},
+};
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
@@ -16,12 +19,16 @@ pub struct BlackholeConfig {
 }
 
 #[typetag::serde(name = "blackhole")]
-impl crate::topology::config::SinkConfig for BlackholeConfig {
+impl SinkConfig for BlackholeConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = Box::new(BlackholeSink::new(self.clone(), acker));
         let healthcheck = Box::new(healthcheck());
 
         Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

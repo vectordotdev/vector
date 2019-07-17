@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Metric},
+    topology::config::{DataType, SinkConfig},
     Event,
 };
 use futures::{future, Async, AsyncSink, Future, Sink};
@@ -27,7 +28,7 @@ pub fn default_address() -> SocketAddr {
 }
 
 #[typetag::serde(name = "prometheus")]
-impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
+impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = Box::new(PrometheusSink::new(self.address, acker));
         let healthcheck = Box::new(future::ok(()));
@@ -35,8 +36,8 @@ impl crate::topology::config::SinkConfig for PrometheusSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn input_type(&self) -> DataType {
+        DataType::Metric
     }
 }
 

@@ -19,6 +19,7 @@ pub struct Config {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
+    Any,
     Log,
     Metric,
 }
@@ -27,9 +28,7 @@ pub enum DataType {
 pub trait SourceConfig: core::fmt::Debug {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<sources::Source, String>;
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn output_type(&self) -> DataType;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -48,9 +47,7 @@ pub trait SinkConfig: core::fmt::Debug {
         acker: crate::buffers::Acker,
     ) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn input_type(&self) -> DataType;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -64,13 +61,9 @@ pub struct TransformOuter {
 pub trait TransformConfig: core::fmt::Debug {
     fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn input_type(&self) -> DataType;
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
+    fn output_type(&self) -> DataType;
 }
 
 // Helper methods for programming construction during tests

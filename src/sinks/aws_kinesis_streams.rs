@@ -6,6 +6,7 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
     },
+    topology::config::{DataType, SinkConfig},
 };
 use futures::{Future, Poll, Sink};
 use rand::random;
@@ -53,12 +54,16 @@ pub enum Encoding {
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]
-impl crate::topology::config::SinkConfig for KinesisSinkConfig {
+impl SinkConfig for KinesisSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let config = self.clone();
         let sink = KinesisService::new(config, acker)?;
         let healthcheck = healthcheck(self.clone())?;
         Ok((Box::new(sink), healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Log
     }
 }
 

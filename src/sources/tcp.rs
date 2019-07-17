@@ -1,5 +1,8 @@
 use super::util::TcpSource;
-use crate::event::{self, Event};
+use crate::{
+    event::{self, Event},
+    topology::config::{DataType, SourceConfig},
+};
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::sync::mpsc;
@@ -39,12 +42,16 @@ impl TcpConfig {
 }
 
 #[typetag::serde(name = "tcp")]
-impl crate::topology::config::SourceConfig for TcpConfig {
+impl SourceConfig for TcpConfig {
     fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
         let tcp = RawTcpSource {
             config: self.clone(),
         };
         tcp.run(self.address, self.shutdown_timeout_secs, out)
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
     }
 }
 
