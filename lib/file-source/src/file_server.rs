@@ -321,8 +321,47 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod test {
-    use super::{Checkpointer, FileFingerprint, FilePosition};
+    use super::{Checkpointer, FileFingerprint, FilePosition, FileServer};
+    use std::{fs, time};
     use tempfile::tempdir;
+
+    #[test]
+    fn test_fingerprinting() {
+        let data_dir = tempdir().unwrap();
+        let target_dir = tempdir().unwrap();
+        let file_server = FileServer {
+            include: vec![target_dir.path().to_owned()],
+            exclude: Vec::new(),
+            max_read_bytes: 10000,
+            start_at_beginning: true,
+            ignore_before: None,
+            max_line_bytes: 10000,
+            fingerprint_bytes: 256,
+            ignored_header_bytes: 0,
+            data_dir: data_dir.path().to_owned(),
+            glob_minimum_cooldown: time::Duration::from_millis(5),
+        };
+
+        let enough_data = vec![b'x'; 256];
+        let not_enough_data = vec![b'x'; 199];
+        let empty_path = target_dir.path().join("empty.log");
+        let big_enough_path = target_dir.path().join("big_enough.log");
+        let not_big_enough_path = target_dir.path().join("not_big_enough.log");
+        fs::write(&empty_path, &[]).unwrap();
+        fs::write(&big_enough_path, &enough_data).unwrap();
+        fs::write(&not_big_enough_path, &not_enough_data).unwrap();
+
+        let mut buf = Vec::new();
+        assert!(file_server
+            .get_fingerprint_of_file(&empty_path, &mut buf)
+            .is_err());
+        assert!(file_server
+            .get_fingerprint_of_file(&big_enough_path, &mut buf)
+            .is_ok());
+        assert!(file_server
+            .get_fingerprint_of_file(&not_big_enough_path, &mut buf)
+            .is_err());
+    }
 
     #[test]
     fn test_checkpointer_basics() {
@@ -337,6 +376,7 @@ mod test {
         chkptr.set_checkpoint(fingerprint, position);
         assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
     }
+
     #[test]
     fn test_checkpointer_restart() {
         let fingerprint: FileFingerprint = 0x1234567890abcdef;
