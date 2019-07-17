@@ -35,7 +35,7 @@ aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recur
 echo "Uploading all artifacts to s3://packages.timber.io/vector/edge/"
 td=$(mktemp -d)
 cp -a "target/artifacts/." "$td"
-rename -v "s/$escaped_version/edge/" "$td/*"
+rename -v "s/$escaped_version/edge/" $td/*
 echo "Renamed all builds: via \"s/$escaped_version/edge/\""
 ls $td
 aws s3 rm --recursive "s3://packages.timber.io/vector/edge/"
@@ -48,7 +48,7 @@ if [[ "$CHANNEL" == "latest" ]]; then
   echo "Uploading all artifacts to s3://packages.timber.io/vector/latest/"
   td=$(mktemp -d)
   cp -a "target/artifacts/." "$td"
-  rename -v "s/$escaped_version/latest/" "$td/*"
+  rename -v "s/$escaped_version/latest/" $td/*
   echo "Renamed all builds: via \"s/$escaped_version/latest/\""
   ls $td
   aws s3 rm --recursive "s3://packages.timber.io/vector/latest/"
