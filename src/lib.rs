@@ -7,6 +7,7 @@ extern crate prost_derive;
 #[macro_use]
 extern crate derivative;
 
+#[cfg(feature = "jemallocator")]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
