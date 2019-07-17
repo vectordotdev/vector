@@ -45,6 +45,7 @@ function extend_cross_base_image() {
 # The following images are basic Docker images that do not extend a
 # cross base image.
 build_image "builder-x86_64-unknown-linux-gnu"
+build_image "builder-x86_64-unknown-linux-musl"
 build_image "checker"
 build_image "packager-deb"
 build_image "packager-rpm"
