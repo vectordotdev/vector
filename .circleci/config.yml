@@ -151,7 +151,7 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES=""
+            make build-archive FEATURES="jemallocator"
       - persist_to_workspace:
           root: target/artifacts
           paths:
