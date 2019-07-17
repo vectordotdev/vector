@@ -111,11 +111,14 @@ impl Graph {
 
     fn edges(&self) -> HashSet<(String, String)> {
         let mut edges = HashSet::new();
+        let valid_names = self.nodes.keys().collect::<HashSet<_>>();
         for (name, node) in self.nodes.iter() {
             match node {
                 Node::Transform { inputs, .. } | Node::Sink { inputs, .. } => {
                     for i in inputs {
-                        edges.insert((i.clone(), name.clone()));
+                        if valid_names.contains(i) {
+                            edges.insert((i.clone(), name.clone()));
+                        }
                     }
                 }
                 Node::Source { .. } => {}
