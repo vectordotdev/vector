@@ -169,6 +169,7 @@ impl RetryLogic for KinesisRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
+            PutRecordsError::HttpDispatch(_) => true,
             PutRecordsError::ProvisionedThroughputExceeded(_) => true,
             PutRecordsError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
