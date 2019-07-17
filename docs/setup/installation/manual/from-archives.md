@@ -24,6 +24,7 @@ architectures. If you don't see an architecture, then we recommend
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | `latest` | 64-bit OSX (10.7+, Lion+) |
 | [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
+| [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL |
 
 {% endtab %}
 {% tab title="Edge" %}
@@ -37,7 +38,8 @@ using them over the "latest" alternatives.
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_edge_x86_64-apple-darwin] | `edge` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
+| [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `edge` | 64-bit Linux (2.6.18+) |
+| [`uknown-linux-musl`][url.vector_edge_x86_64-unknown-linux-musl] | `edge` | 64-bit Linux with MUSL |
 {% endtab %}
 {% endtabs %}
 

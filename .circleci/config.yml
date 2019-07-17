@@ -141,6 +141,23 @@ jobs:
             - "*-x86_64-unknown-linux-gnu.tar.gz"
             - "*-amd64.deb"
 
+  build-x86_64-unknown-linux-musl-archive:
+    docker:
+      - image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: Build archive
+          command: |
+            export VERSION=$(make version)
+            make build-archive FEATURES="jemallocator"
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*-x86_64-unknown-linux-musl.tar.gz"
+            - "*-amd64.deb"
+
   #
   # Packaging
   #
@@ -414,6 +431,7 @@ build-requires: &build-requires
 package-requires: &package-requires
   requires:
     - build-x86_64-unknown-linux-gnu-archive
+    - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
 
 verify-requires: &verify-requires
@@ -450,6 +468,9 @@ workflows:
       - test-stable:
           <<: *test-filters
       - build-x86_64-unknown-linux-gnu-archive:
+          <<: *release-workflow-filters
+          <<: *build-requires
+      - build-x86_64-unknown-linux-musl-archive:
           <<: *release-workflow-filters
           <<: *build-requires
       - build-x86_64-apple-darwin-archive:

@@ -22,6 +22,7 @@ if [ -z "$CHANNEL" ]; then
   exit 1
 fi
 
+escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
 
 #
 # S3
@@ -34,19 +35,24 @@ aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recur
 echo "Uploading all artifacts to s3://packages.timber.io/vector/edge/"
 td=$(mktemp -d)
 cp -a "target/artifacts/." "$td"
-escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
 rename -v "s/$escaped_version/edge/" "$td/*"
+echo "Renamed all builds: via \"s/$escaped_version/edge/\""
+ls $td
 aws s3 rm --recursive "s3://packages.timber.io/vector/edge/"
 aws s3 cp "$td" "s3://packages.timber.io/vector/edge/" --recursive
 rm -rf $td
+echo "Uploaded edge archives"
 
 if [[ "$CHANNEL" == "latest" ]]; then
   # Update the "latest" files
   echo "Uploading all artifacts to s3://packages.timber.io/vector/latest/"
   td=$(mktemp -d)
   cp -a "target/artifacts/." "$td"
-  rename -v "s/edge/latest/" "$td/*"
+  rename -v "s/$escaped_version/latest/" "$td/*"
+  echo "Renamed all builds: via \"s/$escaped_version/latest/\""
+  ls $td
   aws s3 rm --recursive "s3://packages.timber.io/vector/latest/"
   aws s3 cp "$td" "s3://packages.timber.io/vector/latest/" --recursive
   rm -rf $td
+  echo "Uploaded latest archives"
 fi

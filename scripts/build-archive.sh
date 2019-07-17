@@ -13,14 +13,18 @@
 
 set -eu
 
-echo "Building version $VERSION for target $TARGET"
+echo "Building -- version: $VERSION, target: $TARGET, features: $FEATURES"
 
 artifacts_dir="target/artifacts"
 target_dir="target/$TARGET"
 archive_dir_name="vector-$VERSION"
 archive_dir="$target_dir/$archive_dir_name"
 
-cargo build --target $TARGET --release
+if [ "$FEATURES" == "default" ]; then
+  cargo build --target $TARGET --release
+else
+  cargo build --no-default-features --features $FEATURES --target $TARGET --release
+fi
 
 # Build the archive directory
 rm -rf $archive_dir
