@@ -18,17 +18,18 @@ architectures. If you don't see an architecture, then we recommend
 
 {% tabs %}
 {% tab title="Latest" %}
-"Latest" represents the latest stable release.
+"Latest" represents the latest [released version][url.releases].
 
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | `latest` | 64-bit OSX (10.7+, Lion+) |
 | [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
-| [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL |
+| ⚠️ [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL |
 
 {% endtab %}
 {% tab title="Edge" %}
-"Edge" represents build off of the latest version of `master`.
+"Edge" builds are continuous and built after every change merged into
+the [`master` repo branch][url.vector_repo].
 
 {% hint style="warning" %}
 This release could have bugs or other issues. Please think carefully before
@@ -39,9 +40,12 @@ using them over the "latest" alternatives.
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_edge_x86_64-apple-darwin] | `edge` | 64-bit OSX (10.7+, Lion+) |
 | [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `edge` | 64-bit Linux (2.6.18+) |
-| [`uknown-linux-musl`][url.vector_edge_x86_64-unknown-linux-musl] | `edge` | 64-bit Linux with MUSL |
+| ⚠️ [`uknown-linux-musl`][url.vector_edge_x86_64-unknown-linux-musl] | `edge` | 64-bit Linux with MUSL |
 {% endtab %}
 {% endtabs %}
+
+⚠️ = This release is limited, it does not support on-disk buffers or the [`kafka` sink][docs.kafka_sink]. See the [Limited Releases](#limited-releases) section for more info.
+
 
 ## Installation
 
@@ -124,6 +128,21 @@ If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
 {% endhint %}
 
+## Limited Releases
+
+For certain release targets Vector releases limited builds. These builds lack
+the following features:
+
+1. On-disk buffers.
+2. The [`kafka` sink][docs.kafka_sink].
+
+The reason these features are not included is due to the libraries required
+to power them. Specifically, we use [`leveldb`][url.leveldb] and
+[`rdkafka`][url.rdkafka] to power these features. Unforutnately, compiling
+and/or statically linking these libraries has proven to be a challenge. This
+is something we are working to resolve. You can track progress on
+[issue 546][url.issue_661].
+
 ## Service Managers
 
 Vector archives ship with service files in case you need them:
@@ -152,10 +171,17 @@ Simply follow the same [installation instructions above](#installation).
 [docs.configuration]: ../../../usage/configuration
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory
 [docs.from_source]: ../../../setup/installation/manual/from-source.md
+[docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
 [docs.package_managers]: ../../../setup/installation/package-managers
 [docs.platforms]: ../../../setup/installation/platforms
+[url.issue_661]: https://github.com/timberio/vector/issues/661
+[url.leveldb]: https://github.com/google/leveldb
+[url.rdkafka]: https://github.com/edenhill/librdkafka
 [url.releases]: https://github.com/timberio/vector/releases
 [url.vector_edge_x86_64-apple-darwin]: https://packages.timber.io/vector/edge/vector-edge-x86_64-apple-darwin.tar.gz
 [url.vector_edge_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-gnu.tar.gz
+[url.vector_edge_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-musl.tar.gz
 [url.vector_latest_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
 [url.vector_latest_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
+[url.vector_latest_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
+[url.vector_repo]: https://github.com/timberio/vector

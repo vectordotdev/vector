@@ -7,6 +7,16 @@
 #   Signs all previous commits with a DCO signoff as described in the
 #   CONTRIBUTING.md document.
 
+_current_branch=$(git branch | sed -n -e 's/^\* \(.*\)/\1/p')
+hash1=$(git show-ref --heads -s master)
+hash2=$(git merge-base master $_current_branch)
+
+if [ "${hash1}" != "${hash2}" ]; then
+  echo "You branch is not rebased with master. Please rebase first:"
+  echo ""
+  echo "    git rebase master"
+  exit 1
+fi
 
 echo "We found the following commits since master:"
 echo ""
@@ -29,7 +39,6 @@ echo ""
 
 _signoff="sign: $(git config --get user.name) <$(git config --get user.email)>"
 _commit_count=$(git rev-list --count --no-merges master..)
-_current_branch=$(git branch | sed -n -e 's/^\* \(.*\)/\1/p')
 
 git config trailer.sign.key "Signed-off-by"
 git filter-branch -f --msg-filter \

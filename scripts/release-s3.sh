@@ -34,6 +34,7 @@ aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recur
 # Update the "edge" files
 echo "Uploading all artifacts to s3://packages.timber.io/vector/edge/"
 td=$(mktemp -d)
+
 cp -a "target/artifacts/." "$td"
 rename -v "s/$escaped_version/edge/" $td/*
 echo "Renamed all builds: via \"s/$escaped_version/edge/\""
