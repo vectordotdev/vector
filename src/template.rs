@@ -11,16 +11,24 @@ lazy_static! {
 #[derive(Debug, Clone)]
 pub struct Template {
     src: Bytes,
+    dynamic: bool,
 }
 
 impl From<&str> for Template {
     fn from(src: &str) -> Template {
-        Template { src: src.into() }
+        Template {
+            src: src.into(),
+            dynamic: RE.is_match(src.as_bytes()),
+        }
     }
 }
 
 impl Template {
     pub fn render(&self, event: &Event) -> Result<Bytes, Vec<Atom>> {
+        if !self.dynamic {
+            return Ok(self.src.clone());
+        }
+
         let mut missing_fields = Vec::new();
         let out = RE
             .replace_all(self.src.as_ref(), |caps: &Captures| {
