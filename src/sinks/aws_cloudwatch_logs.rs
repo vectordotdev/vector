@@ -3,11 +3,11 @@ use crate::{
     event::{self, Event, LogEvent, ValueKind},
     region::RegionOrEndpoint,
     sinks::util::{BatchServiceSink, PartitionBuffer, PartitionInnerBuffer, SinkExt},
+    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use futures::{stream::iter_ok, sync::oneshot, try_ready, Async, Future, Poll, Sink};
-use regex::bytes::{Captures, Regex};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
@@ -17,7 +17,6 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
-use string_cache::DefaultAtom as Atom;
 use tower::{
     buffer::Buffer,
     limit::{
@@ -35,15 +34,6 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
-}
-
-#[derive(Debug, Clone)]
-enum Partition {
-    /// A static field that doesn't create dynamic partitions
-    Static(Bytes),
-    /// Represents the ability to extract a key/value from the event
-    /// via the provided interpolated stream name.
-    Field(Regex, Bytes, Atom),
 }
 
 type Svc = Buffer<ConcurrencyLimit<RateLimit<Timeout<CloudwatchLogsSvc>>>, Vec<Event>>;
@@ -111,7 +101,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let batch_size = self.batch_size.unwrap_or(1000);
 
         let log_group = self.group_name.clone().into();
-        let log_stream = interpolate(&self.stream_name);
+        let log_stream = Template::from(self.stream_name.as_str());
 
         let svc = CloudwatchLogsPartitionSvc::new(self.clone())?;
 
@@ -375,39 +365,19 @@ pub struct CloudwatchKey {
     stream: Bytes,
 }
 
-fn interpolate(s: &str) -> Partition {
-    let r = Regex::new(r"\{\{(?P<key>\D+)\}\}").unwrap();
-
-    if let Some(cap) = r.captures(s.as_bytes()) {
-        if let Some(m) = cap.name("key") {
-            // TODO(lucio): clean up unwrap
-            let key = String::from_utf8(Vec::from(m.as_bytes())).unwrap();
-            return Partition::Field(r, s.into(), key.into());
-        }
-    }
-
-    Partition::Static(s.into())
-}
-
 fn partition(
     event: Event,
     group: &Bytes,
-    stream: &Partition,
+    stream: &Template,
 ) -> Option<PartitionInnerBuffer<Event, CloudwatchKey>> {
-    let stream = match stream {
-        Partition::Static(g) => g.clone(),
-        Partition::Field(regex, stream, key) => {
-            if let Some(val) = event.as_log().get(&key) {
-                let cap = regex.replace(stream, |_cap: &Captures| val.as_bytes().clone());
-                Bytes::from(&cap[..])
-            } else {
-                warn!(
-                    message =
-                        "Event key does not exist on the event and the event will be dropped.",
-                    key = field::debug(key)
-                );
-                return None;
-            }
+    let stream = match stream.render(&event) {
+        Ok(b) => b,
+        Err(missing_keys) => {
+            warn!(
+                message = "Keys do not exist on the event. Dropping event.",
+                keys = field::debug(missing_keys)
+            );
+            return None;
         }
     };
 
@@ -508,27 +478,9 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
 
     #[test]
-    fn interpolate_event() {
-        if let Partition::Field(_, _, key) = interpolate("{{some_key}}") {
-            assert_eq!(key, "some_key".to_string());
-        } else {
-            panic!("Expected Partition::Field");
-        }
-    }
-
-    #[test]
-    fn interpolate_static() {
-        if let Partition::Static(key) = interpolate("static_key") {
-            assert_eq!(key, "static_key".to_string());
-        } else {
-            panic!("Expected Partition::Static");
-        }
-    }
-
-    #[test]
     fn partition_static() {
         let event = Event::from("hello world");
-        let stream = Partition::Static("stream".into());
+        let stream = Template::from("stream");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -549,7 +501,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("{{log_stream}}");
+        let stream = Template::from("{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -570,7 +522,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("abcd-{{log_stream}}");
+        let stream = Template::from("abcd-{{log_stream}}");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -591,7 +543,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("log_stream".into(), "stream".into());
 
-        let stream = interpolate("{{log_stream}}-abcd");
+        let stream = Template::from("{{log_stream}}-abcd");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();
@@ -608,7 +560,7 @@ mod tests {
     fn partition_no_key_event() {
         let event = Event::from("hello world");
 
-        let stream = interpolate("{{log_stream}}");
+        let stream = Template::from("{{log_stream}}");
         let group = "group".into();
 
         let stream_val = partition(event, &group, &stream);
