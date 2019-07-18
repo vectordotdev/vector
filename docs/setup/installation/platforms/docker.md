@@ -26,7 +26,7 @@ docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-slim:l
 {% endcode-tabs-item %}
 {% code-tabs-item title="alpine" %}
 {% hint style="warning" %}
-This release is limited, it does not support on-disk buffers or the [`kafka` sink][docs.kafka_sink]. See the [Limited Releases][docs.from-archives.limited-releases] section for more info.
+This target is limited, it does not support on-disk buffers or the [`kafka` sink][docs.kafka_sink]. See the [Limited Releases][docs.from-archives.limited-releases] section for more info.
 {% endhint %}
 
 ```bash
