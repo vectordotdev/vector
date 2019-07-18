@@ -18,5 +18,6 @@ More options can be set with [flags][docs.starting.flags] when
 
 
 [docs.monitoring.logs]: ../../usage/administration/monitoring.md#logs
+[docs.sinks]: ../../usage/configuration/sinks
 [docs.starting.flags]: ../../usage/administration/starting.md#flags
 [docs.starting]: ../../usage/administration/starting.md
