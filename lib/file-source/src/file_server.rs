@@ -219,7 +219,10 @@ impl FileServer {
                 .wait()
             {
                 Ok((_, sink)) => chans = sink,
-                Err(_) => unreachable!("Output channel is closed"),
+                Err(_) => {
+                    debug!("Output channel closed.");
+                    return;
+                }
             }
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its

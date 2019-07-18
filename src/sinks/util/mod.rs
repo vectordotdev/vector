@@ -192,10 +192,16 @@ where
                     }
                     self.acker.ack(num_to_ack);
 
-                    trace!("request succeeded: {:?}", response);
+                    trace!(message = "request succeeded.", ?response);
                 }
 
-                Err(e) => error!("request failed: {}", e.into()),
+                Err(error) => {
+                    let error = error.into();
+                    error!(
+                        message = "request failed.",
+                        error = tracing::field::display(&error)
+                    )
+                }
             }
         }
     }

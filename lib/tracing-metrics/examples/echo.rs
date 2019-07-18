@@ -156,16 +156,14 @@ fn main() {
                             println!("Connection is done!");
                             Ok(())
                         })
-                        .map_err(|e| {
-                            error!({ error = field::display(e) }, "serve error");
-                        })
+                        .map_err(|error| error!(message = "serve error", %error))
                         .instrument(span),
                 );
                 Ok::<_, ::std::io::Error>(http)
             })
             .map(|_| ())
-            .map_err(|e| {
-                error!({ error = field::display(e) }, "server error");
+            .map_err(|error| {
+                error!(message = "server error", %error);
             })
             .instrument(server_span.clone());
         server_span.in_scope(|| {

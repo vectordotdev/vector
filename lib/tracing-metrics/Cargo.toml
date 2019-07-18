@@ -9,7 +9,7 @@ tracing-core = "0.1"
 hotmic = "0.8"
 
 [dev-dependencies]
-tracing = "0.1"
+tracing = "0.1.2"
 serde_json = "1.0"
 futures = "0.1.25"
 tokio = "0.1.21"

@@ -45,6 +45,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         let next = Instant::now() + self.backoff;
         let delay = Delay::new(next);
 
+        trace!(message = "retrying request.", delay_ms = %self.backoff.as_millis());
         RetryPolicyFuture { delay, policy }
     }
 }
