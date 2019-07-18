@@ -40,7 +40,7 @@ impl Template {
         if missing_fields.is_empty() {
             Ok(out.into())
         } else {
-            Err(missing_fields.clone())
+            Err(missing_fields)
         }
     }
 }
