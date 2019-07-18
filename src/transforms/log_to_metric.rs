@@ -4,7 +4,6 @@ use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
 };
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
@@ -23,7 +22,6 @@ pub struct CounterConfig {
     name: Option<Atom>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
-    labels: IndexMap<Atom, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -33,7 +31,6 @@ pub struct GaugeConfig {
     #[serde(skip)]
     sanitized_name: Atom,
     name: Option<Atom>,
-    labels: IndexMap<Atom, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -43,7 +40,6 @@ pub struct SetConfig {
     #[serde(skip)]
     sanitized_name: Atom,
     name: Option<Atom>,
-    labels: IndexMap<Atom, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -53,7 +49,6 @@ pub struct HistogramConfig {
     #[serde(skip)]
     sanitized_name: Atom,
     name: Option<Atom>,
-    labels: IndexMap<Atom, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -213,12 +208,11 @@ mod tests {
     #[test]
     fn count_http_status_codes() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "status"
-            labels = {status = "#{event.status}", host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("status", "42");
@@ -237,13 +231,12 @@ mod tests {
     #[test]
     fn count_exceptions() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "backtrace"
             name = "exception_total"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("backtrace", "message");
@@ -262,13 +255,12 @@ mod tests {
     #[test]
     fn count_exceptions_no_match() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "backtrace"
             name = "exception_total"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("success", "42");
@@ -281,14 +273,13 @@ mod tests {
     #[test]
     fn sum_order_amounts() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "amount"
             name = "amount_total"
             increment_by_value = true
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("amount", "33.99");
@@ -307,13 +298,12 @@ mod tests {
     #[test]
     fn memory_usage_gauge() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "gauge"
             field = "memory_rss"
             name = "memory_rss_bytes"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("memory_rss", "123");
@@ -333,14 +323,13 @@ mod tests {
     #[test]
     fn parse_failure() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "status"
             name = "status_total"
             increment_by_value = true
-            labels = {status = "#{event.status}", host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("status", "not a number");
@@ -352,13 +341,12 @@ mod tests {
     #[test]
     fn missing_field() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "status"
             name = "status_total"
-            labels = {status = "#{event.status}", host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("not foo", "not a number");
@@ -370,18 +358,16 @@ mod tests {
     #[test]
     fn multiple_metrics() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "counter"
             field = "status"
-            labels = {status = "#{event.status}", host = "#{event.host}"}
 
             [[metrics]]
             type = "counter"
             field = "backtrace"
             name = "exception_total"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let mut event = Event::from("i am a log");
@@ -416,13 +402,12 @@ mod tests {
     #[test]
     fn user_ip_set() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "set"
             field = "user_ip"
             name = "unique_user_ip"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("user_ip", "1.2.3.4");
@@ -441,12 +426,11 @@ mod tests {
     #[test]
     fn response_time_histogram() {
         let config = parse_config(
-            r##"
+            r#"
             [[metrics]]
             type = "histogram"
             field = "response_time"
-            labels = {host = "#{event.host}"}
-            "##,
+            "#,
         );
 
         let event = create_event("response_time", "2.5");
