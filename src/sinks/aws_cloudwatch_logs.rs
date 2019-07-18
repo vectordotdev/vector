@@ -372,10 +372,10 @@ fn partition(
 ) -> Option<PartitionInnerBuffer<Event, CloudwatchKey>> {
     let stream = match stream.render(&event) {
         Ok(b) => b,
-        Err(key) => {
+        Err(missing_keys) => {
             warn!(
-                message = "Event key does not exist on the event and the event will be dropped.",
-                key = field::debug(key)
+                message = "Keys do not exist on the event. Dropping event.",
+                keys = field::debug(missing_keys)
             );
             return None;
         }
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     fn partition_static() {
         let event = Event::from("hello world");
-        let stream = Template::Static("stream".into());
+        let stream = Template::from("stream");
         let group = "group".into();
 
         let (_event, key) = partition(event, &group, &stream).unwrap().into_parts();

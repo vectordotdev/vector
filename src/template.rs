@@ -1,43 +1,46 @@
 use crate::Event;
 use bytes::Bytes;
+use lazy_static::lazy_static;
 use regex::bytes::{Captures, Regex};
 use string_cache::DefaultAtom as Atom;
 
+lazy_static! {
+    static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
+}
+
 #[derive(Debug, Clone)]
-pub enum Template {
-    Static(Bytes),
-    Dynamic(Regex, Bytes, Atom),
+pub struct Template {
+    src: Bytes,
 }
 
 impl From<&str> for Template {
     fn from(src: &str) -> Template {
-        let r = Regex::new(r"\{\{(?P<key>\D+)\}\}").unwrap();
-
-        if let Some(cap) = r.captures(src.as_bytes()) {
-            if let Some(m) = cap.name("key") {
-                // TODO(lucio): clean up unwrap
-                let key = String::from_utf8(Vec::from(m.as_bytes())).unwrap();
-                return Template::Dynamic(r, src.into(), key.into());
-            }
-        }
-
-        Template::Static(src.into())
+        Template { src: src.into() }
     }
 }
 
 impl Template {
-    // TODO: return error
-    pub fn render(&self, event: &Event) -> Result<Bytes, &Atom> {
-        match self {
-            Template::Static(g) => Ok(g.clone()),
-            Template::Dynamic(regex, src, key) => {
+    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<Atom>> {
+        let mut missing_fields = Vec::new();
+        let out = RE
+            .replace_all(self.src.as_ref(), |caps: &Captures| {
+                let key = caps
+                    .get(1)
+                    .and_then(|m| std::str::from_utf8(m.as_bytes()).ok())
+                    .map(|s| Atom::from(s))
+                    .expect("src should match regex and keys should be utf8");
                 if let Some(val) = event.as_log().get(&key) {
-                    let cap = regex.replace(src, |_cap: &Captures| val.as_bytes().clone());
-                    Ok(Bytes::from(&cap[..]))
+                    val.to_string_lossy()
                 } else {
-                    Err(key)
+                    missing_fields.push(key.clone());
+                    String::new()
                 }
-            }
+            })
+            .into_owned();
+        if missing_fields.is_empty() {
+            Ok(out.into())
+        } else {
+            Err(missing_fields.clone())
         }
     }
 }
@@ -47,27 +50,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_dynamic() {
-        if let Template::Dynamic(_, _, key) = Template::from("{{some_key}}") {
-            assert_eq!(key, "some_key".to_string());
-        } else {
-            panic!("Expected Template::Dynamic");
-        }
-    }
-
-    #[test]
-    fn parse_static() {
-        if let Template::Static(key) = Template::from("static_key") {
-            assert_eq!(key, "static_key".to_string());
-        } else {
-            panic!("Expected Template::Static");
-        }
-    }
-
-    #[test]
     fn render_static() {
         let event = Event::from("hello world");
-        let template = Template::Static("foo".into());
+        let template = Template::from("foo");
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
     }
@@ -108,8 +93,45 @@ mod tests {
     #[test]
     fn render_dynamic_missing_key() {
         let event = Event::from("hello world");
-        let template = Template::from("{{log_stream}}");
+        let template = Template::from("{{log_stream}}-{{foo}}");
 
-        assert_eq!(Err(&Atom::from("log_stream")), template.render(&event));
+        assert_eq!(
+            Err(vec![Atom::from("log_stream"), Atom::from("foo")]),
+            template.render(&event)
+        );
+    }
+
+    #[test]
+    fn render_dynamic_multiple_keys() {
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_implicit("foo".into(), "bar".into());
+        event
+            .as_mut_log()
+            .insert_implicit("baz".into(), "quux".into());
+        let template = Template::from("stream-{{foo}}-{{baz}}.log");
+
+        assert_eq!(
+            Ok(Bytes::from("stream-bar-quux.log")),
+            template.render(&event)
+        )
+    }
+
+    #[test]
+    fn render_dynamic_weird_junk() {
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_implicit("foo".into(), "bar".into());
+        event
+            .as_mut_log()
+            .insert_implicit("baz".into(), "quux".into());
+        let template = Template::from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log");
+
+        assert_eq!(
+            Ok(Bytes::from(r"{stream}{\{{}}}-bar-quux.log")),
+            template.render(&event)
+        )
     }
 }
