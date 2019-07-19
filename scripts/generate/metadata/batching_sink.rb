@@ -44,7 +44,7 @@ class BatchingSink < Sink
       "description" => "The maximum age of a batch before it is flushed.",
       "null" => false,
       "type" => "int",
-      "unit" => "bytes"
+      "unit" => "seconds"
     })
 
     # Common options - requests
