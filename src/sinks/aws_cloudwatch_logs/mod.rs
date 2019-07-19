@@ -478,33 +478,30 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
             }
 
-            CloudwatchError::Describe(err) => {
-                match err {
-                    // TODO add proper error handling
-                    DescribeLogStreamsError::ServiceUnavailable(error) => {
-                        error!(message = "describe streams service unavailable.", %error);
-                        true
-                    }
-
-                    DescribeLogStreamsError::Unknown(res)
-                        if res.status.is_server_error()
-                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-                    {
-                        let BufferedHttpResponse { status, body, .. } = res;
-                        let body = String::from_utf8_lossy(&body[..]);
-
-                        error!(message = "describe streams unknown.", %status, %body);
-                        true
-                    }
-
-                    DescribeLogStreamsError::HttpDispatch(error) => {
-                        error!(message = "describe streams http dispatch.", %error);
-                        true
-                    }
-
-                    _ => false,
+            CloudwatchError::Describe(err) => match err {
+                DescribeLogStreamsError::ServiceUnavailable(error) => {
+                    error!(message = "describe streams service unavailable.", %error);
+                    true
                 }
-            }
+
+                DescribeLogStreamsError::Unknown(res)
+                    if res.status.is_server_error()
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                {
+                    let BufferedHttpResponse { status, body, .. } = res;
+                    let body = String::from_utf8_lossy(&body[..]);
+
+                    error!(message = "describe streams unknown.", %status, %body);
+                    true
+                }
+
+                DescribeLogStreamsError::HttpDispatch(error) => {
+                    error!(message = "describe streams http dispatch.", %error);
+                    true
+                }
+
+                _ => false,
+            },
 
             CloudwatchError::CreateStream(err) => {
                 match err {

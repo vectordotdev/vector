@@ -6,3 +6,4 @@ sample.log
 miniodat
 .DS_Store
 .idea/
+checkpoints/*

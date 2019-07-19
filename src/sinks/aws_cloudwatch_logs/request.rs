@@ -117,7 +117,6 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::DescribeStream(fut) => {
-                    trace!("polling describe");
                     let response = try_ready!(fut.poll().map_err(CloudwatchError::Describe));
 
                     let stream = if let Some(stream) = response
@@ -126,10 +125,10 @@ impl Future for CloudwatchFuture {
                         .into_iter()
                         .next()
                     {
-                        trace!({ stream = ?stream.log_stream_name }, "Stream found");
+                        trace!(message = "stream found", stream = ?stream.log_stream_name);
                         stream
                     } else {
-                        trace!("Provided stream does not exist; creating a new one.");
+                        trace!("provided stream does not exist; creating a new one.");
                         let fut = self.create_log_stream();
                         self.state = State::CreateStream(fut);
                         continue;
@@ -147,6 +146,7 @@ impl Future for CloudwatchFuture {
                         .take()
                         .expect("Token got called twice, this is a bug!");
 
+                    trace!(message = "putting logs.", ?token);
                     let fut = self.put_logs(token, events);
                     self.state = State::Put(fut);
                     continue;
@@ -154,14 +154,21 @@ impl Future for CloudwatchFuture {
 
                 State::CreateStream(fut) => {
                     let _ = try_ready!(fut.poll().map_err(CloudwatchError::CreateStream));
+
+                    trace!("stream created.");
+
                     self.state = State::Idle;
                     continue;
                 }
 
                 State::Put(fut) => {
                     let res = try_ready!(fut.poll().map_err(CloudwatchError::Put));
-                    let token = res.next_sequence_token;
-                    self.token_tx.try_send(token).unwrap();
+
+                    let next_token = res.next_sequence_token;
+
+                    trace!(message = "putting logs was successful.", ?next_token);
+
+                    self.token_tx.try_send(next_token).unwrap();
 
                     return Ok(().into());
                 }
