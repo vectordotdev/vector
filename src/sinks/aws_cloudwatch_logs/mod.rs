@@ -13,7 +13,10 @@ use crate::{
 use bytes::Bytes;
 use futures::{stream::iter_ok, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::{Captures, Regex};
-use rusoto_core::{request::HttpClient, Region};
+use rusoto_core::{
+    request::{BufferedHttpResponse, HttpClient},
+    Region,
+};
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, DescribeLogGroupsRequest,
@@ -447,7 +450,90 @@ impl RetryLogic for CloudwatchRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            _ => true,
+            CloudwatchError::Put(err) => {
+                match err {
+                    PutLogEventsError::ServiceUnavailable(error) => {
+                        error!(message = "put logs service unavailable.", %error);
+                        true
+                    }
+
+                    // TODO add proper error handling
+                    PutLogEventsError::HttpDispatch(error) => {
+                        error!(message = "put logs http dispatch.", %error);
+                        true
+                    }
+
+                    PutLogEventsError::Unknown(res)
+                        if res.status.is_server_error()
+                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                    {
+                        let BufferedHttpResponse { status, body, .. } = res;
+                        let body = String::from_utf8_lossy(&body[..]);
+
+                        error!(message = "describe streams unknown.", %status, %body);
+                        true
+                    }
+
+                    _ => false,
+                }
+            }
+
+            CloudwatchError::Describe(err) => {
+                match err {
+                    // TODO add proper error handling
+                    DescribeLogStreamsError::ServiceUnavailable(error) => {
+                        error!(message = "describe streams service unavailable.", %error);
+                        true
+                    }
+
+                    DescribeLogStreamsError::Unknown(res)
+                        if res.status.is_server_error()
+                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                    {
+                        let BufferedHttpResponse { status, body, .. } = res;
+                        let body = String::from_utf8_lossy(&body[..]);
+
+                        error!(message = "describe streams unknown.", %status, %body);
+                        true
+                    }
+
+                    DescribeLogStreamsError::HttpDispatch(error) => {
+                        error!(message = "describe streams http dispatch.", %error);
+                        true
+                    }
+
+                    _ => false,
+                }
+            }
+
+            CloudwatchError::CreateStream(err) => {
+                match err {
+                    // TODO add proper error handling
+                    CreateLogStreamError::ServiceUnavailable(error) => {
+                        error!(message = "create stream service unavailable.", %error);
+                        true
+                    }
+
+                    CreateLogStreamError::Unknown(res)
+                        if res.status.is_server_error()
+                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                    {
+                        let BufferedHttpResponse { status, body, .. } = res;
+                        let body = String::from_utf8_lossy(&body[..]);
+
+                        error!(message = "create stream unknown.", %status, %body);
+                        true
+                    }
+
+                    CreateLogStreamError::HttpDispatch(error) => {
+                        error!(message = "create stream http dispatch.", %error);
+                        true
+                    }
+
+                    _ => false,
+                }
+            }
+            _ => false,
         }
     }
 }
