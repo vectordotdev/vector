@@ -37,6 +37,25 @@ use tower::{
 use tower_buffer::Buffer;
 use tracing::field;
 
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct CloudwatchLogsSinkConfig {
+    pub stream_name: String,
+    pub group_name: String,
+    #[serde(flatten)]
+    pub region: RegionOrEndpoint,
+    pub batch_timeout: Option<u64>,
+    pub batch_size: Option<usize>,
+    pub encoding: Option<Encoding>,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
+}
+
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
     encoding: Option<Encoding>,
@@ -73,25 +92,6 @@ pub struct CloudwatchLogsPartitionSvc {
     config: CloudwatchLogsSinkConfig,
     clients: HashMap<CloudwatchKey, Svc>,
     request_config: RequestConfig,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct CloudwatchLogsSinkConfig {
-    pub stream_name: String,
-    pub group_name: String,
-    #[serde(flatten)]
-    pub region: RegionOrEndpoint,
-    pub batch_timeout: Option<u64>,
-    pub batch_size: Option<usize>,
-    pub encoding: Option<Encoding>,
-
-    // Tower Request based configuration
-    pub request_in_flight_limit: Option<usize>,
-    pub request_timeout_secs: Option<u64>,
-    pub request_rate_limit_duration_secs: Option<u64>,
-    pub request_rate_limit_num: Option<u64>,
-    pub request_retry_attempts: Option<usize>,
-    pub request_retry_backoff_secs: Option<u64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
