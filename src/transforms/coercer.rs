@@ -59,12 +59,11 @@ impl Transform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::ValueKind;
+    use crate::event::{LogEvent, ValueKind};
     use crate::{topology::config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
-    #[test]
-    fn coercer_works() {
+    fn parse_it() -> LogEvent {
         let mut event = Event::from("dummy message");
         for &(key, value) in &[("number", "1234"), ("bool", "yes"), ("other", "no")] {
             event.as_mut_log().insert_explicit(key.into(), value.into());
@@ -81,10 +80,19 @@ mod tests {
         .unwrap()
         .build()
         .unwrap();
-        let log = coercer.transform(event).unwrap().into_log();
+        coercer.transform(event).unwrap().into_log()
+    }
 
+    #[test]
+    fn coercer_converts_valid_fields() {
+        let log = parse_it();
         assert_eq!(log[&"number".into()], ValueKind::Integer(1234));
         assert_eq!(log[&"bool".into()], ValueKind::Boolean(true));
+    }
+
+    #[test]
+    fn coercer_leaves_unnamed_fields_as_is() {
+        let log = parse_it();
         assert_eq!(log[&"other".into()], ValueKind::Bytes("no".into()));
     }
 }
