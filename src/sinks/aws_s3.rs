@@ -250,6 +250,7 @@ impl RetryLogic for S3RetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
+            PutObjectError::HttpDispatch(_) => true,
             PutObjectError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }

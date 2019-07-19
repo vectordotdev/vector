@@ -21,7 +21,7 @@ export RELEASE=1
 export CLEANED_VERSION=$VERSION
 CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
 
-# The arch is the first part of the part
+# The arch is the first part of the target
 ARCH=$(echo $TARGET | cut -d'-' -f1)
 
 # Create source dir

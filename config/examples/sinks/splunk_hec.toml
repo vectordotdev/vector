@@ -14,7 +14,7 @@
 
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, bytes
+  batch_timeout = 1 # default, seconds
 
   # OPTIONAL - Requests
   encoding = "ndjson" # no default, enum: ndjson, text

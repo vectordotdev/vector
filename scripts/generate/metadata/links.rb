@@ -296,6 +296,11 @@ class Links
         label = "#{type.titleize}: #{name}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [label]}.to_query
 
+      when /^url\.vector_(edge|latest)_(.*)/
+        channel = $1
+        target = $2
+        "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
+
       when /^url\.(.*)_test$/
         name = $1
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{name}"

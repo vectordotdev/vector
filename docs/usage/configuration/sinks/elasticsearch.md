@@ -41,7 +41,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
-  batch_timeout = 1 # default, bytes
+  batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
