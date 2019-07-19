@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{
+    buffer::Buffer,
     limit::{
         concurrency::ConcurrencyLimit,
         rate::{Rate, RateLimit},
@@ -34,7 +35,6 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use tower_buffer::Buffer;
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -159,7 +159,6 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
-
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
         let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
@@ -214,7 +213,6 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
                 let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key).unwrap();
                 let timeout = Timeout::new(cloudwatch, Duration::from_secs(timeout_secs));
 
-                // TODO: add Buffer/Retry here
                 let buffer = Buffer::new(timeout, 1);
                 let retry = Retry::new(policy, buffer);
 
@@ -450,33 +448,30 @@ impl RetryLogic for CloudwatchRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            CloudwatchError::Put(err) => {
-                match err {
-                    PutLogEventsError::ServiceUnavailable(error) => {
-                        error!(message = "put logs service unavailable.", %error);
-                        true
-                    }
-
-                    // TODO add proper error handling
-                    PutLogEventsError::HttpDispatch(error) => {
-                        error!(message = "put logs http dispatch.", %error);
-                        true
-                    }
-
-                    PutLogEventsError::Unknown(res)
-                        if res.status.is_server_error()
-                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-                    {
-                        let BufferedHttpResponse { status, body, .. } = res;
-                        let body = String::from_utf8_lossy(&body[..]);
-
-                        error!(message = "describe streams unknown.", %status, %body);
-                        true
-                    }
-
-                    _ => false,
+            CloudwatchError::Put(err) => match err {
+                PutLogEventsError::ServiceUnavailable(error) => {
+                    error!(message = "put logs service unavailable.", %error);
+                    true
                 }
-            }
+
+                PutLogEventsError::HttpDispatch(error) => {
+                    error!(message = "put logs http dispatch.", %error);
+                    true
+                }
+
+                PutLogEventsError::Unknown(res)
+                    if res.status.is_server_error()
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                {
+                    let BufferedHttpResponse { status, body, .. } = res;
+                    let body = String::from_utf8_lossy(&body[..]);
+
+                    error!(message = "put logs unknown.", %status, %body);
+                    true
+                }
+
+                _ => false,
+            },
 
             CloudwatchError::Describe(err) => match err {
                 DescribeLogStreamsError::ServiceUnavailable(error) => {
@@ -503,33 +498,30 @@ impl RetryLogic for CloudwatchRetryLogic {
                 _ => false,
             },
 
-            CloudwatchError::CreateStream(err) => {
-                match err {
-                    // TODO add proper error handling
-                    CreateLogStreamError::ServiceUnavailable(error) => {
-                        error!(message = "create stream service unavailable.", %error);
-                        true
-                    }
-
-                    CreateLogStreamError::Unknown(res)
-                        if res.status.is_server_error()
-                            || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-                    {
-                        let BufferedHttpResponse { status, body, .. } = res;
-                        let body = String::from_utf8_lossy(&body[..]);
-
-                        error!(message = "create stream unknown.", %status, %body);
-                        true
-                    }
-
-                    CreateLogStreamError::HttpDispatch(error) => {
-                        error!(message = "create stream http dispatch.", %error);
-                        true
-                    }
-
-                    _ => false,
+            CloudwatchError::CreateStream(err) => match err {
+                CreateLogStreamError::ServiceUnavailable(error) => {
+                    error!(message = "create stream service unavailable.", %error);
+                    true
                 }
-            }
+
+                CreateLogStreamError::Unknown(res)
+                    if res.status.is_server_error()
+                        || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+                {
+                    let BufferedHttpResponse { status, body, .. } = res;
+                    let body = String::from_utf8_lossy(&body[..]);
+
+                    error!(message = "create stream unknown.", %status, %body);
+                    true
+                }
+
+                CreateLogStreamError::HttpDispatch(error) => {
+                    error!(message = "create stream http dispatch.", %error);
+                    true
+                }
+
+                _ => false,
+            },
             _ => false,
         }
     }
