@@ -39,8 +39,8 @@ impl Transform for Coercer {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let mut log = event.into_log();
         for (field, conv) in &self.types {
-            if let Some(value) = log.get(field) {
-                match conv.convert(value.clone()) {
+            if let Some(value) = log.remove(field) {
+                match conv.convert(value) {
                     Ok(converted) => log.insert_explicit(field.into(), converted),
                     Err(err) => {
                         debug!(
@@ -65,7 +65,12 @@ mod tests {
 
     fn parse_it() -> LogEvent {
         let mut event = Event::from("dummy message");
-        for &(key, value) in &[("number", "1234"), ("bool", "yes"), ("other", "no")] {
+        for &(key, value) in &[
+            ("number", "1234"),
+            ("bool", "yes"),
+            ("other", "no"),
+            ("float", "broken"),
+        ] {
             event.as_mut_log().insert_explicit(key.into(), value.into());
         }
 
@@ -94,5 +99,11 @@ mod tests {
     fn coercer_leaves_unnamed_fields_as_is() {
         let log = parse_it();
         assert_eq!(log[&"other".into()], ValueKind::Bytes("no".into()));
+    }
+
+    #[test]
+    fn coercer_drops_nonconvertible_fields() {
+        let log = parse_it();
+        assert!(log.get(&"float".into()).is_none());
     }
 }
