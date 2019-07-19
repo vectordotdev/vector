@@ -41,7 +41,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
-  batch_timeout = 300 # default, bytes
+  batch_timeout = 300 # default, seconds
   
   # OPTIONAL - Object Names
   filename_append_uuid = true # default

@@ -39,7 +39,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, bytes
+  batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
   encoding = "json" # default, enum: "json", "text"

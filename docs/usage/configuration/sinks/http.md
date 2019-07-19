@@ -35,7 +35,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
-  batch_timeout = 5 # default, bytes
+  batch_timeout = 5 # default, seconds
   
   # OPTIONAL - Requests
   rate_limit_duration = 1 # default, seconds
