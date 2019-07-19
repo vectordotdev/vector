@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::metric::Metric,
+    template::Template,
     topology::config::{DataType, TransformConfig},
     Event,
 };
@@ -115,6 +116,72 @@ impl LogToMetric {
     }
 }
 
+fn render_template(s: String, event: &Event) -> Result<String, String> {
+    let template = Template::from(s.as_str());
+    let name = template
+        .render(&event)
+        .map_err(|e| format!("Keys ({:?}) do not exist on the event. Dropping event.", e))?;
+    Ok(String::from_utf8_lossy(&name.to_vec()).to_string())
+}
+
+fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
+    let log = event.as_log();
+    match config {
+        MetricConfig::Counter(counter) => {
+            let val = log.get(&counter.field).ok_or("")?;
+            let val = if counter.increment_by_value {
+                val.to_string_lossy()
+                    .parse()
+                    .map_err(|_e| format!("failed to parse counter value"))?
+            } else {
+                1.0
+            };
+
+            let name = render_template(counter.sanitized_name.to_string(), &event)?;
+
+            Ok(Metric::Counter { name, val })
+        }
+        MetricConfig::Histogram(hist) => {
+            let val = log.get(&hist.field).ok_or("")?;
+            let val = val
+                .to_string_lossy()
+                .parse()
+                .map_err(|_| format!("failed to parse histogram value"))?;
+
+            let name = render_template(hist.sanitized_name.to_string(), &event)?;
+
+            Ok(Metric::Histogram {
+                name,
+                val,
+                sample_rate: 1,
+            })
+        }
+        MetricConfig::Gauge(gauge) => {
+            let val = log.get(&gauge.field).ok_or("")?;
+            let val = val
+                .to_string_lossy()
+                .parse()
+                .map_err(|_| format!("failed to parse gauge value"))?;
+
+            let name = render_template(gauge.sanitized_name.to_string(), &event)?;
+
+            Ok(Metric::Gauge {
+                name,
+                val,
+                direction: None,
+            })
+        }
+        MetricConfig::Set(set) => {
+            let val = log.get(&set.field).ok_or("")?;
+            let val = val.to_string_lossy();
+
+            let name = render_template(set.sanitized_name.to_string(), &event)?;
+
+            Ok(Metric::Set { name, val })
+        }
+    }
+}
+
 impl Transform for LogToMetric {
     // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
@@ -124,65 +191,14 @@ impl Transform for LogToMetric {
     }
 
     fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
-        let event = event.into_log();
-
-        for metric in self.config.metrics.iter() {
-            match metric {
-                MetricConfig::Counter(counter) => {
-                    if let Some(val) = event.get(&counter.field) {
-                        if counter.increment_by_value {
-                            if let Ok(val) = val.to_string_lossy().parse() {
-                                output.push(Event::Metric(Metric::Counter {
-                                    name: counter.sanitized_name.to_string(),
-                                    val,
-                                }));
-                            } else {
-                                trace!("failed to parse counter value");
-                            }
-                        } else {
-                            output.push(Event::Metric(Metric::Counter {
-                                name: counter.sanitized_name.to_string(),
-                                val: 1.0,
-                            }));
-                        };
-                    }
+        for config in self.config.metrics.iter() {
+            match to_metric(&config, &event) {
+                Ok(metric) => {
+                    output.push(Event::Metric(metric));
                 }
-                MetricConfig::Histogram(hist) => {
-                    if let Some(val) = event.get(&hist.field) {
-                        if let Ok(val) = val.to_string_lossy().parse() {
-                            output.push(Event::Metric(Metric::Histogram {
-                                name: hist.sanitized_name.to_string(),
-                                val,
-                                sample_rate: 1,
-                            }));
-                        } else {
-                            trace!("failed to parse histogram value");
-                        }
-                    }
-                }
-                MetricConfig::Gauge(gauge) => {
-                    if let Some(val) = event.get(&gauge.field) {
-                        if let Ok(val) = val.to_string_lossy().parse() {
-                            output.push(Event::Metric(Metric::Gauge {
-                                name: gauge.sanitized_name.to_string(),
-                                val,
-                                direction: None,
-                            }));
-                        } else {
-                            trace!("failed to parse gauge value");
-                        }
-                    }
-                }
-                MetricConfig::Set(set) => {
-                    if let Some(val) = event.get(&set.field) {
-                        if let Ok(val) = val.to_string_lossy().parse() {
-                            output.push(Event::Metric(Metric::Set {
-                                name: set.sanitized_name.to_string(),
-                                val,
-                            }));
-                        } else {
-                            trace!("failed to parse set value");
-                        }
+                Err(message) => {
+                    if message.len() > 0 {
+                        trace!("{:?}", message);
                     }
                 }
             }
@@ -395,6 +411,60 @@ mod tests {
             Metric::Counter {
                 name: "status_total".into(),
                 val: 1.0,
+            }
+        );
+    }
+
+    #[test]
+    fn multiple_metrics_with_multiple_templates() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "set"
+            field = "status"
+            name = "{{host}}_{{worker}}_status_set"
+
+            [[metrics]]
+            type = "counter"
+            field = "backtrace"
+            name = "{{service}}_exception_total"
+            "#,
+        );
+
+        let mut event = Event::from("i am a log");
+        event
+            .as_mut_log()
+            .insert_explicit("status".into(), "42".into());
+        event
+            .as_mut_log()
+            .insert_explicit("backtrace".into(), "message".into());
+        event
+            .as_mut_log()
+            .insert_implicit("host".into(), "local".into());
+        event
+            .as_mut_log()
+            .insert_implicit("worker".into(), "abc".into());
+        event
+            .as_mut_log()
+            .insert_implicit("service".into(), "xyz".into());
+
+        let mut transform = LogToMetric::new(&config);
+
+        let mut output = Vec::new();
+        transform.transform_into(&mut output, event);
+        assert_eq!(2, output.len());
+        assert_eq!(
+            output.pop().unwrap().into_metric(),
+            Metric::Counter {
+                name: "xyz_exception_total".into(),
+                val: 1.0,
+            }
+        );
+        assert_eq!(
+            output.pop().unwrap().into_metric(),
+            Metric::Set {
+                name: "local_abc_status_set".into(),
+                val: "42".into(),
             }
         );
     }
