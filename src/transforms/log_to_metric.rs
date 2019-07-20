@@ -116,8 +116,8 @@ impl LogToMetric {
     }
 }
 
-fn render_template(s: String, event: &Event) -> Result<String, String> {
-    let template = Template::from(s.as_str());
+fn render_template(s: &str, event: &Event) -> Result<String, String> {
+    let template = Template::from(s);
     let name = template
         .render(&event)
         .map_err(|e| format!("Keys ({:?}) do not exist on the event. Dropping event.", e))?;
@@ -132,12 +132,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             let val = if counter.increment_by_value {
                 val.to_string_lossy()
                     .parse()
-                    .map_err(|_e| format!("failed to parse counter value"))?
+                    .map_err(|_| "failed to parse counter value".to_string())?
             } else {
                 1.0
             };
 
-            let name = render_template(counter.sanitized_name.to_string(), &event)?;
+            let name = render_template(&counter.sanitized_name, &event)?;
 
             Ok(Metric::Counter { name, val })
         }
@@ -146,9 +146,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             let val = val
                 .to_string_lossy()
                 .parse()
-                .map_err(|_| format!("failed to parse histogram value"))?;
+                .map_err(|_| "failed to parse histogram value".to_string())?;
 
-            let name = render_template(hist.sanitized_name.to_string(), &event)?;
+            let name = render_template(&hist.sanitized_name, &event)?;
 
             Ok(Metric::Histogram {
                 name,
@@ -161,9 +161,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             let val = val
                 .to_string_lossy()
                 .parse()
-                .map_err(|_| format!("failed to parse gauge value"))?;
+                .map_err(|_| "failed to parse gauge value".to_string())?;
 
-            let name = render_template(gauge.sanitized_name.to_string(), &event)?;
+            let name = render_template(&gauge.sanitized_name, &event)?;
 
             Ok(Metric::Gauge {
                 name,
@@ -175,7 +175,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             let val = log.get(&set.field).ok_or("")?;
             let val = val.to_string_lossy();
 
-            let name = render_template(set.sanitized_name.to_string(), &event)?;
+            let name = render_template(&set.sanitized_name, &event)?;
 
             Ok(Metric::Set { name, val })
         }
@@ -197,7 +197,7 @@ impl Transform for LogToMetric {
                     output.push(Event::Metric(metric));
                 }
                 Err(message) => {
-                    if message.len() > 0 {
+                    if !message.is_empty() {
                         trace!("{:?}", message);
                     }
                 }
