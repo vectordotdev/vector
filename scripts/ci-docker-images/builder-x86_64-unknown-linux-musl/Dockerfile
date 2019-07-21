@@ -1,19 +1,14 @@
-FROM japaric/x86_64-unknown-linux-musl:latest
+FROM alpine:3.10.1
 
-RUN apt-get update
-RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:git-core/ppa
+RUN apk add git make cmake g++ gcc rust cargo snappy-dev protobuf-dev openssl-dev bash
 
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
-  build-essential \
-  curl \
-  git \
-  openssh-server \
-  vim \
-  zlib1g-dev
+ENV PROTOC /usr/bin/protoc
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-ENV PATH="$PATH:/root/.cargo/bin"
+# https://github.com/sfackler/rust-openssl/issues/604
+ENV OPENSSL_STATIC 1
+ENV OPENSSL_INCLUDE_DIR /usr/include
+ENV OPENSSL_LIB_DIR /usr/lib
+
+ENV LIBZ_SYS_STATIC 1
+
 ENV TARGET=x86_64-unknown-linux-musl
-RUN rustup target add x86_64-unknown-linux-musl

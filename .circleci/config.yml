@@ -183,7 +183,8 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            export NATIVE_BUILD=true
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
