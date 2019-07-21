@@ -95,6 +95,38 @@ jobs:
   # Building - Archives
   #
 
+  build-armv7-unknown-linux-gnueabihf-archive:
+    docker:
+      - image: timberiodev/vector-builder-armv7-unknown-linux-gnueabihf:latest
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: Build archive
+          command: |
+            export VERSION=$(make version)
+            make build-archive FEATURES="jemallocator"
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*-armv7-unknown-linux-gnueabihf.tar.gz"
+
+  build-armv7-unknown-linux-musleabihf-archive:
+    docker:
+      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run:
+          name: Build archive
+          command: |
+            export VERSION=$(make version)
+            make build-archive FEATURES="jemallocator"
+      - persist_to_workspace:
+          root: target/artifacts
+          paths:
+            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+
   build-x86_64-apple-darwin-archive:
     resource_class: large
     macos:
@@ -156,7 +188,6 @@ jobs:
           root: target/artifacts
           paths:
             - "*-x86_64-unknown-linux-musl.tar.gz"
-            - "*-amd64.deb"
 
   #
   # Packaging
@@ -430,6 +461,8 @@ build-requires: &build-requires
 
 package-requires: &package-requires
   requires:
+    - build-armv7-unknown-linux-gnueabihf
+    - build-armv7-unknown-linux-musleabihf
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -467,6 +500,12 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+      - build-armv7-unknown-linux-gnueabihf:
+          <<: *release-workflow-filters
+          <<: *build-requires
+      - build-armv7-unknown-linux-musleabihf:
+          <<: *release-workflow-filters
+          <<: *build-requires
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *release-workflow-filters
           <<: *build-requires
