@@ -783,7 +783,7 @@ end
   # 
   # * optional
   # * default: 1
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 1
 
   #
@@ -920,7 +920,7 @@ end
   # 
   # * optional
   # * default: 1
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 1
 
   #
@@ -1123,7 +1123,7 @@ end
   # 
   # * optional
   # * default: 300
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 300
 
   #
@@ -1384,7 +1384,7 @@ end
   # 
   # * optional
   # * default: 1
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 1
 
   #
@@ -1529,7 +1529,7 @@ end
   # 
   # * optional
   # * default: 5
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 5
 
   #
@@ -1832,7 +1832,7 @@ end
   # 
   # * optional
   # * default: 1
-  # * unit: bytes
+  # * unit: seconds
   batch_timeout = 1
 
   #

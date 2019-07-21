@@ -122,7 +122,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: seconds` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
@@ -233,7 +233,7 @@ buffer overflows:
 
 Batches are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch_timeout` (default: `300 bytes`).
+1. The batch age meets or exceeds the configured `batch_timeout` (default: `300 seconds`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `10490000 bytes`).
 
 ### Columnar Formats
