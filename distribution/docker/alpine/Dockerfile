@@ -1,7 +1,7 @@
 FROM alpine:3.10.1 AS builder
 
 RUN apk add git make cmake g++ gcc rust cargo snappy-dev protobuf-dev openssl-dev bash
-RUN git clone https://github.com/timberio/vector && cd vector && git checkout d6f3a1a4c2f8da71b950725f7bb164f526c12386
+RUN git clone https://github.com/timberio/vector && cd vector
 
 WORKDIR /vector
 
