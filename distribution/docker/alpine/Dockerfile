@@ -23,7 +23,7 @@ RUN cp -a config/. /release/etc/vector/
 
 FROM alpine:3.10.1
 
-RUN apk add g++ gcc
+RUN apk --no-cache add libgcc libstdc++
 
 COPY --from=builder /release/bin/* /usr/local/bin/
 COPY --from=builder /release/etc/vector /etc
