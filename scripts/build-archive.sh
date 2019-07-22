@@ -8,23 +8,45 @@
 #
 # ENV VARS
 #
+#   $FEATURES - a list of Vector features to include when building, defaults to all
+#   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
 #   $VERSION - the version of Vector, can be obtained via `make version`
 
+NATIVE_BUILD=${NATIVE_BUILD:-}
+
 set -eu
 
-echo "Building -- version: $VERSION, target: $TARGET, features: $FEATURES"
+echo "Building Vector archive"
+echo "Version: $VERSION"
+echo "Target: $TARGET"
+echo "Native build: $NATIVE_BUILD"
+echo "Features: $FEATURES"
 
+# Setup directories
 artifacts_dir="target/artifacts"
-target_dir="target/$TARGET"
+
+if [ -z "$NATIVE_BUILD" ]; then
+  target_dir="target/$TARGET"
+else
+  target_dir="target"
+fi
+
 archive_dir_name="vector-$VERSION"
 archive_dir="$target_dir/$archive_dir_name"
 
-if [ "$FEATURES" == "default" ]; then
-  cargo build --target $TARGET --release
-else
-  cargo build --no-default-features --features $FEATURES --target $TARGET --release
+# Build
+build_flags="--release"
+
+if [ -z "$NATIVE_BUILD" ]; then
+  build_flags="$build_flags --target $TARGET"
 fi
+
+if [ "$FEATURES" != "default" ]; then
+  build_flags="$build_flags --no-default-features --features $FEATURES"
+fi
+
+cargo build $build_flags
 
 # Build the archive directory
 rm -rf $archive_dir
@@ -48,9 +70,10 @@ mkdir -p $archive_dir/etc/init.d
 cp -a distribution/init.d/vector $archive_dir/etc/init.d
 
 # Build the release tar
+_old_dir=$(pwd)
 cd $target_dir
 tar -czvf vector-$VERSION-$TARGET.tar.gz ./$archive_dir_name
-cd ../..
+cd $_old_dir
 
 # Move to the artifacts dir
 mkdir -p $artifacts_dir
