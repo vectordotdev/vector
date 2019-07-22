@@ -27,3 +27,5 @@ RUN apk --no-cache add libgcc libstdc++
 
 COPY --from=builder /release/bin/* /usr/local/bin/
 COPY --from=builder /release/etc/vector /etc
+
+ENTRYPOINT ["/usr/local/bin/vector"] 
