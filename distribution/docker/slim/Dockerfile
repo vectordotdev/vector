@@ -11,13 +11,13 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" && \
     esac && \
     wget --no-verbose https://packages.timber.io/vector/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-${ARCH}.deb && \
     dpkg -i vector-${VECTOR_VERSION}-${ARCH}.deb && \
-    rm -f vector-${VECTOR_VERSION}-${ARCH}.deb && \
-    rm -rf /etc/vector/examples **
-    rm -f /etc/vector/vector.spec.toml
+    rm -f vector-${VECTOR_VERSION}-${ARCH}.deb
 
 FROM debian:9-slim
 
+RUN mkdir /etc/vector
+
 COPY --from=builder /usr/bin/vector /usr/bin/vector
-COPY --from=builder /etc/vector /etc
+COPY --from=builder /etc/vector/vector.toml /etc/vector/
 
 ENTRYPOINT ["/usr/bin/vector"] 
