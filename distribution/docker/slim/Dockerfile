@@ -12,7 +12,8 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" && \
     wget --no-verbose https://packages.timber.io/vector/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-${ARCH}.deb && \
     dpkg -i vector-${VECTOR_VERSION}-${ARCH}.deb && \
     rm -f vector-${VECTOR_VERSION}-${ARCH}.deb && \
-    rm -rf /etc/vector/examples
+    rm -rf /etc/vector/examples **
+    rm -f /etc/vector/vector.spec.toml
 
 FROM debian:9-slim
 
