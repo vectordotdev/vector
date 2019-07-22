@@ -461,8 +461,8 @@ build-requires: &build-requires
 
 package-requires: &package-requires
   requires:
-    - build-armv7-unknown-linux-gnueabihf
-    - build-armv7-unknown-linux-musleabihf
+    - build-armv7-unknown-linux-gnueabihf-archive
+    - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -500,10 +500,10 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
-      - build-armv7-unknown-linux-gnueabihf:
+      - build-armv7-unknown-linux-gnueabihf-archive:
           <<: *release-workflow-filters
           <<: *build-requires
-      - build-armv7-unknown-linux-musleabihf:
+      - build-armv7-unknown-linux-musleabihf-archive:
           <<: *release-workflow-filters
           <<: *build-requires
       - build-x86_64-unknown-linux-gnu-archive:
