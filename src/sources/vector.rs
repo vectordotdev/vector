@@ -1,7 +1,7 @@
 use super::util::TcpSource;
 use crate::{
     event::proto,
-    topology::config::{DataType, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
     Event,
 };
 use bytes::{Bytes, BytesMut};
@@ -35,7 +35,12 @@ impl VectorConfig {
 
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
         let vector = VectorSource;
         vector.run(self.address, self.shutdown_timeout_secs, out)
     }
@@ -79,7 +84,7 @@ mod test {
         buffers::Acker,
         sinks::vector::vector,
         test_util::{next_addr, wait_for_tcp, CollectCurrent},
-        topology::config::SourceConfig,
+        topology::config::{GlobalOptions, SourceConfig},
         Event,
     };
     use futures::{stream, sync::mpsc, Future, Sink};
@@ -89,7 +94,9 @@ mod test {
         let (tx, rx) = mpsc::channel(100);
 
         let addr = next_addr();
-        let server = VectorConfig::new(addr.clone()).build(tx).unwrap();
+        let server = VectorConfig::new(addr.clone())
+            .build("default", &GlobalOptions::default(), tx)
+            .unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
