@@ -337,6 +337,40 @@ A key/value pair representing the new field to be added. Accepts all \
 """
 
 # ------------------------------------------------------------------------------
+# transforms.coercer
+# ------------------------------------------------------------------------------
+[transforms.coercer]
+allow_you_to_description = "coerce event fields into fixed types"
+function_categories = ["change_fields", "convert"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.coercer.options.types]
+type = "table"
+null = true
+description = "Key/Value pairs representing mapped field types."
+
+[transforms.coercer.options.types.options."*"]
+type = "string"
+enum = ["string", "int", "float", "bool", "timestamp|strftime"]
+examples = [
+  {name = "status", value = "int"},
+  {name = "duration", value = "float"},
+  {name = "success", value = "bool"},
+  {name = "timestamp", value = "timestamp|%s", comment = "unix"},
+  {name = "timestamp", value = "timestamp|%+", comment = "iso8601 (date and time)"},
+  {name = "timestamp", value = "timestamp|%F", comment = "iso8601 (date)"},
+  {name = "timestamp", value = "timestamp|%a %b %e %T %Y", comment = "custom strftime format"},
+]
+null = false
+description = """\
+A definition of field type conversions. They key is the field name and the value \
+is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+"""
+
+# ------------------------------------------------------------------------------
 # transforms.field_filter
 # ------------------------------------------------------------------------------
 [transforms.field_filter]

@@ -78,6 +78,7 @@ issue, please:
 Finally, consider the following alternatives:
 
 * [`add_fields` transform][docs.add_fields_transform]
+* [`coercer` transform][docs.coercer_transform]
 
 ## Resources
 
@@ -86,6 +87,7 @@ Finally, consider the following alternatives:
 
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
+[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model.md#log

@@ -219,6 +219,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`coercer` transform][docs.coercer_transform]
 * [`remove_fields` transform][docs.remove_fields_transform]
 
 ## Resources
@@ -227,6 +228,7 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
+[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
