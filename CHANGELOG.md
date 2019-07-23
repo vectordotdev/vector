@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_cloudwatch_logs: Add dynamic group and stream creation
 - tcp sink: Add support for TLS connections.
 - elasticsearch sink: Add support for custom headers and query parameters
+- journald: New source to read in logs from journald
 
 ### Changed
 

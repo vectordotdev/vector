@@ -83,6 +83,7 @@ data_dir = "/var/lib/vector"
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
+| [**`journald`**][docs.journald_source] | Ingests data through log records from journald and outputs [`log`][docs.log_event] events. |
 | [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
 | [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
@@ -298,6 +299,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.file_source]: ../../usage/configuration/sources/file.md
 [docs.grok_parser_transform]: ../../usage/configuration/transforms/grok_parser.md
 [docs.http_sink]: ../../usage/configuration/sinks/http.md
+[docs.journald_source]: ../../usage/configuration/sources/journald.md
 [docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
 [docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
 [docs.kafka_source]: ../../usage/configuration/sources/kafka.md

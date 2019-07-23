@@ -51,6 +51,7 @@
 * [Configuration](usage/configuration/README.md)
   * [Sources](usage/configuration/sources/README.md)
     * [file source](usage/configuration/sources/file.md)
+    * [journald source](usage/configuration/sources/journald.md)
     * [statsd source](usage/configuration/sources/statsd.md)
     * [stdin source](usage/configuration/sources/stdin.md)
     * [syslog source](usage/configuration/sources/syslog.md)

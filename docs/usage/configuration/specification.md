@@ -155,6 +155,26 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+[sources.journald]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "journald"
+  type = "journald"
+
+  # Include only entries from the current runtime (boot)
+  # 
+  # * optional
+  # * default: true
+  current_runtime_only = true
+
+  # Include only entries from the local system
+  # 
+  # * optional
+  # * default: true
+  local_only = true
+
 [sources.kafka]
   # The component type
   # 

@@ -148,6 +148,29 @@ When `true` Vector will read from the beginning of new files, when \
 """
 
 # ------------------------------------------------------------------------------
+# sources.journald
+# ------------------------------------------------------------------------------
+[sources.journald]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "log records from journald"
+
+[sources.journald.options.current_runtime_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the current runtime (boot)"
+
+[sources.journald.options.local_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the local system"
+
+# ------------------------------------------------------------------------------
 # sources.kafka
 # ------------------------------------------------------------------------------
 [sources.kafka]
