@@ -47,6 +47,7 @@ struct PrometheusSink {
     address: SocketAddr,
     counters: HashMap<String, prometheus::Counter>,
     gauges: HashMap<String, prometheus::Gauge>,
+    histograms: HashMap<String, prometheus::Histogram>,
     acker: Acker,
 }
 
@@ -89,6 +90,7 @@ impl PrometheusSink {
             address,
             counters: HashMap::new(),
             gauges: HashMap::new(),
+            histograms: HashMap::new(),
             acker,
         }
     }
@@ -98,7 +100,9 @@ impl PrometheusSink {
             f(counter);
         } else {
             let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
-            self.registry.register(Box::new(counter.clone())).unwrap();
+            if let Err(e) = self.registry.register(Box::new(counter.clone())) {
+                info!("Error registering Prometheus counter: {}", e);
+            };
             f(&counter);
             self.counters.insert(name, counter);
         }
@@ -109,9 +113,26 @@ impl PrometheusSink {
             f(gauge);
         } else {
             let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
-            self.registry.register(Box::new(gauge.clone())).unwrap();
+            if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
+                info!("Error registering Prometheus gauge: {}", e);
+            };
             f(&gauge);
             self.gauges.insert(name.clone(), gauge);
+        }
+    }
+
+    fn with_histogram(&mut self, name: String, f: impl Fn(&prometheus::Histogram)) {
+        if let Some(hist) = self.histograms.get(&name) {
+            f(hist);
+        } else {
+            let buckets = prometheus::exponential_buckets(1.0, 10.0, 6).unwrap();
+            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone()).buckets(buckets);
+            let hist = prometheus::Histogram::with_opts(opts).unwrap();
+            if let Err(e) = self.registry.register(Box::new(hist.clone())) {
+                info!("Error registering Prometheus histogram: {}", e);
+            };
+            f(&hist);
+            self.histograms.insert(name, hist);
         }
     }
 
@@ -172,8 +193,17 @@ impl Sink for PrometheusSink {
                     Some(Direction::Minus) => gauge.sub(val),
                 }
             }),
-            _ => {
-                // TODO: support all the metric types
+            Metric::Histogram {
+                name,
+                val,
+                sample_rate,
+            } => self.with_histogram(name, |hist| {
+                for _ in 0..sample_rate {
+                    hist.observe(val as f64);
+                }
+            }),
+            Metric::Set { name: _, val: _ } => {
+                info!("Sets are not supported in Prometheus sink");
             }
         }
 
