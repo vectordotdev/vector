@@ -627,6 +627,18 @@ impl From<String> for Event {
     }
 }
 
+impl From<LogEvent> for Event {
+    fn from(log: LogEvent) -> Self {
+        Event::Log(log)
+    }
+}
+
+impl From<Metric> for Event {
+    fn from(metric: Metric) -> Self {
+        Event::Metric(metric)
+    }
+}
+
 #[derive(Clone)]
 pub struct FieldsIter<'a> {
     inner: std::collections::hash_map::Iter<'a, Atom, Value>,
