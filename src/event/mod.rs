@@ -150,6 +150,25 @@ impl std::ops::Index<&Atom> for LogEvent {
     }
 }
 
+// Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
+impl<K: Into<Atom>, V: Into<ValueKind>, T: Iterator<Item = (K, V)>> From<T> for LogEvent {
+    fn from(iter: T) -> Self {
+        Self {
+            structured: iter
+                .map(|(key, value)| {
+                    (
+                        key.into(),
+                        Value {
+                            value: value.into(),
+                            explicit: true,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Value {
     value: ValueKind,
