@@ -116,23 +116,34 @@ impl LogToMetric {
     }
 }
 
-fn render_template(s: &str, event: &Event) -> Result<String, String> {
+enum TransformError {
+    FieldNotFound,
+    RenderError(String),
+    ParseError(&'static str),
+}
+
+fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::from(s);
-    let name = template
-        .render(&event)
-        .map_err(|e| format!("Keys ({:?}) do not exist on the event. Dropping event.", e))?;
+    let name = template.render(&event).map_err(|e| {
+        TransformError::RenderError(format!(
+            "Keys ({:?}) do not exist on the event. Dropping event.",
+            e
+        ))
+    })?;
     Ok(String::from_utf8_lossy(&name.to_vec()).to_string())
 }
 
-fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
+fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
     match config {
         MetricConfig::Counter(counter) => {
-            let val = log.get(&counter.field).ok_or("")?;
+            let val = log
+                .get(&counter.field)
+                .ok_or(TransformError::FieldNotFound)?;
             let val = if counter.increment_by_value {
                 val.to_string_lossy()
                     .parse()
-                    .map_err(|_| "failed to parse counter value".to_string())?
+                    .map_err(|_| TransformError::ParseError("counter value"))?
             } else {
                 1.0
             };
@@ -142,11 +153,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             Ok(Metric::Counter { name, val })
         }
         MetricConfig::Histogram(hist) => {
-            let val = log.get(&hist.field).ok_or("")?;
+            let val = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
             let val = val
                 .to_string_lossy()
                 .parse()
-                .map_err(|_| "failed to parse histogram value".to_string())?;
+                .map_err(|_| TransformError::ParseError("histogram value"))?;
 
             let name = render_template(&hist.sanitized_name, &event)?;
 
@@ -157,11 +168,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             })
         }
         MetricConfig::Gauge(gauge) => {
-            let val = log.get(&gauge.field).ok_or("")?;
+            let val = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
             let val = val
                 .to_string_lossy()
                 .parse()
-                .map_err(|_| "failed to parse gauge value".to_string())?;
+                .map_err(|_| TransformError::ParseError("gauge value"))?;
 
             let name = render_template(&gauge.sanitized_name, &event)?;
 
@@ -172,7 +183,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, String> {
             })
         }
         MetricConfig::Set(set) => {
-            let val = log.get(&set.field).ok_or("")?;
+            let val = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
             let val = val.to_string_lossy();
 
             let name = render_template(&set.sanitized_name, &event)?;
@@ -196,10 +207,12 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(message) => {
-                    if !message.is_empty() {
-                        trace!("{:?}", message);
-                    }
+                Err(TransformError::FieldNotFound) => {}
+                Err(TransformError::ParseError(message)) => {
+                    trace!("failed to parse {:?}", message);
+                }
+                Err(TransformError::RenderError(message)) => {
+                    trace!("{:?}", message);
                 }
             }
         }
