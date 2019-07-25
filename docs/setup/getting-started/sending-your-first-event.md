@@ -5,7 +5,7 @@ description: A "Hello World" getting started guide
 # Sending Your First Event
 
 This is a "Hello World" style guide that walks through sending your first
-[event][docs.event] through Vector. It designed to be followed locally,
+[event][docs.event] through Vector. It's designed to be followed locally,
 making it quick and easy. We'll start with the simplest of examples: accepting
 an event via the [`stdin` source][docs.stdin_source], and then printing it out
 via the [`console` sink][docs.console_sink].
