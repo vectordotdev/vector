@@ -48,7 +48,7 @@ Now pipe an event through Vector:
 echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
 ```
 
-Viola! The following is printed in your terminal:
+Voilà! The following is printed in your terminal:
 
 ```text
 Starting Vector ...
@@ -91,7 +91,7 @@ Let's pipe the same event again through Vector:
 echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
 ```
 
-Viola! The following is printed in your terminal:
+Voilà! The following is printed in your terminal:
 
 ```text
 Starting Vector ...
