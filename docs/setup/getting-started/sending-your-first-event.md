@@ -14,7 +14,7 @@ via the [`console` sink][docs.console_sink].
 
 ## 1. Install Vector
 
-If you haven't already, [install Vector]:
+If you haven't already, [install Vector][docs.installation]:
 
 ```bash
 curl https://sh.vector.dev -sSf | sh
