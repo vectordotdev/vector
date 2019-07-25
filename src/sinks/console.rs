@@ -68,7 +68,7 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<String, ()>
             if (log.is_structured() && encoding != &Some(Encoding::Text))
                 || encoding == &Some(Encoding::Json)
             {
-                let bytes = serde_json::to_vec(&log.all_fields())
+                let bytes = serde_json::to_vec(&log.unflatten())
                     .map_err(|e| panic!("Error encoding: {}", e))?;
                 String::from_utf8(bytes)
                     .map_err(|e| panic!("Unable to convert json to utf8: {}", e))
