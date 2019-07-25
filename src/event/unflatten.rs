@@ -18,7 +18,7 @@ enum MapValue {
     Null,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Unflatten {
     map: HashMap<Atom, MapValue>,
 }
