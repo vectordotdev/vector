@@ -5,7 +5,7 @@ description: A "Hello World" getting started guide
 # Sending Your First Event
 
 This is a "Hello World" style guide that walks through sending your first
-[event][docs.event] through Vector. It designed to be followed locally,
+[event][docs.event] through Vector. It's designed to be followed locally,
 making it quick and easy. We'll start with the simplest of examples: accepting
 an event via the [`stdin` source][docs.stdin_source], and then printing it out
 via the [`console` sink][docs.console_sink].
@@ -14,7 +14,7 @@ via the [`console` sink][docs.console_sink].
 
 ## 1. Install Vector
 
-If you haven't already, [install Vector]:
+If you haven't already, [install Vector][docs.installation]:
 
 ```bash
 curl https://sh.vector.dev -sSf | sh
@@ -48,7 +48,7 @@ Now pipe an event through Vector:
 echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
 ```
 
-Viola! The following is printed in your terminal:
+Voilà! The following is printed in your terminal:
 
 ```text
 Starting Vector ...
@@ -91,7 +91,7 @@ Let's pipe the same event again through Vector:
 echo '172.128.80.109 - Bins5273 656 [2019-05-03T13:11:48-04:00] "PUT /mesh" 406 10272' | vector --config ~/vector.toml
 ```
 
-Viola! The following is printed in your terminal:
+Voilà! The following is printed in your terminal:
 
 ```text
 Starting Vector ...
