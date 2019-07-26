@@ -23,7 +23,7 @@ use rusoto_logs::{
     DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
+use std::{borrow::Cow, collections::HashMap, convert::TryInto, fmt, time::Duration};
 use tower::{
     buffer::Buffer,
     limit::{
@@ -433,6 +433,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
+                    let body = truncate_string_at(&body, 50);
 
                     error!(message = "put logs unknown.", %status, %body);
                     true
@@ -453,6 +454,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
+                    let body = truncate_string_at(&body, 50);
 
                     error!(message = "describe streams unknown.", %status, %body);
                     true
@@ -478,6 +480,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
+                    let body = truncate_string_at(&body, 50);
 
                     error!(message = "create stream unknown.", %status, %body);
                     true
@@ -492,6 +495,14 @@ impl RetryLogic for CloudwatchRetryLogic {
             },
             _ => false,
         }
+    }
+}
+
+fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
+    if s.len() >= maxlen {
+        format!("{}[...]", &s[..maxlen - 5]).into()
+    } else {
+        s.into()
     }
 }
 
