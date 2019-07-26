@@ -26,7 +26,7 @@ as possible to contribute while still protecting users of Vector.
 
 ### What is convetional commits?
 
-[Covnentional commits](https://www.conventionalcommits.org) is a standardized
+[Conventional commits](https://www.conventionalcommits.org) is a standardized
 format for commit messages. Vector only requires this format for commits on
 the `master` branch. And because Vector squashes commits before merging
 branches, this means that only the pull request title must conform to this

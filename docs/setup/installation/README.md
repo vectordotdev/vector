@@ -15,7 +15,7 @@ instructions:
 curl https://sh.vector.dev -sSf | sh
 ```
 
-This script performs paltform detection and helps you choose the best
+This script performs platform detection and helps you choose the best
 method for installation. If you prefer a manual approach, choose your
 specific platform below.
 

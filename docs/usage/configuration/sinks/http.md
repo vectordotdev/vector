@@ -120,7 +120,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 5` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
@@ -204,7 +204,7 @@ buffer overflows:
 
 Batches are flushed when 1 of 2 conditions are met:
 
-1. The batch age meets or exceeds the configured `batch_timeout` (default: `5 bytes`).
+1. The batch age meets or exceeds the configured `batch_timeout` (default: `5 seconds`).
 2. The batch size meets or exceeds the configured `batch_size` (default: `1049000 bytes`).
 
 ### Compression

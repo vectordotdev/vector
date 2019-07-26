@@ -206,30 +206,49 @@ class Links
       end
     end
 
-    def find!(files, name)
-      matched_files =
-        files.select do |file|
-          normalized_file = file.downcase
-          
-          [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
-            !(file_name =~ /#{name}(\..*)?$/).nil?
-          end
-        end
+    def find_doc!(name)
+      docs = find(@docs_files, name)
 
-      if matched_files.length == 1
-        matched_files.first
-      elsif matched_files.length >= 2
+      if docs.length == 1
+        docs.first
+      elsif docs.length >= 2
         raise <<~EOF
-        #{name.inspect} is ambiguous. Please be more specific or
-        define the link the /.metadata.toml file. These files matched:
+        #{name.inspect} is ambiguous and matches multiple doc.
 
         * #{matched_files.join("\n* ")}
         EOF
       else
         raise <<~EOF
-        #{name.inspect} could not be found. Please check the spelling
-        or add it to the /.metadata.toml file.
+        #{name.inspect} doc could not be found.
         EOF
+      end
+    end
+
+    def find_image!(name)
+      images = find(@image_files, name)
+
+      if images.length == 1
+        images.first
+      elsif images.length >= 2
+        raise <<~EOF
+        #{name.inspect} is ambiguous and matches multiple images.
+
+        * #{matched_files.join("\n* ")}
+        EOF
+      else
+        raise <<~EOF
+        #{name.inspect} image could not be found.
+        EOF
+      end
+    end
+
+    def find(files, name)
+      files.select do |file|
+        normalized_file = file.downcase
+        
+        [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
+          !(file_name =~ /#{name}(\..*)?$/).nil?
+        end
       end
     end
 
@@ -252,17 +271,17 @@ class Links
     def parse(full_name)
       case full_name
       when /^docs\.(.*)_(sink|source|transform)$/
-        sink = $1
+        name = $1
         type = $2.pluralize
-        "/usage/configuration/#{type}/#{sink}.md"
+        "/usage/configuration/#{type}/#{name}.md"
 
       when /^docs\.(.*)$/
         name = $1
-        find!(@docs_files, name)
+        find_doc!(name)
 
       when /^images\.(.*)$/
         name = $1
-        find!(@image_files, name)
+        find_image!(name)
 
       when /^url\.issue_([0-9]+)$/
         "#{VECTOR_ISSUES_ROOT}/#{$1}"

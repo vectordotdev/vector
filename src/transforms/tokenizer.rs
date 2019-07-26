@@ -8,7 +8,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, is_not, tag},
     character::complete::{one_of, space0},
-    combinator::{all_consuming, rest, verify},
+    combinator::{all_consuming, map, opt, rest, verify},
     multi::many0,
     sequence::{delimited, terminated},
 };
@@ -118,12 +118,16 @@ pub fn parse(input: &str) -> Vec<&str> {
     let simple = is_not::<_, _, (&str, nom::error::ErrorKind)>(" \t[\"");
     let string = delimited(
         tag("\""),
-        escaped(is_not("\"\\"), '\\', one_of("\"\\")),
+        map(opt(escaped(is_not("\"\\"), '\\', one_of("\"\\"))), |o| {
+            o.unwrap_or("")
+        }),
         tag("\""),
     );
     let bracket = delimited(
         tag("["),
-        escaped(is_not("]\\"), '\\', one_of("]\\")),
+        map(opt(escaped(is_not("]\\"), '\\', one_of("]\\"))), |o| {
+            o.unwrap_or("")
+        }),
         tag("]"),
     );
 
@@ -165,6 +169,11 @@ mod tests {
     }
 
     #[test]
+    fn empty_quotes() {
+        assert_eq!(parse(r#"foo """#), &["foo", ""]);
+    }
+
+    #[test]
     fn escaped_quotes() {
         assert_eq!(
             parse(r#"foo "bar \" \" baz""#),
@@ -180,6 +189,11 @@ mod tests {
     #[test]
     fn brackets() {
         assert_eq!(parse("[foo.bar = baz] quux"), &["foo.bar = baz", "quux"],);
+    }
+
+    #[test]
+    fn empty_brackets() {
+        assert_eq!(parse("[] quux"), &["", "quux"],);
     }
 
     #[test]

@@ -25,10 +25,6 @@ docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-slim:l
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="alpine" %}
-{% hint style="warning" %}
-This target is limited, it does not support on-disk buffers or the [`kafka` sink][docs.kafka_sink]. See the [Limited Releases][docs.from-archives.limited-releases] section for more info.
-{% endhint %}
-
 ```bash
 docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-alpine:latest
 ```
@@ -105,8 +101,6 @@ docker run timberio/vector:latest
 
 
 [docs.configuration]: ../../../usage/configuration
-[docs.from-archives.limited-releases]: ../../../setup/installation/manual/from-archives.md#limited-releases
-[docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
 [docs.starting]: ../../../usage/administration/starting.md
 [url.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [url.docker_alpine]: https://hub.docker.com/_/alpine

@@ -1,21 +1,31 @@
-FROM alpine:latest AS builder
+FROM alpine:3.10.1 AS builder
 
-LABEL MAINTAINER="Vector Contributors <vector@timber.io>"
+RUN apk add git make cmake g++ gcc rust cargo snappy-dev protobuf-dev openssl-dev bash
+RUN git clone https://github.com/timberio/vector && cd vector
 
-ENV VECTOR_VERSION latest
+WORKDIR /vector
 
-WORKDIR /scripts
+ENV PROTOC /usr/bin/protoc
 
-# Downloading Vector
-ADD https://packages.timber.io/vector/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-x86_64-unknown-linux-musl.tar.gz ./
+# https://github.com/sfackler/rust-openssl/issues/604
+ENV OPENSSL_STATIC 1
+ENV OPENSSL_INCLUDE_DIR /usr/include
+ENV OPENSSL_LIB_DIR /usr/lib
 
-# Installing packages
-RUN mkdir vector && \
-    mkdir /etc/vector && \
-    tar -xzf vector-${VECTOR_VERSION}-x86_64-unknown-linux-musl.tar.gz --directory="vector" --strip-components=2 && \
-    cp -a vector/config/. /etc/vector
+ENV LIBZ_SYS_STATIC 1
 
-FROM alpine:latest
+RUN cargo build --release
 
-COPY --from=builder /scripts/vector/bin/* /usr/local/bin/
-COPY --from=builder /etc/vector /etc
+RUN mkdir -p /release/bin
+RUN mkdir -p /release/etc/vector
+RUN cp -a target/release/vector /release/bin/
+RUN cp -a config/. /release/etc/vector/
+
+FROM alpine:3.10.1
+
+RUN apk --no-cache add libgcc libstdc++
+
+COPY --from=builder /release/bin/* /usr/local/bin/
+COPY --from=builder /release/etc/vector /etc
+
+ENTRYPOINT ["/usr/local/bin/vector"] 
