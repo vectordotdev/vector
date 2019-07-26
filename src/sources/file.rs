@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
-use tracing::{dispatcher, field};
+use tracing::dispatcher;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields, default)]
@@ -100,11 +100,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
     let include = config.include.clone();
     let exclude = config.exclude.clone();
     Box::new(future::lazy(move || {
-        info!(
-            message = "Starting file server.",
-            include = field::debug(include),
-            exclude = field::debug(exclude)
-        );
+        info!(message = "Starting file server.", ?include, ?exclude);
 
         let span = info_span!("file-server");
         let dispatcher = dispatcher::get_default(|d| d.clone());

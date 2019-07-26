@@ -45,6 +45,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         let next = Instant::now() + self.backoff;
         let delay = Delay::new(next);
 
+        debug!(message = "retrying request.", delay_ms = %self.backoff.as_millis());
         RetryPolicyFuture { delay, policy }
     }
 }
@@ -60,7 +61,7 @@ where
         match result {
             Ok(response) => {
                 if self.logic.should_retry_response(response) {
-                    warn!("retrying after response");
+                    warn!(message = "retrying after response.");
                     Some(self.build_retry())
                 } else {
                     None
@@ -68,7 +69,7 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!("retries exhausted: {}", error);
+                    error!(message = "retries exhausted.", %error);
                     return None;
                 }
 
@@ -77,11 +78,11 @@ where
                         warn!("retrying after error: {}", expected);
                         Some(self.build_retry())
                     } else {
-                        error!("encountered non-retriable error: {}", error);
+                        error!(message = "encountered non-retriable error.", %error);
                         None
                     }
                 } else {
-                    warn!("unexpected error type: {}", error);
+                    warn!(message = "unexpected error type.", %error);
                     None
                 }
             }

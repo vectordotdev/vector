@@ -51,7 +51,7 @@ tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
 
 # Tracing
-tracing = "0.1"
+tracing = "0.1.2"
 tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
 tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
 tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
@@ -68,7 +68,7 @@ rusoto_kinesis = "0.37.0"
 rusoto_credential = "0.16.0"
 
 # Tower
-tower = "0.1"
+tower = "0.1.1"
 tower-hyper = "0.1"
 
 # Serde

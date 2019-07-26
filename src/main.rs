@@ -302,18 +302,15 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Config {
 fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
-        Err(e) => {
-            if let std::io::ErrorKind::NotFound = e.kind() {
+        Err(error) => {
+            if let std::io::ErrorKind::NotFound = error.kind() {
                 error!(
                     message = "Config file not found in path.",
                     path = field::display(path.display()),
                 );
                 None
             } else {
-                error!(
-                    message = "Error opening config file.",
-                    error = field::display(e),
-                );
+                error!(message = "Error opening config file.", %error);
                 None
             }
         }

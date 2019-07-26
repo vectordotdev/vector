@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## v0.4.0-dev
 
 ### Added
-  - [configuration] Added `--dry-run` and `--healthchecks-only` options [#233]
 
+- [configuration] Added `--dry-run` and `--healthchecks-only` options [#233]
 - aws_s3: Add `filename_extension` options.
 - aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` synatx for extracting values from events.
+- aws_cloudwatch_logs: retry support added and more stablity improvements
 - coercer: New transform to convert fields into specified types.
 
 ### Changed

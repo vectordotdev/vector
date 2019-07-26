@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -42,11 +41,11 @@ impl Transform for Coercer {
             if let Some(value) = log.remove(field) {
                 match conv.convert(value) {
                     Ok(converted) => log.insert_explicit(field.into(), converted),
-                    Err(err) => {
+                    Err(error) => {
                         debug!(
                             message = "Could not convert types.",
                             field = &field[..],
-                            error = &field::display(err),
+                            %error,
                         );
                     }
                 }

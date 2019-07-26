@@ -6,7 +6,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -62,11 +61,11 @@ impl Transform for JsonParser {
         let parsed = to_parse
             .and_then(|to_parse| {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
-                    .map_err(|e| {
+                    .map_err(|error| {
                         debug!(
                             message = "Event failed to parse as JSON",
                             field = self.field.as_ref(),
-                            error = field::display(e),
+                            %error,
                         )
                     })
                     .ok()
