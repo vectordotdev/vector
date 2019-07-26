@@ -21,7 +21,6 @@ struct Client {
 }
 
 enum State {
-    Token(Option<String>),
     CreateStream(RusotoFuture<(), CreateLogStreamError>),
     DescribeStream(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
     Put(RusotoFuture<PutLogEventsResponse, PutLogEventsError>),
@@ -69,37 +68,26 @@ impl Future for CloudwatchFuture {
                 State::DescribeStream(fut) => {
                     let response = try_ready!(fut.poll().map_err(CloudwatchError::Describe));
 
-                    let stream = if let Some(stream) = response
+                    if let Some(stream) = response
                         .log_streams
                         .ok_or(CloudwatchError::NoStreamsFound)?
                         .into_iter()
                         .next()
                     {
                         trace!(message = "stream found", stream = ?stream.log_stream_name);
-                        stream
+
+                        let events = self
+                            .events
+                            .take()
+                            .expect("Token got called twice, this is a bug!");
+
+                        let token = stream.upload_sequence_token;
+                        trace!(message = "putting logs.", ?token);
+                        self.state = State::Put(self.client.put_logs(token, events));
                     } else {
                         trace!("provided stream does not exist; creating a new one.");
-                        let fut = self.client.create_log_stream();
-                        self.state = State::CreateStream(fut);
-                        continue;
-                    };
-
-                    self.state = State::Token(stream.upload_sequence_token);
-                }
-
-                State::Token(token) => {
-                    // These both take since this call should only happen once per
-                    // future.
-                    let token = token.take();
-                    let events = self
-                        .events
-                        .take()
-                        .expect("Token got called twice, this is a bug!");
-
-                    trace!(message = "putting logs.", ?token);
-                    let fut = self.client.put_logs(token, events);
-                    self.state = State::Put(fut);
-                    continue;
+                        self.state = State::CreateStream(self.client.create_log_stream());
+                    }
                 }
 
                 State::CreateStream(fut) => {
@@ -108,7 +96,6 @@ impl Future for CloudwatchFuture {
                     trace!("stream created.");
 
                     self.state = State::DescribeStream(self.client.describe_stream());
-                    continue;
                 }
 
                 State::Put(fut) => {
