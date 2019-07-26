@@ -97,9 +97,9 @@ pub trait TcpSource: Clone + Send + 'static {
                                 let host = host.clone();
                                 source.build_event(frame, host)
                             })
-                            .map_err(|error| warn!(message = "connection error", %error));
+                            .map_err(|error| warn!(message = "connection error.", %error));
 
-                        let handler = events_in.forward(out).map(|_| debug!("connection closed"));
+                        let handler = events_in.forward(out).map(|_| debug!("connection closed."));
 
                         tokio::spawn(handler.instrument(span.clone()));
                     });
