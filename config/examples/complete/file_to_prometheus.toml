@@ -29,6 +29,7 @@ field = "message"
 type = "counter"
 increment_by_value = true
 field = "bytes_out"
+name = "bytes_out_total"
 
 [[transforms.log_to_metric.metrics]]
 type = "gauge"
@@ -55,13 +56,4 @@ type = "console"
 [sinks.prometheus]
 inputs = ["log_to_metric"]
 type = "prometheus"
-
-# [[sinks.prometheus.metrics]]
-# type = "counter"
-# field = "bytes_out_total"
-
-# [[sinks.prometheus.metrics]]
-# type = "histogram"
-# field = "bytes_out_histogram"
-# name = "bytes_out_linear_histogram"
-# buckets = {type = "linear", start = 100.0, width = 2.0, count = 5}
+buckets = [0.0, 10.0, 100.0, 1000.0, 10000.0, 100001.0]
