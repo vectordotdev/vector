@@ -435,7 +435,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = truncate_string_at(&body, 50);
 
-                    error!(message = "put logs unknown.", %status, %body);
+                    error!(message = "put logs http error.", %status, %body);
                     true
                 }
 
@@ -456,7 +456,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = truncate_string_at(&body, 50);
 
-                    error!(message = "describe streams unknown.", %status, %body);
+                    error!(message = "describe streams http error.", %status, %body);
                     true
                 }
 
@@ -482,7 +482,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = truncate_string_at(&body, 50);
 
-                    error!(message = "create stream unknown.", %status, %body);
+                    error!(message = "create stream http error.", %status, %body);
                     true
                 }
 
