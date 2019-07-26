@@ -82,6 +82,7 @@ impl Future for CloudwatchFuture {
                             .expect("Token got called twice, this is a bug!");
 
                         let token = stream.upload_sequence_token;
+
                         trace!(message = "putting logs.", ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
                     } else {

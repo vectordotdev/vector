@@ -282,6 +282,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
             match rx.poll() {
                 Ok(Async::Ready(token)) => {
                     self.token = token;
+                    self.token_rx = None;
                     Ok(().into())
                 }
                 Ok(Async::NotReady) => Ok(Async::NotReady),
