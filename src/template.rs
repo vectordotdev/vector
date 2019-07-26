@@ -43,6 +43,11 @@ impl Template {
             }
         }
     }
+
+    pub fn render_string(&self, event: &Event) -> Result<String, Vec<Atom>> {
+        self.render(event)
+            .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
+    }
 }
 
 fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {

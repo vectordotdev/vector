@@ -1,11 +1,12 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event, ValueKind},
+    event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
+    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
@@ -27,7 +28,6 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct S3Sink {
     client: S3Client,
-    key_prefix: String,
     bucket: String,
     gzip: bool,
     filename_time_format: String,
@@ -118,15 +118,15 @@ impl S3Sink {
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
 
-        let key_prefix = config
-            .key_prefix
-            .clone()
-            .unwrap_or_else(|| "date=%F/".into());
+        let key_prefix = if let Some(kp) = &config.key_prefix {
+            Template::from(kp.as_str())
+        } else {
+            Template::from("date=%F/")
+        };
 
         let region = config.region.clone();
         let s3 = S3Sink {
             client: Self::create_client(region.try_into()?),
-            key_prefix: key_prefix.clone(),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -285,17 +285,17 @@ fn generate_key(
 
 fn encode_event(
     event: Event,
-    batch_time_format: &String,
+    key_prefix: &Template,
     encoding: &Option<Encoding>,
 ) -> Result<PartitionInnerBuffer<Vec<u8>, Bytes>, ()> {
+    let key = key_prefix.render_string(&event).map_err(|missing_keys| {
+        warn!(
+            message = "Keys do not exist on the event. Dropping event.",
+            keys = field::debug(missing_keys)
+        );
+    })?;
+
     let log = event.into_log();
-
-    let key = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
-        ts.format(batch_time_format).to_string()
-    } else {
-        Utc::now().format(batch_time_format).to_string()
-    };
-
     match (encoding, log.is_structured()) {
         (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
             .map(|mut b| {
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn s3_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let batch_time_format = "date=%F".to_string();
+        let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
 
         let encoded_message = message + "\n";
@@ -341,7 +341,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
 
-        let batch_time_format = "date=%F".to_string();
+        let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(event, &batch_time_format, &None).unwrap();
 
         let (bytes, _) = bytes.into_parts();
