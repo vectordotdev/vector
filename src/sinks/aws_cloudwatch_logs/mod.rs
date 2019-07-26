@@ -12,7 +12,7 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, sync::mpsc, Async, Future, Poll, Sink, Stream};
+use futures::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
     Region,
@@ -60,9 +60,7 @@ pub struct CloudwatchLogsSvc {
     stream_name: String,
     group_name: String,
     token: Option<String>,
-    token_tx: mpsc::Sender<Option<String>>,
-    token_rx: mpsc::Receiver<Option<String>>,
-    in_flight: bool,
+    token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
 
 type Svc = Buffer<
@@ -239,17 +237,13 @@ impl CloudwatchLogsSvc {
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
 
-        let (tx, rx) = mpsc::channel(1);
-
         Ok(CloudwatchLogsSvc {
             client,
             encoding: config.encoding.clone(),
             stream_name,
             group_name,
             token: None,
-            token_tx: tx,
-            token_rx: rx,
-            in_flight: false,
+            token_rx: None,
         })
     }
 
@@ -284,21 +278,20 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
     type Future = request::CloudwatchFuture;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        if self.in_flight {
-            match self.token_rx.poll() {
-                Ok(Async::Ready(Some(token))) => {
-                    self.in_flight = false;
+        if let Some(rx) = &mut self.token_rx {
+            match rx.poll() {
+                Ok(Async::Ready(token)) => {
                     self.token = token;
-                    return Ok(().into());
+                    Ok(().into())
                 }
-                Ok(Async::Ready(None)) => {
-                    // Since we own one of the `tx` there will
-                    // always be one active one thus we will never
-                    // hit this none case until CloudwatchLogSvc gets dropped.
-                    unreachable!()
+                Ok(Async::NotReady) => Ok(Async::NotReady),
+                Err(_) => {
+                    // This case only happens when the `tx` end gets dropped due to an error
+                    // in this case we just reset the token and try again.
+                    self.token = None;
+                    self.token_rx = None;
+                    Ok(().into())
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => panic!("token stream error {:?}", e),
             }
         } else {
             Ok(().into())
@@ -306,23 +299,28 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
     }
 
     fn call(&mut self, req: Vec<Event>) -> Self::Future {
-        let events = req
-            .into_iter()
-            .map(|e| e.into_log())
-            .map(|e| self.encode_log(e))
-            .collect::<Vec<_>>();
+        if let None = self.token_rx {
+            let events = req
+                .into_iter()
+                .map(|e| e.into_log())
+                .map(|e| self.encode_log(e))
+                .collect::<Vec<_>>();
 
-        self.in_flight = true;
+            let (tx, rx) = oneshot::channel();
+            self.token_rx = Some(rx);
 
-        debug!(message = "Sending events.", events = %events.len());
-        request::CloudwatchFuture::new(
-            self.client.clone(),
-            self.stream_name.clone(),
-            self.group_name.clone(),
-            events,
-            self.token.take(),
-            self.token_tx.clone(),
-        )
+            debug!(message = "Sending events.", events = %events.len());
+            request::CloudwatchFuture::new(
+                self.client.clone(),
+                self.stream_name.clone(),
+                self.group_name.clone(),
+                events,
+                self.token.take(),
+                tx,
+            )
+        } else {
+            panic!("poll_ready was not called; this is a bug!");
+        }
     }
 }
 

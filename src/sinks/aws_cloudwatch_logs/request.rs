@@ -1,5 +1,5 @@
 use super::CloudwatchError;
-use futures::{sync::mpsc, try_ready, Future, Poll};
+use futures::{sync::oneshot, try_ready, Future, Poll};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
@@ -11,7 +11,7 @@ pub struct CloudwatchFuture {
     client: Client,
     state: State,
     events: Option<Vec<InputLogEvent>>,
-    token_tx: mpsc::Sender<Option<String>>,
+    token_tx: Option<oneshot::Sender<Option<String>>>,
 }
 
 struct Client {
@@ -34,7 +34,7 @@ impl CloudwatchFuture {
         group_name: String,
         events: Vec<InputLogEvent>,
         token: Option<String>,
-        token_tx: mpsc::Sender<Option<String>>,
+        token_tx: oneshot::Sender<Option<String>>,
     ) -> Self {
         let client = Client {
             client,
@@ -54,7 +54,7 @@ impl CloudwatchFuture {
             client,
             events,
             state,
-            token_tx,
+            token_tx: Some(token_tx),
         }
     }
 }
@@ -118,7 +118,11 @@ impl Future for CloudwatchFuture {
 
                     trace!(message = "putting logs was successful.", ?next_token);
 
-                    self.token_tx.try_send(next_token).unwrap();
+                    self.token_tx
+                        .take()
+                        .expect("Put was polled twice.")
+                        .send(next_token)
+                        .expect("CloudwatchLogsSvc was dropped unexpectedly");
 
                     return Ok(().into());
                 }
