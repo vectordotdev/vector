@@ -1,5 +1,5 @@
 use super::CloudwatchError;
-use futures::{sync::mpsc, Future, Poll};
+use futures::{sync::mpsc, try_ready, Future, Poll};
 use rusoto_core::RusotoFuture;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, CreateLogStreamRequest,
@@ -8,17 +8,19 @@ use rusoto_logs::{
 };
 
 pub struct CloudwatchFuture {
-    client: CloudWatchLogsClient,
+    client: Client,
     state: State,
-    stream_name: String,
-    group_name: String,
     events: Option<Vec<InputLogEvent>>,
-    token: Option<String>,
     token_tx: mpsc::Sender<Option<String>>,
 }
 
+struct Client {
+    client: CloudWatchLogsClient,
+    stream_name: String,
+    group_name: String,
+}
+
 enum State {
-    Idle,
     Token(Option<String>),
     CreateStream(RusotoFuture<(), CreateLogStreamError>),
     DescribeStream(RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError>),
@@ -34,52 +36,26 @@ impl CloudwatchFuture {
         token: Option<String>,
         token_tx: mpsc::Sender<Option<String>>,
     ) -> Self {
-        Self {
+        let client = Client {
             client,
-            events: Some(events),
-            state: State::Idle,
             stream_name,
             group_name,
-            token,
+        };
+
+        let (state, events) = if let Some(token) = token {
+            let state = State::Put(client.put_logs(Some(token), events));
+            (state, None)
+        } else {
+            let state = State::DescribeStream(client.describe_stream());
+            (state, Some(events))
+        };
+
+        Self {
+            client,
+            events,
+            state,
             token_tx,
         }
-    }
-
-    fn put_logs(
-        &mut self,
-        sequence_token: Option<String>,
-        log_events: Vec<InputLogEvent>,
-    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
-        let request = PutLogEventsRequest {
-            log_events,
-            sequence_token,
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
-
-        self.client.put_log_events(request)
-    }
-
-    fn describe_stream(
-        &mut self,
-    ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
-        let request = DescribeLogStreamsRequest {
-            limit: Some(1),
-            log_group_name: self.group_name.clone(),
-            log_stream_name_prefix: Some(self.stream_name.clone()),
-            ..Default::default()
-        };
-
-        self.client.describe_log_streams(request)
-    }
-
-    fn create_log_stream(&mut self) -> RusotoFuture<(), CreateLogStreamError> {
-        let request = CreateLogStreamRequest {
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
-
-        self.client.create_log_stream(request)
     }
 }
 
@@ -88,34 +64,8 @@ impl Future for CloudwatchFuture {
     type Error = CloudwatchError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        macro_rules! try_ready {
-            ($e:expr) => {
-                match $e {
-                    Ok(futures::Async::Ready(t)) => t,
-                    Ok(futures::Async::NotReady) => return Ok(futures::Async::NotReady),
-                    Err(e) => {
-                        self.token_tx.try_send(self.token.take()).unwrap();
-
-                        return Err(From::from(e));
-                    }
-                }
-            };
-        }
-
         loop {
             match &mut self.state {
-                State::Idle => {
-                    if let Some(token) = self.token.take() {
-                        self.state = State::Token(Some(token));
-                        continue;
-                    } else {
-                        trace!("Token does not exist; calling describe stream.");
-                        let fut = self.describe_stream();
-                        self.state = State::DescribeStream(fut);
-                        continue;
-                    }
-                }
-
                 State::DescribeStream(fut) => {
                     let response = try_ready!(fut.poll().map_err(CloudwatchError::Describe));
 
@@ -129,7 +79,7 @@ impl Future for CloudwatchFuture {
                         stream
                     } else {
                         trace!("provided stream does not exist; creating a new one.");
-                        let fut = self.create_log_stream();
+                        let fut = self.client.create_log_stream();
                         self.state = State::CreateStream(fut);
                         continue;
                     };
@@ -147,7 +97,7 @@ impl Future for CloudwatchFuture {
                         .expect("Token got called twice, this is a bug!");
 
                     trace!(message = "putting logs.", ?token);
-                    let fut = self.put_logs(token, events);
+                    let fut = self.client.put_logs(token, events);
                     self.state = State::Put(fut);
                     continue;
                 }
@@ -157,7 +107,7 @@ impl Future for CloudwatchFuture {
 
                     trace!("stream created.");
 
-                    self.state = State::Idle;
+                    self.state = State::DescribeStream(self.client.describe_stream());
                     continue;
                 }
 
@@ -174,5 +124,44 @@ impl Future for CloudwatchFuture {
                 }
             }
         }
+    }
+}
+
+impl Client {
+    pub fn put_logs(
+        &self,
+        sequence_token: Option<String>,
+        log_events: Vec<InputLogEvent>,
+    ) -> RusotoFuture<PutLogEventsResponse, PutLogEventsError> {
+        let request = PutLogEventsRequest {
+            log_events,
+            sequence_token,
+            log_group_name: self.group_name.clone(),
+            log_stream_name: self.stream_name.clone(),
+        };
+
+        self.client.put_log_events(request)
+    }
+
+    pub fn describe_stream(
+        &self,
+    ) -> RusotoFuture<DescribeLogStreamsResponse, DescribeLogStreamsError> {
+        let request = DescribeLogStreamsRequest {
+            limit: Some(1),
+            log_group_name: self.group_name.clone(),
+            log_stream_name_prefix: Some(self.stream_name.clone()),
+            ..Default::default()
+        };
+
+        self.client.describe_log_streams(request)
+    }
+
+    pub fn create_log_stream(&self) -> RusotoFuture<(), CreateLogStreamError> {
+        let request = CreateLogStreamRequest {
+            log_group_name: self.group_name.clone(),
+            log_stream_name: self.stream_name.clone(),
+        };
+
+        self.client.create_log_stream(request)
     }
 }
