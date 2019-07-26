@@ -23,7 +23,7 @@ use rusoto_logs::{
     DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap, convert::TryInto, fmt, time::Duration};
+use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use tower::{
     buffer::Buffer,
     limit::{
@@ -286,7 +286,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                     Ok(().into())
                 }
                 Ok(Async::NotReady) => Ok(Async::NotReady),
-                Err(_) => {
+                Err(oneshot::Canceled) => {
                     // This case only happens when the `tx` end gets dropped due to an error
                     // in this case we just reset the token and try again.
                     self.token = None;
@@ -300,7 +300,7 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
     }
 
     fn call(&mut self, req: Vec<Event>) -> Self::Future {
-        if let None = self.token_rx {
+        if self.token_rx.is_none() {
             let events = req
                 .into_iter()
                 .map(|e| e.into_log())
@@ -433,7 +433,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
-                    let body = truncate_string_at(&body, 50);
+                    let body = &body[..body.len().min(50)];
 
                     error!(message = "put logs http error.", %status, %body);
                     true
@@ -454,7 +454,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
-                    let body = truncate_string_at(&body, 50);
+                    let body = &body[..body.len().min(50)];
 
                     error!(message = "describe streams http error.", %status, %body);
                     true
@@ -480,7 +480,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 {
                     let BufferedHttpResponse { status, body, .. } = res;
                     let body = String::from_utf8_lossy(&body[..]);
-                    let body = truncate_string_at(&body, 50);
+                    let body = &body[..body.len().min(50)];
 
                     error!(message = "create stream http error.", %status, %body);
                     true
@@ -495,14 +495,6 @@ impl RetryLogic for CloudwatchRetryLogic {
             },
             _ => false,
         }
-    }
-}
-
-fn truncate_string_at<'a>(s: &'a str, maxlen: usize) -> Cow<'a, str> {
-    if s.len() >= maxlen {
-        format!("{}[...]", &s[..maxlen - 5]).into()
-    } else {
-        s.into()
     }
 }
 
