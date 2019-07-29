@@ -26,7 +26,7 @@ ARG LIBRESSL_VERSION=2.9.2
 # It is a linker-level LTO that uses output of rustc produced with
 # -C linker-plugin-lto option. That is different from LLVM LTO inside rustc
 # that can be activated by -C lto.
-ARG LTO=""
+ARG LTO="lto"
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
