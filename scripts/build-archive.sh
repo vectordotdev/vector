@@ -65,6 +65,9 @@ fi
 
 cargo build $build_flags
 
+# Strip the output binary
+strip $target_dir/release/vector
+
 # Build the archive directory
 rm -rf $archive_dir
 mkdir -p $archive_dir
