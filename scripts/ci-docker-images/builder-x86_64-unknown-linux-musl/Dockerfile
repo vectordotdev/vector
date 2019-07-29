@@ -232,20 +232,16 @@ ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $LIBS_PREFIX/lib/linux/clang_rt.crt
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
 "#!/bin/sh\n"\
-"echo \$(date --iso=seconds) musl-cc \$@ >> /var/log/musl-cc.log\n"\
 "case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
 "$CLANG_PREFIX/bin/clang -Qunused-arguments $MUSL_CFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
 "exit \$?" > $LIBS_PREFIX/bin/musl-cc
 RUN echo \
 "#!/bin/sh\n"\
-"echo \$(date --iso=seconds) musl-c++ \$@ >> /var/log/musl-c++.log\n"\
 "case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
 "$CLANG_PREFIX/bin/clang++ -Qunused-arguments $MUSL_CXXFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
 "exit \$?" > $LIBS_PREFIX/bin/musl-c++
 RUN echo \
 "#!/bin/sh\n"\
-"echo \$(date --iso=seconds) musl-ld \$@ >> /var/log/musl-ld.log\n"\
-"case \"\$@\" in *-shared*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
 "$CLANG_PREFIX/bin/ld.lld -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux \$@\n"\
 "exit \$?" > $LIBS_PREFIX/bin/musl-ld
 RUN chmod +x $LIBS_PREFIX/bin/*
