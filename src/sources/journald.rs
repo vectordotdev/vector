@@ -7,6 +7,7 @@ use chrono::TimeZone;
 use futures::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::io::Error;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
@@ -26,6 +27,7 @@ lazy_static! {
 pub struct JournaldConfig {
     pub current_runtime_only: Option<bool>,
     pub local_only: Option<bool>,
+    pub units: Vec<String>,
 }
 
 #[typetag::serde(name = "journald")]
@@ -43,7 +45,21 @@ impl SourceConfig for JournaldConfig {
         )
         .map_err(|err| format!("{}", err))?;
 
-        Ok(journald_source(journal, out))
+        // Map the given unit names into valid systemd units by
+        // appending ".service" if no extension is present.
+        let units = self
+            .units
+            .iter()
+            .map(|unit| {
+                if let Some(_) = unit.find('.') {
+                    unit.into()
+                } else {
+                    format!("{}.service", unit)
+                }
+            })
+            .collect::<HashSet<String>>();
+
+        Ok(journald_source(journal, out, units))
     }
 
     fn output_type(&self) -> DataType {
@@ -54,6 +70,7 @@ impl SourceConfig for JournaldConfig {
 fn journald_source<J: 'static + JournaldSource + Send>(
     journal: J,
     out: mpsc::Sender<Event>,
+    units: HashSet<String>,
 ) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
@@ -66,6 +83,7 @@ fn journald_source<J: 'static + JournaldSource + Send>(
 
         let journald_server = JournaldServer {
             journal,
+            units,
             channel: out,
             shutdown: shutdown_rx,
         };
@@ -121,6 +139,7 @@ impl JournaldSource for Journal {
 
 struct JournaldServer<J, T> {
     journal: J,
+    units: HashSet<String>,
     channel: T,
     shutdown: std::sync::mpsc::Receiver<()>,
 }
@@ -142,6 +161,16 @@ impl<J: JournaldSource, T: Sink<SinkItem = JournalRecord, SinkError = ()>> Journ
                         break;
                     }
                 };
+                if self.units.len() > 0 {
+                    // Make sure the systemd unit is exactly one of the specified units
+                    if let Some(unit) = record.get("_SYSTEMD_UNIT") {
+                        if !self.units.contains(unit) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
                 match channel.send(record).wait() {
                     Ok(_) => {}
                     Err(()) => error!(message = "Could not send journald log"),
@@ -163,6 +192,7 @@ mod tests {
     use crate::test_util::{block_on, shutdown_on_idle};
     use futures::stream::Stream;
     use std::io::Error;
+    use std::iter::FromIterator;
     use std::time::{Duration, SystemTime};
     use stream_cancel::Tripwire;
     use tokio::util::FutureExt;
@@ -201,14 +231,16 @@ mod tests {
         journal
     }
 
-    #[test]
-    fn journald_source_works() {
-        let n = 5;
-        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+    fn run_journal(units: &[&str]) -> Vec<Event> {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
 
         let journal = fake_journal();
-        let source = journald_source(journal, tx);
+        let source = journald_source(
+            journal,
+            tx,
+            HashSet::from_iter(units.into_iter().map(|&s| s.into())),
+        );
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -216,16 +248,30 @@ mod tests {
         drop(trigger);
         shutdown_on_idle(rt);
 
-        let received =
-            block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel");
+        block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel")
+    }
+
+    #[test]
+    fn journald_source_works() {
+        let received = run_journal(&[]);
         assert_eq!(received.len(), 2);
         assert_eq!(
-            received[0].as_log()[&event::MESSAGE].to_string_lossy(),
-            "System Initialization"
+            received[0].as_log()[&event::MESSAGE],
+            ValueKind::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[1].as_log()[&event::MESSAGE].to_string_lossy(),
-            "unit message"
+            received[1].as_log()[&event::MESSAGE],
+            ValueKind::Bytes("unit message".into())
+        );
+    }
+
+    #[test]
+    fn journald_source_filters_units() {
+        let received = run_journal(&["unit.service"]);
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()[&event::MESSAGE],
+            ValueKind::Bytes("unit message".into())
         );
     }
 }

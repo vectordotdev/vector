@@ -175,6 +175,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: true
   local_only = true
 
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  # 
+  # * optional
+  # * no default
+  units = ["ntpd", "sysinit.target"]
+
 [sources.kafka]
   # The component type
   # 

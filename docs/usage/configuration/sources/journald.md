@@ -34,6 +34,7 @@ The `journald` source ingests data through log records from journald and outputs
   
   current_runtime_only = true # default
   local_only = true # default
+  units = ["ntpd", "sysinit.target"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -42,6 +43,7 @@ The `journald` source ingests data through log records from journald and outputs
   type = "journald"
   current_runtime_only = <bool>
   local_only = <bool>
+  units = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -65,6 +67,14 @@ The `journald` source ingests data through log records from journald and outputs
   # * optional
   # * default: true
   local_only = true
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  # 
+  # * optional
+  # * no default
+  units = ["ntpd", "sysinit.target"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -78,6 +88,7 @@ The `journald` source ingests data through log records from journald and outputs
 | **OPTIONAL** | | |
 | `current_runtime_only` | `bool` | Include only entries from the current runtime (boot)<br />`default: true` |
 | `local_only` | `bool` | Include only entries from the local system<br />`default: true` |
+| `units` | `[string]` | The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.<br />`default: []` |
 
 ## Examples
 
