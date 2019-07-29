@@ -183,7 +183,7 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            make build-archive FEATURES="jemallocator leveldb rdkafka rdkafka/cmake_build"
       - persist_to_workspace:
           root: target/artifacts
           paths:
