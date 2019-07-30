@@ -109,15 +109,6 @@ impl KinesisService {
 
         Ok(sink)
     }
-
-    fn gen_partition_key(&mut self) -> String {
-        random::<[char; 16]>()
-            .into_iter()
-            .fold(String::new(), |mut s, c| {
-                s.push(*c);
-                s
-            })
-    }
 }
 
 impl Service<Vec<Vec<u8>>> for KinesisService {
@@ -139,7 +130,7 @@ impl Service<Vec<Vec<u8>>> for KinesisService {
             .into_iter()
             .map(|data| PutRecordsRequestEntry {
                 data,
-                partition_key: self.gen_partition_key(),
+                partition_key: gen_partition_key(),
                 ..Default::default()
             })
             .collect();
@@ -229,8 +220,7 @@ fn encode_event(
             })
             .ok()?
     } else {
-        // TODO: generate random key
-        unimplemented!()
+        gen_partition_key().into()
     };
 
     let log = event.into_log();
@@ -246,6 +236,15 @@ fn encode_event(
             Some(bytes)
         }
     }
+}
+
+fn gen_partition_key() -> String {
+    random::<[char; 16]>()
+        .into_iter()
+        .fold(String::new(), |mut s, c| {
+            s.push(*c);
+            s
+        })
 }
 
 #[cfg(test)]
