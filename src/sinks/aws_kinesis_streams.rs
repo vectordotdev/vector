@@ -6,6 +6,7 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
     },
+    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use futures::{Future, Poll, Sink};
@@ -31,6 +32,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
+    pub partition_key_field: Option<Template>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: Option<usize>,
@@ -84,6 +86,7 @@ impl KinesisService {
         let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
         let encoding = config.encoding.clone();
+        let partition_key_field = config.partition_key_field.clone();
 
         let policy = FixedRetryPolicy::new(
             retry_attempts,
@@ -102,7 +105,7 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(Vec::new(), batch_size, Duration::from_secs(batch_timeout))
-            .with(move |e| encode_event(e, &encoding));
+            .with(move |e| encode_event(e, &partition_key_field, &encoding).ok_or(()));
 
         Ok(sink)
     }
@@ -209,19 +212,38 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
     Ok(Box::new(fut))
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Vec<u8>, ()> {
-    let log = event.into_log();
+fn encode_event(
+    event: Event,
+    partition_key_field: &Option<Template>,
+    encoding: &Option<Encoding>,
+) -> Option<Vec<u8>> {
+    // TODO: Setup partition key enum
+    let _partition_key = if let Some(template) = partition_key_field {
+        template
+            .render(&event)
+            .map_err(|missing_keys| {
+                warn!(
+                    message = "Keys do not exist on the event. Dropping event.",
+                    ?missing_keys
+                );
+            })
+            .ok()?
+    } else {
+        // TODO: generate random key
+        unimplemented!()
+    };
 
+    let log = event.into_log();
     match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
-        }
+        (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.all_fields())
+            .map_err(|e| panic!("Error encoding: {}", e))
+            .ok(),
         (&Some(Encoding::Text), _) | (_, false) => {
             let bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
-            Ok(bytes)
+            Some(bytes)
         }
     }
 }
@@ -235,7 +257,7 @@ mod tests {
     #[test]
     fn kinesis_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let bytes = encode_event(message.clone().into(), &None).unwrap();
+        let bytes = encode_event(message.clone().into(), &None, &None).unwrap();
 
         assert_eq!(&bytes[..], message.as_bytes())
     }
@@ -247,7 +269,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let bytes = encode_event(event, &None).unwrap();
+        let bytes = encode_event(event, &None, &None).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
