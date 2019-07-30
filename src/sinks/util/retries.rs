@@ -82,7 +82,7 @@ where
                         None
                     }
                 } else if let Some(_) = error.downcast_ref::<Elapsed>() {
-                    warn!("request timeouted.");
+                    warn!("request timedout.");
                     Some(self.build_retry())
                 } else {
                     warn!(message = "unexpected error type.", %error);
