@@ -19,7 +19,6 @@ use rusoto_kinesis::{
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
@@ -105,13 +104,14 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(Vec::new(), batch_size, Duration::from_secs(batch_timeout))
+            // TODO: use with_flat_map here
             .with(move |e| encode_event(e, &partition_key_field, &encoding).ok_or(()));
 
         Ok(sink)
     }
 }
 
-impl Service<Vec<Vec<u8>>> for KinesisService {
+impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
     type Response = PutRecordsOutput;
     type Error = PutRecordsError;
     type Future = Instrumented<RusotoFuture<PutRecordsOutput, PutRecordsError>>;
@@ -120,20 +120,11 @@ impl Service<Vec<Vec<u8>>> for KinesisService {
         Ok(().into())
     }
 
-    fn call(&mut self, items: Vec<Vec<u8>>) -> Self::Future {
+    fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending events.",
-            events = &field::debug(items.len())
+            message = "sending records.",
+            events = %records.len(),
         );
-
-        let records = items
-            .into_iter()
-            .map(|data| PutRecordsRequestEntry {
-                data,
-                partition_key: gen_partition_key(),
-                ..Default::default()
-            })
-            .collect();
 
         let request = PutRecordsInput {
             records,
@@ -207,10 +198,9 @@ fn encode_event(
     event: Event,
     partition_key_field: &Option<Template>,
     encoding: &Option<Encoding>,
-) -> Option<Vec<u8>> {
-    // TODO: Setup partition key enum
-    let _partition_key = if let Some(template) = partition_key_field {
-        template
+) -> Option<PutRecordsRequestEntry> {
+    let partition_key = if let Some(template) = partition_key_field {
+        let key = template
             .render(&event)
             .map_err(|missing_keys| {
                 warn!(
@@ -218,24 +208,33 @@ fn encode_event(
                     ?missing_keys
                 );
             })
-            .ok()?
+            .ok()?;
+
+        String::from_utf8_lossy(&key[..]).into_owned()
     } else {
-        gen_partition_key().into()
+        gen_partition_key()
     };
 
     let log = event.into_log();
-    match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.all_fields())
-            .map_err(|e| panic!("Error encoding: {}", e))
-            .ok(),
+    let data = match (encoding, log.is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => {
+            serde_json::to_vec(&log.all_fields()).expect("Error encoding event as json.")
+        }
+
         (&Some(Encoding::Text), _) | (_, false) => {
             let bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
-            Some(bytes)
+            bytes
         }
-    }
+    };
+
+    Some(PutRecordsRequestEntry {
+        data,
+        partition_key,
+        ..Default::default()
+    })
 }
 
 fn gen_partition_key() -> String {
@@ -256,9 +255,9 @@ mod tests {
     #[test]
     fn kinesis_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let bytes = encode_event(message.clone().into(), &None, &None).unwrap();
+        let event = encode_event(message.clone().into(), &None, &None).unwrap();
 
-        assert_eq!(&bytes[..], message.as_bytes())
+        assert_eq!(&event.data[..], message.as_bytes())
     }
 
     #[test]
@@ -268,9 +267,9 @@ mod tests {
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let bytes = encode_event(event, &None, &None).unwrap();
+        let event = encode_event(event, &None, &None).unwrap();
 
-        let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
         assert_eq!(map["key"], "value".to_string())
@@ -280,32 +279,31 @@ mod tests {
 #[cfg(feature = "kinesis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-
-    use crate::buffers::Acker;
-    use crate::region::RegionOrEndpoint;
-    use crate::sinks::aws_kinesis_streams::{KinesisService, KinesisSinkConfig};
-    use crate::test_util::random_lines_with_stream;
-    use futures::{Future, Sink};
+    use super::*;
+    use crate::{
+        buffers::Acker,
+        region::RegionOrEndpoint,
+        test_util::{random_lines_with_stream, random_string},
+    };
+    use futures::{stream::iter_ok, Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
     use tokio::runtime::Runtime;
 
-    const STREAM_NAME: &'static str = "RouterTest";
-
     #[test]
     fn kinesis_put_records() {
+        let stream = gen_stream();
+
         let region = Region::Custom {
             name: "localstack".into(),
             endpoint: "http://localhost:4568".into(),
         };
 
-        ensure_stream(region.clone());
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        ensure_stream(region.clone(), stream.clone());
 
         let config = KinesisSinkConfig {
-            stream_name: STREAM_NAME.into(),
+            stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
             batch_size: Some(2),
             ..Default::default()
@@ -326,7 +324,64 @@ mod integration_tests {
 
         let timestamp = timestamp as f64 / 1000.0;
         let records = rt
-            .block_on(fetch_records(STREAM_NAME.into(), timestamp, region))
+            .block_on(fetch_records(stream.clone(), timestamp, region))
+            .unwrap();
+
+        let mut output_lines = records
+            .into_iter()
+            .map(|e| String::from_utf8(e.data).unwrap())
+            .collect::<Vec<_>>();
+
+        input_lines.sort();
+        output_lines.sort();
+        assert_eq!(output_lines, input_lines)
+    }
+
+    #[test]
+    fn kinesis_put_records_partitioned() {
+        let stream = gen_stream();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:4568".into(),
+        };
+
+        ensure_stream(region.clone(), stream.clone());
+
+        let config = KinesisSinkConfig {
+            stream_name: stream.clone(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
+            batch_size: Some(2),
+            partition_key_field: Some("{{partition_key}}".into()),
+            ..Default::default()
+        };
+
+        let mut rt = Runtime::new().unwrap();
+
+        let sink = KinesisService::new(config, Acker::Null).unwrap();
+
+        let timestamp = chrono::Utc::now().timestamp_millis();
+
+        let (mut input_lines, _) = random_lines_with_stream(100, 11);
+        let events = input_lines
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(i, line)| {
+                let mut e = Event::from(line);
+                e.as_mut_log()
+                    .insert_implicit("partition_key".into(), format!("part-{}", i % 2).into());
+                e
+            });
+
+        let pump = sink.send_all(iter_ok(events));
+        rt.block_on(pump).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        let timestamp = timestamp as f64 / 1000.0;
+        let records = rt
+            .block_on(fetch_records(stream.clone(), timestamp, region))
             .unwrap();
 
         let mut output_lines = records
@@ -392,11 +447,11 @@ mod integration_tests {
             .map(|records| records.records)
     }
 
-    fn ensure_stream(region: Region) {
+    fn ensure_stream(region: Region, stream_name: String) {
         let client = KinesisClient::new(region);
 
         let req = rusoto_kinesis::CreateStreamInput {
-            stream_name: STREAM_NAME.into(),
+            stream_name,
             shard_count: 1,
         };
 
@@ -404,6 +459,10 @@ mod integration_tests {
             Ok(_) => (),
             Err(e) => println!("Unable to check the stream {:?}", e),
         };
+    }
+
+    fn gen_stream() -> String {
+        format!("test-{}", random_string(10).to_lowercase())
     }
 
 }
