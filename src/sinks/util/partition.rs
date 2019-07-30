@@ -256,7 +256,7 @@ mod tests {
     use bytes::Bytes;
     use futures::{Future, Sink};
     use std::time::Duration;
-    use tokio_test::clock;
+    use tokio01_test::clock;
 
     #[test]
     fn batch_sink_buffers_messages_until_limit() {
