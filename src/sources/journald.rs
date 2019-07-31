@@ -7,6 +7,7 @@ use chrono::TimeZone;
 use futures::{future, sync::mpsc, Future, Sink};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::io::Error;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time;
@@ -50,7 +51,10 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-fn journald_source(journal: Journal, out: mpsc::Sender<Event>) -> super::Source {
+fn journald_source<J: 'static + JournaldSource + Send>(
+    journal: J,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let out = out
@@ -105,13 +109,23 @@ fn create_event(record: JournalRecord) -> Event {
     log.into()
 }
 
-struct JournaldServer<T> {
-    journal: Journal,
+trait JournaldSource {
+    fn next_record(&mut self) -> Result<Option<JournalRecord>, Error>;
+}
+
+impl JournaldSource for Journal {
+    fn next_record(&mut self) -> Result<Option<JournalRecord>, Error> {
+        Journal::next_record(self)
+    }
+}
+
+struct JournaldServer<J, T> {
+    journal: J,
     channel: T,
     shutdown: std::sync::mpsc::Receiver<()>,
 }
 
-impl<T: Sink<SinkItem = JournalRecord, SinkError = ()>> JournaldServer<T> {
+impl<J: JournaldSource, T: Sink<SinkItem = JournalRecord, SinkError = ()>> JournaldServer<J, T> {
     pub fn run(mut self) {
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
