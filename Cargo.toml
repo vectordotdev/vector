@@ -64,6 +64,7 @@ hotmic = "0.8"
 rusoto_core = "0.37.0"
 rusoto_s3 = "0.37.0"
 rusoto_logs = "0.37.0"
+rusoto_cloudwatch = "0.37.0"
 rusoto_kinesis = "0.37.0"
 rusoto_credential = "0.16.0"
 
