@@ -9,7 +9,7 @@ use crate::{
     template::Template,
     topology::config::{DataType, SinkConfig},
 };
-use futures::{Future, Poll, Sink};
+use futures::{stream::iter_ok, Future, Poll, Sink};
 use rand::random;
 use rusoto_core::RusotoFuture;
 use rusoto_kinesis::{
@@ -104,8 +104,7 @@ impl KinesisService {
 
         let sink = BatchServiceSink::new(svc, acker)
             .batched_with_min(Vec::new(), batch_size, Duration::from_secs(batch_timeout))
-            // TODO: use with_flat_map here
-            .with(move |e| encode_event(e, &partition_key_field, &encoding).ok_or(()));
+            .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
     }
