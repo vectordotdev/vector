@@ -220,13 +220,10 @@ fn encode_event(
             serde_json::to_vec(&log.all_fields()).expect("Error encoding event as json.")
         }
 
-        (&Some(Encoding::Text), _) | (_, false) => {
-            let bytes = log
-                .get(&event::MESSAGE)
-                .map(|v| v.as_bytes().to_vec())
-                .unwrap_or(Vec::new());
-            bytes
-        }
+        (&Some(Encoding::Text), _) | (_, false) => log
+            .get(&event::MESSAGE)
+            .map(|v| v.as_bytes().to_vec())
+            .unwrap_or(Vec::new()),
     };
 
     Some(PutRecordsRequestEntry {
