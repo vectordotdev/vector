@@ -269,7 +269,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.elasticsearch_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -299,5 +298,4 @@ issue, please:
 [url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
 [url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

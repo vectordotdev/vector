@@ -1,7 +1,6 @@
 <p align="center">
   <strong>
     <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://forum.vector.dev">Forums<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/mailing_list">Mailing List<a/></strong>
 </p>
 
@@ -49,7 +48,7 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][url.community] - [forum][url.vector_forum], [slack chat][url.vector_chat], [mailing list][url.mailing_list]
+* [**Community**][url.community] - [slack chat][url.vector_chat], [mailing list][url.mailing_list]
 * [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
 
 
@@ -257,5 +256,4 @@ the License.
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.test_harness]: https://github.com/timberio/vector-test-harness/
 [url.vector_chat]: https://chat.vector.dev
-[url.vector_forum]: https://forum.vector.dev
 [url.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22

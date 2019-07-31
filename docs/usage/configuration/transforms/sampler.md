@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to sample events with a configu
 ![][images.sampler_transform]
 
 {% hint style="warning" %}
-The `sampler` sink is in beta. Please see the current
+The `sampler` transform is in beta. Please see the current
 [enhancements][url.sampler_transform_enhancements] and
 [bugs][url.sampler_transform_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_sampler_transform_issue]
@@ -80,8 +80,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.sampler_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.sampler_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -104,4 +103,3 @@ issue, please:
 [url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22
 [url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22
 [url.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

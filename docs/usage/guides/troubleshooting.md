@@ -95,12 +95,11 @@ At this point we recommend reaching out to the community for help.
 
 1. If encountered a bug, please [file a bug report][url.new_bug_report]
 2. If you did not encounter a bug:
-   1. Get help on the [Vector forum][url.vector_forum]. This is the best place
-      to get high-quality help.
-   2. Join the [Vector slack][url.vector_chat] for real-time chat.
+   1. Join the [Vector slack][url.vector_chat] for real-time chat.
+   2. [File a help issue][url.new_help_issue].
 
 
 [docs.monitoring.rate-limiting]: ../../usage/administration/monitoring.md#rate-limiting
 [url.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
+[url.new_help_issue]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Help
 [url.vector_chat]: https://chat.vector.dev
-[url.vector_forum]: https://forum.vector.dev

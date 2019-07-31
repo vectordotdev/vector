@@ -15,7 +15,7 @@ description: Ingests data through one or more local files and outputs `log` even
 ![][images.file_source]
 
 {% hint style="warning" %}
-The `file` sink is in beta. Please see the current
+The `file` source is in beta. Please see the current
 [enhancements][url.file_source_enhancements] and
 [bugs][url.file_source_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_file_source_issue]
@@ -224,8 +224,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.file_source_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open source issues][url.file_source_issues].
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -252,4 +251,3 @@ issue, please:
 [url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
 [url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+file
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

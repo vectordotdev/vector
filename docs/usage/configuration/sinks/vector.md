@@ -116,7 +116,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.vector_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -137,7 +136,6 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.vector_sink]: ../../../assets/vector-sink.svg
 [url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.vector_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+vector%22+label%3A%22Type%3A+Bug%22
 [url.vector_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+vector%22+label%3A%22Type%3A+Enhancement%22
 [url.vector_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+vector%22

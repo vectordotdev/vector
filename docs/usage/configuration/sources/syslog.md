@@ -161,8 +161,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.syslog_source_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open source issues][url.syslog_source_issues].
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -180,7 +179,6 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.syslog_source]: ../../../assets/syslog-source.svg
 [url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.syslog_5424]: https://tools.ietf.org/html/rfc5424
 [url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Bug%22
 [url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Enhancement%22

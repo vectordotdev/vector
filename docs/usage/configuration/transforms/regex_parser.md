@@ -249,8 +249,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.regex_parser_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.regex_parser_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 
@@ -292,5 +291,4 @@ Finally, consider the following alternatives:
 [url.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
 [url.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
 [url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

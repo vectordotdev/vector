@@ -135,7 +135,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.console_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -161,5 +160,4 @@ issue, please:
 [url.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22+label%3A%22Type%3A+Enhancement%22
 [url.console_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22
 [url.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams

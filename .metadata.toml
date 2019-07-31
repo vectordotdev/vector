@@ -764,10 +764,10 @@ beta = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
 input_types = ["log"]
-request_rate_limit_duration = 1
-request_rate_limit_num = 5
-request_retry_attempts = 5
-request_retry_backoff_secs = 1
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_cw_logs_service_limits"
@@ -1316,6 +1316,7 @@ lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
+new_help_issue = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Help"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_source = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_transform = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
@@ -1330,7 +1331,6 @@ roadmap = "https://github.com/timberio/vector/milestones?direction=asc&sort=titl
 rust = "https://www.rust-lang.org/"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
-search_forum = "https://forum.vector.dev/search?expanded=true"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
@@ -1348,6 +1348,5 @@ vector_initd_service = "https://github.com/timberio/vector/blob/master/distribut
 vector_systemd_file = "https://github.com/timberio/vector/blob/master/distribution/systemd/vector.service"
 vote_feature = "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 vector_chat = "https://chat.vector.dev"
-vector_forum = "https://forum.vector.dev"
 website = "https://vector.dev"
 yum = "http://yum.baseurl.org/"

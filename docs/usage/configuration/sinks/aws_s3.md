@@ -428,7 +428,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.aws_s3_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -468,6 +467,5 @@ issue, please:
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3
 [url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
