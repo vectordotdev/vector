@@ -66,9 +66,6 @@ if [ -n "$RUST_LTO" ]; then
   printf "[profile.release]\nlto = $lto_value" >> Cargo.toml
 fi
 
-echo $build_flags
-set -x
-
 if [ "$FEATURES" != "default" ]; then
     cargo build $build_flags --no-default-features --features "$FEATURES"
 else
