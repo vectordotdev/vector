@@ -19,11 +19,11 @@ use tracing::field;
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    #[serde(default = "default_buckets")]
+    #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
 }
 
-pub fn default_buckets() -> Vec<f64> {
+pub fn default_histogram_buckets() -> Vec<f64> {
     vec![
         0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
     ]
@@ -109,7 +109,7 @@ impl PrometheusSink {
         } else {
             let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
-                info!("Error registering Prometheus counter: {}", e);
+                error!("Error registering Prometheus counter: {}", e);
             };
             f(&counter);
             self.counters.insert(name, counter);
@@ -122,7 +122,7 @@ impl PrometheusSink {
         } else {
             let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
             if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
-                info!("Error registering Prometheus gauge: {}", e);
+                error!("Error registering Prometheus gauge: {}", e);
             };
             f(&gauge);
             self.gauges.insert(name.clone(), gauge);
@@ -137,7 +137,7 @@ impl PrometheusSink {
             let opts = prometheus::HistogramOpts::new(name.clone(), name.clone()).buckets(buckets);
             let hist = prometheus::Histogram::with_opts(opts).unwrap();
             if let Err(e) = self.registry.register(Box::new(hist.clone())) {
-                info!("Error registering Prometheus histogram: {}", e);
+                error!("Error registering Prometheus histogram: {}", e);
             };
             f(&hist);
             self.histograms.insert(name, hist);
@@ -211,7 +211,7 @@ impl Sink for PrometheusSink {
                 }
             }),
             Metric::Set { .. } => {
-                info!("Sets are not supported in Prometheus sink");
+                trace!("Sets are not supported in Prometheus sink");
             }
         }
 
