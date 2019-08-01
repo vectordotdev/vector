@@ -26,7 +26,6 @@ architectures. If you don't see an architecture, then we recommend
 | [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
 | [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] ⚠️ | `latest` | 64-bit Linux with MUSL |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_latest_armv7-unknown-linux-gnueabihf] ⚠️ | `latest` | ARMv7 Linux |
-| [`armv7-unknown-linux-musleabihf`][url.vector_latest_armv7-unknown-linux-musleabihf] ⚠️ | `latest` | ARMv7 Linux with MUSL |
 
 {% endtab %}
 {% tab title="Edge" %}
@@ -44,7 +43,6 @@ using them over the "latest" alternatives.
 | [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `edge` | 64-bit Linux (2.6.18+) |
 | [`uknown-linux-musl`][url.vector_edge_x86_64-unknown-linux-musl] ⚠️ | `edge` | 64-bit Linux with MUSL |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_edge_armv7-unknown-linux-gnueabihf] ⚠️ | `edge` | ARMv7 Linux |
-| [`armv7-unknown-linux-musleabihf`][url.vector_edge_armv7-unknown-linux-musleabihf] ⚠️ | `edge` | ARMv7 Linux with MUSL |
 {% endtab %}
 {% endtabs %}
 
@@ -183,12 +181,10 @@ Simply follow the same [installation instructions above](#installation).
 [url.rdkafka]: https://github.com/edenhill/librdkafka
 [url.releases]: https://github.com/timberio/vector/releases
 [url.vector_edge_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/edge/vector-edge-armv7-unknown-linux-gnueabihf.tar.gz
-[url.vector_edge_armv7-unknown-linux-musleabihf]: https://packages.timber.io/vector/edge/vector-edge-armv7-unknown-linux-musleabihf.tar.gz
 [url.vector_edge_x86_64-apple-darwin]: https://packages.timber.io/vector/edge/vector-edge-x86_64-apple-darwin.tar.gz
 [url.vector_edge_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-gnu.tar.gz
 [url.vector_edge_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-musl.tar.gz
 [url.vector_latest_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-gnueabihf.tar.gz
-[url.vector_latest_armv7-unknown-linux-musleabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-musleabihf.tar.gz
 [url.vector_latest_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
 [url.vector_latest_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
 [url.vector_latest_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
