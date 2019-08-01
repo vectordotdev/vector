@@ -58,7 +58,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
     }
 
     fn event(&self, event: &Event) {
-        if event.fields().any(|f| f.name() == "rate_limit") {
+        if event.fields().any(|f| f.name() == "rate_limit_secs") {
             let mut limit_visitor = LimitVisitor::default();
             event.record(&mut limit_visitor);
 
@@ -172,7 +172,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
 
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name() == "rate_limit" {
+        if field.name() == "rate_limit_secs" {
             self.limit = Some(value as usize);
         }
     }
