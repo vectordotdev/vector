@@ -341,3 +341,6 @@ ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="${LTO:+-Clinker-plugin-lto
 # Set up pkg-config.
 ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
 ENV PKG_CONFIG_ALLOW_CROSS=1
+
+# Set env vars for the scripts/build-archive.sh file
+ENV TARGET=x86_64-unknown-linux-musl
