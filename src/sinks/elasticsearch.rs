@@ -24,7 +24,7 @@ use tower::ServiceBuilder;
 pub struct ElasticSearchConfig {
     pub host: String,
     pub index: Option<String>,
-    pub doc_type: String,
+    pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
@@ -72,6 +72,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
     let index = config.index.clone().unwrap_or("vector-%Y.%m.%d".into());
+    let doc_type = config.clone().doc_type.unwrap_or("_doc".into());
 
     let dynamic_date = detect_dynamic_date(&index);
 
@@ -117,7 +118,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             let mut action = json!({
                 "index": {
                     "_index": index,
-                    "_type": config.doc_type,
+                    "_type": doc_type,
                 }
             });
             maybe_set_id(
@@ -294,7 +295,7 @@ mod integration_tests {
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
             index: Some(index.clone()),
-            doc_type: "log_lines".into(),
+            doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
@@ -348,7 +349,7 @@ mod integration_tests {
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
             index: Some(index.clone()),
-            doc_type: "log_lines".into(),
+            doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
             ..Default::default()
