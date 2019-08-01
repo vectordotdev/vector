@@ -92,10 +92,10 @@ impl TcpSink {
 
     fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, BytesCodec>, ()> {
         loop {
-            match self.state {
+            self.state = match self.state {
                 TcpSinkState::Disconnected => {
                     debug!(message = "connecting", addr = &field::display(&self.addr));
-                    self.state = TcpSinkState::Connecting(TcpStream::connect(&self.addr));
+                    TcpSinkState::Connecting(TcpStream::connect(&self.addr))
                 }
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
@@ -106,16 +106,15 @@ impl TcpSink {
                             message = "disconnected.",
                             addr = &field::display(&self.addr)
                         );
-                        self.state = TcpSinkState::Disconnected;
+                        TcpSinkState::Disconnected
                     }
                 },
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::Ready(socket)) => {
                         let addr = socket.peer_addr().unwrap_or(self.addr);
                         debug!(message = "connected", addr = &field::display(&addr));
-                        self.state =
-                            TcpSinkState::Connected(FramedWrite::new(socket, BytesCodec::new()));
                         self.backoff = Self::fresh_backoff();
+                        TcpSinkState::Connected(FramedWrite::new(socket, BytesCodec::new()))
                     }
                     Ok(Async::NotReady) => {
                         return Ok(Async::NotReady);
@@ -123,13 +122,13 @@ impl TcpSink {
                     Err(err) => {
                         error!("Error connecting to {}: {}", self.addr, err);
                         let delay = Delay::new(Instant::now() + self.backoff.next().unwrap());
-                        self.state = TcpSinkState::Backoff(delay);
+                        TcpSinkState::Backoff(delay)
                     }
                 },
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }
-            }
+            };
         }
     }
 }
