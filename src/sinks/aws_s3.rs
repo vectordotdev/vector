@@ -422,15 +422,31 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
-            filename_time_format: Some("%F%f".into()),
+            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+            filename_time_format: Some("waitsforfullbatch".into()),
+            filename_append_uuid: Some(false),
             ..config()
         };
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 30);
+        let (lines, _events) = random_lines_with_stream(100, 30);
 
-        let pump = sink.send_all(events);
+        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+            let mut e = Event::from(line);
+            let i = if i < 10 {
+                1
+            } else if i < 20 {
+                2
+            } else {
+                3
+            };
+            e.as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            e
+        });
+
+        let pump = sink.send_all(futures::stream::iter_ok(events));
         block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -452,9 +468,12 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
-            filename_time_format: Some("%F%f".into()),
+            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+            filename_time_format: Some("waitsforfullbatch".into()),
+            filename_append_uuid: Some(false),
             ..config()
         };
+
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
@@ -467,15 +486,31 @@ mod integration_tests {
         rt.spawn(pump);
 
         let mut tx = tx.wait();
-        for line in lines.iter().take(15) {
-            tx.send(Event::from(line.as_str())).unwrap();
+
+        for (i, line) in lines.iter().enumerate().take(15) {
+            let mut event = Event::from(line.as_str());
+
+            let i = if i < 10 { 1 } else { 2 };
+
+            event
+                .as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            tx.send(event).unwrap();
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        for line in lines.iter().skip(15) {
-            tx.send(Event::from(line.as_str())).unwrap();
+        for (i, line) in lines.iter().skip(15).enumerate() {
+            let mut event = Event::from(line.as_str());
+
+            let i = if i < 5 { 2 } else { 3 };
+
+            event
+                .as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            tx.send(event).unwrap();
         }
+
         drop(tx);
 
         crate::test_util::shutdown_on_idle(rt);
@@ -503,6 +538,7 @@ mod integration_tests {
             filename_time_format: Some("%S%f".into()),
             ..config()
         };
+
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
