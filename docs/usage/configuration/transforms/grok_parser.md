@@ -148,7 +148,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.grok_parser_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_grok_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_grok_parser_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -179,7 +181,6 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
-[url.community]: https://vector.dev/community
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.grok_debugger]: http://grokdebug.herokuapp.com/
 [url.grok_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22+label%3A%22Type%3A+Bug%22
@@ -187,5 +188,8 @@ Finally, consider the following alternatives:
 [url.grok_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+grok_parser%22
 [url.grok_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 [url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
+[url.new_grok_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+grok_parser&labels=Type%3A+Bug
+[url.new_grok_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+grok_parser&labels=Type%3A+Enhancement
 [url.rust_grok_library]: https://github.com/daschl/grok
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

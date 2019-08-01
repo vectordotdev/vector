@@ -94,12 +94,11 @@ vector --verbose --config=/etc/vector/vector.toml
 At this point we recommend reaching out to the community for help.
 
 1. If encountered a bug, please [file a bug report][url.new_bug_report]
-2. If you did not encounter a bug:
-   1. Join the [Vector slack][url.vector_chat] for real-time chat.
-   2. [File a help issue][url.new_help_issue].
+2. If encountered a missing feature, please [file a feature request][url.new_feature_request].
+3. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 [docs.monitoring.rate-limiting]: ../../usage/administration/monitoring.md#rate-limiting
 [url.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
-[url.new_help_issue]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Help
+[url.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [url.vector_chat]: https://chat.vector.dev

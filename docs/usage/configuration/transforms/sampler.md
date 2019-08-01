@@ -81,7 +81,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.sampler_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_sampler_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_sampler_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -97,9 +99,11 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sampler_transform]: ../../../assets/sampler-transform.svg
-[url.community]: https://vector.dev/community
+[url.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler&labels=Type%3A+Bug
+[url.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler&labels=Type%3A+Enhancement
 [url.new_sampler_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler
 [url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22
 [url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22
 [url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22
 [url.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
+[url.vector_chat]: https://chat.vector.dev

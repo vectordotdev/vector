@@ -211,7 +211,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.add_fields_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_add_fields_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_add_fields_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -246,6 +248,8 @@ Finally, consider the following alternatives:
 [url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancement%22
 [url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22
 [url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
-[url.community]: https://vector.dev/community
+[url.new_add_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Bug
+[url.new_add_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Enhancement
 [url.toml_array]: https://github.com/toml-lang/toml#array
 [url.toml_table]: https://github.com/toml-lang/toml#table
+[url.vector_chat]: https://chat.vector.dev
