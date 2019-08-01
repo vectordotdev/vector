@@ -6,7 +6,6 @@ use crate::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, SinkExt,
     },
-    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use futures::{stream::iter_ok, Future, Poll, Sink};
@@ -18,6 +17,7 @@ use rusoto_kinesis::{
 };
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 use tracing_futures::{Instrument, Instrumented};
 
@@ -31,7 +31,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
-    pub partition_key_field: Option<Template>,
+    pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_size: Option<usize>,
@@ -195,24 +195,14 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
 
 fn encode_event(
     event: Event,
-    partition_key_field: &Option<Template>,
+    partition_key_field: &Option<Atom>,
     encoding: &Option<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
-    let partition_key = if let Some(template) = partition_key_field {
-        let key = template
-            .render(&event)
-            .map_err(|missing_keys| {
-                warn!(
-                    message = "Keys do not exist on the event. Dropping event.",
-                    ?missing_keys
-                );
-            })
-            .ok()?;
-
-        String::from_utf8_lossy(&key[..]).into_owned()
-    } else {
-        gen_partition_key()
-    };
+    let partition_key = partition_key_field
+        .as_ref()
+        .and_then(|k| event.as_log().get(&k))
+        .map(|v| v.to_string_lossy())
+        .unwrap_or_else(gen_partition_key);
 
     let log = event.into_log();
     let data = match (encoding, log.is_structured()) {
@@ -253,7 +243,7 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &None, &None).unwrap();
 
-        assert_eq!(&event.data[..], message.as_bytes())
+        assert_eq!(&event.data[..], message.as_bytes());
     }
 
     #[test]
@@ -268,7 +258,19 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(map[&event::MESSAGE.to_string()], message);
-        assert_eq!(map["key"], "value".to_string())
+        assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn kinesis_encode_event_custom_partition_key() {
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_implicit("key".into(), "some_key".into());
+        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+
+        assert_eq!(&event.data[..], "hello world".as_bytes());
+        assert_eq!(&event.partition_key, &"some_key".to_string());
     }
 }
 
@@ -314,63 +316,6 @@ mod integration_tests {
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        rt.block_on(pump).unwrap();
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
-
-        let timestamp = timestamp as f64 / 1000.0;
-        let records = rt
-            .block_on(fetch_records(stream.clone(), timestamp, region))
-            .unwrap();
-
-        let mut output_lines = records
-            .into_iter()
-            .map(|e| String::from_utf8(e.data).unwrap())
-            .collect::<Vec<_>>();
-
-        input_lines.sort();
-        output_lines.sort();
-        assert_eq!(output_lines, input_lines)
-    }
-
-    #[test]
-    fn kinesis_put_records_partitioned() {
-        let stream = gen_stream();
-
-        let region = Region::Custom {
-            name: "localstack".into(),
-            endpoint: "http://localhost:4568".into(),
-        };
-
-        ensure_stream(region.clone(), stream.clone());
-
-        let config = KinesisSinkConfig {
-            stream_name: stream.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
-            batch_size: Some(2),
-            partition_key_field: Some("{{partition_key}}".into()),
-            ..Default::default()
-        };
-
-        let mut rt = Runtime::new().unwrap();
-
-        let sink = KinesisService::new(config, Acker::Null).unwrap();
-
-        let timestamp = chrono::Utc::now().timestamp_millis();
-
-        let (mut input_lines, _) = random_lines_with_stream(100, 11);
-        let events = input_lines
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(i, line)| {
-                let mut e = Event::from(line);
-                e.as_mut_log()
-                    .insert_implicit("partition_key".into(), format!("part-{}", i % 2).into());
-                e
-            });
-
-        let pump = sink.send_all(iter_ok(events));
         rt.block_on(pump).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(1));
