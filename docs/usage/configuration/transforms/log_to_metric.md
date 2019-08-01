@@ -312,8 +312,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.log_to_metric_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.log_to_metric_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 
@@ -346,4 +345,3 @@ Finally, consider the following alternatives:
 [url.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Enhancement%22
 [url.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22
 [url.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

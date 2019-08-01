@@ -147,8 +147,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.grok_parser_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.grok_parser_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 
@@ -189,5 +188,4 @@ Finally, consider the following alternatives:
 [url.grok_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
 [url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
 [url.rust_grok_library]: https://github.com/daschl/grok
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

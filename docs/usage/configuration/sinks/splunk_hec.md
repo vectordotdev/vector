@@ -228,7 +228,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.splunk_hec_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ### Setup
@@ -260,7 +259,6 @@ should supply to the `host` and `token` options.
 [images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg
 [url.community]: https://vector.dev/community
 [url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
 [url.splunk_hec_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22+label%3A%22Type%3A+Bug%22

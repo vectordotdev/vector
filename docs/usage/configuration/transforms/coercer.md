@@ -167,8 +167,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.coercer_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.coercer_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 
@@ -202,5 +201,4 @@ Finally, consider the following alternatives:
 [url.coercer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+coercer%22
 [url.coercer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
 [url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

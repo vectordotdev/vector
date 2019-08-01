@@ -192,8 +192,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.tokenizer_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open transform issues][url.tokenizer_transform_issues].
 2. Reach out to the [community][url.community] for help.
 
 
@@ -223,7 +222,6 @@ Finally, consider the following alternatives:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
 [url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.tokenizer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Bug%22
 [url.tokenizer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+tokenizer%22+label%3A%22Type%3A+Enhancement%22

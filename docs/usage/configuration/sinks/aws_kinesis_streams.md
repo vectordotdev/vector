@@ -284,7 +284,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.aws_kinesis_streams_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -321,4 +320,3 @@ issue, please:
 [url.community]: https://vector.dev/community
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [url.new_aws_kinesis_streams_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_kinesis_streams
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

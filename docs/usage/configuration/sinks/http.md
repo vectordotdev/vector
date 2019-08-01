@@ -300,7 +300,6 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.http_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -329,4 +328,3 @@ issue, please:
 [url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22
 [url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
 [url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http
-[url.search_forum]: https://forum.vector.dev/search?expanded=true

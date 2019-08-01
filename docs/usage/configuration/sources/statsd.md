@@ -15,7 +15,7 @@ description: Ingests data through the StatsD UDP protocol and outputs `log` even
 ![][images.statsd_source]
 
 {% hint style="warning" %}
-The `statsd` sink is in beta. Please see the current
+The `statsd` source is in beta. Please see the current
 [enhancements][url.statsd_source_enhancements] and
 [bugs][url.statsd_source_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_statsd_source_issue]
@@ -174,8 +174,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.statsd_source_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
+1. Check for any [open source issues][url.statsd_source_issues].
 2. Reach out to the [community][url.community] for help.
 
 ## Resources
@@ -193,7 +192,6 @@ issue, please:
 [images.statsd_source]: ../../../assets/statsd-source.svg
 [url.community]: https://vector.dev/community
 [url.new_statsd_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22
 [url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22
 [url.statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22
