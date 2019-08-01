@@ -303,7 +303,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.aws_cloudwatch_logs_sink_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_aws_cloudwatch_logs_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_aws_cloudwatch_logs_sink_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -337,7 +339,9 @@ issue, please:
 [url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [url.aws_cw_logs_service_limits]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html
 [url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
-[url.community]: https://vector.dev/community
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[url.new_aws_cloudwatch_logs_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs&labels=Type%3A+Bug
+[url.new_aws_cloudwatch_logs_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs&labels=Type%3A+Enhancement
 [url.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

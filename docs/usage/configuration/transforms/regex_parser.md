@@ -250,7 +250,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.regex_parser_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_regex_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_regex_parser_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -281,7 +283,8 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
-[url.community]: https://vector.dev/community
+[url.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+regex_parser&labels=Type%3A+Bug
+[url.new_regex_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+regex_parser&labels=Type%3A+Enhancement
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [url.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
 [url.regex_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22+label%3A%22Type%3A+Bug%22
@@ -292,3 +295,4 @@ Finally, consider the following alternatives:
 [url.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
 [url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

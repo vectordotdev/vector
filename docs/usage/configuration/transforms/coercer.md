@@ -168,7 +168,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.coercer_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_coercer_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_coercer_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -200,5 +202,7 @@ Finally, consider the following alternatives:
 [url.coercer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+coercer%22+label%3A%22Type%3A+Enhancement%22
 [url.coercer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+coercer%22
 [url.coercer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
-[url.community]: https://vector.dev/community
+[url.new_coercer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+coercer&labels=Type%3A+Bug
+[url.new_coercer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+coercer&labels=Type%3A+Enhancement
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

@@ -228,7 +228,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.splunk_hec_sink_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_splunk_hec_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_splunk_hec_sink_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ### Setup
 
@@ -257,7 +259,8 @@ should supply to the `host` and `token` options.
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg
-[url.community]: https://vector.dev/community
+[url.new_splunk_hec_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec&labels=Type%3A+Bug
+[url.new_splunk_hec_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec&labels=Type%3A+Enhancement
 [url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
@@ -265,3 +268,4 @@ should supply to the `host` and `token` options.
 [url.splunk_hec_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22+label%3A%22Type%3A+Enhancement%22
 [url.splunk_hec_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22
 [url.splunk_hec_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
+[url.vector_chat]: https://chat.vector.dev

@@ -1,7 +1,7 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/mailing_list">Mailing List<a/></strong>
+    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
+  </strong>
 </p>
 
 ---

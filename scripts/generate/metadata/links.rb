@@ -315,6 +315,14 @@ class Links
         label = "#{type.titleize}: #{name}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [label]}.to_query
 
+      when /^url\.new_(.*)_(sink|source|transform)_(bug|enhancement)$/
+        name = $1
+        type = $2
+        issue_type = $3.singularize
+        component_label = "#{type.titleize}: #{name}"
+        type_label = "Type: #{issue_type.titleize}"
+        VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
+
       when /^url\.vector_(edge|latest)_(.*)/
         channel = $1
         target = $2

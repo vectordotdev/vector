@@ -162,7 +162,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open source issues][url.syslog_source_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_syslog_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_syslog_source_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -178,9 +180,11 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.syslog_source]: ../../../assets/syslog-source.svg
-[url.community]: https://vector.dev/community
+[url.new_syslog_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+syslog&labels=Type%3A+Bug
+[url.new_syslog_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+syslog&labels=Type%3A+Enhancement
 [url.syslog_5424]: https://tools.ietf.org/html/rfc5424
 [url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Bug%22
 [url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Enhancement%22
 [url.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22
 [url.syslog_source_source]: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
+[url.vector_chat]: https://chat.vector.dev

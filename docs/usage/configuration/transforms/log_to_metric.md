@@ -313,7 +313,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open transform issues][url.log_to_metric_transform_issues].
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_log_to_metric_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_log_to_metric_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -339,9 +341,11 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
-[url.community]: https://vector.dev/community
 [url.issue_540]: https://github.com/timberio/vector/issues/540
 [url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Bug%22
 [url.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Enhancement%22
 [url.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22
 [url.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
+[url.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+log_to_metric&labels=Type%3A+Bug
+[url.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+log_to_metric&labels=Type%3A+Enhancement
+[url.vector_chat]: https://chat.vector.dev
