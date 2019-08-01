@@ -111,21 +111,21 @@ jobs:
           paths:
             - "*-armv7-unknown-linux-gnueabihf.tar.gz"
 
-  build-armv7-unknown-linux-musleabihf-archive:
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+  # build-armv7-unknown-linux-musleabihf-archive:
+  #   docker:
+  #     - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
+  #   resource_class: xlarge
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: Build archive
+  #         command: |
+  #           export VERSION=$(make version)
+  #           make build-archive FEATURES="jemallocator"
+  #     - persist_to_workspace:
+  #         root: target/artifacts
+  #         paths:
+  #           - "*-armv7-unknown-linux-musleabihf.tar.gz"
 
   build-x86_64-apple-darwin-archive:
     resource_class: large
@@ -463,7 +463,7 @@ build-requires: &build-requires
 package-requires: &package-requires
   requires:
     - build-armv7-unknown-linux-gnueabihf-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    # - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -504,9 +504,9 @@ workflows:
       - build-armv7-unknown-linux-gnueabihf-archive:
           <<: *release-workflow-filters
           <<: *build-requires
-      - build-armv7-unknown-linux-musleabihf-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+      # - build-armv7-unknown-linux-musleabihf-archive:
+      #     <<: *release-workflow-filters
+      #     <<: *build-requires
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *release-workflow-filters
           <<: *build-requires
