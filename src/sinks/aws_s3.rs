@@ -11,7 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{Future, Poll, Sink};
+use futures::{stream::iter_ok, Future, Poll, Sink};
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_s3::{
     HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
@@ -147,7 +147,7 @@ impl S3Sink {
                 batch_size,
                 Duration::from_secs(batch_timeout),
             )
-            .with(move |e| encode_event(e, &key_prefix, &encoding));
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
@@ -287,32 +287,36 @@ fn encode_event(
     event: Event,
     key_prefix: &Template,
     encoding: &Option<Encoding>,
-) -> Result<PartitionInnerBuffer<Vec<u8>, Bytes>, ()> {
-    let key = key_prefix.render_string(&event).map_err(|missing_keys| {
-        warn!(
-            message = "Keys do not exist on the event. Dropping event.",
-            keys = field::debug(missing_keys)
-        );
-    })?;
+) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    let key = key_prefix
+        .render_string(&event)
+        .map_err(|missing_keys| {
+            warn!(
+                message = "Keys do not exist on the event. Dropping event.",
+                keys = field::debug(missing_keys)
+            );
+        })
+        .ok()?;
 
     let log = event.into_log();
-    match (encoding, log.is_structured()) {
+    let bytes = match (encoding, log.is_structured()) {
         (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
-            .map(|b| PartitionInnerBuffer::new(b, key.into()))
-            .map_err(|e| panic!("Error encoding: {}", e)),
+            .expect("Failed to encode event as json, this is a bug!"),
         (&Some(Encoding::Text), _) | (_, false) => {
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
             bytes.push(b'\n');
-            Ok(PartitionInnerBuffer::new(bytes, key.into()))
+            bytes
         }
-    }
+    };
+
+    Some(PartitionInnerBuffer::new(bytes, key.into()))
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use crate::{
     template::Template,
     topology::config::{DataType, SinkConfig},
 };
-use futures::{Future, Sink};
+use futures::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
@@ -112,35 +112,45 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             batch_size,
             Duration::from_secs(batch_timeout),
         )
-        .with(move |event: Event| {
-            let index = index.render_string(&event).map_err(|keys| {
-                warn!(
-                    message = "Keys do not exist on the event. Dropping event.",
-                    ?keys
-                );
-            })?;
-
-            let mut action = json!({
-                "index": {
-                    "_index": index,
-                    "_type": config.doc_type,
-                }
-            });
-            maybe_set_id(
-                id_key.as_ref(),
-                action.pointer_mut("/index").unwrap(),
-                &event,
-            );
-
-            let mut body = serde_json::to_vec(&action).unwrap();
-            body.push(b'\n');
-
-            serde_json::to_writer(&mut body, &event.as_log().all_fields()).unwrap();
-            body.push(b'\n');
-            Ok(body)
-        });
+        .with_flat_map(move |e| iter_ok(encode_event(e, &index, &config.doc_type, &id_key)));
 
     Box::new(sink)
+}
+
+fn encode_event(
+    event: Event,
+    index: &Template,
+    doc_type: &String,
+    id_key: &Option<String>,
+) -> Option<Vec<u8>> {
+    let index = index
+        .render_string(&event)
+        .map_err(|keys| {
+            warn!(
+                message = "Keys do not exist on the event. Dropping event.",
+                ?keys
+            );
+        })
+        .ok()?;
+
+    let mut action = json!({
+        "index": {
+            "_index": index,
+            "_type": doc_type,
+        }
+    });
+    maybe_set_id(
+        id_key.as_ref(),
+        action.pointer_mut("/index").unwrap(),
+        &event,
+    );
+
+    let mut body = serde_json::to_vec(&action).unwrap();
+    body.push(b'\n');
+
+    serde_json::to_writer(&mut body, &event.as_log().all_fields()).unwrap();
+    body.push(b'\n');
+    Some(body)
 }
 
 fn healthcheck(host: String) -> super::Healthcheck {
