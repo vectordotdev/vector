@@ -293,7 +293,7 @@ fn encode_event(
         .map_err(|missing_keys| {
             warn!(
                 message = "Keys do not exist on the event. Dropping event.",
-                keys = field::debug(missing_keys)
+                ?missing_keys
             );
         })
         .ok()?;

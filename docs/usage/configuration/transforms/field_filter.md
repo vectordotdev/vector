@@ -15,7 +15,7 @@ description: Accepts `log` and `metric` events and allows you to filter events b
 ![][images.field_filter_transform]
 
 {% hint style="warning" %}
-The `field_filter` sink is in beta. Please see the current
+The `field_filter` transform is in beta. Please see the current
 [enhancements][url.field_filter_transform_enhancements] and
 [bugs][url.field_filter_transform_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_field_filter_transform_issue]
@@ -86,9 +86,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.field_filter_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open transform issues][url.field_filter_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_field_filter_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_field_filter_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -105,11 +106,12 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.field_filter_transform]: ../../../assets/field_filter-transform.svg
-[url.community]: https://vector.dev/community
 [url.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Bug%22
 [url.field_filter_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22+label%3A%22Type%3A+Enhancement%22
 [url.field_filter_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+field_filter%22
 [url.field_filter_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/field_filter.rs
 [url.issue_479]: https://github.com/timberio/vector/issues/479
+[url.new_field_filter_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter&labels=Type%3A+Bug
+[url.new_field_filter_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter&labels=Type%3A+Enhancement
 [url.new_field_filter_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+field_filter
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.vector_chat]: https://chat.vector.dev

@@ -58,10 +58,10 @@ pub trait TcpSource: Clone + Send + 'static {
 
             let future = listener
                 .incoming()
-                .map_err(|e| {
+                .map_err(|error| {
                     error!(
                         message = "failed to accept socket",
-                        error = field::display(e)
+                        %error
                     )
                 })
                 .for_each(move |socket| {
@@ -97,11 +97,9 @@ pub trait TcpSource: Clone + Send + 'static {
                                 let host = host.clone();
                                 source.build_event(frame, host)
                             })
-                            .map_err(|e| {
-                                warn!(message = "connection error", error = field::display(e))
-                            });
+                            .map_err(|error| warn!(message = "connection error.", %error));
 
-                        let handler = events_in.forward(out).map(|_| debug!("connection closed"));
+                        let handler = events_in.forward(out).map(|_| debug!("connection closed."));
 
                         tokio::spawn(handler.instrument(span.clone()));
                     });

@@ -150,11 +150,7 @@ pub fn unix(
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
 
-        info!(
-            message = "listening.",
-            path = &field::debug(path),
-            r#type = "unix"
-        );
+        info!(message = "listening.", ?path, r#type = "unix");
 
         listener
             .incoming()

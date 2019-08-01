@@ -23,7 +23,7 @@ use tower::ServiceBuilder;
 pub struct ElasticSearchConfig {
     pub host: String,
     pub index: Option<String>,
-    pub doc_type: String,
+    pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
@@ -75,6 +75,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     } else {
         Template::from("vector-%Y.%m.%d")
     };
+    let doc_type = config.clone().doc_type.unwrap_or("_doc".into());
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -112,7 +113,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             batch_size,
             Duration::from_secs(batch_timeout),
         )
-        .with_flat_map(move |e| iter_ok(encode_event(e, &index, &config.doc_type, &id_key)));
+        .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
     Box::new(sink)
 }
@@ -255,7 +256,7 @@ mod integration_tests {
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
             index: Some(index.clone()),
-            doc_type: "log_lines".into(),
+            doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
@@ -309,7 +310,7 @@ mod integration_tests {
         let config = ElasticSearchConfig {
             host: "http://localhost:9200/".into(),
             index: Some(index.clone()),
-            doc_type: "log_lines".into(),
+            doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
             ..Default::default()

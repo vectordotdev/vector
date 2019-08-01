@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
@@ -92,11 +91,11 @@ impl Transform for Tokenizer {
             {
                 match conversion.convert(value.as_bytes().into()) {
                     Ok(value) => event.as_mut_log().insert_explicit(name.clone(), value),
-                    Err(err) => {
+                    Err(error) => {
                         debug!(
                             message = "Could not convert types.",
                             name = &name[..],
-                            error = &field::display(err)
+                            %error
                         );
                     }
                 }
