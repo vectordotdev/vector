@@ -834,13 +834,20 @@ description = "The encoding format used to serialize the events before flushing.
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+description = "The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
 examples = ["my-stream"]
 null = false
-description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+description = "The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
+
+[sinks.aws_kinesis_streams.options.partition_key_field]
+type = "string"
+default = "random"
+examples = ["my-partition-key"]
+null = true
+description = "The field used for each records partition key Kinesis stream."
 
 # ------------------------------------------------------------------------------
 # sinks.aws_s3
