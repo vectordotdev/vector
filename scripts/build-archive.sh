@@ -16,6 +16,11 @@
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
+FEATURES=${FEATURES:-}
+
+if [ -z "$FEATURES" ]; then
+    FEATURES="default"
+fi
 
 set -eu
 
@@ -44,9 +49,7 @@ if [ -z "$NATIVE_BUILD" ]; then
   build_flags="$build_flags --target $TARGET"
 fi
 
-if [ "$FEATURES" != "default" ]; then
-  build_flags="$build_flags --no-default-features --features $FEATURES"
-fi
+
 
 # Currently the only way to set Rust codegen LTO type (-C lto, as opposed to
 # -C compiler-plugin-lto) at build time for a crate with library dependencies
@@ -63,7 +66,15 @@ if [ -n "$RUST_LTO" ]; then
   printf "[profile.release]\nlto = $lto_value" >> Cargo.toml
 fi
 
-cargo build $build_flags
+echo $build_flags
+set -x
+
+if [ "$FEATURES" != "default" ]; then
+    cargo build $build_flags --no-default-features --features "$FEATURES"
+else
+    cargo build $build_flags
+fi
+
 
 # Strip the output binary
 strip $target_dir/release/vector
