@@ -12,9 +12,11 @@ use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
     net::tcp::{ConnectFuture, TcpStream},
+    prelude::AsyncWrite,
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
+use tokio_tls::{Connect as TlsConnect, TlsConnector};
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -65,7 +67,13 @@ impl SinkConfig for TcpSinkConfig {
             None => TcpSinkTls::default(),
         };
 
-        let sink = raw_tcp(addr, acker, self.encoding.clone(), tls);
+        let sink = raw_tcp(
+            self.address.clone(),
+            addr,
+            acker,
+            self.encoding.clone(),
+            tls,
+        );
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
@@ -77,6 +85,7 @@ impl SinkConfig for TcpSinkConfig {
 }
 
 pub struct TcpSink {
+    hostname: String,
     addr: SocketAddr,
     tls: TcpSinkTls,
     state: TcpSinkState,
@@ -86,7 +95,8 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(ConnectFuture),
-    Connected(FramedWrite<TcpStream, BytesCodec>),
+    TlsConnecting(TlsConnect<TcpStream>),
+    Connected(Box<dyn FramedConnection + Send>),
     Backoff(Delay),
 }
 
@@ -96,8 +106,9 @@ pub struct TcpSinkTls {
 }
 
 impl TcpSink {
-    pub fn new(addr: SocketAddr, tls: TcpSinkTls) -> Self {
+    pub fn new(hostname: String, addr: SocketAddr, tls: TcpSinkTls) -> Self {
         Self {
+            hostname,
             addr,
             tls,
             state: TcpSinkState::Disconnected,
@@ -112,7 +123,7 @@ impl TcpSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    fn poll_connection(&mut self) -> Poll<&mut FramedWrite<TcpStream, BytesCodec>, ()> {
+    fn poll_connection(&mut self) -> Poll<&mut Box<dyn FramedConnection + Send>, ()> {
         loop {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
@@ -136,7 +147,20 @@ impl TcpSink {
                         let addr = socket.peer_addr().unwrap_or(self.addr);
                         debug!(message = "connected", addr = &field::display(&addr));
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(FramedWrite::new(socket, BytesCodec::new()))
+                        match self.tls.enabled {
+                            true => {
+                                let c = native_tls::TlsConnector::builder()
+                                    .build()
+                                    .expect("Could not build TLS connector?!?");
+                                TcpSinkState::TlsConnecting(
+                                    TlsConnector::from(c).connect(&self.hostname, socket),
+                                )
+                            }
+                            false => TcpSinkState::Connected(Box::new(FramedWrite::new(
+                                socket,
+                                BytesCodec::new(),
+                            ))),
+                        }
                     }
                     Ok(Async::NotReady) => {
                         return Ok(Async::NotReady);
@@ -147,6 +171,24 @@ impl TcpSink {
                         TcpSinkState::Backoff(delay)
                     }
                 },
+                TcpSinkState::TlsConnecting(ref mut connect_future) => {
+                    match connect_future.poll() {
+                        Ok(Async::Ready(socket)) => {
+                            debug!(message = "negotiated TLS");
+                            self.backoff = Self::fresh_backoff();
+                            TcpSinkState::Connected(Box::new(FramedWrite::new(
+                                socket,
+                                BytesCodec::new(),
+                            )))
+                        }
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Err(err) => {
+                            error!("Error negotiating TLS with {}: {}", self.addr, err);
+                            let delay = Delay::new(Instant::now() + self.backoff.next().unwrap());
+                            TcpSinkState::Backoff(delay)
+                        }
+                    }
+                }
                 TcpSinkState::Connected(ref mut connection) => {
                     return Ok(Async::Ready(connection));
                 }
@@ -166,7 +208,7 @@ impl Sink for TcpSink {
                     message = "sending event.",
                     bytes = &field::display(line.len())
                 );
-                match connection.start_send(line) {
+                match connection.start(line) {
                     Err(err) => {
                         debug!(
                             message = "disconnected.",
@@ -193,7 +235,7 @@ impl Sink for TcpSink {
 
         let connection = try_ready!(self.poll_connection());
 
-        match connection.poll_complete() {
+        match connection.poll() {
             Err(err) => {
                 debug!(
                     message = "disconnected.",
@@ -209,13 +251,14 @@ impl Sink for TcpSink {
 }
 
 pub fn raw_tcp(
+    hostname: String,
     addr: SocketAddr,
     acker: Acker,
     encoding: Option<Encoding>,
     tls: TcpSinkTls,
 ) -> super::RouterSink {
     Box::new(
-        TcpSink::new(addr, tls)
+        TcpSink::new(hostname, addr, tls)
             .stream_ack(acker)
             .with(move |event| encode_event(event, &encoding)),
     )
@@ -252,4 +295,18 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> 
         b.push(b'\n');
         Bytes::from(b)
     })
+}
+
+trait FramedConnection {
+    fn start(&mut self, line: Bytes) -> std::io::Result<AsyncSink<Bytes>>;
+    fn poll(&mut self) -> std::io::Result<Async<()>>;
+}
+
+impl<T: AsyncWrite> FramedConnection for FramedWrite<T, BytesCodec> {
+    fn start(&mut self, line: Bytes) -> std::io::Result<AsyncSink<Bytes>> {
+        FramedWrite::<T, BytesCodec>::start_send(self, line)
+    }
+    fn poll(&mut self) -> std::io::Result<Async<()>> {
+        FramedWrite::<T, BytesCodec>::poll_complete(self)
+    }
 }

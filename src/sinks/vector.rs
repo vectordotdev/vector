@@ -35,7 +35,7 @@ impl SinkConfig for VectorSinkConfig {
             .next()
             .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
 
-        let sink = vector(addr, acker);
+        let sink = vector(self.address.clone(), addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
@@ -46,9 +46,9 @@ impl SinkConfig for VectorSinkConfig {
     }
 }
 
-pub fn vector(addr: SocketAddr, acker: Acker) -> super::RouterSink {
+pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
-        TcpSink::new(addr, TcpSinkTls::default())
+        TcpSink::new(hostname, addr, TcpSinkTls::default())
             .stream_ack(acker)
             .with(move |event| encode_event(event)),
     )
