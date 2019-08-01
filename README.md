@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
+    <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
   </strong>
 </p>
 
@@ -48,7 +48,7 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][url.community] - [slack chat][url.vector_chat], [mailing list][url.mailing_list]
+* [**Community**][url.community] - [chat][url.vector_chat], [mailing list][url.mailing_list]
 * [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
 
 
