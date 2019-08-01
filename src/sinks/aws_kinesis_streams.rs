@@ -283,7 +283,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::{stream::iter_ok, Future, Sink};
+    use futures::{Future, Sink};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
