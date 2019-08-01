@@ -158,4 +158,74 @@ impl<J: JournaldSource, T: Sink<SinkItem = JournalRecord, SinkError = ()>> Journ
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::test_util::{block_on, shutdown_on_idle};
+    use futures::stream::Stream;
+    use std::io::Error;
+    use std::time::{Duration, SystemTime};
+    use stream_cancel::Tripwire;
+    use tokio::util::FutureExt;
+
+    #[derive(Default)]
+    struct FakeJournal {
+        records: Vec<JournalRecord>,
+    }
+
+    impl FakeJournal {
+        fn push(&mut self, unit: &str, message: &str) {
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Calculating time stamp failed");
+            let mut record = JournalRecord::new();
+            record.insert("MESSAGE".into(), message.into());
+            record.insert("_SYSTEMD_UNIT".into(), unit.into());
+            record.insert(
+                "_SOURCE_REALTIME_TIMESTAMP".into(),
+                format!("{}", timestamp.as_micros()),
+            );
+            self.records.push(record);
+        }
+    }
+
+    impl JournaldSource for FakeJournal {
+        fn next_record(&mut self) -> Result<Option<JournalRecord>, Error> {
+            Ok(self.records.pop())
+        }
+    }
+
+    fn fake_journal() -> FakeJournal {
+        let mut journal = FakeJournal::default();
+        journal.push("unit.service", "unit message");
+        journal.push("sysinit.target", "System Initialization");
+        journal
+    }
+
+    #[test]
+    fn journald_source_works() {
+        let n = 5;
+        let (tx, rx) = futures::sync::mpsc::channel(2 * n);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let journal = fake_journal();
+        let source = journald_source(journal, tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        std::thread::sleep(Duration::from_millis(100));
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received =
+            block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel");
+        assert_eq!(received.len(), 2);
+        assert_eq!(
+            received[0].as_log()[&event::MESSAGE].to_string_lossy(),
+            "System Initialization"
+        );
+        assert_eq!(
+            received[1].as_log()[&event::MESSAGE].to_string_lossy(),
+            "unit message"
+        );
+    }
+}
