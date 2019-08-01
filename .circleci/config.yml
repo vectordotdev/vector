@@ -106,6 +106,7 @@ jobs:
           command: |
             export VERSION=$(make version)
             export FEATURES="jemallocator"
+            export STRIP=false
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
