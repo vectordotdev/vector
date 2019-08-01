@@ -36,6 +36,9 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   region = "us-east-1"
   stream_name = "my-stream"
   
+  # OPTIONAL - General
+  partition_key_field = "my-partition-key" # default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
@@ -65,6 +68,9 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   inputs = ["<string>", ...]
   region = "<string>"
   stream_name = "<string>"
+
+  # OPTIONAL - General
+  partition_key_field = "<string>"
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -96,8 +102,10 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "aws_kinesis_streams"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
-| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |
+| `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
+| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
+| **OPTIONAL** - General | | |
+| `partition_key_field` | `string` | The field used for each records partition key Kinesis stream.<br />`default: "random"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
