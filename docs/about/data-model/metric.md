@@ -4,7 +4,7 @@ description: 'A deeper look into Vector''s internal metric event.'
 
 # Metric Event
 
-![](../assets/data-model-metric.svg)
+![][images.data-model-metric]
 
 {% hint style="warning" %}
 The metric data model is in beta and still under development. We are working
@@ -161,4 +161,5 @@ that unique value.
 [docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
 [docs.sinks]: ../../usage/configuration/sinks
 [docs.statsd_sink]: ../../usage/configuration/sinks/statsd.md
+[images.data-model-metric]: ../../assets/data-model-metric.svg
 [url.issue_512]: https://github.com/timberio/vector/issues/512

@@ -1,10 +1,10 @@
 ---
-description: 'A deep look into Vector''s internal log event.'
+description: 'A deeper look into Vector''s internal log event.'
 ---
 
 # Log Event
 
-![](../assets/data-model-log.svg)
+![][images.data-model-log]
 
 As mentioned in the [data model page][docs.data-model], Vector's events must
 be one of 2 types: a `log` or a `metric`. This page provides a deeper dive into
@@ -173,3 +173,4 @@ avoid type human error when configuring Vector.
 [docs.configuration]: ../../usage/configuration
 [docs.data-model]: ../../about/data-model
 [docs.sinks]: ../../usage/configuration/sinks
+[images.data-model-log]: ../../assets/data-model-log.svg
