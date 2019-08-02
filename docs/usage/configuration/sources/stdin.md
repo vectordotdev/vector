@@ -136,7 +136,7 @@ issue, please:
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms

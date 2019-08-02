@@ -15,10 +15,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` synatx for extracting values from events.
 - aws_cloudwatch_logs: retry support added and more stablity improvements
 - coercer: New transform to convert fields into specified types.
+- aws_kinesis_streams: Added configurable partition keys
 
 ### Changed
-  - [configuration] Empty inputs are treated as errors instead of warnings [#506]
 
+- [configuration] Empty inputs are treated as errors instead of warnings [#506]
 - aws_cloudwatch_logs: Now partitions events by `log_group`/`log_stream`.
 - elasticsearch: `doc_type` is now optional defaulting to `_doc_`.
 

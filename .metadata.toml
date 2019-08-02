@@ -830,17 +830,23 @@ enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
 
+[sinks.aws_kinesis_streams.options.partition_key_field]
+type = "string"
+examples = ["my-partition-key"]
+null = true
+description = "The event field used as the Kinesis record's partition key value."
+
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+description = "The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
 examples = ["my-stream"]
 null = false
-description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+description = "The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
 
 # ------------------------------------------------------------------------------
 # sinks.aws_s3
@@ -1248,12 +1254,12 @@ best_effort_delivery = "/about/guarantees.md#best-effort-delivery"
 config_composition = "/usage/configuration/README.md#composition"
 config_value_types = "/usage/configuration/README.md#value-types"
 data_directory = "/usage/configuration/README.md#data-directory"
-default_schema = "/about/data-model.md#default-schema"
+default_schema = "/about/data-model/log.md#default-schema"
 event = "/about/data-model.md#event"
-event_key_special_characters = "/about/data-model.md#special-characters"
+event_key_special_characters = "/about/data-model/log.md#special-characters"
 from_source = "/setup/installation/manual/from-source.md"
-log_event = "/about/data-model.md#log"
-metric_event = "/about/data-model.md#metric"
+log_event = "/about/data-model/log.md"
+metric_event = "/about/data-model/metric.md"
 metrics = "/usage/administration/monitoring.md#metrics"
 monitoring_logs = "/usage/administration/monitoring.md#logs"
 pipelines = "/usage/configuration/README.md#composition"
@@ -1274,7 +1280,9 @@ aws_cw_logs_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#
 aws_cw_logs_service_limits = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
 aws_cw_logs_stream_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
+aws_kinesis_partition_key = "https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey"
 aws_kinesis_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+aws_kinesis_split_shards = "https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html"
 aws_s3 = "https://aws.amazon.com/s3/"
 aws_s3_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
 aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"

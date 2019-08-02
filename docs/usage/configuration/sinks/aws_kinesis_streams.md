@@ -36,6 +36,9 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   region = "us-east-1"
   stream_name = "my-stream"
   
+  # OPTIONAL - General
+  partition_key_field = "my-partition-key" # no default
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
@@ -65,6 +68,9 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   inputs = ["<string>", ...]
   region = "<string>"
   stream_name = "<string>"
+
+  # OPTIONAL - General
+  partition_key_field = "<string>"
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -96,8 +102,10 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "aws_kinesis_streams"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
-| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.<br />`required` `example: "my-stream"` |
+| `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
+| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
+| **OPTIONAL** - General | | |
+| `partition_key_field` | `string` | The event field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) and [Missing keys or blank values](#missing-keys-or-blank-values) for more info.<br />`no default` `example: "my-partition-key"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
@@ -152,9 +160,9 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. [`credential_process` command][url.aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-​3. [AWS credentials file][url.aws_credentials_file], usually located at `~/.aws/credentials`.
-4. ​[IAM instance profile][url.iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
+​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -170,12 +178,11 @@ how to do this.
 
 ![][images.sink-flow-serial]
 
-The `aws_kinesis_streams` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `aws_kinesis_streams` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -244,6 +251,44 @@ vector --config /etc/vector/vector.toml --require-healthy
 Be careful when doing this, one unhealthy sink can prevent other healthy sinks
 from processing data at all.
 
+### Partitioning
+
+By default, Vector issues random 16 byte values for each
+[Kinesis record's partition key][url.aws_kinesis_partition_key], evenly
+distributing records across your Kinesis partitions. Depending on your use case
+this might not be sufficient since random distribution does not preserve order.
+To override this, you can supply the `partition_key_field` option. This option
+represents a field on your event to use for the partition key value instead.
+This is useful if you have a field already on your event, and it also pairs
+nicely with the [`add_fields` transform][docs.add_fields_transform].
+
+#### Missing keys or blank values
+
+Kenisis requires a value for the partition key and therefore if the key is
+missing or the value is blank the event will be dropped and a
+[`warning` level log event][docs.monitoring.logs] will be logged. As such,
+the field specified in the `partition_key_field` option should always contain
+a value.
+
+#### Values that exceed 256 characters
+
+If the value provided exceeds the maximum allowed length of 256 characters
+Vector will slice the value and use the first 256 characters.
+
+#### Non-string values
+
+Vector will coerce the value into a string.
+
+#### Provisioning & capacity planning
+
+This is generally outside the scope of Vector but worth touching on. When you
+supply your own partition key it opens up the possibility for "hot spots",
+and you should be aware of your data distribution for the key you're providing.
+Kinesis provides the ability to
+[manually split shards][url.aws_kinesis_split_shards] to accomodate this.
+If they key you're using is dynamic and unpredictable we highly recommend
+recondsidering your ordering policy to allow for even and random distribution.
+
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -295,12 +340,14 @@ issue, please:
 * [**Service Limits**][url.aws_kinesis_service_limits]
 
 
+[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.event]: ../../../about/data-model.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.monitoring.logs]: ../../../usage/administration/monitoring.md#logs
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
@@ -314,7 +361,9 @@ issue, please:
 [url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
+[url.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [url.aws_kinesis_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
+[url.aws_kinesis_split_shards]: https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html
 [url.aws_kinesis_streams_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Bug%22
 [url.aws_kinesis_streams_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_kinesis_streams_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_kinesis_streams%22

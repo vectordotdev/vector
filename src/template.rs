@@ -2,6 +2,11 @@ use crate::Event;
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use regex::bytes::{Captures, Regex};
+use serde::{
+    de::{self, Deserialize, Deserializer, Visitor},
+    ser::{Serialize, Serializer},
+};
+use std::fmt;
 use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
@@ -50,6 +55,43 @@ impl Template {
         } else {
             Err(missing_fields)
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Template {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(TemplateVisitor)
+    }
+}
+
+struct TemplateVisitor;
+
+impl<'de> Visitor<'de> for TemplateVisitor {
+    type Value = Template;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "a string")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Template::from(s))
+    }
+}
+
+impl Serialize for Template {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // TODO: determine if we should serialize this as a struct or just the
+        // bytes.
+        serializer.serialize_bytes(&self.src[..])
     }
 }
 
