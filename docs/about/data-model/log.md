@@ -112,7 +112,7 @@ Externally, Vector supports all [JSON types][url.json_types] and
 [TOML types][url.toml_types]. These types are mapped to Vector's internal
 types which are described below.
 
-### Strings
+### String
 
 Strings are UTF8 compatible and are only bounded by the available system
 memory.
@@ -125,11 +125,11 @@ Integers are signed integers up to 64 bits.
 
 Floats are signed floats up to 64 bits.
 
-### Booleans
+### Boolean
 
 Booleans represent binary true/false values.
 
-### Timestamps
+### Timestamp
 
 Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
 stored as UTC.
@@ -144,7 +144,7 @@ time zone data files, typically installed through the `tzdata` package. See
 [issue 551][url.issue_551] for more info.
 {% endhint %}
 
-### Arrays
+### Array
 
 For simplicity and performance reasons, Vector represents arrays with indexed
 keys. This means that when Vector ingests arrays it will flatten the items
