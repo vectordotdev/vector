@@ -927,7 +927,7 @@ end
   # The field used for each records partition key Kinesis stream.
   # 
   # * optional
-  # * default: "random"
+  # * no default
   partition_key_field = "my-partition-key"
 
   #

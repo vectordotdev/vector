@@ -37,7 +37,7 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "my-stream"
   
   # OPTIONAL - General
-  partition_key_field = "my-partition-key" # default
+  partition_key_field = "my-partition-key" # no default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
@@ -105,7 +105,7 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
 | **OPTIONAL** - General | | |
-| `partition_key_field` | `string` | The field used for each records partition key Kinesis stream.<br />`default: "random"` |
+| `partition_key_field` | `string` | The field used for each records partition key Kinesis stream.<br />`no default` `example: "my-partition-key"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
