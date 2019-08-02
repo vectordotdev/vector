@@ -68,7 +68,7 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis
+          SERVICES: kinesis,cloudwatch
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
