@@ -8,17 +8,18 @@
 
 set -eu
 
-echo "Releasing timberio/vector* Docker images"
-docker build -t timberio/vector:$VERSION distribution/docker
-docker build -t timberio/vector-alpine:$VERSION distribution/docker/alpine
-docker build -t timberio/vector-slim:$VERSION distribution/docker/slim
-docker build -t timberio/vector:latest distribution/docker
-docker build -t timberio/vector-slim:latest distribution/docker/slim
+echo "Releasing timberio/vector Docker images"
+docker build -t timberio/vector:$VERSION-alpine distribution/docker/alpine
+docker build -t timberio/vector:$VERSION-debian distribution/docker/debian
+docker build -t timberio/vector:$VERSION-debian-slim distribution/docker/debian-slim
+docker build -t timberio/vector:latest-alpine distribution/docker/alpine
+docker build -t timberio/vector:latest-debian distribution/docker/debian
+docker build -t timberio/vector:latest-debian-slim distribution/docker/debian-slim
 
 docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-docker push timberio/vector:$VERSION
-docker push timberio/vector-alpine:$VERSION
-docker push timberio/vector-slim:$VERSION
-docker push timberio/vector:latest
-docker push timberio/vector-alpine:latest
-docker push timberio/vector-slim:latest
+docker push timberio/vector:$VERSION-alpine
+docker push timberio/vector:$VERSION-debian
+docker push timberio/vector:$VERSION-debian-slim
+docker push timberio/vector:latest-alpine
+docker push timberio/vector:latest-debian
+docker push timberio/vector:latest-debian-slim
