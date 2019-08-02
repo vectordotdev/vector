@@ -4,7 +4,7 @@ description: Using Vector on Docker
 
 # Docker
 
-Vector maintains the [`timberio/vector` Docker image][url.docker_hub_vector]
+Vector maintains the [`timberio/vector-*` Docker images][url.docker_hub_vector]
 available on [Docker Hub][url.docker_hub_vector].
 
 ## Installation
@@ -89,8 +89,8 @@ whenever Timber is [released][url.releases]. All other [releases][url.releases]
 are available via the `X.X.X` tag:
 
 ```bash
-docker run timberio/vector:latest
-docker run timberio/vector:X.X.X
+docker run timberio/vector-alpine:latest
+docker run timberio/vector-alpine:X.X.X
 ```
 
 ## Updating
@@ -98,7 +98,7 @@ docker run timberio/vector:X.X.X
 Simply run the with the `latest` tag:
 
 ```bash
-docker run timberio/vector:latest
+docker run timberio/vector-alpine:latest
 ```
 
 
