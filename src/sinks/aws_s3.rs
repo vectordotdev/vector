@@ -1,16 +1,17 @@
 use crate::{
     buffers::Acker,
-    event::{self, Event, ValueKind},
+    event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, Buffer, PartitionBuffer, PartitionInnerBuffer, SinkExt,
     },
+    template::Template,
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{Future, Poll, Sink};
+use futures::{stream::iter_ok, Future, Poll, Sink};
 use rusoto_core::{Region, RusotoFuture};
 use rusoto_s3::{
     HeadBucketError, HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest,
@@ -27,7 +28,6 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct S3Sink {
     client: S3Client,
-    key_prefix: String,
     bucket: String,
     gzip: bool,
     filename_time_format: String,
@@ -118,15 +118,15 @@ impl S3Sink {
         let filename_time_format = config.filename_time_format.clone().unwrap_or("%s".into());
         let filename_append_uuid = config.filename_append_uuid.unwrap_or(true);
 
-        let key_prefix = config
-            .key_prefix
-            .clone()
-            .unwrap_or_else(|| "date=%F/".into());
+        let key_prefix = if let Some(kp) = &config.key_prefix {
+            Template::from(kp.as_str())
+        } else {
+            Template::from("date=%F/")
+        };
 
         let region = config.region.clone();
         let s3 = S3Sink {
             client: Self::create_client(region.try_into()?),
-            key_prefix: key_prefix.clone(),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -147,7 +147,7 @@ impl S3Sink {
                 batch_size,
                 Duration::from_secs(batch_timeout),
             )
-            .with(move |e| encode_event(e, &key_prefix, &encoding));
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
@@ -285,34 +285,38 @@ fn generate_key(
 
 fn encode_event(
     event: Event,
-    batch_time_format: &String,
+    key_prefix: &Template,
     encoding: &Option<Encoding>,
-) -> Result<PartitionInnerBuffer<Vec<u8>, Bytes>, ()> {
+) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+    let key = key_prefix
+        .render_string(&event)
+        .map_err(|missing_keys| {
+            warn!(
+                message = "Keys do not exist on the event. Dropping event.",
+                ?missing_keys
+            );
+        })
+        .ok()?;
+
     let log = event.into_log();
-
-    let key = if let Some(ValueKind::Timestamp(ts)) = log.get(&event::TIMESTAMP) {
-        ts.format(batch_time_format).to_string()
-    } else {
-        Utc::now().format(batch_time_format).to_string()
-    };
-
-    match (encoding, log.is_structured()) {
+    let bytes = match (encoding, log.is_structured()) {
         (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.unflatten())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
-            .map(|b| PartitionInnerBuffer::new(b, key.into()))
-            .map_err(|e| panic!("Error encoding: {}", e)),
+            .expect("Failed to encode event as json, this is a bug!"),
         (&Some(Encoding::Text), _) | (_, false) => {
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or(Vec::new());
             bytes.push(b'\n');
-            Ok(PartitionInnerBuffer::new(bytes, key.into()))
+            bytes
         }
-    }
+    };
+
+    Some(PartitionInnerBuffer::new(bytes, key.into()))
 }
 
 #[cfg(test)]
@@ -325,7 +329,7 @@ mod tests {
     #[test]
     fn s3_encode_event_non_structured() {
         let message = "hello world".to_string();
-        let batch_time_format = "date=%F".to_string();
+        let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
 
         let encoded_message = message + "\n";
@@ -341,7 +345,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
 
-        let batch_time_format = "date=%F".to_string();
+        let batch_time_format = Template::from("date=%F");
         let bytes = encode_event(event, &batch_time_format, &None).unwrap();
 
         let (bytes, _) = bytes.into_parts();
@@ -422,15 +426,31 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
-            filename_time_format: Some("%F%f".into()),
+            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+            filename_time_format: Some("waitsforfullbatch".into()),
+            filename_append_uuid: Some(false),
             ..config()
         };
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 30);
+        let (lines, _events) = random_lines_with_stream(100, 30);
 
-        let pump = sink.send_all(events);
+        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+            let mut e = Event::from(line);
+            let i = if i < 10 {
+                1
+            } else if i < 20 {
+                2
+            } else {
+                3
+            };
+            e.as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            e
+        });
+
+        let pump = sink.send_all(futures::stream::iter_ok(events));
         block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
@@ -452,9 +472,12 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             batch_size: Some(1000),
-            filename_time_format: Some("%F%f".into()),
+            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+            filename_time_format: Some("waitsforfullbatch".into()),
+            filename_append_uuid: Some(false),
             ..config()
         };
+
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 
@@ -467,15 +490,31 @@ mod integration_tests {
         rt.spawn(pump);
 
         let mut tx = tx.wait();
-        for line in lines.iter().take(15) {
-            tx.send(Event::from(line.as_str())).unwrap();
+
+        for (i, line) in lines.iter().enumerate().take(15) {
+            let mut event = Event::from(line.as_str());
+
+            let i = if i < 10 { 1 } else { 2 };
+
+            event
+                .as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            tx.send(event).unwrap();
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        for line in lines.iter().skip(15) {
-            tx.send(Event::from(line.as_str())).unwrap();
+        for (i, line) in lines.iter().skip(15).enumerate() {
+            let mut event = Event::from(line.as_str());
+
+            let i = if i < 5 { 2 } else { 3 };
+
+            event
+                .as_mut_log()
+                .insert_implicit("i".into(), format!("{}", i).into());
+            tx.send(event).unwrap();
         }
+
         drop(tx);
 
         crate::test_util::shutdown_on_idle(rt);
@@ -503,6 +542,7 @@ mod integration_tests {
             filename_time_format: Some("%S%f".into()),
             ..config()
         };
+
         let prefix = config.key_prefix.clone();
         let sink = S3Sink::new(&config, Acker::Null).unwrap();
 

@@ -559,8 +559,7 @@ fn benchmark_complex(c: &mut Criterion) {
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use chrono::Utc;
-    use vector::event;
-    use vector::sinks::elasticsearch::*;
+    use vector::{event, template::Template};
 
     c.bench(
         "elasticsearch_indexes",
@@ -572,9 +571,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
 
-                    ("index-%Y.%m.%d".to_string(), event)
+                    (Template::from("index-%Y.%m.%d"), event)
                 },
-                |(index, event)| build_index_name(&index, &event, true),
+                |(index, event)| index.render(&event),
             )
         }),
     );
@@ -589,9 +588,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
 
-                    ("index".to_string(), event)
+                    (Template::from("index"), event)
                 },
-                |(index, event)| build_index_name(&index, &event, false),
+                |(index, event)| index.render(&event),
             )
         }),
     );
