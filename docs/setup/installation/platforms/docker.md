@@ -14,9 +14,9 @@ as a proof of concept. This is used to test Vector and ensure it is installed
 and working:
 
 {% code-tabs %}
-{% code-tabs-item title="debian" %}
+{% code-tabs-item title="alpine (recommended)" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-alpine:latest
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian-slim" %}
@@ -24,9 +24,9 @@ docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
 docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-slim:latest
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="alpine" %}
+{% code-tabs-item title="debian" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-alpine:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
