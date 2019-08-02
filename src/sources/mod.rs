@@ -1,7 +1,6 @@
 use futures::Future;
 
 pub mod file;
-#[cfg(feature = "systemd")]
 pub mod journald;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;

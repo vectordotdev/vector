@@ -126,7 +126,6 @@ snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
 owning_ref = "0.4.0"
-systemd = { version = "0.4", optional = true, git = "https://github.com/timberio/rust-systemd" }
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -147,7 +146,7 @@ tokio01-test = "0.1.1"
 tower-test = "0.1"
 
 [features]
-default = ["rdkafka", "leveldb", "jemallocator", "systemd"]
+default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",

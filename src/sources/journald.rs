@@ -5,6 +5,7 @@ use crate::{
 };
 use chrono::TimeZone;
 use futures::{future, sync::mpsc, Future, Sink};
+use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -13,7 +14,6 @@ use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time;
 use string_cache::DefaultAtom as Atom;
-use systemd::journal::{Journal, JournalFiles, JournalRecord};
 use tracing::{dispatcher, field};
 
 lazy_static! {
@@ -30,6 +30,13 @@ pub struct JournaldConfig {
     pub units: Vec<String>,
 }
 
+fn map_bool<T>(flag: bool, t_value: T, f_value: T) -> T {
+    match flag {
+        true => t_value,
+        false => f_value,
+    }
+}
+
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     fn build(
@@ -38,12 +45,16 @@ impl SourceConfig for JournaldConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        let journal = Journal::open(
-            JournalFiles::All,
+        let flags = map_bool(
             self.current_runtime_only.unwrap_or(true),
+            journald::SD_JOURNAL_RUNTIME_ONLY,
+            0,
+        ) | map_bool(
             self.local_only.unwrap_or(true),
-        )
-        .map_err(|err| format!("{}", err))?;
+            journald::SD_JOURNAL_LOCAL_ONLY,
+            0,
+        );
+        let journal = Journal::open(flags).map_err(|err| format!("{}", err))?;
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.
@@ -67,7 +78,7 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-fn journald_source<J: 'static + JournaldSource + Send>(
+fn journald_source<J: 'static + Iterator<Item = Result<Record, Error>> + Send>(
     journal: J,
     out: mpsc::Sender<Event>,
     units: HashSet<String>,
@@ -76,7 +87,7 @@ fn journald_source<J: 'static + JournaldSource + Send>(
 
     let out = out
         .sink_map_err(|_| ())
-        .with(|record: JournalRecord| future::ok(create_event(record)));
+        .with(|record: Record| future::ok(create_event(record)));
 
     Box::new(future::lazy(move || {
         info!(message = "Starting journald server.",);
@@ -100,7 +111,7 @@ fn journald_source<J: 'static + JournaldSource + Send>(
     }))
 }
 
-fn create_event(record: JournalRecord) -> Event {
+fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from(record.into_iter());
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
@@ -127,16 +138,6 @@ fn create_event(record: JournalRecord) -> Event {
     log.into()
 }
 
-trait JournaldSource {
-    fn next_record(&mut self) -> Result<Option<JournalRecord>, Error>;
-}
-
-impl JournaldSource for Journal {
-    fn next_record(&mut self) -> Result<Option<JournalRecord>, Error> {
-        Journal::next_record(self)
-    }
-}
-
 struct JournaldServer<J, T> {
     journal: J,
     units: HashSet<String>,
@@ -144,16 +145,18 @@ struct JournaldServer<J, T> {
     shutdown: std::sync::mpsc::Receiver<()>,
 }
 
-impl<J: JournaldSource, T: Sink<SinkItem = JournalRecord, SinkError = ()>> JournaldServer<J, T> {
+impl<J: Iterator<Item = Result<Record, Error>>, T: Sink<SinkItem = Record, SinkError = ()>>
+    JournaldServer<J, T>
+{
     pub fn run(mut self) {
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
         loop {
             loop {
-                let record = match self.journal.next_record() {
-                    Ok(Some(record)) => record,
-                    Ok(None) => break,
-                    Err(err) => {
+                let record = match self.journal.next() {
+                    None => break,
+                    Some(Ok(record)) => record,
+                    Some(Err(err)) => {
                         error!(
                             message = "Could not read from journald source",
                             error = field::display(&err),
@@ -199,7 +202,7 @@ mod tests {
 
     #[derive(Default)]
     struct FakeJournal {
-        records: Vec<JournalRecord>,
+        records: Vec<Record>,
     }
 
     impl FakeJournal {
@@ -207,7 +210,7 @@ mod tests {
             let timestamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .expect("Calculating time stamp failed");
-            let mut record = JournalRecord::new();
+            let mut record = Record::new();
             record.insert("MESSAGE".into(), message.into());
             record.insert("_SYSTEMD_UNIT".into(), unit.into());
             record.insert(
@@ -218,9 +221,10 @@ mod tests {
         }
     }
 
-    impl JournaldSource for FakeJournal {
-        fn next_record(&mut self) -> Result<Option<JournalRecord>, Error> {
-            Ok(self.records.pop())
+    impl Iterator for FakeJournal {
+        type Item = Result<Record, Error>;
+        fn next(&mut self) -> Option<Self::Item> {
+            self.records.pop().map(|item| Ok(item))
         }
     }
 
