@@ -4,7 +4,7 @@ description: Using Vector on Docker
 
 # Docker
 
-Vector maintains the [`timberio/vector-*` Docker images][url.docker_hub_vector]
+Vector maintains the [`timberio/vector` Docker image][url.docker_hub_vector]
 available on [Docker Hub][url.docker_hub_vector].
 
 ## Installation
@@ -16,17 +16,17 @@ and working:
 {% code-tabs %}
 {% code-tabs-item title="alpine (recommended)" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-alpine:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:alpine-latest
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian-slim" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-debian-slim:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:debian-slim-latest
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector-debian:latest
+docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:debian-latest
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -58,14 +58,14 @@ Vector can be managed through the [Systemd][url.systemd] service manager:
 
 ## Image Variants
 
-### timberio/vector-alpine:\<version\>
+### timberio/vector:aline-\<version\>
 
 This image is based on [`alpine:latest`][url.docker_alpine] which is a Linux
 distribution built around musl libc and BusyBox. It is considerably smaller in
 size than other Docker images and statically links libraries. This is the image
 we recommend due to it's small size and reliability.
 
-### timberio/vector-debian-slim:\<version\>
+### timberio/vector:debian-slim-\<version\>
 
 This image is based on `debian:9-slim` which is much smaller (up to 30x), and
 thus leads to much slimmer images in general.
@@ -75,7 +75,7 @@ possible is desired. To minimize image size, it's uncommon for additional
 related tools (such as git or bash) to be included. Using this image as a
 base, add the things you need in your own Dockerfile.
 
-### timberio/vector-debian:\<version\>
+### timberio/vector:debian-\<version\>
 
 This is the defacto image. If you are unsure about what your needs are, you
 probably want to use this one. It is designed to be used both as a throw away
@@ -89,8 +89,8 @@ whenever Timber is [released][url.releases]. All other [releases][url.releases]
 are available via the `X.X.X` tag:
 
 ```bash
-docker run timberio/vector-alpine:latest
-docker run timberio/vector-alpine:X.X.X
+docker run timberio/vector:alpine-latest
+docker run timberio/vector:alpine-X.X.X
 ```
 
 ## Updating
@@ -98,7 +98,7 @@ docker run timberio/vector-alpine:X.X.X
 Simply run the with the `latest` tag:
 
 ```bash
-docker run timberio/vector-alpine:latest
+docker run timberio/vector:alpine-latest
 ```
 
 
