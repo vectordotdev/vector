@@ -11,11 +11,13 @@
 #   $FEATURES - a list of Vector features to include when building, defaults to all
 #   $NATIVE_BUILD - whether to pass the --target flag when building via cargo
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
+#   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
 #   $VERSION - the version of Vector, can be obtained via `make version`
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
+STRIP=${STRIP:-}
 FEATURES=${FEATURES:-}
 
 if [ -z "$FEATURES" ]; then
@@ -74,7 +76,9 @@ fi
 
 
 # Strip the output binary
-strip $target_dir/release/vector
+if [ "$STRIP" != "false" ]; then
+  strip $target_dir/release/vector
+fi
 
 # Build the archive directory
 rm -rf $archive_dir

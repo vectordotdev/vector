@@ -31,7 +31,7 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model]
+* [**Data model**][docs.data_model] - [log][docs.log_event], [metric][docs.metric_event]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
@@ -206,10 +206,10 @@ the License.
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.log_event]: https://docs.vector.dev/about/data-model/log
 [docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.metric_event]: https://docs.vector.dev/about/data-model/metric
 [docs.performance]: https://docs.vector.dev/performance
 [docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser

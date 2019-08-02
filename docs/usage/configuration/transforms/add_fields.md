@@ -110,7 +110,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 
 While unrealistic, this example demonstrates the various accepted
 [types][docs.config_value_types] and how they're repsented in Vector's
-internal [log struction][docs.data_model.log].
+internal [log structure][docs.log].
 
 ## How It Works
 
@@ -138,7 +138,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data_model.log] are structured.
+Learn more about how [`log` events][docs.log] are structured.
 
 ### Complex Transforming
 
@@ -181,7 +181,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data_model.log] are structured.
+Learn more about how [`log` events][docs.log] are structured.
 
 ### Removing Fields
 
@@ -233,10 +233,10 @@ Finally, consider the following alternatives:
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model.log]: ../../../about/data-model.md#log
-[docs.data_model]: ../../../about/data-model.md
-[docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.data_model]: ../../../about/data-model
+[docs.event_key_special_characters]: ../../../about/data-model/log.md#special-characters
+[docs.log]: ../../../about/data-model/log.md
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md

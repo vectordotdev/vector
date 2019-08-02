@@ -156,9 +156,9 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. [`credential_process` command][url.aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-​3. [AWS credentials file][url.aws_credentials_file], usually located at `~/.aws/credentials`.
-4. ​[IAM instance profile][url.iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
+​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -175,12 +175,11 @@ how to do this.
  
 ![][images.sink-flow-partitioned]
 
-The `aws_cloudwatch_logs` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `aws_cloudwatch_logs` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -317,9 +316,9 @@ issue, please:
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
@@ -331,7 +330,7 @@ issue, please:
 [url.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22
 [url.aws_cloudwatch_logs_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_cloudwatch_logs_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22
-[url.aws_cloudwatch_logs_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_cloudwatch_logs.rs
+[url.aws_cloudwatch_logs_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/mod.rs
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html

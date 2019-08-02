@@ -37,14 +37,14 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.field_filter_transform]: ../../../usage/configuration/transforms/field_filter.md
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.log_to_metric_transform]: ../../../usage/configuration/transforms/log_to_metric.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.pipelines]: ../../../usage/configuration/README.md#composition
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md

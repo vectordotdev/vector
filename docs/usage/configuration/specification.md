@@ -932,17 +932,23 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The AWS region of the target CloudWatch Logs stream resides.
+  # The AWS region of the target Kinesis stream resides.
   # 
   # * required
   # * no default
   region = "us-east-1"
 
-  # The stream name of the target CloudWatch Logs stream.
+  # The stream name of the target Kinesis Logs stream.
   # 
   # * required
   # * no default
   stream_name = "my-stream"
+
+  # The event field used as the Kinesis record's partition key value.
+  # 
+  # * optional
+  # * no default
+  partition_key_field = "my-partition-key"
 
   #
   # Batching

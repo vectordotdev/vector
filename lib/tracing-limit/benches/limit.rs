@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         bar = "bar",
                         baz = 3,
                         quuux = field::debug(0.99),
-                        rate_limit = 5
+                        rate_limit_secs = 5
                     )
                 }
             })
@@ -62,7 +62,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         bar = "bar",
                         baz = 3,
                         quuux = field::debug(0.99),
-                        rate_limit = 100
+                        rate_limit_secs = 100
                     )
                 }
             })
@@ -81,7 +81,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         bar = "bar",
                         baz = 3,
                         quuux = field::debug(0.99),
-                        rate_limit = 1000
+                        rate_limit_secs = 1000
                     )
                 }
             })

@@ -214,10 +214,10 @@ All TOML values types are supported. For convenience this includes:
 [docs.http_sink]: ../../usage/configuration/sinks/http.md
 [docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
 [docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
-[docs.log_event]: ../../about/data-model.md#log
+[docs.log_event]: ../../about/data-model/log.md
 [docs.log_to_metric_transform]: ../../usage/configuration/transforms/log_to_metric.md
 [docs.lua_transform]: ../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../about/data-model.md#metric
+[docs.metric_event]: ../../about/data-model/metric.md
 [docs.operating_systems]: ../../setup/installation/operating-systems
 [docs.pipelines]: ../../usage/configuration/README.md#composition
 [docs.platforms]: ../../setup/installation/platforms

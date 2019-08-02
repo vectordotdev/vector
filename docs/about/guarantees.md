@@ -112,7 +112,7 @@ keep you in the loop if this ever changes.
 [docs.blackhole_sink]: ../usage/configuration/sinks/blackhole.md
 [docs.console_sink]: ../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../about/data-model.md#event
+[docs.event]: ../about/data-model/README.md#event
 [docs.file_source]: ../usage/configuration/sources/file.md
 [docs.http_sink]: ../usage/configuration/sinks/http.md
 [docs.kafka_sink]: ../usage/configuration/sinks/kafka.md

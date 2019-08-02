@@ -114,12 +114,11 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 
 ![][images.sink-flow-serial]
 
-The `splunk_hec` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `splunk_hec` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -249,9 +248,9 @@ should supply to the `host` and `token` options.
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
