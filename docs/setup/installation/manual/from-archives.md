@@ -1,5 +1,5 @@
 ---
-description: Install Vector from pre-built archives
+description: Install Vector from pre-compiled archives
 ---
 
 # Install From Archives
@@ -28,9 +28,8 @@ architectures. If you don't see an architecture, then we recommend
 | [`armv7-unknown-linux-gnueabihf`][url.vector_latest_armv7-unknown-linux-gnueabihf] ⚠️ | `latest` | ARMv7 Linux |
 
 {% endtab %}
-{% tab title="Edge" %}
-"Edge" builds are continuous and built after every change merged into
-the [`master` repo branch][url.vector_repo].
+{% tab title="Nightly" %}
+"Nightly" builds released nightly from the [`master` repo branch][url.vector_repo].
 
 {% hint style="warning" %}
 This release could have bugs or other issues. Please think carefully before
@@ -39,10 +38,10 @@ using them over the "latest" alternatives.
 
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
-| [`x86_64-apple-darwin`][url.vector_edge_x86_64-apple-darwin] | `edge` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-musl`][url.vector_edge_x86_64-unknown-linux-musl] | `edge` | 64-bit Linux with MUSL. Recommended for Linux. |
-| [`uknown-linux-gnu`][url.vector_edge_x86_64-unknown-linux-gnu] | `edge` | 64-bit Linux (2.6.18+) |
-| [`armv7-unknown-linux-gnueabihf`][url.vector_edge_armv7-unknown-linux-gnueabihf] ⚠️ | `edge` | ARMv7 Linux |
+| [`x86_64-apple-darwin`][url.vector_nightly_x86_64-apple-darwin] | `nightly` | 64-bit OSX (10.7+, Lion+) |
+| [`uknown-linux-musl`][url.vector_nightly_x86_64-unknown-linux-musl] | `nightly` | 64-bit Linux with MUSL. Recommended for Linux. |
+| [`uknown-linux-gnu`][url.vector_nightly_x86_64-unknown-linux-gnu] | `nightly` | 64-bit Linux (2.6.18+) |
+| [`armv7-unknown-linux-gnueabihf`][url.vector_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | `nightly` | ARMv7 Linux |
 {% endtab %}
 {% endtabs %}
 
@@ -180,12 +179,12 @@ Simply follow the same [installation instructions above](#installation).
 [url.leveldb]: https://github.com/google/leveldb
 [url.rdkafka]: https://github.com/edenhill/librdkafka
 [url.releases]: https://github.com/timberio/vector/releases
-[url.vector_edge_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/edge/vector-edge-armv7-unknown-linux-gnueabihf.tar.gz
-[url.vector_edge_x86_64-apple-darwin]: https://packages.timber.io/vector/edge/vector-edge-x86_64-apple-darwin.tar.gz
-[url.vector_edge_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-gnu.tar.gz
-[url.vector_edge_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/edge/vector-edge-x86_64-unknown-linux-musl.tar.gz
 [url.vector_latest_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-gnueabihf.tar.gz
 [url.vector_latest_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
 [url.vector_latest_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
 [url.vector_latest_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
+[url.vector_nightly_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/nightly/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz
+[url.vector_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
+[url.vector_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
+[url.vector_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
 [url.vector_repo]: https://github.com/timberio/vector
