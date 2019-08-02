@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - [configuration] Empty inputs are treated as errors instead of warnings [#506]
 - aws_cloudwatch_logs: Now partitions events by `log_group`/`log_stream`.
+- All sinks now return structured events instead of flattened events.
 - elasticsearch: `doc_type` is now optional defaulting to `_doc_`.
 
 ### Deprecated

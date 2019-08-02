@@ -213,7 +213,7 @@ fn encode_event(
     let log = event.into_log();
     let data = match (encoding, log.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&log.all_fields()).expect("Error encoding event as json.")
+            serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
 
         (&Some(Encoding::Text), _) | (_, false) => log

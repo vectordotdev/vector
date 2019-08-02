@@ -297,7 +297,7 @@ fn encode_event(
     };
 
     match (encoding, log.is_structured()) {
-        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.all_fields())
+        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.unflatten())
             .map(|mut b| {
                 b.push(b'\n');
                 b

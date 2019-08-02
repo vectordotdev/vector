@@ -131,6 +131,7 @@ walkdir = "2.2.7"
 elastic = { git = "https://github.com/elastic-rs/elastic" }
 matches = "0.1.8"
 pretty_assertions = "0.6.1"
+proptest = "0.9"
 tokio01-test = "0.1.1"
 tower-test = "0.1"
 

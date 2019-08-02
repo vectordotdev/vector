@@ -256,7 +256,7 @@ impl CloudwatchLogsSvc {
 
         match (&self.encoding, log.is_structured()) {
             (&Some(Encoding::Json), _) | (_, true) => {
-                let bytes = serde_json::to_vec(&log.all_fields()).unwrap();
+                let bytes = serde_json::to_vec(&log.unflatten()).unwrap();
                 let message = String::from_utf8(bytes).unwrap();
 
                 InputLogEvent { message, timestamp }
