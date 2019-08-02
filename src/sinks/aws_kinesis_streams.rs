@@ -241,7 +241,10 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::{self, Event}, test_util::random_string};
+    use crate::{
+        event::{self, Event},
+        test_util::random_string,
+    };
     use std::collections::HashMap;
 
     #[test]
