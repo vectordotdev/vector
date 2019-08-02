@@ -16,17 +16,23 @@ and working:
 {% code-tabs %}
 {% code-tabs-item title="alpine (recommended)" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest-alpine
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  timberio/vector:latest-alpine
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian-slim" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest-debian-slim
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  timberio/vector:latest-debian-slim
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="debian" %}
 ```bash
-docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest-debian
+docker run \
+  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
+  timberio/vector:latest-debian
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -58,14 +64,14 @@ Vector can be managed through the [Systemd][url.systemd] service manager:
 
 ## Image Variants
 
-### timberio/vector:\<version\>-alpine
+### timberio/vector:&lt;version&gt;-alpine
 
 This image is based on [`alpine:latest`][url.docker_alpine] which is a Linux
 distribution built around musl libc and BusyBox. It is considerably smaller in
 size than other Docker images and statically links libraries. This is the image
 we recommend due to it's small size and reliability.
 
-### timberio/vector:\<version\>-debian-slim
+### timberio/vector:&lt;version&gt;-debian-slim
 
 This image is based on `debian:9-slim` which is much smaller (up to 30x), and
 thus leads to much slimmer images in general.
@@ -75,7 +81,7 @@ possible is desired. To minimize image size, it's uncommon for additional
 related tools (such as git or bash) to be included. Using this image as a
 base, add the things you need in your own Dockerfile.
 
-### timberio/vector:\<version\>-debian
+### timberio/vector:&lt;version&gt;-debian
 
 This is the defacto image. If you are unsure about what your needs are, you
 probably want to use this one. It is designed to be used both as a throw away
