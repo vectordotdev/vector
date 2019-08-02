@@ -442,7 +442,7 @@ test-filters: &test-filters
     branches:
       only: /.*/
     tags:
-      only: /.*/
+      ignore: /.*/
 
 release-workflow-filters: &release-workflow-filters
   filters:
