@@ -23,13 +23,14 @@ architectures. If you don't see an architecture, then we recommend
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | `latest` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL. Recommended for Linux. |
+| [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_latest_armv7-unknown-linux-gnueabihf] ⚠️ | `latest` | ARMv7 Linux |
 
 {% endtab %}
 {% tab title="Nightly" %}
-"Nightly" builds released nightly from the [`master` repo branch][url.vector_repo].
+"Nightly" builds are released nightly and built from the
+[`master` repo branch][url.vector_repo].
 
 {% hint style="warning" %}
 This release could have bugs or other issues. Please think carefully before
@@ -39,7 +40,7 @@ using them over the "latest" alternatives.
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_nightly_x86_64-apple-darwin] | `nightly` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-musl`][url.vector_nightly_x86_64-unknown-linux-musl] | `nightly` | 64-bit Linux with MUSL. Recommended for Linux. |
+| [`uknown-linux-musl`][url.vector_nightly_x86_64-unknown-linux-musl] | `nightly` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`uknown-linux-gnu`][url.vector_nightly_x86_64-unknown-linux-gnu] | `nightly` | 64-bit Linux (2.6.18+) |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | `nightly` | ARMv7 Linux |
 {% endtab %}
@@ -50,13 +51,7 @@ using them over the "latest" alternatives.
 
 ## Installation
 
-Change into the directory you want to install Vector, such as your home dir:
-
-```bash
-cd ~
-```
-
-Then copy the appropriate download link above and then proceed to download it:
+Copy the appropriate download link above and then proceed to download it:
 
 ```bash
 curl -o <release-download-url> | tar -xzf --directory="vector" --strip-components=1
