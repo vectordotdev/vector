@@ -17,6 +17,9 @@ as possible to contribute while still protecting users of Vector.
    git commit -sm 'My commit message'
    ```
 
+   We also included a `make signoff` target that handles this for you if
+   you forgot.
+
 2. Open a pull request. The pull request title must follow the format outlined
    in the [conventional commits spec](https://www.conventionalcommits.org).
 
@@ -24,7 +27,7 @@ as possible to contribute while still protecting users of Vector.
 
 ## FAQ
 
-### What is convetional commits?
+### What is conventional commits?
 
 [Conventional commits](https://www.conventionalcommits.org) is a standardized
 format for commit messages. Vector only requires this format for commits on
@@ -32,6 +35,12 @@ the `master` branch. And because Vector squashes commits before merging
 branches, this means that only the pull request title must conform to this
 format. Vector performs a pull request check to verify the pull request title
 in case you forget.
+
+### Do I need to update the changelog?
+
+Nope! This is one of the primary reasons we use the conventional commits style.
+Before releasing Vector we'll automatically generate a changelog for the
+release.
 
 ### What is a DCO?
 

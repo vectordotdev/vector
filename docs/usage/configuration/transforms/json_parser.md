@@ -193,9 +193,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.json_parser_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open transform issues][url.json_parser_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_json_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_json_parser_transform_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -206,16 +207,17 @@ issue, please:
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.json_parser_transform]: ../../../assets/json_parser-transform.svg
-[url.community]: https://vector.dev/community
 [url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Bug%22
 [url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Enhancement%22
 [url.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22
 [url.json_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.new_json_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+json_parser&labels=Type%3A+Bug
+[url.new_json_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+json_parser&labels=Type%3A+Enhancement
+[url.vector_chat]: https://chat.vector.dev
 [url.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

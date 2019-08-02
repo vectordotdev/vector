@@ -114,12 +114,11 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 
 ![][images.sink-flow-serial]
 
-The `splunk_hec` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `splunk_hec` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -228,8 +227,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.splunk_hec_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_splunk_hec_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_splunk_hec_sink_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ### Setup
 
@@ -248,9 +248,9 @@ should supply to the `host` and `token` options.
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
@@ -258,12 +258,13 @@ should supply to the `host` and `token` options.
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg
-[url.community]: https://vector.dev/community
+[url.new_splunk_hec_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec&labels=Type%3A+Bug
+[url.new_splunk_hec_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec&labels=Type%3A+Enhancement
 [url.new_splunk_hec_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+splunk_hec
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.splunk_hec_setup]: https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector
 [url.splunk_hec_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22+label%3A%22Type%3A+Bug%22
 [url.splunk_hec_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22+label%3A%22Type%3A+Enhancement%22
 [url.splunk_hec_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+splunk_hec%22
 [url.splunk_hec_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/splunk_hec.rs
+[url.vector_chat]: https://chat.vector.dev

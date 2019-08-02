@@ -105,27 +105,30 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            export FEATURES="jemallocator"
+            export STRIP=false
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-armv7-unknown-linux-gnueabihf.tar.gz"
 
-  build-armv7-unknown-linux-musleabihf-archive:
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+  # build-armv7-unknown-linux-musleabihf-archive:
+  #   docker:
+  #     - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
+  #   resource_class: xlarge
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: Build archive
+  #         command: |
+  #           export VERSION=$(make version)
+  #           export FEATURES="jemallocator"
+  #           make build-archive 
+  #     - persist_to_workspace:
+  #         root: target/artifacts
+  #         paths:
+  #           - "*-armv7-unknown-linux-musleabihf.tar.gz"
 
   build-x86_64-apple-darwin-archive:
     resource_class: large
@@ -183,7 +186,10 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            export RUST_LTO="lto"
+            export FEATURES="jemallocator leveldb rdkafka rdkafka/cmake_build"
+            export TARGET="x86_64-unknown-linux-musl"
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -436,16 +442,9 @@ test-filters: &test-filters
     branches:
       only: /.*/
     tags:
-      only: /.*/
+      ignore: /.*/
 
 release-workflow-filters: &release-workflow-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      only: /v.*/
-
-tag-release-workflow-filters: &tag-release-workflow-filters
   filters:
     branches:
       ignore: /.*/
@@ -462,7 +461,7 @@ build-requires: &build-requires
 package-requires: &package-requires
   requires:
     - build-armv7-unknown-linux-gnueabihf-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    # - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -490,7 +489,7 @@ release-requires: &release-requires
 workflows:
   version: 2
 
-  build:
+  test:
     jobs:
       - check-code:
           <<: *test-filters
@@ -500,12 +499,30 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+
+  build:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - check-code:
+          <<: *release-workflow-filters
+      - check-fmt:
+          <<: *release-workflow-filters
+      - check-generate:
+          <<: *release-workflow-filters
+      - test-stable:
+          <<: *release-workflow-filters
       - build-armv7-unknown-linux-gnueabihf-archive:
           <<: *release-workflow-filters
           <<: *build-requires
-      - build-armv7-unknown-linux-musleabihf-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+      # - build-armv7-unknown-linux-musleabihf-archive:
+      #     <<: *release-workflow-filters
+      #     <<: *build-requires
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *release-workflow-filters
           <<: *build-requires
@@ -546,24 +563,24 @@ workflows:
           <<: *release-workflow-filters
           <<: *verify-requires
       - release-deb:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-github:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-rpm:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-s3:
           <<: *release-workflow-filters
           <<: *release-requires
       # Installs directly from S3
       - release-docker:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-s3
       # Installs directly from S3
       - release-homebrew:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-s3

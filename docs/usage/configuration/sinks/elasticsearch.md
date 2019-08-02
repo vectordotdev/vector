@@ -145,12 +145,11 @@ Content-Length: 654
  
 ![][images.sink-flow-partitioned]
 
-The `elasticsearch` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `elasticsearch` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -269,8 +268,9 @@ If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
 1. Check for any [open sink issues][url.elasticsearch_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+2. If encountered a bug, please [file a bug report][url.new_elasticsearch_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_elasticsearch_sink_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -281,10 +281,10 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model.md
-[docs.event]: ../../../about/data-model.md#event
+[docs.data_model]: ../../../about/data-model
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
@@ -292,12 +292,13 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.community]: https://vector.dev/community
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22
 [url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22
 [url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
+[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Bug
+[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Enhancement
 [url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

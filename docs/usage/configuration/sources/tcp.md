@@ -129,9 +129,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.tcp_source_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open source issues][url.tcp_source_issues].
+2. If encountered a bug, please [file a bug report][url.new_tcp_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_tcp_source_enhancement].
+4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -141,15 +142,16 @@ issue, please:
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tcp_source]: ../../../assets/tcp-source.svg
-[url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.new_tcp_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Bug
+[url.new_tcp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Enhancement
 [url.tcp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Bug%22
 [url.tcp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Enhancement%22
 [url.tcp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22
 [url.tcp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/tcp.rs
+[url.vector_chat]: https://chat.vector.dev

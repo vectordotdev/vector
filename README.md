@@ -1,8 +1,7 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://forum.vector.dev">Forums<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/mailing_list">Mailing List<a/></strong>
+    <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
+  </strong>
 </p>
 
 ---
@@ -32,7 +31,7 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model]
+* [**Data model**][docs.data_model] - [log][docs.log_event], [metric][docs.metric_event]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
@@ -49,7 +48,7 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][url.community] - [forum][url.vector_forum], [slack chat][url.vector_chat], [mailing list][url.mailing_list]
+* [**Community**][url.community] - [chat][url.vector_chat], [mailing list][url.mailing_list]
 * [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
 
 
@@ -207,10 +206,10 @@ the License.
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.log_event]: https://docs.vector.dev/about/data-model/log
 [docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.metric_event]: https://docs.vector.dev/about/data-model/metric
 [docs.performance]: https://docs.vector.dev/performance
 [docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
@@ -257,5 +256,4 @@ the License.
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.test_harness]: https://github.com/timberio/vector-test-harness/
 [url.vector_chat]: https://chat.vector.dev
-[url.vector_forum]: https://forum.vector.dev
 [url.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
