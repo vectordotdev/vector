@@ -30,16 +30,18 @@ assets = [
 [workspace]
 members = [
   ".",
+  "lib/codec",
   "lib/file-source",
+  "lib/journald",
   "lib/tracing-metrics",
   "lib/tracing-limit",
-  "lib/codec",
 ]
 
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
+journald = { path = "lib/journald" }
 tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
 
