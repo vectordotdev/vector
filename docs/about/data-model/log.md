@@ -108,16 +108,41 @@ override the keys used, if necessary.
 
 ## Types
 
-Externally, Vector supports all JSON and TOML types. Interally, 
+Externally, Vector supports all [JSON types][url.json_types] and
+[TOML types][url.toml_types]. These types are mapped to Vector's internal
+types which are described below.
 
-Log events support the following value types:
+### Strings
 
-1. `string` (unlimited length, depends on available memory)
-2. `int` (up to 64 bits)
-3. `float` (up to 64 bits)
-4. `bool`
-5. `timestamp`
-6. `array` (must be consistent types)
+Strings are UTF8 compatible and are only bounded by the available system
+memory.
+
+### Int
+
+Integers are signed integers up to 64 bits.
+
+### Float
+
+Floats are signed floats up to 64 bits.
+
+### Booleans
+
+Booleans represent binary true/false values.
+
+### Timestamps
+
+Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
+stored as UTC.
+
+{% hint style="warning" %}
+**A nete about timestamps without timezone information:**
+
+If Vector receives a timestamp that does not contain timezone information
+Vector assumes the timestamp is in local time, and will convert the timestamp
+to UTC from the local time. It is important that the host system contain
+time zone data files, typically installed through the `tzdata` package. See
+[issue 551][url.issue_551] for more info.
+{% endhint %}
 
 ### Arrays
 
@@ -174,3 +199,7 @@ avoid type human error when configuring Vector.
 [docs.data-model]: ../../about/data-model
 [docs.sinks]: ../../usage/configuration/sinks
 [images.data-model-log]: ../../assets/data-model-log.svg
+[url.issue_551]: https://github.com/timberio/vector/issues/551
+[url.json_types]: https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax
+[url.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
+[url.toml_types]: https://github.com/toml-lang/toml#table-of-contents

@@ -124,8 +124,7 @@ min, and other aggregations.
 
 Depending on the downstream service Vector will aggregate histograms internally
 (such is the case for the [`prometheus` sink][docs.prometheus_sink]) or forward
-them immediately to the service for aggregation (such is the case for the
-[`statsd` sink][docs.statsd_sink]).
+them immediately to the service for aggregation.
 
 ### Set
 
@@ -160,6 +159,5 @@ that unique value.
 [docs.data-model]: ../../about/data-model
 [docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
 [docs.sinks]: ../../usage/configuration/sinks
-[docs.statsd_sink]: ../../usage/configuration/sinks/statsd.md
 [images.data-model-metric]: ../../assets/data-model-metric.svg
 [url.issue_512]: https://github.com/timberio/vector/issues/512

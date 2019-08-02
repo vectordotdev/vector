@@ -37,7 +37,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.field_filter_transform]: ../../../usage/configuration/transforms/field_filter.md
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
