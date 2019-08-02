@@ -489,8 +489,8 @@ release-requires: &release-requires
 workflows:
   version: 2
 
-  build:
-    test:
+  test:
+    jobs:
       - check-code:
           <<: *test-filters
       - check-fmt:
@@ -500,14 +500,15 @@ workflows:
       - test-stable:
           <<: *test-filters
 
-    build:
-      triggers:
-        - schedule:
-            cron: "0 0 * * *"
-            filters:
-              branches:
-                only: master
+  build:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
 
+    jobs:
       - check-code:
           <<: *release-workflow-filters
       - check-fmt:
