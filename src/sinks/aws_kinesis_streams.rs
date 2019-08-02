@@ -204,6 +204,12 @@ fn encode_event(
         .map(|v| v.to_string_lossy())
         .unwrap_or_else(gen_partition_key);
 
+    let partition_key = if partition_key.len() >= 256 {
+        partition_key[..256].to_string()
+    } else {
+        partition_key
+    };
+
     let log = event.into_log();
     let data = match (encoding, log.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => {
@@ -235,7 +241,7 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::{event::{self, Event}, test_util::random_string};
     use std::collections::HashMap;
 
     #[test]
@@ -271,6 +277,18 @@ mod tests {
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(&event.partition_key, &"some_key".to_string());
+    }
+
+    #[test]
+    fn kinesis_encode_event_custom_partition_key_limit() {
+        let mut event = Event::from("hello world");
+        event
+            .as_mut_log()
+            .insert_implicit("key".into(), random_string(300).into());
+        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+
+        assert_eq!(&event.data[..], "hello world".as_bytes());
+        assert_eq!(event.partition_key.len(), 256);
     }
 }
 
