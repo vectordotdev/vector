@@ -58,14 +58,14 @@ Vector can be managed through the [Systemd][url.systemd] service manager:
 
 ## Image Variants
 
-### timberio/vector-alpine:<version>
+### timberio/vector-alpine:\<version\>
 
 This image is based on [`alpine:latest`][url.docker_alpine] which is a Linux
 distribution built around musl libc and BusyBox. It is considerably smaller in
 size than other Docker images and statically links libraries. This is the image
 we recommend due to it's small size and reliability.
 
-### timberio/vector-debian-slim:<version>
+### timberio/vector-debian-slim:\<version\>
 
 This image is based on `debian:9-slim` which is much smaller (up to 30x), and
 thus leads to much slimmer images in general.
@@ -75,7 +75,7 @@ possible is desired. To minimize image size, it's uncommon for additional
 related tools (such as git or bash) to be included. Using this image as a
 base, add the things you need in your own Dockerfile.
 
-### timberio/vector-debian:<version>
+### timberio/vector-debian:\<version\>
 
 This is the defacto image. If you are unsure about what your needs are, you
 probably want to use this one. It is designed to be used both as a throw away
