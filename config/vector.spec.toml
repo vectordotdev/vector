@@ -924,7 +924,7 @@ end
   # * no default
   stream_name = "my-stream"
 
-  # The field used for each records partition key Kinesis stream.
+  # The event field used as the Kinesis record's partition key value.
   # 
   # * optional
   # * no default

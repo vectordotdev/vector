@@ -99,8 +99,8 @@ issue, please:
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms

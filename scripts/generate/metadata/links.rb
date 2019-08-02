@@ -215,7 +215,7 @@ class Links
         raise <<~EOF
         #{name.inspect} is ambiguous and matches multiple doc.
 
-        * #{matched_files.join("\n* ")}
+        * #{docs.join("\n* ")}
         EOF
       else
         raise <<~EOF
@@ -233,7 +233,7 @@ class Links
         raise <<~EOF
         #{name.inspect} is ambiguous and matches multiple images.
 
-        * #{matched_files.join("\n* ")}
+        * #{images.join("\n* ")}
         EOF
       else
         raise <<~EOF
@@ -243,6 +243,19 @@ class Links
     end
 
     def find(files, name)
+      exact_matches =
+        files.select do |file|
+          normalized_file = file.downcase
+          
+          [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
+            !(file_name =~ /\/#{name}(\..*)$/).nil?
+          end
+        end
+
+      if exact_matches.any?
+        return exact_matches
+      end
+
       files.select do |file|
         normalized_file = file.downcase
         

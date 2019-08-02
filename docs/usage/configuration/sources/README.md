@@ -37,7 +37,7 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 [docs.agent_role]: ../../../setup/deployment/roles/agent.md
 [docs.event]: ../../../about/data-model.md#event
 [docs.file_source]: ../../../usage/configuration/sources/file.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.service_role]: ../../../setup/deployment/roles/service.md
 [docs.statsd_source]: ../../../usage/configuration/sources/statsd.md
 [docs.stdin_source]: ../../../usage/configuration/sources/stdin.md

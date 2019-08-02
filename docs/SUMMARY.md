@@ -14,7 +14,7 @@
 ## About
 
 * [Concepts](about/concepts.md)
-* [Data Model](about/data-model.md)
+* [Data Model](about/data-model/README.md)
 * [Guarantees](about/guarantees.md)
 
 ## Setup
