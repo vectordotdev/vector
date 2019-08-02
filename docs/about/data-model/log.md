@@ -135,7 +135,7 @@ Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
 stored as UTC.
 
 {% hint style="warning" %}
-**A nete about timestamps without timezone information:**
+**A note about timestamps without timezone information:**
 
 If Vector receives a timestamp that does not contain timezone information
 Vector assumes the timestamp is in local time, and will convert the timestamp

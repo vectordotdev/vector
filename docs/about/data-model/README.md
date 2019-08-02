@@ -11,9 +11,9 @@ This section will provide a deeper dive into Vector's data model.
 Vector characterizes all data flowing through Vector as "events". Events must be
 one of 2 types:
 
-{% page-ref page="log.md" %}
+{% page-ref page="../data-model/log.md" %}
 
-{% page-ref page="metric.md" %}
+{% page-ref page="../data-model/metric.md" %}
 
 Each section above will provide a deeper dive into that specific event type.
 
