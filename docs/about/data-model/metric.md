@@ -2,7 +2,7 @@
 description: 'A deeper look into Vector''s internal metric event.'
 ---
 
-# Metric Event
+# Metric
 
 ![][images.data-model-metric]
 

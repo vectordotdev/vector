@@ -2,7 +2,7 @@
 description: 'A deeper look into Vector''s internal log event.'
 ---
 
-# Log Event
+# Log
 
 ![][images.data-model-log]
 
