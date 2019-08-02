@@ -442,16 +442,9 @@ test-filters: &test-filters
     branches:
       only: /.*/
     tags:
-      only: /.*/
+      ignore: /.*/
 
 release-workflow-filters: &release-workflow-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      only: /v.*/
-
-tag-release-workflow-filters: &tag-release-workflow-filters
   filters:
     branches:
       ignore: /.*/
@@ -496,7 +489,7 @@ release-requires: &release-requires
 workflows:
   version: 2
 
-  build:
+  test:
     jobs:
       - check-code:
           <<: *test-filters
@@ -506,6 +499,24 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+
+  build:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - check-code:
+          <<: *release-workflow-filters
+      - check-fmt:
+          <<: *release-workflow-filters
+      - check-generate:
+          <<: *release-workflow-filters
+      - test-stable:
+          <<: *release-workflow-filters
       - build-armv7-unknown-linux-gnueabihf-archive:
           <<: *release-workflow-filters
           <<: *build-requires
@@ -552,24 +563,24 @@ workflows:
           <<: *release-workflow-filters
           <<: *verify-requires
       - release-deb:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-github:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-rpm:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           <<: *release-requires
       - release-s3:
           <<: *release-workflow-filters
           <<: *release-requires
       # Installs directly from S3
       - release-docker:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-s3
       # Installs directly from S3
       - release-homebrew:
-          <<: *tag-release-workflow-filters
+          <<: *release-workflow-filters
           requires:
             - release-s3
