@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod metric;
+mod unflatten;
 
 pub use metric::Metric;
 
@@ -113,6 +114,10 @@ impl LogEvent {
             inner: self.structured.iter(),
             explicit_only: false,
         }
+    }
+
+    pub fn unflatten(self) -> unflatten::Unflatten {
+        unflatten::Unflatten::from(self.structured)
     }
 
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {

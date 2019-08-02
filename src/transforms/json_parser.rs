@@ -32,7 +32,7 @@ impl TransformConfig for JsonParserConfig {
     }
 }
 
-struct JsonParser {
+pub struct JsonParser {
     field: Atom,
     drop_invalid: bool,
     drop_field: bool,

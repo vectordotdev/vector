@@ -183,8 +183,8 @@ fn encode_event(
 
     let mut body = match (encoding, event.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => json!({
-            "event": event.all_fields(),
             "fields": event.explicit_fields(),
+            "event": event.unflatten(),
             "time": timestamp,
         }),
         (&Some(Encoding::Text), _) | (_, false) => json!({
