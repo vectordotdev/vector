@@ -220,7 +220,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::region::RegionOrEndpoint;
-    use pretty_assertions::assert_eq;
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
