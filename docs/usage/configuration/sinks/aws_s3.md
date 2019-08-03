@@ -250,7 +250,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 
   # A prefix to apply to all object key names. This should be used to partition
   # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  # this to be the root S3 "folder".
   # 
   # * optional
   # * default: "date=%F"
@@ -316,7 +316,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
 | `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
-| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
+| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
 | `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
 | `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |

@@ -1200,7 +1200,7 @@ end
 
   # A prefix to apply to all object key names. This should be used to partition
   # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  # this to be the root S3 "folder".
   # 
   # * optional
   # * default: "date=%F"
