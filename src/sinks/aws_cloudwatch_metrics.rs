@@ -61,7 +61,7 @@ impl CloudWatchMetricsService {
         config: CloudWatchMetricsSinkConfig,
         acker: Acker,
     ) -> Result<super::RouterSink, String> {
-        let client = CloudWatchClient::new(config.region.clone().try_into()?);
+        let client = Self::create_client(config.clone().region.try_into()?)?;
 
         let batch_size = config.batch_size.unwrap_or(5);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
@@ -98,8 +98,7 @@ impl CloudWatchMetricsService {
     }
 
     fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> Result<super::Healthcheck, String> {
-        let region = config.region.clone();
-        let client = Self::create_client(region.try_into()?)?;
+        let client = Self::create_client(config.clone().region.try_into()?)?;
 
         let datum = MetricDatum {
             metric_name: "healthcheck".into(),
