@@ -509,10 +509,10 @@ workflows:
               only: master
 
     jobs:
-      - check-code:
-      - check-fmt:
-      - check-generate:
-      - test-stable:
+      - check-code
+      - check-fmt
+      - check-generate
+      - test-stable
       - build-armv7-unknown-linux-gnueabihf-archive:
           <<: *require-checks-and-tests
       # - build-armv7-unknown-linux-musleabihf-archive:
