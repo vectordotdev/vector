@@ -245,7 +245,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
-| `index` | `string` | Index name to write events to.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
+| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |

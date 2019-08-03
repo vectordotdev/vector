@@ -247,9 +247,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "aws_cloudwatch_logs"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
+| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
-| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
+| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
