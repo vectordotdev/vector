@@ -1,21 +1,19 @@
 ---
-description: 'A deeper look at Vector''s data model: the event'
+description: 'A deeper look at Vector''s data model'
 ---
 
 # Data Model
 
-This section will provide a deeper dive into Vector's data model.
+![][images.data-model]
 
-## Event
-
-Vector characterizes all data flowing through Vector as "events". Events must be
-one of 2 types:
+As shown above, Vector generalizes all data flowing through Vector as events.
+Events must be one of 2 types:
 
 {% page-ref page="../data-model/log.md" %}
 
 {% page-ref page="../data-model/metric.md" %}
 
-Each section above will provide a deeper dive into that specific event type.
+Each page above will provide a deeper dive into it's respective event type.
 
 
 
