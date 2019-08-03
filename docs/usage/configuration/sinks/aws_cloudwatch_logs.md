@@ -33,9 +33,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"]
-  group_name = "/var/log/my-log.log"
+  group_name = "/var/log/{{ file }}.log"
   region = "us-east-1"
-  stream_name = "my-stream"
+  stream_name = "{{ instance_id }}"
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
@@ -89,6 +89,155 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.aws_cloudwatch_logs_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_cloudwatch_logs"
+  type = "aws_cloudwatch_logs"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The group name of the target CloudWatch Logs stream.
+  # 
+  # * required
+  # * no default
+  group_name = "/var/log/{{ file }}.log"
+  group_name = "ec2/{{ instance_id }}"
+
+  # The AWS region of the target CloudWatch Logs stream resides.
+  # 
+  # * required
+  # * no default
+  region = "us-east-1"
+
+  # The stream name of the target CloudWatch Logs stream.
+  # 
+  # * required
+  # * no default
+  stream_name = "{{ instance_id }}"
+  stream_name = "stream-name"
+  stream_name = "%Y-%m-%d"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * optional
+  # * default: "dynamic"
+  # * enum: "json", "text"
+  encoding = "json"
+  encoding = "text"
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
+
+  #
+  # Buffer
+  #
+
+  [sinks.aws_cloudwatch_logs_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -98,9 +247,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `enum: "aws_cloudwatch_logs"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream. See [Partitioning](#partitioning) for more info.<br />`required` `example: "/var/log/my-log.log"` |
+| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
-| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream. See [Partitioning](#partitioning) for more info.<br />`required` `example: "my-stream"` |
+| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
@@ -281,6 +430,25 @@ Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
 
+### Template Syntax
+
+The `group_name` and `stream_name` options
+support [Vector's template syntax][docs.configuration.template_syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```coffeescript
+[sinks.my_aws_cloudwatch_logs_sink_id]
+  # ...
+  group_name = "/var/log/{{ file }}.log"
+  group_name = "ec2/{{ instance_id }}"
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template_syntax].
+
 ### Timeouts
 
 To ensure the pipeline does not halt when a service fails to respond Vector
@@ -316,6 +484,7 @@ issue, please:
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.template_syntax]: ../../../usage/configuration#template_syntax
 [docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md

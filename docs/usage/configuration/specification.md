@@ -793,7 +793,8 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/my-log.log"
+  group_name = "/var/log/{{ file }}.log"
+  group_name = "ec2/{{ instance_id }}"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -805,7 +806,9 @@ end
   # 
   # * required
   # * no default
-  stream_name = "my-stream"
+  stream_name = "{{ instance_id }}"
+  stream_name = "stream-name"
+  stream_name = "%Y-%m-%d"
 
   #
   # Batching
@@ -948,7 +951,7 @@ end
   # 
   # * optional
   # * no default
-  partition_key_field = "my-partition-key"
+  partition_key_field = "user_id"
 
   #
   # Batching
@@ -1204,6 +1207,7 @@ end
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
   # Buffer
@@ -1408,11 +1412,12 @@ end
   # * default: "_doc"
   doc_type = "_doc"
 
-  # Index name to write events to. `strftime` specifiers are supported.
+  # Index name to write events to.
   # 
   # * optional
   # * default: "vector-%F"
-  index = "vector-%F"
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
 
   #
   # Batching
@@ -1718,7 +1723,7 @@ end
   # 
   # * required
   # * no default
-  key_field = "partition_key"
+  key_field = "user_id"
 
   # The Kafka topic name to write events to.
   # 

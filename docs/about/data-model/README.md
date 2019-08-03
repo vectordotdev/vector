@@ -15,5 +15,11 @@ Events must be one of 2 types:
 
 Each page above will provide a deeper dive into it's respective event type.
 
+## Event
+
+For clarification, Vector uses the term "event" to refer to both log and
+metrics event. This is the generalized term that represents all units of data
+flowing through Vector.
+
 
 [images.data-model]: ../../assets/data-model.svg

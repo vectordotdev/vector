@@ -61,6 +61,10 @@ class Context
     def option_description(option)
       description = option.description.strip
 
+      if option.templateable?
+        description << "This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]."
+      end
+
       if option.relevant_when
         conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
         description << " Only relevant when #{conditions.to_sentence}"

@@ -52,6 +52,60 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.syslog_source]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "syslog"
+  type = "syslog"
+
+  # The input mode.
+  # 
+  # * required
+  # * no default
+  # * enum: "tcp", "udp", "unix"
+  mode = "tcp"
+  mode = "udp"
+  mode = "unix"
+
+  # The TCP or UDP address to listen on.
+  # 
+  # * optional
+  # * no default
+  address = "0.0.0.0:9000"
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_length = 102400
+
+  # The unix socket path. *This should be absolute path.* Only relevant when
+  # `mode` is `unix`.
+  # 
+  # * optional
+  # * no default
+  path = "/path/to/socket"
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

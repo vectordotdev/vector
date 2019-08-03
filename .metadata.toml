@@ -784,9 +784,13 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
-examples = ["/var/log/my-log.log"]
+examples = [
+  "/var/log/{{ file }}.log",
+  "ec2/{{ instance_id }}"
+]
 null = false
 partition_key = true
+templateable = true
 description = "The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream."
 
 [sinks.aws_cloudwatch_logs.options.region]
@@ -797,9 +801,14 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
-examples = ["my-stream"]
+examples = [
+  "{{ instance_id }}",
+  "stream-name",
+  "%Y-%m-%d"
+]
 null = false
 partition_key = true
+templateable = true
 description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
 
 # ------------------------------------------------------------------------------
@@ -832,7 +841,7 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
-examples = ["my-partition-key"]
+examples = ["user_id"]
 null = true
 description = "The event field used as the Kinesis record's partition key value."
 
@@ -872,7 +881,6 @@ write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](
 type = "string"
 examples = ["my-bucket"]
 null = false
-partition_key = true
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
 [sinks.aws_s3.options.compression]
@@ -924,10 +932,12 @@ default = "date=%F"
 examples = [
   "date=%F/",
   "date=%F/hour=%H/",
-  "year=%Y/month=%m/day=%d/"
+  "year=%Y/month=%m/day=%d/",
+  "application_id={{ application_id }}/date=%F/"
 ]
 null = true
 partition_key = true
+templateable = true
 description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\". [`strftime` specifiers][url.strftime_specifiers] are supported. "
 
 [sinks.aws_s3.options.region]
@@ -1011,9 +1021,13 @@ description = "The host of your Elasticsearch cluster. This should be the full U
 [sinks.elasticsearch.options.index]
 type = "string"
 default = "vector-%F"
+examples = [
+  "vector-%Y-%m-%d",
+  "application-{{ application_id }}-%Y-%m-%d"
+]
 null = false
-partition_key = true
-description = "Index name to write events to. [`strftime` specifiers][url.strftime_specifiers] are supported."
+templateable = true
+description = "Index name to write events to."
 
 # ------------------------------------------------------------------------------
 # sinks.http
@@ -1114,7 +1128,7 @@ description = "The encoding format used to serialize the events before flushing.
 
 [sinks.kafka.options.key_field]
 type = "string"
-examples = ["partition_key"]
+examples = ["user_id"]
 null = false
 description = """\
 The field name to use for the topic key. If unspecified, the key will be \
@@ -1318,6 +1332,7 @@ kafka_partitioning_docs = "https://cwiki.apache.org/confluence/display/KAFKA/A+G
 kafka_protocol = "https://kafka.apache.org/protocol"
 kubernetes_limit_resources = "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/"
 leveldb = "https://github.com/google/leveldb"
+log_event_source = "https://github.com/timberio/vector/blob/master/src/event/mod.rs"
 lua = "https://www.lua.org/"
 lua_docs = "https://www.lua.org/manual/5.3/"
 lua_manual = "http://www.lua.org/manual/5.1/manual.html"
@@ -1325,6 +1340,7 @@ lua_require = "http://www.lua.org/manual/5.1/manual.html#pdf-require"
 lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
+metric_event_source = "https://github.com/timberio/vector/blob/master/src/event/metric.rs"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
 new_feature_request = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"

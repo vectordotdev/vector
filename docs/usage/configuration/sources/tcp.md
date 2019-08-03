@@ -50,6 +50,51 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.tcp_source]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "tcp"
+  type = "tcp"
+
+  # The address to bind the socket to.
+  # 
+  # * required
+  # * no default
+  address = "0.0.0.0:9000"
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_length = 102400
+
+  # The timeout before a connection is forcefully closed during shutdown.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  shutdown_timeout_secs = 30
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

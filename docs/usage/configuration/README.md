@@ -184,6 +184,85 @@ The Vector configuration file requires the [TOML][url.toml] format for it's
 simplicity, explicitness, and relaxed white-space parsing. For more information,
 please refer to the excellent [TOML documentation][url.toml].
 
+### Template Syntax
+
+Select configuration options support Vector's template syntax to produce
+dynamic values derived from the event's data. There are 2 special syntaxes
+which are desribed below:
+
+#### Strftime specifiers
+
+For simplicity, Vector allows you to supply [strftime \
+specifiers][url.strftime_specifiers] diredctly as part of the value to produce
+formatted timestamp values based off of the event's `timestamp` field.
+
+For example, given the following [`log` event][docs.log_event]:
+
+```rust
+LogEvent {
+    "timestamp": chrono::DateTime<2019-05-02T00:23:22Z>,
+    "message": "message"
+    "host": "my.host.com"
+}
+```
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[sinks.my_s3_sink_id]
+  type = "aws_s3"
+  key_prefix = "date=%Y-%m-%d"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Vector would produce the following value for the `key_prefix` field:
+
+```
+date=2019-05-02
+```
+
+This effectively enables time partitioning for the
+[`aws_s3` sink][docs.aws_s3_sink].
+
+##### Event fields
+
+In addition to formatting the `timestamp` field, Vector allows you to directly
+access event fields with the `{{ <field-name> }}` syntax.
+
+For example, given the following [`log` event][docs.log_event]:
+
+```rust
+LogEvent {
+    "timestamp": chrono::DateTime<2019-05-02T00:23:22Z>,
+    "message": "message"
+    "application_id":  1
+}
+```
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[sinks.my_s3_sink_id]
+  type = "aws_s3"
+  key_prefix = "application_id={{ application_id }}/date=%Y-%m-%d"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+Vector would produce the following value for the `key_prefix` field:
+
+```
+application_id=1/date=2019-05-02
+```
+
+This effectively enables application specific time partitioning.
+
+
 ### Value Types
 
 All TOML values types are supported. For convenience this includes:
@@ -253,4 +332,5 @@ All TOML values types are supported. For convenience this includes:
 [url.prometheus]: https://prometheus.io/
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.toml]: https://github.com/toml-lang/toml

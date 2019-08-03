@@ -59,6 +59,70 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.prometheus_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "prometheus"
+  type = "prometheus"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The address to expose for scraping.
+  # 
+  # * required
+  # * no default
+  address = "0.0.0.0:9598"
+
+  #
+  # Buffer
+  #
+
+  [sinks.prometheus_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

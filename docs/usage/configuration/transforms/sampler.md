@@ -46,6 +46,38 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
   pass_list = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.sampler_transform]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "sampler"
+  type = "sampler"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The maximum number of events allowed per second.
+  # 
+  # * required
+  # * no default
+  rate = 10
+
+  # A list of regular expression patterns to exclude events from sampling. If an
+  # event's `"message"` key matches _any_ of these patterns it will _not_ be
+  # sampled.
+  # 
+  # * optional
+  # * no default
+  pass_list = ["[error]", "field2"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

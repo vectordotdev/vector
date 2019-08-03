@@ -16,6 +16,7 @@ class Option
     :options,
     :partition_key,
     :relevant_when,
+    :templateable,
     :type,
     :unit
 
@@ -39,6 +40,7 @@ class Option
     @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
+    @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
 
@@ -149,6 +151,10 @@ class Option
 
   def table?
     type == "table"
+  end
+
+  def templateable?
+    templateable == true
   end
 
   def wildcard?

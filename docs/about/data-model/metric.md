@@ -19,13 +19,52 @@ Vector for your use case.
 
 ## Structure
 
-A `metric` in Vector must be one of the [supported types](#types), it's schema
-is fixed and described in more detail in the [types section](#types).
+Vector characterizes a `Metric` event as a defined set of types:
+
+{% code-tabs %}
+{% code-tabs-item title="definition" %}
+```rust
+pub enum Metric {
+    Counter {
+        name: String,
+        val: f32,
+    },
+    Histogram {
+        name: String,
+        val: f32,
+        sample_rate: u32,
+    },
+    Gauge {
+        name: String,
+        val: f32,
+        direction: Option<Direction>,
+    },
+    Set {
+        name: String,
+        val: String,
+    },
+}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="example" %}
+```rust
+Metric {
+  Counter {
+    name: "login.count",
+    val: 2.0
+  }
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can view a complete definition in the
+[metric event source file][url.metric_event_source].
 
 ## Types
 
-A vector metric must be one of the following types: `counter`, `gauge`, `set`,
-`histogram`. Each are described below:
+A vector metric must be one of the following types: `Counter`, `Gauge`,
+`Histogram`, `Set`. Each are described below:
 
 ### Counter
 
@@ -161,3 +200,4 @@ that unique value.
 [docs.sinks]: ../../usage/configuration/sinks
 [images.data-model-metric]: ../../assets/data-model-metric.svg
 [url.issue_512]: https://github.com/timberio/vector/issues/512
+[url.metric_event_source]: https://github.com/timberio/vector/blob/master/src/event/metric.rs

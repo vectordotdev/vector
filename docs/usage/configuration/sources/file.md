@@ -69,6 +69,96 @@ The `file` source ingests data through one or more local files and outputs [`log
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.file_source]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "file"
+  type = "file"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
+  # 
+  # * required
+  # * no default
+  exclude = ["/var/log/nginx/access.log"]
+
+  # Array of file patterns to include. Globbing is supported.
+  # 
+  # * required
+  # * no default
+  include = ["/var/log/nginx/*.log"]
+
+  # The number of bytes read off the head of the file to generate a unique
+  # fingerprint.
+  # 
+  # * optional
+  # * default: 256
+  # * unit: bytes
+  fingerprint_bytes = 256
+
+  # Delay between file discovery calls. This controls the interval at which
+  # Vector searches for files.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  glob_minimum_cooldown = 1000
+
+  # Ignore files with a data modification date that does not exceed this age.
+  # 
+  # * optional
+  # * no default
+  # * unit: seconds
+  ignore_older = 86400
+
+  # The number of bytes to skipe ahead (or ignore) when generating a unique
+  # fingerprint. This is helpful if all files share a common header.
+  # 
+  # * optional
+  # * default: 0
+  # * unit: bytes
+  ignored_header_bytes = 0
+
+  # The maximum number of a bytes a line can contain before being discarded. This
+  # protects against malformed lines or tailing incorrect files.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_line_bytes = 102400
+
+  # When `true` Vector will read from the beginning of new files, when `false`
+  # Vector will only read new data added to the file.
+  # 
+  # * optional
+  # * default: false
+  start_at_beginning = false
+
+  #
+  # Context
+  #
+
+  # The key name added to each event with the full path of the file.
+  # 
+  # * optional
+  # * default: "file"
+  file_key = "file"
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

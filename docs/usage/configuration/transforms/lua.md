@@ -57,6 +57,48 @@ end
   search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.lua_transform]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "lua"
+  type = "lua"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The inline Lua source to evaluate.
+  # 
+  # * required
+  # * no default
+  source = """
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""
+
+
+  # A list of directories search when loading a Lua file via the `require`
+  # function.
+  # 
+  # * optional
+  # * no default
+  search_dirs = ["/etc/vector/lua"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

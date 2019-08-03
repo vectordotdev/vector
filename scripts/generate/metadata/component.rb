@@ -80,6 +80,10 @@ class Component
     type == "source"
   end
 
+  def templateable_options
+    options.to_h.values.sort.select(&:templateable?)
+  end
+
   def transform?
     type == "transform"
   end

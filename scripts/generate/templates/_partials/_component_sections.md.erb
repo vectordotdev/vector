@@ -199,6 +199,29 @@ attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` opt
 The `<%= component.name %>` <%= component.type %> streams data on a real-time
 event-by-event basis. It does not batch data.
 <%- end -%>
+<%- if component.templateable_options.any? -%>
+
+### Template Syntax
+
+The <%= option_names(component.templateable_options).to_sentence %> options
+support [Vector's template syntax][docs.configuration.template_syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```toml
+[<%= component.type.pluralize %>.my_<%= component.id %>_id]
+  # ...
+  <%- option = component.templateable_options.fetch(0) -%>
+  <%- option.examples.each do |example| -%>
+  <%= option.name %> = <%= example.to_toml %>
+  <%- end -%>
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template_syntax].
+<%- end -%>
 <%- if component.options.request_timeout_secs -%>
 
 ### Timeouts

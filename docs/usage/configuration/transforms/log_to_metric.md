@@ -53,6 +53,69 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     labels = {* = "<string>"}
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.log_to_metric_transform]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "log_to_metric"
+  type = "log_to_metric"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Metrics
+  #
+
+  [[transforms.log_to_metric_transform.metrics]]
+    # The metric type.
+    # 
+    # * required
+    # * no default
+    # * enum: "counter", "gauge"
+    type = "counter"
+    type = "gauge"
+
+    # The log field to use as the metric.
+    # 
+    # * required
+    # * no default
+    field = "duration"
+
+    # If `true` the metric will be incremented by the `field` value. If `false` the
+    # metric will be incremented by 1 regardless of the `field` value.
+    # 
+    # * optional
+    # * default: false
+    increment_by_value = false
+
+    # The name of the metric. Defaults to `<field>_total` for `counter` and
+    # `<field>` for `gauge`.
+    # 
+    # * optional
+    # * default: "dynamic"
+    name = "duration_total"
+
+    [transforms.log_to_metric_transform.metrics.labels]
+      # Key/value pairs representing the metric labels.
+      # 
+      # * required
+      # * no default
+      host = "${HOSTNAME}"
+      region = "us-east-1"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

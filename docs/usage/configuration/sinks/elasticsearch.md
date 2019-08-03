@@ -37,7 +37,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - General
   doc_type = "_doc" # default
-  index = "vector-%F" # default
+  index = "vector-%Y-%m-%d" # default
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -91,6 +91,148 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.elasticsearch_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "elasticsearch"
+  type = "elasticsearch"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example.
+  # 
+  # * required
+  # * no default
+  host = "http://10.24.32.122:9000"
+
+  # The `doc_type` for your index data. This is only relevant for Elasticsearch
+  # <= 6.X. If you are using >= 7.0 you do not need to set this option since
+  # Elasticsearch has removed it.
+  # 
+  # * optional
+  # * default: "_doc"
+  doc_type = "_doc"
+
+  # Index name to write events to.
+  # 
+  # * optional
+  # * default: "vector-%F"
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 60
+  # * unit: seconds
+  request_timeout_secs = 60
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
+
+  #
+  # Buffer
+  #
+
+  [sinks.elasticsearch_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -103,7 +245,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
-| `index` | `string` | Index name to write events to. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Partitioning](#partitioning) for more info.<br />`default: "vector-%F"` |
+| `index` | `string` | Index name to write events to.This option is supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
@@ -142,8 +284,7 @@ Content-Length: 654
 
 ### Buffers & Batches
 
- 
-![][images.sink-flow-partitioned]
+![][images.sink-flow-serial]
 
 The `elasticsearch` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
@@ -214,20 +355,6 @@ Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
 more about how Vector handles nested documents in the [Data Model
 document][docs.data_model].
 
-### Partitioning
-
-Partitioning is controlled via the `index`
-options and allows you to dynamically partition data on the fly. You'll notice
-that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling this partitioning. The interpolated result is effectively the internal
-partition key. Let's look at a few examples:
-
-| Value          | Interpolation          | Desc                                   |
-|:---------------|:-----------------------|:---------------------------------------|
-| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
-| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
-
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -246,6 +373,25 @@ with the Vector team by [opening an issie][url.new_elasticsearch_sink_issue].
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+
+### Template Syntax
+
+The `index` options
+support [Vector's template syntax][docs.configuration.template_syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```coffeescript
+[sinks.my_elasticsearch_sink_id]
+  # ...
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template_syntax].
 
 ### Timeouts
 
@@ -281,6 +427,7 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.template_syntax]: ../../../usage/configuration#template_syntax
 [docs.data_model]: ../../../about/data-model
 [docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
@@ -291,7 +438,7 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22
 [url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22

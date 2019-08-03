@@ -58,6 +58,80 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.console_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "console"
+  type = "console"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The standard stream to write to.
+  # 
+  # * required
+  # * no default
+  # * enum: "stdout", "stderr"
+  target = "stdout"
+  target = "stderr"
+
+  # The encoding format used to serialize the events before writing.
+  # 
+  # * optional
+  # * default: "dynamic"
+  # * enum: "json", "text"
+  encoding = "json"
+  encoding = "text"
+
+  #
+  # Buffer
+  #
+
+  [sinks.console_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

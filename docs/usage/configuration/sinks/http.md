@@ -104,6 +104,182 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
     * = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.http_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "http"
+  type = "http"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson", "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The full URI to make HTTP requests to. This should include the protocol and
+  # host, but can also include the port, path, and any other valid part of a URI.
+  # 
+  # * required
+  # * no default
+  uri = "https://10.22.212.22:9000/endpoint"
+
+  # The compression strategy used to compress the payload before sending.
+  # 
+  # * optional
+  # * no default
+  # * must be: "gzip" (if supplied)
+  compression = "gzip"
+
+  # A URI that Vector can request in order to determine the service health.
+  # 
+  # * optional
+  # * no default
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  batch_timeout = 5
+
+  #
+  # Requests
+  #
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 10
+  rate_limit_num = 10
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 10
+  request_in_flight_limit = 10
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 10
+  retry_attempts = 10
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 10
+  # * unit: seconds
+  retry_backoff_secs = 10
+
+  #
+  # Basic auth
+  #
+
+  [sinks.http_sink.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
+  # Buffer
+  #
+
+  [sinks.http_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory", "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block", "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+
+  #
+  # Headers
+  #
+
+  [sinks.http_sink.headers]
+    # A custom header to be added to each outgoing HTTP request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options

@@ -36,6 +36,30 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
   fields = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.remove_fields_transform]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "remove_fields"
+  type = "remove_fields"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The field names to drop.
+  # 
+  # * required
+  # * no default
+  fields = ["field1", "field2"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
