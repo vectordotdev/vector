@@ -1,10 +1,10 @@
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{Event, Metric},
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, SinkExt,
+        BatchServiceSink, Partition, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -14,7 +14,7 @@ use rusoto_cloudwatch::{
 };
 use rusoto_core::{Region, RusotoFuture};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, fmt, time::Duration};
+use std::{convert::TryInto, time::Duration};
 use tower::{Service, ServiceBuilder};
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
@@ -63,7 +63,7 @@ impl CloudWatchMetricsService {
     ) -> Result<super::RouterSink, String> {
         let client = CloudWatchClient::new(config.region.clone().try_into()?);
 
-        let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
+        let batch_size = config.batch_size.unwrap_or(5);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
@@ -88,7 +88,7 @@ impl CloudWatchMetricsService {
             .timeout(Duration::from_secs(timeout))
             .service(cloudwatch_metrics);
 
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
+        let sink = BatchServiceSink::new(svc, acker).partitioned_batched_with_min(
             Vec::new(),
             batch_size,
             Duration::from_secs(batch_timeout),
@@ -138,6 +138,14 @@ impl CloudWatchMetricsService {
     }
 }
 
+use bytes::Bytes;
+
+impl Partition<Bytes> for Event {
+    fn partition(&self) -> Bytes {
+        "key".into()
+    }
+}
+
 impl Service<Vec<Event>> for CloudWatchMetricsService {
     type Response = ();
     type Error = PutMetricDataError;
@@ -148,21 +156,14 @@ impl Service<Vec<Event>> for CloudWatchMetricsService {
     }
 
     fn call(&mut self, items: Vec<Event>) -> Self::Future {
-        let input = encode_events(items).unwrap();
+        let namespace = self.config.namespace.clone();
+        let input = encode_events(items, namespace).unwrap();
 
         debug!(message = "sending data.", input = &field::debug(&input));
 
         self.client
             .put_metric_data(input)
             .instrument(info_span!("request"))
-    }
-}
-
-impl fmt::Debug for CloudWatchMetricsService {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("CloudWatchMetricsService")
-            .field("config", &self.config)
-            .finish()
     }
 }
 
@@ -183,10 +184,22 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
-fn encode_events(_events: Vec<Event>) -> Result<PutMetricDataInput, ()> {
+fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataInput, ()> {
+    let metric_data: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event.as_metric() {
+            Metric::Counter { name, val } => Some(MetricDatum {
+                metric_name: name.to_string(),
+                value: Some(*val as f64),
+                ..Default::default()
+            }),
+            _ => None,
+        })
+        .collect();
+
     let datum = PutMetricDataInput {
-        namespace: "namespace".to_string(),
-        metric_data: Vec::new(),
+        namespace,
+        metric_data,
     };
 
     Ok(datum)
@@ -199,17 +212,36 @@ mod tests {
     use rusoto_cloudwatch::PutMetricDataInput;
 
     #[test]
-    fn encode_events_basic() {
-        let event = Event::Metric(Metric::Counter {
-            name: "exception_total".into(),
-            val: 1.0,
-        });
+    fn encode_events_basic_counter() {
+        let namespace = String::from("namespace");
+
+        let events = vec![
+            Event::Metric(Metric::Counter {
+                name: "exception_total".into(),
+                val: 1.0,
+            }),
+            Event::Metric(Metric::Counter {
+                name: "bytes_out".into(),
+                val: 2.5,
+            }),
+        ];
 
         assert_eq!(
-            encode_events(vec![event]).unwrap(),
+            encode_events(events, namespace.clone()).unwrap(),
             PutMetricDataInput {
-                namespace: "namespace".into(),
-                metric_data: Vec::new(),
+                namespace,
+                metric_data: vec![
+                    MetricDatum {
+                        metric_name: "exception_total".into(),
+                        value: Some(1.0),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "bytes_out".into(),
+                        value: Some(2.5),
+                        ..Default::default()
+                    }
+                ],
             }
         );
     }
@@ -220,6 +252,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::region::RegionOrEndpoint;
+    use crate::test_util::random_string;
+    use futures::{stream, Sink};
+    use tokio::runtime::Runtime;
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
@@ -235,5 +270,26 @@ mod integration_tests {
 
         let healthcheck = CloudWatchMetricsService::healthcheck(&config()).unwrap();
         rt.block_on(healthcheck).unwrap();
+    }
+
+    #[test]
+    fn cloudwatch_metrics_put_data() {
+        let mut rt = Runtime::new().unwrap();
+        let sink = CloudWatchMetricsService::new(config(), Acker::Null).unwrap();
+
+        let mut events = Vec::new();
+        let name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Counter {
+                name: name.clone(),
+                val: i as f32,
+            });
+            events.push(event);
+        }
+
+        let stream = stream::iter_ok(events.clone().into_iter());
+
+        let pump = sink.send_all(stream);
+        rt.block_on(pump).unwrap();
     }
 }
