@@ -444,21 +444,21 @@ test-filters: &test-filters
     tags:
       ignore: /.*/
 
-release-workflow-filters: &release-workflow-filters
+tag-workflow-filters: &tag-workflow-filters
   filters:
     branches:
       ignore: /.*/
     tags:
       only: /v.*/
 
-build-requires: &build-requires
+require-checks-and-tests: &require-checks-and-tests
   requires:
     - check-code
     - check-fmt
     - check-generate
     - test-stable
 
-package-requires: &package-requires
+require-builds: &require-builds
   requires:
     - build-armv7-unknown-linux-gnueabihf-archive
     # - build-armv7-unknown-linux-musleabihf-archive
@@ -466,11 +466,11 @@ package-requires: &package-requires
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
 
-verify-requires: &verify-requires
+require-packages: &require-packages
   requires:
     - package-rpm
 
-release-requires: &release-requires
+require-verifies: &require-verifies
   requires:
     - verify-amazon-linux-1
     - verify-amazon-linux-2
@@ -500,7 +500,7 @@ workflows:
       - test-stable:
           <<: *test-filters
 
-  build:
+  nightly:
     triggers:
       - schedule:
           cron: "0 0 * * *"
@@ -510,77 +510,102 @@ workflows:
 
     jobs:
       - check-code:
-          <<: *release-workflow-filters
       - check-fmt:
-          <<: *release-workflow-filters
       - check-generate:
-          <<: *release-workflow-filters
       - test-stable:
-          <<: *release-workflow-filters
       - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
       # - build-armv7-unknown-linux-musleabihf-archive:
-      #     <<: *release-workflow-filters
-      #     <<: *build-requires
+      #     <<: *tag-workflow-filters
+      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
-      - package-rpm:
-          <<: *release-workflow-filters
-          <<: *package-requires
-      - verify-amazon-linux-1:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-amazon-linux-2:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-centos-7:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-8:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-9:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-10:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-16-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-18-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-19-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - release-deb:
-          <<: *release-workflow-filters
-          <<: *release-requires
-      - release-github:
-          <<: *release-workflow-filters
-          <<: *release-requires
-      - release-rpm:
-          <<: *release-workflow-filters
-          <<: *release-requires
+          <<: *require-checks-and-tests
       - release-s3:
-          <<: *release-workflow-filters
-          <<: *release-requires
+          <<: *require-builds
       # Installs directly from S3
       - release-docker:
-          <<: *release-workflow-filters
+          <<: *tag-workflow-filters
+          requires:
+            - release-s3
+
+  tag:
+    jobs:
+      - check-code:
+          <<: *tag-workflow-filters
+      - check-fmt:
+          <<: *tag-workflow-filters
+      - check-generate:
+          <<: *tag-workflow-filters
+      - test-stable:
+          <<: *tag-workflow-filters
+      - build-armv7-unknown-linux-gnueabihf-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      # - build-armv7-unknown-linux-musleabihf-archive:
+      #     <<: *tag-workflow-filters
+      #     <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-gnu-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-musl-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - build-x86_64-apple-darwin-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - package-rpm:
+          <<: *tag-workflow-filters
+          <<: *require-builds
+      - verify-amazon-linux-1:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-amazon-linux-2:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-centos-7:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-8:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-9:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-10:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-16-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-18-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-19-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - release-deb:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-github:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-rpm:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-s3:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      # Installs directly from S3
+      - release-docker:
+          <<: *tag-workflow-filters
           requires:
             - release-s3
       # Installs directly from S3
       - release-homebrew:
-          <<: *release-workflow-filters
+          <<: *tag-workflow-filters
           requires:
             - release-s3

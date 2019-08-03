@@ -8,20 +8,7 @@
 
 set -eu
 
-CHANNEL=""
-if [[ $VERSION == *"-"* ]]; then
-  CHANNEL="nightly"
-  echo "Version ($VERSION) is a nightly version, only releasing to nightly channels"
-else
-  CHANNEL="latest"
-  echo "Version ($VERSION) is a release version, releasing to latest channels"
-fi
-
-if [ -z "$CHANNEL" ]; then
-  echo 'The CHANNEL env var must be set to "nightly" or "latest"'
-  exit 1
-fi
-
+CHANNEL=$(util/release-channel.sh)
 escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
 
 #
