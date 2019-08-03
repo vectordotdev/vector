@@ -62,7 +62,7 @@ class Context
       description = option.description.strip
 
       if option.templateable?
-        description << "This option supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]."
+        description << "This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]."
       end
 
       if option.relevant_when

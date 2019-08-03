@@ -245,7 +245,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
-| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template_syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
+| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
@@ -377,7 +377,7 @@ attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` opt
 ### Template Syntax
 
 The `index` options
-support [Vector's template syntax][docs.configuration.template_syntax],
+support [Vector's template syntax][docs.configuration.template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
@@ -391,7 +391,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration.template_syntax].
+[template syntax section][docs.configuration.template-syntax].
 
 ### Timeouts
 
@@ -427,7 +427,7 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.configuration.template_syntax]: ../../../usage/configuration#template_syntax
+[docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data_model]: ../../../about/data-model
 [docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
