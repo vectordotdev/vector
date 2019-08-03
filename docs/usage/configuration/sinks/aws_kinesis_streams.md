@@ -331,7 +331,7 @@ issue, please:
 1. Check for any [open sink issues][url.aws_kinesis_streams_sink_issues].
 2. If encountered a bug, please [file a bug report][url.new_aws_kinesis_streams_sink_bug].
 3. If encountered a missing feature, please [file a feature request][url.new_aws_kinesis_streams_sink_enhancement].
-4. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 

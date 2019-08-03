@@ -16,4 +16,4 @@ Events must be one of 2 types:
 Each page above will provide a deeper dive into it's respective event type.
 
 
-
+[images.data-model]: ../../assets/data-model.svg
