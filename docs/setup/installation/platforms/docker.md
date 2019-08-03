@@ -13,37 +13,52 @@ Vector ships with a [default `vector.toml` file][url.default_configuration]
 as a proof of concept. This is used to test Vector and ensure it is installed
 and working:
 
-{% code-tabs %}
-{% code-tabs-item title="alpine (recommended)" %}
+{% tabs %}
+{% tab title="alpine (recommended)" %}
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
   timberio/vector:latest-alpine
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="debian-slim" %}
+
+Modify `$PWD` to the directory where you store your local `vector.toml` file.
+A couple of things to note:
+
+1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
+your `$PATH`.
+2. Configuration is located in `/etc/vector`.
+{% endtab %}
+{% tab title="debian-slim" %}
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
   timberio/vector:latest-debian-slim
 ```
-{% endcode-tabs-item %}
-{% code-tabs-item title="debian" %}
+
+Modify `$PWD` to the directory where you store your local `vector.toml` file.
+A few things to note:
+
+1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
+your `$PATH`.
+2. A Systemd script is also installed; you can start vector via `systemctl start vector`.
+3. Configuration is located in `/etc/vector`.
+{% endtab %}
+{% tab title="debian" %}
 ```bash
 docker run \
   -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
   timberio/vector:latest-debian
 ```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 Modify `$PWD` to the directory where you store your local `vector.toml` file.
+A few things to note:
 
-Once logged in, [start][docs.starting] Vector with:
-
-```bash
-systemctl start vector
-```
+1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
+your `$PATH`.
+2. A Systemd script is also installed; you can start vector via `systemctl start vector`.
+3. Configuration is located in `/etc/vector`.
+{% endtab %}
+{% endtabs %}
 
 ## Configuring
 
@@ -55,12 +70,6 @@ into your own image.
 
 You can learn more about configuring Vector in the
 [Configuration][docs.configuration] section.
-
-## Administering
-
-Vector can be managed through the [Systemd][url.systemd] service manager:
-
-{% page-ref page="../../../usage/administration" %}
 
 ## Image Variants
 
