@@ -149,7 +149,7 @@ install_from_archive() {
             _archive_arch=$_arch
             ;;
         x86_64-*linux*)
-            _archive_arch="x86_64-unknown-linux-gnu"
+            _archive_arch="x86_64-unknown-linux-musl"
             ;;
         *)
             err "unsupported arch: $_arch"
