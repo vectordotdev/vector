@@ -143,11 +143,8 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
-# Remove root level field
-event["field"] = nil
-
-# Remove nested field
-event["parent.child"] = nil
+# Drop event entirely
+event = nil
 ```
 
 {% endtab %}
