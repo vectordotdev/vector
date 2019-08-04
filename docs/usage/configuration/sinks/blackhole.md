@@ -180,7 +180,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.blackhole_sink_issues].
+1. Check for any [open `blackhole_sink` issues][url.blackhole_sink_issues].
 2. If encountered a bug, please [file a bug report][url.new_blackhole_sink_bug].
 3. If encountered a missing feature, please [file a feature request][url.new_blackhole_sink_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.

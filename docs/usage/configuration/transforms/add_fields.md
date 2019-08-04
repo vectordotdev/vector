@@ -251,7 +251,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open transform issues][url.add_fields_transform_issues].
+1. Check for any [open `add_fields_transform` issues][url.add_fields_transform_issues].
 2. If encountered a bug, please [file a bug report][url.new_add_fields_transform_bug].
 3. If encountered a missing feature, please [file a feature request][url.new_add_fields_transform_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
@@ -261,7 +261,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`coercer` transform][docs.coercer_transform]
+* [`lua` transform][docs.lua_transform]
 * [`remove_fields` transform][docs.remove_fields_transform]
 
 ## Resources
@@ -270,7 +270,6 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
-[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables

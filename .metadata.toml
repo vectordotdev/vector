@@ -340,7 +340,7 @@ A key/value pair representing the new field to be added. Accepts all \
 # ------------------------------------------------------------------------------
 [transforms.coercer]
 allow_you_to_description = "coerce event fields into fixed types"
-function_categories = ["change_fields", "convert"]
+function_categories = ["coerce"]
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -488,7 +488,7 @@ The field decode as JSON. Must be a `string` value.\
 # ------------------------------------------------------------------------------
 [transforms.log_to_metric]
 allow_you_to_description = "convert logs into one or more metrics"
-function_categories = ["convert"]
+function_categories = ["convert_types"]
 guides = []
 input_types = ["log"]
 output_types = ["metric"]
@@ -555,7 +555,7 @@ description = "Key/value pairs representing the metric labels."
 [transforms.lua]
 allow_you_to_description = "transform events with a full embedded [Lua][url.lua] engine"
 beta = true
-function_categories = ["parse"]
+function_categories = ["program"]
 guides = []
 input_types = ["log"]
 output_types = ["log"]

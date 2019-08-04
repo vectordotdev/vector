@@ -217,7 +217,7 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open transform issues][url.lua_transform_issues].
+1. Check for any [open `lua_transform` issues][url.lua_transform_issues].
 2. If encountered a bug, please [file a bug report][url.new_lua_transform_bug].
 3. If encountered a missing feature, please [file a feature request][url.new_lua_transform_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
@@ -227,9 +227,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`grok_parser` transform][docs.grok_parser_transform]
-* [`regex_parser` transform][docs.regex_parser_transform]
-* [`tokenizer` transform][docs.tokenizer_transform]
+* [`lua` transform][docs.lua_transform]
 
 ## Resources
 
@@ -242,12 +240,10 @@ Finally, consider the following alternatives:
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model
 [docs.default_schema]: ../../../about/data-model/log.md#default-schema
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model/log.md
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.lua_transform]: ../../../assets/lua-transform.svg

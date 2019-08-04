@@ -489,17 +489,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open transform issues][url.log_to_metric_transform_issues].
+1. Check for any [open `log_to_metric_transform` issues][url.log_to_metric_transform_issues].
 2. If encountered a bug, please [file a bug report][url.new_log_to_metric_transform_bug].
 3. If encountered a missing feature, please [file a feature request][url.new_log_to_metric_transform_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
-
-
-### Alternatives
-
-Finally, consider the following alternatives:
-
-* [`coercer` transform][docs.coercer_transform]
 
 ## Resources
 
@@ -507,7 +500,6 @@ Finally, consider the following alternatives:
 * [**Source code**][url.log_to_metric_transform_source]
 
 
-[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
