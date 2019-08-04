@@ -26,7 +26,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # REQUIRED - General
   type = "http" # must be: "http"
   inputs = ["my-source-id"]
-  encoding = "ndjson" # enum: "ndjson", "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
   uri = "https://10.22.212.22:9000/endpoint"
   
   # OPTIONAL - General
@@ -52,8 +52,8 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   
   # OPTIONAL - Buffer
   [sinks.my_http_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
   
@@ -129,7 +129,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -242,7 +242,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -250,7 +250,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -287,12 +287,12 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "http"` |
+| `type` | `string` | The component type<br />`required` `must be: "http"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
@@ -308,8 +308,8 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
 | `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Headers | | |

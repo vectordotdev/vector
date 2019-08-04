@@ -206,7 +206,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # 
   # * required
   # * no default
-  # * enum: "tcp", "udp", "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
   mode = "udp"
   mode = "unix"
@@ -380,7 +380,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -464,7 +464,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -529,7 +529,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "counter", "gauge"
+    # * enum: "counter" or "gauge"
     type = "counter"
     type = "gauge"
 
@@ -647,7 +647,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -753,7 +753,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -836,7 +836,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -890,7 +890,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -898,7 +898,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -979,7 +979,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1033,7 +1033,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1041,7 +1041,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1098,7 +1098,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1219,7 +1219,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1227,7 +1227,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1281,7 +1281,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1289,7 +1289,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1330,7 +1330,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "stdout", "stderr"
+  # * enum: "stdout" or "stderr"
   target = "stdout"
   target = "stderr"
 
@@ -1338,7 +1338,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1352,7 +1352,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1360,7 +1360,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1491,7 +1491,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1499,7 +1499,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1540,7 +1540,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1653,7 +1653,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1661,7 +1661,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1735,7 +1735,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1749,7 +1749,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1757,7 +1757,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1810,7 +1810,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1818,7 +1818,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1893,7 +1893,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1947,7 +1947,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1955,7 +1955,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -2006,7 +2006,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -2020,7 +2020,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2028,7 +2028,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -2081,7 +2081,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2089,7 +2089,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 

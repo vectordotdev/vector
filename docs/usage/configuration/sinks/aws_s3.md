@@ -37,7 +37,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   region = "us-east-1"
   
   # REQUIRED - Requests
-  encoding = "ndjson" # enum: "ndjson", "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -61,8 +61,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   
   # OPTIONAL - Buffer
   [sinks.my_aws_s3_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
 ```
@@ -148,7 +148,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -269,7 +269,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -277,7 +277,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -303,12 +303,12 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "aws_s3"` |
+| `type` | `string` | The component type<br />`required` `must be: "aws_s3"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
 | **REQUIRED** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: seconds` |
@@ -318,7 +318,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
 | `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
-| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
@@ -327,8 +327,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 

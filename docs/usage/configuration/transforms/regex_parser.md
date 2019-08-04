@@ -109,7 +109,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -126,14 +126,14 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
+| `type` | `string` | The component type<br />`required` `must be: "regex_parser"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 

@@ -34,7 +34,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
   batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  encoding = "ndjson" # default, enum: "ndjson", "text"
+  encoding = "ndjson" # default, enum: "ndjson" or "text"
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 10 # default
   request_in_flight_limit = 10 # default
@@ -44,8 +44,8 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
   
   # OPTIONAL - Buffer
   [sinks.my_splunk_hec_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
 ```
@@ -139,7 +139,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -193,7 +193,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -201,7 +201,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -227,7 +227,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "splunk_hec"` |
+| `type` | `string` | The component type<br />`required` `must be: "splunk_hec"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `host` | `string` | Your Splunk HEC host.<br />`required` `example: "my-splunk-host.com"` |
 | `token` | `string` | Your Splunk HEC token.<br />`required` `example: "A94A8FE5CCB19BA61C4C08"` |
@@ -235,7 +235,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "ndjson" or "text"` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
 | `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
@@ -243,8 +243,8 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 

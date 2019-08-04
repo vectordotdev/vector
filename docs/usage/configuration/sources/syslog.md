@@ -25,7 +25,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 [sources.my_syslog_source_id]
   # REQUIRED - General
   type = "syslog" # must be: "syslog"
-  mode = "tcp" # enum: "tcp", "udp", "unix"
+  mode = "tcp" # enum: "tcp", "udp", and "unix"
   
   # OPTIONAL - General
   address = "0.0.0.0:9000" # no default
@@ -70,7 +70,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
   # 
   # * required
   # * no default
-  # * enum: "tcp", "udp", "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
   mode = "udp"
   mode = "unix"
@@ -113,8 +113,8 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "syslog"` |
-| `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", "unix"` |
+| `type` | `string` | The component type<br />`required` `must be: "syslog"` |
+| `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", and "unix"` |
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP or UDP address to listen on.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |

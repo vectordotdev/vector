@@ -29,7 +29,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   
   # REQUIRED - Metrics
   [[transforms.my_log_to_metric_transform_id.metrics]]
-    type = "counter" # enum: "counter", "gauge"
+    type = "counter" # enum: "counter" or "gauge"
     field = "duration"
     
     increment_by_value = false # default
@@ -83,7 +83,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     # 
     # * required
     # * no default
-    # * enum: "counter", "gauge"
+    # * enum: "counter" or "gauge"
     type = "counter"
     type = "gauge"
 
@@ -123,10 +123,10 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "log_to_metric"` |
+| `type` | `string` | The component type<br />`required` `must be: "log_to_metric"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Metrics | | |
-| `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge"` |
+| `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter" or "gauge"` |
 | `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value.<br />`default: false` |
 | `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "dynamic"` |

@@ -65,7 +65,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "statsd"` |
+| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
 | `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## Examples

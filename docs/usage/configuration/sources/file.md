@@ -166,7 +166,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "file"` |
+| `type` | `string` | The component type<br />`required` `must be: "file"` |
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |

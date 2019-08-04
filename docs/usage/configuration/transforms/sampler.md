@@ -85,7 +85,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "sampler"` |
+| `type` | `string` | The component type<br />`required` `must be: "sampler"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: 10` |
 | **OPTIONAL** | | |

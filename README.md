@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], and [more][docs.installation]
+* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [archives][docs.archives], and [more][docs.installation]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -182,6 +182,7 @@ the License.
 [docs.administration]: https://docs.vector.dev/usage/administration
 [docs.agent_role]: https://docs.vector.dev/setup/deployment/roles/agent
 [docs.apt]: https://docs.vector.dev/setup/installation/package-managers/apt
+[docs.archives]: https://docs.vector.dev/setup/installation/manual/from-archives
 [docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
 [docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3

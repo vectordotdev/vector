@@ -47,8 +47,12 @@ class Context
       end
 
       if option.enum
-        escaped_values = option.enum.collect { |enum| enum.inspect.gsub("|", "\\|") }
-        tags << "enum: #{escaped_values.join(", ")}"
+        escaped_values = option.enum.collect { |enum| enum.to_toml.gsub("|", "\\|") }
+        if escaped_values.length > 1
+          tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+        else
+          tags << "must be: #{escaped_values.first}"
+        end
       end
 
       if !option.unit.nil?

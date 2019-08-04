@@ -75,7 +75,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "vector"` |
+| `type` | `string` | The component type<br />`required` `must be: "vector"` |
 | `address` | `string` | The TCP address to bind to.<br />`required` `example: "0.0.0.0:9000"` |
 | **OPTIONAL** | | |
 | `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |

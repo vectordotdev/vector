@@ -83,7 +83,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "field_filter"` |
+| `type` | `string` | The component type<br />`required` `must be: "field_filter"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |

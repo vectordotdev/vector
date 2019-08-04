@@ -109,7 +109,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -126,14 +126,14 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "tokenizer"` |
+| `type` | `string` | The component type<br />`required` `must be: "tokenizer"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
 | `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 

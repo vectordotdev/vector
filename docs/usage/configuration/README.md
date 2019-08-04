@@ -187,8 +187,12 @@ please refer to the excellent [TOML documentation][url.toml].
 ### Template Syntax
 
 Select configuration options support Vector's template syntax to produce
-dynamic values derived from the event's data. There are 2 special syntaxes
-which are desribed below:
+dynamic values derived from the event's data. There are 2 special syntaxes:
+
+1. Strftime specifiers. Ex: `date=%Y/%m/%d`
+2. Event fields. Ex: `{{ field_name }}`
+
+Each are described in more detail below.
 
 #### Strftime specifiers
 

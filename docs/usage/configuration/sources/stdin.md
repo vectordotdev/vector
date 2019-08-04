@@ -85,7 +85,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "stdin"` |
+| `type` | `string` | The component type<br />`required` `must be: "stdin"` |
 | **OPTIONAL** - General | | |
 | `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.<br />`default: 102400` `unit: bytes` |
 | **OPTIONAL** - Context | | |

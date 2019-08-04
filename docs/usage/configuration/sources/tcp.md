@@ -102,7 +102,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "tcp"` |
+| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
 | `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
 | **OPTIONAL** - General | | |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |

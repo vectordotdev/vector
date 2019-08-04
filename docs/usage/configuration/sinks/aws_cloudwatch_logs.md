@@ -42,7 +42,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  encoding = "json" # default, enum: "json", "text"
+  encoding = "json" # default, enum: "json" or "text"
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
@@ -52,8 +52,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   
   # OPTIONAL - Buffer
   [sinks.my_aws_cloudwatch_logs_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
 ```
@@ -157,7 +157,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -211,7 +211,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -219,7 +219,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -245,7 +245,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "aws_cloudwatch_logs"` |
+| `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_logs"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
@@ -254,7 +254,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "json", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "json" or "text"` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
 | `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
@@ -262,8 +262,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
