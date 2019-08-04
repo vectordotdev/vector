@@ -24,6 +24,7 @@ scopes:
   - coercer transform
   - field_filter transform
   - grok_parser transform
+  - javascript transform
   - json_parser transform
   - log_to_metric transform
   - lua transform

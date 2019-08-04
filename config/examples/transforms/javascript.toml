@@ -1,0 +1,25 @@
+# `javascript` Transform Example
+# ------------------------------------------------------------------------------
+# An example demonstrating the `javascript` transform
+# Docs: https://docs.vector.dev/usage/configuration/transforms/javascript
+
+[transforms.my_javascript_transform]
+  # REQUIRED - General
+  type = "javascript" # must be: javascript
+  inputs = ["my-source-id"]
+  source = """
+  event => {
+      if (event.host.match(/(dev|test)/)) {
+          return null
+      }
+      try {
+          const message = JSON.parse(event.message)
+          if (Array.isArray(message)) {
+              return message.map(m => ({...event, message: JSON.stringify(m)}))
+          }
+      } catch (e) {
+          event.invalid = true
+      }
+      return event
+  }
+  """

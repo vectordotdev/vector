@@ -224,6 +224,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`javascript` transform][docs.javascript_transform]
 * [`lua` transform][docs.lua_transform]
 
 ## Resources
@@ -237,6 +238,7 @@ Finally, consider the following alternatives:
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model
 [docs.default_schema]: ../../../about/data-model/log.md#default-schema
+[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

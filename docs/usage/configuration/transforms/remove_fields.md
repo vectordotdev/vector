@@ -103,6 +103,7 @@ issue, please:
 Finally, consider the following alternatives:
 
 * [`add_fields` transform][docs.add_fields_transform]
+* [`javascript` transform][docs.javascript_transform]
 * [`lua` transform][docs.lua_transform]
 
 ## Resources
@@ -114,6 +115,7 @@ Finally, consider the following alternatives:
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model/metric.md

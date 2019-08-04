@@ -261,6 +261,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`javascript` transform][docs.javascript_transform]
 * [`lua` transform][docs.lua_transform]
 * [`remove_fields` transform][docs.remove_fields_transform]
 
@@ -275,6 +276,7 @@ Finally, consider the following alternatives:
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model
 [docs.event_key_special_characters]: ../../../about/data-model/log.md#special-characters
+[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
 [docs.log]: ../../../about/data-model/log.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md

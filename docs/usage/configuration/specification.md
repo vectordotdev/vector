@@ -480,6 +480,43 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+[transforms.javascript]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "javascript"
+  type = "javascript"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The inline JavaScript source with handler function.
+  # 
+  # * required
+  # * no default
+  source = """
+event => ({...event, field: 'value'})
+
+"""
+
+
+  # Name of the handler function.
+  # 
+  # * optional
+  # * no default
+  handler = "handler"
+
+  # Maximum allowed RAM usage for JavaScript engine in bytes.
+  # 
+  # * optional
+  # * no default
+  memory_limit = 10000000
+
 [transforms.json_parser]
   # The component type
   # 

@@ -61,6 +61,7 @@
     * [coercer transform](usage/configuration/transforms/coercer.md)
     * [field\_filter transform](usage/configuration/transforms/field_filter.md)
     * [grok\_parser transform](usage/configuration/transforms/grok_parser.md)
+    * [javascript transform](usage/configuration/transforms/javascript.md)
     * [json\_parser transform](usage/configuration/transforms/json_parser.md)
     * [log\_to\_metric transform](usage/configuration/transforms/log_to_metric.md)
     * [lua transform](usage/configuration/transforms/lua.md)
