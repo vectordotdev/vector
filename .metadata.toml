@@ -226,8 +226,7 @@ examples = ["/path/to/socket"]
 null = true
 relevant_when = {mode = "unix"}
 description = """\
-The unix socket path. *This should be absolute path.* Only relevant \
-when `mode` is `unix`.
+The unix socket path. *This should be absolute path.*
 """
 
 # ------------------------------------------------------------------------------
@@ -505,7 +504,7 @@ event.\
 
 [transforms.log_to_metric.options.metrics.options.type]
 type = "string"
-enum = ["counter", "gauge"]
+enum = ["counter", "gauge", "histogram", "set"]
 null = false
 description = "The metric type."
 
@@ -519,6 +518,7 @@ description = "The log field to use as the metric."
 type = "bool"
 default = false
 null = false
+relevant_when = {type = "counter"}
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\

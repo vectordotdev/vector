@@ -143,7 +143,7 @@ min, and other aggregations.
   "histogram": {
     "name": "memory_rss",
     "val": 201.0,
-    "sample_rate": 80
+    "sample_rate": 1
   }
 }
 ```

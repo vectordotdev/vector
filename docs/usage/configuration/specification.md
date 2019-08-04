@@ -224,8 +224,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: bytes
   max_length = 102400
 
-  # The unix socket path. *This should be absolute path.* Only relevant when
-  # `mode` is `unix`.
+  # The unix socket path. *This should be absolute path.*
   # 
   # * optional
   # * no default
@@ -529,9 +528,11 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "counter" or "gauge"
+    # * enum: "counter", "gauge", "histogram", and "set"
     type = "counter"
     type = "gauge"
+    type = "histogram"
+    type = "set"
 
     # The log field to use as the metric.
     # 

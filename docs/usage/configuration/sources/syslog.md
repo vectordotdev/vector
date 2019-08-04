@@ -88,8 +88,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
   # * unit: bytes
   max_length = 102400
 
-  # The unix socket path. *This should be absolute path.* Only relevant when
-  # `mode` is `unix`.
+  # The unix socket path. *This should be absolute path.*
   # 
   # * optional
   # * no default
@@ -118,7 +117,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 | **OPTIONAL** - General | | |
 | `address` | `string` | The TCP or UDP address to listen on.<br />`no default` `example: "0.0.0.0:9000"` |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when `mode` is `unix`. Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
+| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
