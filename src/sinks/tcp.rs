@@ -22,6 +22,7 @@ use tracing::field;
 pub struct TcpSinkConfig {
     pub address: String,
     pub encoding: Option<Encoding>,
+    pub tls: Option<TcpSinkTlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -31,11 +32,18 @@ pub enum Encoding {
     Json,
 }
 
+#[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct TcpSinkTlsConfig {
+    pub enabled: Option<bool>,
+}
+
 impl TcpSinkConfig {
     pub fn new(address: String) -> Self {
         Self {
             address,
             encoding: None,
+            tls: None,
         }
     }
 }
@@ -50,7 +58,14 @@ impl SinkConfig for TcpSinkConfig {
             .next()
             .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
 
-        let sink = raw_tcp(addr, acker, self.encoding.clone());
+        let tls = match self.tls {
+            Some(ref tls) => TcpSinkTls {
+                enabled: tls.enabled.unwrap_or(false),
+            },
+            None => TcpSinkTls::default(),
+        };
+
+        let sink = raw_tcp(addr, acker, self.encoding.clone(), tls);
         let healthcheck = tcp_healthcheck(addr);
 
         Ok((sink, healthcheck))
@@ -63,6 +78,7 @@ impl SinkConfig for TcpSinkConfig {
 
 pub struct TcpSink {
     addr: SocketAddr,
+    tls: TcpSinkTls,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
 }
@@ -74,10 +90,16 @@ enum TcpSinkState {
     Backoff(Delay),
 }
 
+#[derive(Default)]
+pub struct TcpSinkTls {
+    enabled: bool,
+}
+
 impl TcpSink {
-    pub fn new(addr: SocketAddr) -> Self {
+    pub fn new(addr: SocketAddr, tls: TcpSinkTls) -> Self {
         Self {
             addr,
+            tls,
             state: TcpSinkState::Disconnected,
             backoff: Self::fresh_backoff(),
         }
@@ -186,9 +208,14 @@ impl Sink for TcpSink {
     }
 }
 
-pub fn raw_tcp(addr: SocketAddr, acker: Acker, encoding: Option<Encoding>) -> super::RouterSink {
+pub fn raw_tcp(
+    addr: SocketAddr,
+    acker: Acker,
+    encoding: Option<Encoding>,
+    tls: TcpSinkTls,
+) -> super::RouterSink {
     Box::new(
-        TcpSink::new(addr)
+        TcpSink::new(addr, tls)
             .stream_ack(acker)
             .with(move |event| encode_event(event, &encoding)),
     )

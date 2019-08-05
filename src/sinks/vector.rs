@@ -1,7 +1,8 @@
 use crate::{
     buffers::Acker,
     event::proto,
-    sinks::{tcp::TcpSink, util::SinkExt},
+    sinks::tcp::{TcpSink, TcpSinkTls},
+    sinks::util::SinkExt,
     topology::config::{DataType, SinkConfig},
     Event,
 };
@@ -47,7 +48,7 @@ impl SinkConfig for VectorSinkConfig {
 
 pub fn vector(addr: SocketAddr, acker: Acker) -> super::RouterSink {
     Box::new(
-        TcpSink::new(addr)
+        TcpSink::new(addr, TcpSinkTls::default())
             .stream_ack(acker)
             .with(move |event| encode_event(event)),
     )
