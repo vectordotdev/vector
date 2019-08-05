@@ -192,6 +192,25 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
                 value: Some(*val as f64),
                 ..Default::default()
             }),
+            Metric::Gauge {
+                name,
+                val,
+                direction: None,
+            } => Some(MetricDatum {
+                metric_name: name.to_string(),
+                value: Some(*val as f64),
+                ..Default::default()
+            }),
+            Metric::Histogram {
+                name,
+                val,
+                sample_rate,
+            } => Some(MetricDatum {
+                metric_name: name.to_string(),
+                values: Some(vec![*val as f64]),
+                counts: Some(vec![*sample_rate as f64]),
+                ..Default::default()
+            }),
             _ => None,
         })
         .collect();
@@ -244,6 +263,53 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn encode_events_absolute_gauge() {
+        let namespace = String::from("namespace");
+
+        let events = vec![Event::Metric(Metric::Gauge {
+            name: "temperature".into(),
+            val: 10.0,
+            direction: None,
+        })];
+
+        assert_eq!(
+            encode_events(events, namespace.clone()).unwrap(),
+            PutMetricDataInput {
+                namespace,
+                metric_data: vec![MetricDatum {
+                    metric_name: "temperature".into(),
+                    value: Some(10.0),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn encode_events_histogram() {
+        let namespace = String::from("namespace");
+
+        let events = vec![Event::Metric(Metric::Histogram {
+            name: "latency".into(),
+            val: 11.0,
+            sample_rate: 100,
+        })];
+
+        assert_eq!(
+            encode_events(events, namespace.clone()).unwrap(),
+            PutMetricDataInput {
+                namespace,
+                metric_data: vec![MetricDatum {
+                    metric_name: "latency".into(),
+                    values: Some(vec![11.0]),
+                    counts: Some(vec![100.0]),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
 }
 
 #[cfg(feature = "cloudwatch-metrics-integration-tests")]
@@ -277,11 +343,32 @@ mod integration_tests {
         let sink = CloudWatchMetricsService::new(config(), Acker::Null).unwrap();
 
         let mut events = Vec::new();
-        let name = random_string(10);
+
+        let counter_name = random_string(10);
         for i in 0..10 {
             let event = Event::Metric(Metric::Counter {
-                name: name.clone(),
+                name: counter_name.clone(),
                 val: i as f32,
+            });
+            events.push(event);
+        }
+
+        let gauge_name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Gauge {
+                name: gauge_name.clone(),
+                val: i as f32,
+                direction: None,
+            });
+            events.push(event);
+        }
+
+        let histogram_name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Histogram {
+                name: histogram_name.clone(),
+                val: i as f32,
+                sample_rate: 100,
             });
             events.push(event);
         }
