@@ -10,6 +10,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::io::Error;
+use std::iter::FromIterator;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time;
@@ -97,7 +98,7 @@ where
 }
 
 fn create_event(record: Record) -> Event {
-    let mut log = LogEvent::from(record.into_iter());
+    let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
         log.insert_explicit(event::MESSAGE.clone(), message);
