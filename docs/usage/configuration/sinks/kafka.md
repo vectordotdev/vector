@@ -106,7 +106,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   topic = "topic-1234"
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -164,7 +164,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 | `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`required` `example: "user_id"` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |

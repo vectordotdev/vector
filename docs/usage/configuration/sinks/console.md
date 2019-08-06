@@ -88,7 +88,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   target = "stderr"
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -144,7 +144,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |

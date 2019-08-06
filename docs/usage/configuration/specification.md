@@ -842,7 +842,7 @@ end
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -986,7 +986,7 @@ end
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -1106,7 +1106,7 @@ end
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * required
   # * no default
@@ -1347,7 +1347,7 @@ end
   target = "stderr"
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -1550,7 +1550,7 @@ end
   inputs = ["my-source-id"]
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * required
   # * no default
@@ -1746,7 +1746,7 @@ end
   topic = "topic-1234"
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -1905,7 +1905,7 @@ end
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -2019,7 +2019,7 @@ end
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default

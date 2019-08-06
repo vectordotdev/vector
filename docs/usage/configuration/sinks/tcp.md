@@ -90,7 +90,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
   #
 
   # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based oon if the event is structured or not.
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
   # * no default
@@ -146,7 +146,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `address` | `string` | The TCP address.<br />`required` `example: "92.12.333.224:5000"` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
