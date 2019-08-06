@@ -30,13 +30,6 @@ pub struct JournaldConfig {
     pub units: Vec<String>,
 }
 
-fn map_bool<T>(flag: bool, t_value: T, f_value: T) -> T {
-    match flag {
-        true => t_value,
-        false => f_value,
-    }
-}
-
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     fn build(
@@ -45,16 +38,9 @@ impl SourceConfig for JournaldConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        let flags = map_bool(
-            self.current_runtime_only.unwrap_or(true),
-            journald::SD_JOURNAL_RUNTIME_ONLY,
-            0,
-        ) | map_bool(
-            self.local_only.unwrap_or(true),
-            journald::SD_JOURNAL_LOCAL_ONLY,
-            0,
-        );
-        let journal = Journal::open(flags).map_err(|err| format!("{}", err))?;
+        let local_only = self.local_only.unwrap_or(true);
+        let runtime_only = self.current_runtime_only.unwrap_or(true);
+        let journal = Journal::open(local_only, runtime_only).map_err(|err| format!("{}", err))?;
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.

@@ -9,13 +9,11 @@ use std::iter;
 use std::os::raw::c_int;
 use std::ptr::null_mut;
 
-pub const SD_JOURNAL_LOCAL_ONLY: c_int = 1;
-pub const SD_JOURNAL_RUNTIME_ONLY: c_int = 2;
-pub const SD_JOURNAL_SYSTEM: c_int = 4;
-pub const SD_JOURNAL_CURRENT_USER: c_int = 8;
+const SD_JOURNAL_LOCAL_ONLY: c_int = 1;
+const SD_JOURNAL_RUNTIME_ONLY: c_int = 2;
 
 #[allow(non_camel_case_types)]
-pub enum sd_journal {}
+enum sd_journal {}
 
 #[derive(WrapperApi)]
 struct LibSystemd {
@@ -41,12 +39,22 @@ unsafe impl Send for Journal {}
 
 pub type Record = HashMap<String, String>;
 
+fn bool_flag<T: Default>(flag: bool, tvalue: T) -> T {
+    if flag {
+        tvalue
+    } else {
+        T::default()
+    }
+}
+
 impl Journal {
-    pub fn open(flags: c_int) -> IOResult<Journal> {
+    pub fn open(local_only: bool, runtime_only: bool) -> IOResult<Journal> {
         // Each Journal structure gets their own handle to the library,
         // but I couldn't figure out how to make lazy_static work.
         let lib = load_lib().map_err(|err| IOError::new(std::io::ErrorKind::Other, err))?;
 
+        let flags = bool_flag(local_only, SD_JOURNAL_LOCAL_ONLY)
+            | bool_flag(runtime_only, SD_JOURNAL_RUNTIME_ONLY);
         let mut journal = null_mut();
         sd_result(lib.sd_journal_open(&mut journal, flags))?;
         sd_result(lib.sd_journal_seek_head(journal))?;
