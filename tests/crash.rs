@@ -6,7 +6,10 @@ use vector::{
         block_on, next_addr, random_lines, receive, runtime, send_lines, shutdown_on_idle,
         wait_for_tcp,
     },
-    topology::{self, config},
+    topology::{
+        self,
+        config::{self, GlobalOptions},
+    },
     Event, {sinks, sources},
 };
 
@@ -152,7 +155,12 @@ struct ErrorSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for ErrorSourceConfig {
-    fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _out: mpsc::Sender<Event>,
+    ) -> Result<sources::Source, String> {
         Ok(Box::new(future::err(())))
     }
 
@@ -204,7 +212,12 @@ struct PanicSourceConfig;
 
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for PanicSourceConfig {
-    fn build(&self, _out: mpsc::Sender<Event>) -> Result<sources::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _out: mpsc::Sender<Event>,
+    ) -> Result<sources::Source, String> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

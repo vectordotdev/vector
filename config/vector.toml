@@ -32,4 +32,5 @@ data_dir = "/var/lib/vector"
 
 # Output data
 [sinks.print]
+  inputs       = ["apache_parser"]
   type         = "console"

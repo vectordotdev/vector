@@ -17,6 +17,19 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
+#[derive(Default)]
+pub struct GlobalOptions {
+    pub data_dir: Option<PathBuf>,
+}
+
+impl GlobalOptions {
+    pub fn from(config: &Config) -> Self {
+        Self {
+            data_dir: config.data_dir.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
     Any,
@@ -26,7 +39,12 @@ pub enum DataType {
 
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<sources::Source, String>;
+    fn build(
+        &self,
+        name: &str,
+        globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<sources::Source, String>;
 
     fn output_type(&self) -> DataType;
 }
