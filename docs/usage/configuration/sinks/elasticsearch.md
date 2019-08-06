@@ -37,7 +37,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - General
   doc_type = "_doc" # default
-  index = "vector-%Y-%m-%d" # no default
+  index = "vector-%Y-%m-%d"
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -247,8 +247,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
 | `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |

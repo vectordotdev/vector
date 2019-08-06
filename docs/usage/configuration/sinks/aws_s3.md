@@ -44,7 +44,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # no default
+  key_prefix = "date=%F/"
   
   # OPTIONAL - Requests
   compression = "gzip" # no default, must be: "gzip" (if supplied)
@@ -305,8 +305,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 300` `unit: seconds` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
@@ -451,6 +451,19 @@ the following options:
 | :------- | :---------- |
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
+
+#### Dynamic encoding
+
+By default, the `encoding` chosen is dynamic based on the explicit/implcit
+nature of the event's structure. For example, if this event is parsed (explicit
+structuring), Vector will use `json` to encode the structured data. If the event
+was not explicitly structured, the `text` encoding will be used.
+
+To further explain why Vector adopts this default, take the simple example of
+accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+it directly to the `aws_s3` sink. It is less
+surprising that the outgoing data reflects the incoming data exactly since it
+was not explicitly structured.
 
 ### Environment Variables
 
@@ -654,6 +667,7 @@ issue, please:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg

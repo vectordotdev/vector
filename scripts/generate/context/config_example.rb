@@ -28,7 +28,7 @@ class Context
 
       if option.examples.first == option.default
         tags << "default"
-      elsif option.optional?
+      elsif option.default.nil? && option.optional?
         tags << "no default"
       end
 

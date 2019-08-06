@@ -252,10 +252,10 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
 | **OPTIONAL** - General | | |
-| `partition_key_field` | `string` | The event field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) and [Missing keys or blank values](#missing-keys-or-blank-values) for more info.<br />`no default` `example: "user_id"` |
+| `partition_key_field` | `string` | The event field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.<br />`no default` `example: "user_id"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
@@ -372,6 +372,19 @@ the following options:
 | :------- | :---------- |
 | `json` | The payload will be encoded as a single JSON payload. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
+
+#### Dynamic encoding
+
+By default, the `encoding` chosen is dynamic based on the explicit/implcit
+nature of the event's structure. For example, if this event is parsed (explicit
+structuring), Vector will use `json` to encode the structured data. If the event
+was not explicitly structured, the `text` encoding will be used.
+
+To further explain why Vector adopts this default, take the simple example of
+accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+it directly to the `aws_kinesis_streams` sink. It is less
+surprising that the outgoing data reflects the incoming data exactly since it
+was not explicitly structured.
 
 ### Environment Variables
 
@@ -498,6 +511,7 @@ issue, please:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.aws_kinesis_streams_sink]: ../../../assets/aws_kinesis_streams-sink.svg
