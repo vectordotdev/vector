@@ -66,10 +66,10 @@ impl Journal {
     /// * runtime_only: If `true`, include only journal entries from
     ///   volatile journal files, excluding those stored on persistent
     ///   storage. Otherwise, include persistent records.
-    pub fn open(local_only: bool, runtime_only: bool) -> IOResult<Journal> {
+    pub fn open(local_only: bool, runtime_only: bool) -> Result<Journal, Error> {
         // Each Journal structure gets their own handle to the library,
         // but I couldn't figure out how to make lazy_static work.
-        let lib = load_lib().map_err(|err| IOError::new(std::io::ErrorKind::Other, err))?;
+        let lib = load_lib()?;
 
         let flags = bool_flag(local_only, SD_JOURNAL_LOCAL_ONLY)
             | bool_flag(runtime_only, SD_JOURNAL_RUNTIME_ONLY);
@@ -125,5 +125,36 @@ fn sd_result(code: c_int) -> IOResult<c_int> {
     match code {
         _ if code < 0 => Err(IOError::from_raw_os_error(-code)),
         _ => Ok(code),
+    }
+}
+
+/// Error type for functions that return more than just
+/// `std::io::Error`.
+#[derive(Debug)]
+pub enum Error {
+    IOError(IOError),
+    DLOpenError(dlopen::Error),
+}
+
+impl From<dlopen::Error> for Error {
+    fn from(err: dlopen::Error) -> Error {
+        Error::DLOpenError(err)
+    }
+}
+
+impl From<IOError> for Error {
+    fn from(err: IOError) -> Error {
+        Error::IOError(err)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            Error::IOError(err) => write!(fmt, "I/O Error: {}", err),
+            Error::DLOpenError(err) => write!(fmt, "dlopen Error: {}", err),
+        }
     }
 }
