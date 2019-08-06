@@ -193,7 +193,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{block_on, shutdown_on_idle};
+    use crate::test_util::{block_on, runtime, shutdown_on_idle};
     use futures::stream::Stream;
     use std::io::Error;
     use std::iter::FromIterator;
@@ -246,7 +246,7 @@ mod tests {
             tx,
             HashSet::from_iter(units.into_iter().map(|&s| s.into())),
         );
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
         std::thread::sleep(Duration::from_millis(100));
