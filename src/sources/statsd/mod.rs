@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{topology::config::GlobalOptions, Event};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,12 @@ struct StatsdConfig {
 
 #[typetag::serde(name = "statsd")]
 impl crate::topology::config::SourceConfig for StatsdConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
         Ok(statsd(self.address.clone(), out))
     }
 

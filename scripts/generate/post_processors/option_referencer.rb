@@ -18,7 +18,7 @@ module PostProcessors
           sections_with_references = how_it_works.split("`#{option}`")[0..-2]
           titles =
             sections_with_references.collect do |section|
-              match = section.scan(/\n#* (.*)\n/).last
+              match = section.scan(/\n### (.*)\n/).last
               if match.nil?
                 nil
               else

@@ -85,6 +85,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   include = ["/var/log/nginx/*.log"]
 
+  # The directory used to persist file checkpoint positions. By default, the
+  # global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
+
   # The number of bytes read off the head of the file to generate a unique
   # fingerprint.
   # 
@@ -550,8 +558,8 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
     # 
-    # * optional
-    # * default: "dynamic"
+    # * required
+    # * no default
     name = "duration_total"
 
     [transforms.log_to_metric.metrics.labels]
@@ -833,10 +841,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -976,10 +985,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1092,16 +1102,61 @@ end
   region = "us-east-1"
 
   #
-  # Requests
+  # Batching
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The maximum size of a batch before it is flushed.
   # 
-  # * required
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: seconds
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder".
+  # 
+  # * optional
   # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Requests
+  #
 
   # The compression type to use before writing data.
   # 
@@ -1109,6 +1164,15 @@ end
   # * no default
   # * must be: "gzip" (if supplied)
   compression = "gzip"
+
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
+  # 
+  # * optional
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
@@ -1156,59 +1220,6 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: seconds
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The extension to use in the object name.
-  # 
-  # * optional
-  # * default: "log"
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder".
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
   # Buffer
@@ -1291,10 +1302,11 @@ end
   target = "stdout"
   target = "stderr"
 
-  # The encoding format used to serialize the events before writing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1336,7 +1348,7 @@ end
   # Index name to write events to.
   # 
   # * optional
-  # * default: "vector-%F"
+  # * no default
   index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
 
@@ -1457,7 +1469,8 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * required
   # * no default
@@ -1652,10 +1665,11 @@ end
   # * no default
   topic = "topic-1234"
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1777,10 +1791,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
@@ -1890,10 +1905,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"

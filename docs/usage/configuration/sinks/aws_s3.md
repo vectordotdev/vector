@@ -36,9 +36,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   bucket = "my-bucket"
   region = "us-east-1"
   
-  # REQUIRED - Requests
-  encoding = "ndjson" # enum: "ndjson" or "text"
-  
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, seconds
@@ -47,10 +44,11 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   filename_append_uuid = true # default
   filename_extension = "log" # default
   filename_time_format = "%s" # default
-  key_prefix = "date=%F/" # default
+  key_prefix = "date=%F/"
   
   # OPTIONAL - Requests
   compression = "gzip" # no default, must be: "gzip" (if supplied)
+  encoding = "ndjson" # no default, enum: "ndjson" or "text"
   gzip = false # default
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
@@ -76,9 +74,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   bucket = "<string>"
   region = "<string>"
 
-  # REQUIRED - Requests
-  encoding = {"ndjson" | "text"}
-
   # OPTIONAL - Batching
   batch_size = <int>
   batch_timeout = <int>
@@ -91,6 +86,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 
   # OPTIONAL - Requests
   compression = "gzip"
+  encoding = {"ndjson" | "text"}
   gzip = <bool>
   rate_limit_duration = <int>
   rate_limit_num = <int>
@@ -141,16 +137,61 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   region = "us-east-1"
 
   #
-  # Requests
+  # Batching
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The maximum size of a batch before it is flushed.
   # 
-  # * required
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: seconds
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder".
+  # 
+  # * optional
   # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Requests
+  #
 
   # The compression type to use before writing data.
   # 
@@ -158,6 +199,15 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   # * no default
   # * must be: "gzip" (if supplied)
   compression = "gzip"
+
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
+  # 
+  # * optional
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
@@ -207,59 +257,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   retry_backoff_secs = 5
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: seconds
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The extension to use in the object name.
-  # 
-  # * optional
-  # * default: "log"
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder".
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
   # Buffer
   #
 
@@ -307,11 +304,9 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
-| **REQUIRED** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 300` `unit: seconds` |
 | **OPTIONAL** - Object Names | | |
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
@@ -319,6 +314,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
 | `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson" or "text"` |
 | `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
@@ -455,6 +451,19 @@ the following options:
 | :------- | :---------- |
 | `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
 | `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
+
+#### Dynamic encoding
+
+By default, the `encoding` chosen is dynamic based on the explicit/implcit
+nature of the event's structure. For example, if this event is parsed (explicit
+structuring), Vector will use `json` to encode the structured data. If the event
+was not explicitly structured, the `text` encoding will be used.
+
+To further explain why Vector adopts this default, take the simple example of
+accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+it directly to the `aws_s3` sink. It is less
+surprising that the outgoing data reflects the incoming data exactly since it
+was not explicitly structured.
 
 ### Environment Variables
 
@@ -658,6 +667,7 @@ issue, please:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
