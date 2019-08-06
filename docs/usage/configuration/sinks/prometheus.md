@@ -34,7 +34,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
   
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -73,6 +73,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   # 
   # * optional
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+  # * unit: seconds
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 ```
 {% endcode-tabs-item %}
@@ -87,7 +88,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `address` | `string` | The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.<br />`required` `example: "0.0.0.0:9598"` |
 | **OPTIONAL** | | |
-| `buckets` | `[float]` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` |
+| `buckets` | `[float]` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Default buckets](#default-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `unit: seconds` |
 
 ## Examples
 
@@ -103,14 +104,14 @@ For example, given the following internal Vector histograms:
 [
   {
     "histogram": {
-      "name": "response_time_ms",
-      "val": 24.3
+      "name": "response_time_s",
+      "val": 0.243
     }
   },
   {
     "histogram": {
-      "name": "response_time_ms",
-      "val": 56.6
+      "name": "response_time_s",
+      "val": 0.546
     }
   }
 ]
@@ -120,21 +121,105 @@ The `prometheus` sink will expose this data in Prometheus'
 [text-based exposition format][url.prometheus_text_based_exposition_format]:
 
 ```text
-# HELP response_time_ms response_time_ms
-# TYPE response_time_ms histogram
-response_time_ms_bucket{le="1"} 0
-response_time_ms_bucket{le="10"} 2
-response_time_ms_bucket{le="100"} 0
-response_time_ms_bucket{le="1000"} 0
-response_time_ms_bucket{le="10000"} 0
-response_time_ms_bucket{le="100000"} 0
-response_time_ms_bucket{le="+Inf"} 0
-response_time_ms_sum 80.9
-response_time_ms_count 2
+# HELP response_time_s response_time_s
+# TYPE response_time_s histogram
+response_time_s_bucket{le="0.005"} 0
+response_time_s_bucket{le="0.01"} 1
+response_time_s_bucket{le="0.025"} 0
+response_time_s_bucket{le="0.05"} 1
+response_time_s_bucket{le="0.1"} 0
+response_time_s_bucket{le="0.25"} 0
+response_time_s_bucket{le="0.5"} 0
+response_time_s_bucket{le="1.0"} 0
+response_time_s_bucket{le="2.5"} 0
+response_time_s_bucket{le="5.0"} 0
+response_time_s_bucket{le="10.0"} 0
+response_time_s_bucket{le="+Inf"} 0
+response_time_s_sum 0.789
+response_time_s_count 2
 ```
 
-You'll notice the the buckets (`le` label) are automatically defined. You can
-override these buckets via the `buckets` option.
+Note, the buckets used are those defined by the `buckets` option, and the
+buckets above reflect the default buckets.
+
+{% hint style="warning" %}
+It's important that your metric units align with your bucket units. The default
+buckets are in seconds and any metric values passed should also be in seconds.
+If your metrics are not in seconds you can override the buckets to reflect
+your units.
+{% endhint %}
+{% endtab %}
+{% tab title="Counters" %}
+This example demonstrates how Vector's internal [`counter` metric \
+type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
+exposition format][url.prometheus_text_based_exposition_format].
+
+For example, given the following internal Vector gauges:
+
+```javascript
+[
+  {
+    "counter": {
+      "name": "logins",
+      "val": 1
+    }
+  },
+  {
+    "counter": {
+      "name": "logins",
+      "val": 3
+    }
+  }
+]
+````
+
+The `prometheus` sink will expose this data in Prometheus'
+[text-based exposition format][url.prometheus_text_based_exposition_format]:
+
+```text
+# HELP logins logins
+# TYPE logins counter
+logins 4
+```
+
+Notice that Vector aggregates the metric and exposes the final value.
+{% endtab %}
+{% tab title="Gauges" %}
+This example demonstrates how Vector's internal [`gauge` metric \
+type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
+exposition format][url.prometheus_text_based_exposition_format].
+
+For example, given the following internal Vector gauges:
+
+```javascript
+[
+  {
+    "gauge": {
+      "name": "memory_rss",
+      "val": 250,
+      "direction": "plus"
+    }
+  },
+  {
+    "gauge": {
+      "name": "memory_rss",
+      "val": 25
+      "direction": "minus"
+    }
+  }
+]
+````
+
+The `prometheus` sink will expose this data in Prometheus'
+[text-based exposition format][url.prometheus_text_based_exposition_format]:
+
+```text
+# HELP memory_rss memory_rss
+# TYPE memory_rss gauge
+memory_rss 225
+```
+
+Notice that Vector aggregates the metric and exposes the final value.
 {% endtab %}
 {% endtabs %}
 
@@ -183,8 +268,25 @@ guide][url.prometheus_histograms_guide] provides a good overview of histograms,
 buckets, summaries, and how you should think about configuring them. The buckets
 you choose should align with your known range and distribution of values as
 well as how you plan to report on them. The aforementioned guide provides
-examples on how you should align them, and the `buckets` option provides a
-global default for all histogram metrics.
+examples on how you should align them.
+
+#### Default buckets
+
+The `buckets` option defines the global default buckets for histograms:
+
+```coffeescript
+[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+```
+
+These defaults are tailored to broadly measure the response time (in seconds)
+of a network service. Most likely, however, you will be required to define
+buckets customized to your use case.
+
+{% hint style="warning" %}
+Note: These values are in `seconds`, therefore,
+your metric values should also be in `seconds`.
+If this is not the case you should adjust your metric or buckets to coincide.
+{% endhint %}
 
 ### In-Memory Aggregation
 
