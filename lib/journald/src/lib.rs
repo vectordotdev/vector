@@ -30,6 +30,14 @@ fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
     unsafe { Container::load("libsystemd.so") }
 }
 
+/// A minimal systemd journald reader.
+///
+/// Supports only the features that Vector requires: open and read next
+/// (iterator).
+///
+/// This was implemented to support loading the `libsystemd.so` library
+/// at run time to prevent adding it as a hard dependency for the
+/// static-linked target.
 pub struct Journal {
     lib: Container<LibSystemd>,
     journal: *mut sd_journal,
@@ -48,6 +56,16 @@ fn bool_flag<T: Default>(flag: bool, tvalue: T) -> T {
 }
 
 impl Journal {
+    /// Open the journald source for reading.
+    ///
+    /// Params:
+    ///
+    /// * local_only: If `true`, include only journal entries
+    ///   originating from the current host. Otherwise, include entries
+    ///   from all hosts.
+    /// * runtime_only: If `true`, include only journal entries from
+    ///   volatile journal files, excluding those stored on persistent
+    ///   storage. Otherwise, include persistent records.
     pub fn open(local_only: bool, runtime_only: bool) -> IOResult<Journal> {
         // Each Journal structure gets their own handle to the library,
         // but I couldn't figure out how to make lazy_static work.
@@ -61,7 +79,11 @@ impl Journal {
         Ok(Journal { lib, journal })
     }
 
-    pub fn get_record(&mut self) -> IOResult<Record> {
+    /// Fetch the current record structure. `libsystemd` reads journal
+    /// records in two steps -- first advance to the next record and
+    /// then fetch the fields of the current record. This accomplishes
+    /// the second part of that process.
+    pub fn current_record(&mut self) -> IOResult<Record> {
         self.lib.sd_journal_restart_data(self.journal);
 
         iter::from_fn(|| {
@@ -94,7 +116,7 @@ impl Iterator for Journal {
         match sd_result(self.lib.sd_journal_next(self.journal)) {
             Err(err) => Some(Err(err)),
             Ok(0) => None,
-            _ => Some(self.get_record()),
+            _ => Some(self.current_record()),
         }
     }
 }
