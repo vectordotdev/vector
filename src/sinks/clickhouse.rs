@@ -84,10 +84,11 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
             "query",
             format!(
                 "INSERT INTO {}.{} FORMAT JSONEachRow",
-                database, table.replace("\"", "\\\"")
+                database,
+                table.replace("\"", "\\\"")
             )
             .as_str(),
-          )
+        )
         .finish();
 
     let url = format!("{}?{}", host, query);
