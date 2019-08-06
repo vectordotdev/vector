@@ -26,7 +26,8 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
   target = "stdout" # enum: "stdout" or "stderr"
-  encoding = "json" # default, enum: "json" or "text"
+  
+  encoding = "json" # no default, enum: "json" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -84,7 +85,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
 | **OPTIONAL** | | |
-| `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 
 ## How It Works
 
