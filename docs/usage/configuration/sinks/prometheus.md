@@ -43,7 +43,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   type = "prometheus"
   inputs = ["<string>", ...]
   address = "<string>"
-  buckets = "<string>"
+  buckets = [<float>, ...]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -87,7 +87,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `address` | `string` | The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.<br />`required` `example: "0.0.0.0:9598"` |
 | **OPTIONAL** | | |
-| `buckets` | `string` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` |
+| `buckets` | `[float]` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` |
 
 ## Examples
 

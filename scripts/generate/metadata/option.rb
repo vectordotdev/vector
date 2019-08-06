@@ -3,7 +3,7 @@
 class Option
   include Comparable
 
-  TYPES = ["*", "bool", "float", "int", "string", "[string]", "table", "[table]"]
+  TYPES = ["*", "bool", "float", "[float]", "int", "string", "[string]", "table", "[table]"]
 
   attr_reader :name,
     :category,
