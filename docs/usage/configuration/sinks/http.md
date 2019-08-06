@@ -22,7 +22,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_http_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "http" # must be: "http"
   inputs = ["my-source-id"]
@@ -46,19 +46,19 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   retry_backoff_secs = 10 # default, seconds
   
   # OPTIONAL - Basic auth
-  [sinks.my_http_sink_id.basic_auth]
+  [sinks.my_sink_id.basic_auth]
     password = "password"
     user = "username"
   
   # OPTIONAL - Buffer
-  [sinks.my_http_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
   
   # OPTIONAL - Headers
-  [sinks.my_http_sink_id.headers]
+  [sinks.my_sink_id.headers]
     X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}

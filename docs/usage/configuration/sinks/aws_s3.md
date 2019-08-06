@@ -29,7 +29,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_aws_s3_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"]
@@ -58,7 +58,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   retry_backoff_secs = 5 # default, seconds
   
   # OPTIONAL - Buffer
-  [sinks.my_aws_s3_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"

@@ -29,7 +29,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_file_source_id]
+[sources.my_source_id]
   # REQUIRED - General
   type = "file" # must be: "file"
   exclude = ["/var/log/nginx/access.log"]

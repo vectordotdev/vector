@@ -22,7 +22,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_console_sink_id]
+[sinks.my_sink_id]
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
   target = "stdout" # enum: "stdout" or "stderr"

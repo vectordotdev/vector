@@ -22,7 +22,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_tokenizer_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
@@ -33,7 +33,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   field = "message" # default
   
   # OPTIONAL - Types
-  [transforms.my_tokenizer_transform_id.types]
+  [transforms.my_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"

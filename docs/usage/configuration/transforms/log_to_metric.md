@@ -22,13 +22,13 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_log_to_metric_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "log_to_metric" # must be: "log_to_metric"
   inputs = ["my-source-id"]
   
   # REQUIRED - Metrics
-  [[transforms.my_log_to_metric_transform_id.metrics]]
+  [[transforms.my_transform_id.metrics]]
     type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
     name = "duration_total"

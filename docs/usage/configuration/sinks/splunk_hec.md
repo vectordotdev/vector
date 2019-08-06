@@ -22,7 +22,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_splunk_hec_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
@@ -43,7 +43,7 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
   retry_backoff_secs = 5 # default, seconds
   
   # OPTIONAL - Buffer
-  [sinks.my_splunk_hec_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"

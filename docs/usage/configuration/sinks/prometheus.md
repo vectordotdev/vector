@@ -29,7 +29,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_prometheus_sink_id]
+[sinks.my_sink_id]
   type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"

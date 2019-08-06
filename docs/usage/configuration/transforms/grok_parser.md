@@ -22,7 +22,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_grok_parser_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
@@ -33,7 +33,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   field = "message" # default
   
   # OPTIONAL - Types
-  [transforms.my_grok_parser_transform_id.types]
+  [transforms.my_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"

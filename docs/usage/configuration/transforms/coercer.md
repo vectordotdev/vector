@@ -22,13 +22,13 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_coercer_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
   
   # OPTIONAL - Types
-  [transforms.my_coercer_transform_id.types]
+  [transforms.my_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"

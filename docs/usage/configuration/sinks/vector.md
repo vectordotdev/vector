@@ -22,14 +22,14 @@ The `vector` sink [streams](#streaming) [`log`][docs.log_event] events to anothe
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_vector_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "vector" # must be: "vector"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
   
   # OPTIONAL - Buffer
-  [sinks.my_vector_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"

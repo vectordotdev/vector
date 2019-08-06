@@ -22,7 +22,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_blackhole_sink_id]
+[sinks.my_sink_id]
   type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
   print_amount = 1000

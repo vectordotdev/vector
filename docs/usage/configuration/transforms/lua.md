@@ -29,7 +29,7 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_lua_transform_id]
+[transforms.my_transform_id]
   type = "lua" # must be: "lua"
   inputs = ["my-source-id"]
   source = """

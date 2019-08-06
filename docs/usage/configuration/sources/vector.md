@@ -29,7 +29,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_vector_source_id]
+[sources.my_source_id]
   type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
   

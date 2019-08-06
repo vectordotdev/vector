@@ -22,7 +22,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_tcp_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "tcp" # must be: "tcp"
   inputs = ["my-source-id"]
@@ -32,7 +32,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
   encoding = "json" # no default, enum: "json" or "text"
   
   # OPTIONAL - Buffer
-  [sinks.my_tcp_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"

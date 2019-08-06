@@ -1,7 +1,7 @@
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```toml
-<%= config_example(component.options.to_h.values.sort, path: "#{component.type.pluralize}.my_#{component.id}_id") %>
+<%= config_example(component.options.to_h.values.sort, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}

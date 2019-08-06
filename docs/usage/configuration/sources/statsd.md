@@ -29,7 +29,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_statsd_source_id]
+[sources.my_source_id]
   type = "statsd" # must be: "statsd"
   address = "127.0.0.1:8126"
 ```

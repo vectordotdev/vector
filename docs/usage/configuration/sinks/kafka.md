@@ -22,7 +22,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sinks.my_kafka_sink_id]
+[sinks.my_sink_id]
   # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
@@ -34,7 +34,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   encoding = "json" # no default, enum: "json" or "text"
   
   # OPTIONAL - Buffer
-  [sinks.my_kafka_sink_id.buffer]
+  [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"

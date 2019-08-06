@@ -29,7 +29,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_field_filter_transform_id]
+[transforms.my_transform_id]
   type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"

@@ -22,13 +22,13 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_add_fields_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "add_fields" # must be: "add_fields"
   inputs = ["my-source-id"]
   
   # REQUIRED - Fields
-  [transforms.my_add_fields_transform_id.fields]
+  [transforms.my_transform_id.fields]
     my_string_field = "string value"
     my_env_var_field = "${ENV_VAR}"
     my_int_field = 1

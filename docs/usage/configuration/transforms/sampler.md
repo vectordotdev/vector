@@ -29,7 +29,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_sampler_transform_id]
+[transforms.my_transform_id]
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
   rate = 10
