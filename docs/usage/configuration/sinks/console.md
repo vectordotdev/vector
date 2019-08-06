@@ -23,48 +23,25 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sinks.my_console_sink_id]
-  # REQUIRED - General
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
   target = "stdout" # enum: "stdout" or "stderr"
   
-  # OPTIONAL - General
   encoding = "json" # no default, enum: "json" or "text"
-  
-  # OPTIONAL - Buffer
-  [sinks.my_console_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sinks.<sink-id>]
-  # REQUIRED - General
   type = "console"
   inputs = ["<string>", ...]
   target = {"stdout" | "stderr"}
-
-  # OPTIONAL - General
   encoding = {"json" | "text"}
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
 [sinks.console_sink]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -95,42 +72,6 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.console_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -139,17 +80,12 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "console"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
 ## How It Works
 
@@ -236,7 +172,6 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

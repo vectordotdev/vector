@@ -1258,10 +1258,6 @@ end
     num_items = 500
 
 [sinks.blackhole]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1283,47 +1279,7 @@ end
   # * no default
   print_amount = 1000
 
-  #
-  # Buffer
-  #
-
-  [sinks.blackhole.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
 [sinks.console]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1354,42 +1310,6 @@ end
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.console.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 
 [sinks.elasticsearch]
   #
@@ -1791,10 +1711,6 @@ end
     num_items = 500
 
 [sinks.prometheus]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1815,41 +1731,12 @@ end
   # * no default
   address = "0.0.0.0:9598"
 
-  #
-  # Buffer
-  #
-
-  [sinks.prometheus.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
+  # Default buckets to use for histogram metrics.
+  # 
+  # * optional
+  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+  # * unit: seconds
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
 [sinks.splunk_hec]
   #

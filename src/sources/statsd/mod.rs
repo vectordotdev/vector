@@ -86,7 +86,14 @@ mod test {
 
         let mut config = config::Config::empty();
         config.add_source("in", StatsdConfig { address: in_addr });
-        config.add_sink("out", &["in"], PrometheusSinkConfig { address: out_addr });
+        config.add_sink(
+            "out",
+            &["in"],
+            PrometheusSinkConfig {
+                address: out_addr,
+                buckets: vec![0.0, 10.0],
+            },
+        );
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 

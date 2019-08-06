@@ -1,14 +1,12 @@
 #encoding: utf-8
 
 require_relative "component"
-require_relative "example"
 
 class Transform < Component
   attr_reader :allow_you_to_description,
     :function_categories,
     :input_types,
-    :output_types,
-    :examples
+    :output_types
 
   def initialize(hash)
     super(hash)
@@ -28,12 +26,6 @@ class Transform < Component
 
     if (invalid_types = @output_types - EVENT_TYPES) != []
       raise("#{self.class.name}#output_types contains invalid values: #{invalid_types.inspect}")
-    end
-
-    # examples
-
-    @examples = (hash["examples"] || []).collect do |example_hash|
-      Example.new(example_hash)
     end
   end
 end

@@ -18,7 +18,7 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 <%- end -%>
-<%- if component.sink? && component.batching? -%>
+<%- if component.sink? && component.buffer? && component.batching? -%>
 
 ### Buffers & Batches
 
@@ -143,7 +143,7 @@ The `address` option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 <%- end -%>
-<% if component.sink? -%>
+<% if component.sink? && component.healthcheck? -%>
 
 ### Health Checks
 

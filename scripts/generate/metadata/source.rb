@@ -1,11 +1,9 @@
 #encoding: utf-8
 
 require_relative "component"
-require_relative "example"
 
 class Source < Component
   attr_reader :delivery_guarantee,
-    :examples,
     :through_description
 
   def initialize(hash)
@@ -23,12 +21,6 @@ class Source < Component
         "Source #delivery_guarantee must be one of: " +
           "#{DELIVERY_GUARANTEES.inspect}, got #{@delivery_guarantee.inspect}"
       )
-    end
-
-    # examples
-
-    @examples = (hash["examples"] || []).collect do |example_hash|
-      Example.new(example_hash)
     end
 
     # through_description
