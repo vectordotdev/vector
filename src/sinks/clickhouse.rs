@@ -79,7 +79,11 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            format!("INSERT INTO \"{}\" FORMAT JSONEachRow", table).as_str(),
+            format!(
+                "INSERT INTO {} FORMAT JSONEachRow",
+                table.replace("\"", "\\\"")
+            )
+            .as_str(),
         )
         .finish();
 
