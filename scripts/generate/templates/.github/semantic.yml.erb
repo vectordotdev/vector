@@ -1,0 +1,20 @@
+# Always validate the PR title, and ignore the commits
+titleOnly: true
+
+scopes:
+  - cli
+  - config
+  - data model
+  - observability
+  - testing
+  - topology
+  - workflow
+  <%- metadata.sources.to_h.values.sort.each do |source| -%>
+  - <%= source.name %> source
+  <%- end -%>
+  <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
+  - <%= transform.name %> transform
+  <%- end -%>
+  <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
+  - <%= sink.name %> sink
+  <%- end -%>

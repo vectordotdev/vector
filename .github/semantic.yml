@@ -1,2 +1,43 @@
 # Always validate the PR title, and ignore the commits
 titleOnly: true
+
+scopes:
+  - cli
+  - config
+  - data model
+  - observability
+  - testing
+  - topology
+  - workflow
+  - file source
+  - statsd source
+  - stdin source
+  - syslog source
+  - tcp source
+  - vector source
+  - add_fields transform
+  - coercer transform
+  - field_filter transform
+  - grok_parser transform
+  - json_parser transform
+  - log_to_metric transform
+  - lua transform
+  - regex_parser transform
+  - remove_fields transform
+  - sampler transform
+  - tokenizer transform
+  - aws_cloudwatch_logs sink
+  - aws_kinesis_streams sink
+  - aws_s3 sink
+  - blackhole sink
+  - console sink
+  - elasticsearch sink
+  - http sink
+  - kafka sink
+  - prometheus sink
+  - splunk_hec sink
+  - tcp sink
+  - vector sink
+
+
+
