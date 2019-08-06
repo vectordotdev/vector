@@ -140,7 +140,7 @@ tower-test = "0.1"
 [features]
 default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
-  "cloudwatch-integration-tests",
+  "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
@@ -148,7 +148,7 @@ docker = [
   "s3-integration-tests",
   "splunk-integration-tests",
 ]
-cloudwatch-integration-tests = []
+cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
 es-integration-tests = []
 kafka-integration-tests = []

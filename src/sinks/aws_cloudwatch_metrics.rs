@@ -16,7 +16,6 @@ use rusoto_core::{Region, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, time::Duration};
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 
 #[derive(Clone)]
@@ -158,7 +157,7 @@ impl Service<Vec<Event>> for CloudWatchMetricsService {
         let namespace = self.config.namespace.clone();
         let input = encode_events(items, namespace).unwrap();
 
-        debug!(message = "sending data.", input = &field::debug(&input));
+        debug!(message = "sending data.", ?input);
 
         self.client
             .put_metric_data(input)
@@ -177,7 +176,12 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
         match error {
             PutMetricDataError::HttpDispatch(_) => true,
             PutMetricDataError::InternalServiceFault(_) => true,
-            PutMetricDataError::Unknown(res) if res.status.is_server_error() => true,
+            PutMetricDataError::Unknown(res)
+                if res.status.is_server_error()
+                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+            {
+                true
+            }
             _ => false,
         }
     }
@@ -185,7 +189,7 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 
 fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataInput, ()> {
     let metric_data: Vec<_> = events
-        .iter()
+        .into_iter()
         .filter_map(|event| match event.as_metric() {
             Metric::Counter { name, val } => Some(MetricDatum {
                 metric_name: name.to_string(),
@@ -317,9 +321,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::region::RegionOrEndpoint;
-    use crate::test_util::random_string;
+    use crate::test_util::{random_string, runtime};
     use futures::{stream, Sink};
-    use tokio::runtime::Runtime;
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
@@ -331,7 +334,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_metrics_healthchecks() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let healthcheck = CloudWatchMetricsService::healthcheck(&config()).unwrap();
         rt.block_on(healthcheck).unwrap();
@@ -339,7 +342,7 @@ mod integration_tests {
 
     #[test]
     fn cloudwatch_metrics_put_data() {
-        let mut rt = Runtime::new().unwrap();
+        let mut rt = runtime();
         let sink = CloudWatchMetricsService::new(config(), Acker::Null).unwrap();
 
         let mut events = Vec::new();
