@@ -37,7 +37,7 @@ pub struct ClickhouseConfig {
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = clickhouse(self.clone(), acker);
+        let sink = clickhouse(self.clone(), acker)?;
         let healtcheck = healthcheck(self.host.clone());
 
         Ok((sink, healtcheck))
@@ -48,8 +48,8 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> super::RouterSink {
-    let host = config.host.clone();
+fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, String> {
+    let mut host = config.host.clone();
     let table = config.table.clone();
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -72,16 +72,26 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> super::RouterSink {
         HttpRetryLogic,
     );
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let uri = format!(
-            "{}/?query=INSERT%20INTO%20{}%20FORMAT%20JSONEachRow",
-            host, table
-        );
-        let uri: Uri = uri.parse().unwrap();
+    if !host.ends_with("/") {
+        host.push('/');
+    }
 
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair(
+            "query",
+            format!("INSERT INTO \"{}\" FORMAT JSONEachRow", table).as_str(),
+        )
+        .finish();
+
+    let url = format!("{}?{}", host, query);
+    let uri = url
+        .parse::<Uri>()
+        .map_err(|e| format!("Unable to parse host as URI: {}", e))?;
+
+    let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri);
+        builder.uri(uri.clone());
 
         builder.header("Content-Type", "application/x-ndjson");
 
@@ -111,7 +121,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> super::RouterSink {
             Ok(body)
         });
 
-    Box::new(sink)
+    Ok(Box::new(sink))
 }
 
 fn healthcheck(host: String) -> super::Healthcheck {
@@ -151,7 +161,7 @@ mod tests {
     #[test]
     fn insert_events() {
         let table = gen_table();
-        let host = String::from("http://localhost:8123/");
+        let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
             host: host.clone(),
