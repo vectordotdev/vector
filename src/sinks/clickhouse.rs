@@ -50,9 +50,9 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, String> {
-    let mut host = config.host.clone();
-    let table = config.table.clone();
+    let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
+    let table = config.table.clone();
 
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -75,26 +75,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
         HttpRetryLogic,
     );
 
-    if !host.ends_with("/") {
-        host.push('/');
-    }
-
-    let query = url::form_urlencoded::Serializer::new(String::new())
-        .append_pair(
-            "query",
-            format!(
-                "INSERT INTO {}.{} FORMAT JSONEachRow",
-                database,
-                table.replace("\"", "\\\"")
-            )
-            .as_str(),
-        )
-        .finish();
-
-    let url = format!("{}?{}", host, query);
-    let uri = url
-        .parse::<Uri>()
-        .map_err(|e| format!("Unable to parse host as URI: {}", e))?;
+    let uri = encode_uri(&host, &database, &table)?;
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
@@ -153,9 +134,51 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
+fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair(
+            "query",
+            format!(
+                "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
+                database,
+                table.replace("\"", "\\\"")
+            )
+            .as_str(),
+        )
+        .finish();
+
+    let url = if host.ends_with("/") {
+        format!("{}?{}", host, query)
+    } else {
+        format!("{}/?{}", host, query)
+    };
+
+    url.parse::<Uri>()
+        .map_err(|e| format!("Unable to parse host as URI: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_valid() {
+        let uri = encode_uri("http://localhost:80", "my_database", "my_table").unwrap();
+        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+
+        let uri = encode_uri("http://localhost:80", "my_database", "my_\"table\"").unwrap();
+        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+    }
+
+    #[test]
+    fn encode_invalid() {
+        encode_uri("localhost:80", "my_database", "my_table").unwrap_err();
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "clickhouse-integration-tests")]
-mod tests {
+mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
