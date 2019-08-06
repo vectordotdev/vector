@@ -280,6 +280,9 @@ RUN sed -i \
   crypto/compat/getprogname_linux.c
 ENV CC=$LIBS_PREFIX/bin/musl-cc
 ENV CXX=$LIBS_PREFIX/bin/musl-c++
+ENV CFLAGS=""
+ENV CXXFLAGS=""
+ENV LDFLAGS=""
 RUN mkdir build && \
   cd build && \
   cmake \
