@@ -21,6 +21,7 @@ use tower::ServiceBuilder;
 pub struct ClickhouseConfig {
     pub host: String,
     pub table: String,
+    pub database: Option<String>,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
@@ -51,6 +52,8 @@ impl SinkConfig for ClickhouseConfig {
 fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, String> {
     let mut host = config.host.clone();
     let table = config.table.clone();
+    let database = config.database.clone().unwrap_or("default".into());
+
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
@@ -80,11 +83,11 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
         .append_pair(
             "query",
             format!(
-                "INSERT INTO {} FORMAT JSONEachRow",
-                table.replace("\"", "\\\"")
+                "INSERT INTO {}.{} FORMAT JSONEachRow",
+                database, table.replace("\"", "\\\"")
             )
             .as_str(),
-        )
+          )
         .finish();
 
     let url = format!("{}?{}", host, query);
