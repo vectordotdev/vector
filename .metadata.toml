@@ -907,7 +907,7 @@ description = "The compression type to use before writing data."
 type = "string"
 category = "Requests"
 enum = ["ndjson", "text"]
-null = false
+null = true
 description = """\
 The encoding format used to serialize the events before flushing. The default \
 is dynamic based on if the event is structured or not.\
