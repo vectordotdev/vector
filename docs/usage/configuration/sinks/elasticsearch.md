@@ -240,27 +240,27 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;elasticsearch&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
-| `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.&lt;br /&gt;`required` `example: &quot;http://10.24.32.122:9000&quot;` |
+| `type` | `string` | The component type<br />`required` `must be: "elasticsearch"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
-| `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch &lt;= 6.X. If you are using &gt;= 7.0 you do not need to set this option since Elasticsearch has removed it.&lt;br /&gt;`default: &quot;_doc&quot;` |
-| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector&#39;s template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.&lt;br /&gt;`default: &quot;vector-%F&quot;` |
+| `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
+| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.&lt;br /&gt;`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.&lt;br /&gt;`default: 1` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.&lt;br /&gt;`default: 60` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.&lt;br /&gt;`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.&lt;br /&gt;`default: 5` `unit: seconds` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.&lt;br /&gt;`default: &quot;memory&quot;` `enum: &quot;memory&quot; or &quot;disk&quot;` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.&lt;br /&gt;`default: &quot;block&quot;` `enum: &quot;block&quot; or &quot;drop_newest&quot;` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = &quot;disk&quot;&lt;br /&gt;`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = &quot;memory&quot;&lt;br /&gt;`default: 500` `unit: events` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
+| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
+| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
 ## Examples
 

@@ -85,11 +85,11 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;sampler&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
-| `rate` | `int` | The maximum number of events allowed per second.&lt;br /&gt;`required` `example: 10` |
+| `type` | `string` | The component type<br />`required` `must be: "sampler"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: 10` |
 | **OPTIONAL** | | |
-| `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event&#39;s `&quot;message&quot;` key matches _any_ of these patterns it will _not_ be sampled.&lt;br /&gt;`no default` `example: [&quot;[error]&quot;, &quot;field2&quot;]` |
+| `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 
 ## How It Works
 

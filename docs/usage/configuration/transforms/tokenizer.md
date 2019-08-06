@@ -126,14 +126,14 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;tokenizer&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
-| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.&lt;br /&gt;`required` `example: (see above)` |
+| `type` | `string` | The component type<br />`required` `must be: "tokenizer"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.&lt;br /&gt;`default: true` |
-| `field` | `string` | The field to tokenize.&lt;br /&gt;`default: &quot;message&quot;` |
+| `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
+| `field` | `string` | The field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.&lt;br /&gt;`required` `enum: &quot;string&quot;, &quot;int&quot;, &quot;float&quot;, &quot;bool&quot;, and &quot;timestamp\|strftime&quot;` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 

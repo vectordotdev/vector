@@ -77,11 +77,11 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;json_parser&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
-| `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.&lt;br /&gt;`required` `example: true` |
+| `type` | `string` | The component type<br />`required` `must be: "json_parser"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`required` `example: true` |
 | **OPTIONAL** | | |
-| `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.&lt;br /&gt;`default: &quot;message&quot;` |
+| `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
 ## Examples
 

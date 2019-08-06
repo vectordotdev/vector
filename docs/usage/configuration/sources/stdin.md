@@ -85,11 +85,11 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;stdin&quot;` |
+| `type` | `string` | The component type<br />`required` `must be: "stdin"` |
 | **OPTIONAL** - General | | |
-| `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.&lt;br /&gt;`default: 102400` `unit: bytes` |
+| `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.<br />`default: 102400` `unit: bytes` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.&lt;br /&gt;`default: &quot;host&quot;` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 

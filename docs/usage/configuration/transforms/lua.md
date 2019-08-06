@@ -106,11 +106,11 @@ end
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;lua&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
-| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.&lt;br /&gt;`required` `example: (see above)` |
+| `type` | `string` | The component type<br />`required` `must be: "lua"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
-| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.&lt;br /&gt;`no default` `example: [&quot;/etc/vector/lua&quot;]` |
+| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
 
 ## Examples
 

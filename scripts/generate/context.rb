@@ -147,10 +147,6 @@ class Context
     binding
   end
 
-  def h(string)
-    ERB::Util.html_escape(string)
-  end
-
   def option_names(options)
     options.collect { |option| "`#{option.name}`" }
   end

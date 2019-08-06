@@ -112,14 +112,14 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;syslog&quot;` |
-| `mode` | `string` | The input mode.&lt;br /&gt;`required` `enum: &quot;tcp&quot;, &quot;udp&quot;, and &quot;unix&quot;` |
+| `type` | `string` | The component type<br />`required` `must be: "syslog"` |
+| `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", and "unix"` |
 | **OPTIONAL** - General | | |
-| `address` | `string` | The TCP or UDP address to listen on.&lt;br /&gt;`no default` `example: &quot;0.0.0.0:9000&quot;` |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.&lt;br /&gt;`default: 102400` `unit: bytes` |
-| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when mode = &quot;unix&quot;&lt;br /&gt;`no default` `example: &quot;/path/to/socket&quot;` |
+| `address` | `string` | The TCP or UDP address to listen on.<br />`no default` `example: "0.0.0.0:9000"` |
+| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
+| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.&lt;br /&gt;`default: &quot;host&quot;` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 

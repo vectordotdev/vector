@@ -65,8 +65,8 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;statsd&quot;` |
-| `address` | `string` | UDP socket address to bind to.&lt;br /&gt;`required` `example: &quot;127.0.0.1:8126&quot;` |
+| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
+| `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## Examples
 

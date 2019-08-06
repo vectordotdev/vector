@@ -125,14 +125,14 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;log_to_metric&quot;` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `type` | `string` | The component type<br />`required` `must be: "log_to_metric"` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Metrics | | |
-| `metrics.type` | `string` | The metric type.&lt;br /&gt;`required` `enum: &quot;counter&quot;, &quot;gauge&quot;, &quot;histogram&quot;, and &quot;set&quot;` |
-| `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.&lt;br /&gt;`required` `example: &quot;duration&quot;` |
-| `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = &quot;counter&quot;&lt;br /&gt;`default: false` |
-| `metrics.name` | `string` | The name of the metric. Defaults to `&lt;field&gt;_total` for `counter` and `&lt;field&gt;` for `gauge`.&lt;br /&gt;`default: &quot;&lt;dynamic&gt;&quot;` |
-| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.&lt;br /&gt;`required` `example: (see above)` |
+| `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge", "histogram", and "set"` |
+| `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
+| `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"<br />`default: false` |
+| `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "<dynamic>"` |
+| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.<br />`required` `example: (see above)` |
 
 ## Examples
 
