@@ -42,7 +42,6 @@ through_description = "one or more local files"
 [sources.file.options.data_dir]
 type = "string"
 examples = ["/var/lib/vector"]
-default = "<global.data_dir>"
 null = true
 description = """\
 The directory used to persist file checkpoint positions. By default, the \
@@ -537,7 +536,6 @@ the metric will be incremented by 1 regardless of the `field` value.\
 
 [transforms.log_to_metric.options.metrics.options.name]
 type = "string"
-default = "<dynamic>"
 examples = ["duration_total"]
 null = false
 description = """\
@@ -788,10 +786,12 @@ write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogE
 [sinks.aws_cloudwatch_logs.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
@@ -845,10 +845,12 @@ write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.aws_kinesis_streams.options.partition_key_field]
 type = "string"
@@ -906,7 +908,10 @@ type = "string"
 category = "Requests"
 enum = ["ndjson", "text"]
 null = false
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"
@@ -986,10 +991,12 @@ write_to_description = "the console, `STDOUT` or `STDERR`"
 
 [sinks.console.options.encoding]
 type = "string"
-default = "<dynamic>"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before writing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.console.options.target]
 type = "string"
@@ -1085,7 +1092,10 @@ description = "The compression strategy used to compress the payload before send
 type = "string"
 enum = ["ndjson", "text"]
 null = false
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.http.options.headers]
 type = "table"
@@ -1132,10 +1142,12 @@ to initially to bootstrap itself\
 
 [sinks.kafka.options.encoding]
 type = "string"
-default = "<dynamic>"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.kafka.options.key_field]
 type = "string"
@@ -1190,10 +1202,12 @@ write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
 [sinks.splunk_hec.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
 enum = ["ndjson", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 [sinks.splunk_hec.options.host]
 type = "string"
@@ -1225,10 +1239,12 @@ description = "The TCP address."
 [sinks.tcp.options.encoding]
 type = "string"
 category = "Requests"
-default = "<dynamic>"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based oon if the event is structured or not.\
+"""
 
 # ------------------------------------------------------------------------------
 # sinks.vector

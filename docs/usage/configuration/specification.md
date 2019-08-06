@@ -90,7 +90,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # permissions to this dir.
   # 
   # * optional
-  # * default: "<global.data_dir>"
+  # * no default
   data_dir = "/var/lib/vector"
 
   # The number of bytes read off the head of the file to generate a unique
@@ -558,8 +558,8 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
     # 
-    # * optional
-    # * default: "<dynamic>"
+    # * required
+    # * no default
     name = "duration_total"
 
     [transforms.log_to_metric.metrics.labels]
@@ -841,10 +841,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -984,10 +985,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1103,7 +1105,8 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * required
   # * no default
@@ -1212,7 +1215,7 @@ end
   # this to be the root S3 "folder".
   # 
   # * optional
-  # * default: "date=%F"
+  # * no default
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
@@ -1343,10 +1346,11 @@ end
   target = "stdout"
   target = "stderr"
 
-  # The encoding format used to serialize the events before writing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1424,7 +1428,7 @@ end
   # Index name to write events to.
   # 
   # * optional
-  # * default: "vector-%F"
+  # * no default
   index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
 
@@ -1545,7 +1549,8 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * required
   # * no default
@@ -1740,10 +1745,11 @@ end
   # * no default
   topic = "topic-1234"
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1898,10 +1904,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
@@ -2011,10 +2018,11 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"

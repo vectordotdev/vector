@@ -125,7 +125,8 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # * no default
   inputs = ["my-source-id"]
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * required
   # * no default
@@ -289,7 +290,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `must be: "http"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |

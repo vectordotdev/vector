@@ -29,7 +29,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   target = "stdout" # enum: "stdout" or "stderr"
   
   # OPTIONAL - General
-  encoding = "json" # default, enum: "json" or "text"
+  encoding = "json" # no default, enum: "json" or "text"
   
   # OPTIONAL - Buffer
   [sinks.my_console_sink_id.buffer]
@@ -87,10 +87,11 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   target = "stdout"
   target = "stderr"
 
-  # The encoding format used to serialize the events before writing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -143,7 +144,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before writing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |

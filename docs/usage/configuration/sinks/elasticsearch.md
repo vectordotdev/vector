@@ -37,7 +37,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - General
   doc_type = "_doc" # default
-  index = "vector-%Y-%m-%d" # default
+  index = "vector-%Y-%m-%d" # no default
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -130,7 +130,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   # Index name to write events to.
   # 
   # * optional
-  # * default: "vector-%F"
+  # * no default
   index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
 

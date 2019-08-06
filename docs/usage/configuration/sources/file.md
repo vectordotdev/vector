@@ -36,7 +36,7 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
-  data_dir = "/var/lib/vector" # default
+  data_dir = "/var/lib/vector" # no default
   fingerprint_bytes = 256 # default, bytes
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
@@ -103,7 +103,7 @@ The `file` source ingests data through one or more local files and outputs [`log
   # permissions to this dir.
   # 
   # * optional
-  # * default: "<global.data_dir>"
+  # * no default
   data_dir = "/var/lib/vector"
 
   # The number of bytes read off the head of the file to generate a unique
@@ -180,7 +180,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
-| `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.<br />`default: "<global.data_dir>"` |
+| `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.<br />`no default` `example: "/var/lib/vector"` |
 | `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
 | `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |

@@ -42,7 +42,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   batch_timeout = 1 # default, seconds
   
   # OPTIONAL - Requests
-  encoding = "json" # default, enum: "json" or "text"
+  encoding = "json" # no default, enum: "json" or "text"
   rate_limit_duration = 1 # default, seconds
   rate_limit_num = 5 # default
   request_in_flight_limit = 5 # default
@@ -153,10 +153,11 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based oon if the event is structured or not.
   # 
   # * optional
-  # * default: "<dynamic>"
+  # * no default
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -254,7 +255,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "<dynamic>"` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based oon if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
 | `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |

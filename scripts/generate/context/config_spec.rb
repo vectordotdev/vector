@@ -19,7 +19,7 @@ class Context
 
       tags << (option.required? && option.default.nil? ? "required" : "optional")
 
-      if !option.default.nil?
+      if option.examples.first == option.default
         tags << "default: #{option.default.to_toml}"
       else
         tags << "no default"

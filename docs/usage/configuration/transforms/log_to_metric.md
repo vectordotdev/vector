@@ -31,9 +31,9 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   [[transforms.my_log_to_metric_transform_id.metrics]]
     type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
+    name = "duration_total"
     
     increment_by_value = false # default, relevant when type = "counter"
-    name = "duration_total" # default
     labels = {host = "${HOSTNAME}", region = "us-east-1"}
 ```
 {% endcode-tabs-item %}
@@ -48,8 +48,8 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   [[transforms.<transform-id>.metrics]]
     type = {"counter" | "gauge" | "histogram" | "set"}
     field = "<string>"
-    increment_by_value = <bool>
     name = "<string>"
+    increment_by_value = <bool>
     labels = {* = "<string>"}
 ```
 {% endcode-tabs-item %}
@@ -105,8 +105,8 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
     # 
-    # * optional
-    # * default: "<dynamic>"
+    # * required
+    # * no default
     name = "duration_total"
 
     [transforms.log_to_metric_transform.metrics.labels]
@@ -130,8 +130,8 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | **REQUIRED** - Metrics | | |
 | `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge", "histogram", and "set"` |
 | `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
+| `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`required` `example: "duration_total"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"<br />`default: false` |
-| `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`default: "<dynamic>"` |
 | `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.<br />`required` `example: (see above)` |
 
 ## Examples
