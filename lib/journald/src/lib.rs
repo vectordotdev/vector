@@ -1,5 +1,3 @@
-#![allow(non_camel_case_types)]
-
 #[macro_use]
 extern crate dlopen_derive;
 
@@ -16,6 +14,7 @@ pub const SD_JOURNAL_RUNTIME_ONLY: c_int = 2;
 pub const SD_JOURNAL_SYSTEM: c_int = 4;
 pub const SD_JOURNAL_CURRENT_USER: c_int = 8;
 
+#[allow(non_camel_case_types)]
 pub enum sd_journal {}
 
 #[derive(WrapperApi)]
