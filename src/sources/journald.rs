@@ -78,11 +78,10 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-fn journald_source<J: 'static + Iterator<Item = Result<Record, Error>> + Send>(
-    journal: J,
-    out: mpsc::Sender<Event>,
-    units: HashSet<String>,
-) -> super::Source {
+fn journald_source<J>(journal: J, out: mpsc::Sender<Event>, units: HashSet<String>) -> super::Source
+where
+    J: 'static + Iterator<Item = Result<Record, Error>> + Send,
+{
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let out = out
@@ -145,8 +144,10 @@ struct JournaldServer<J, T> {
     shutdown: std::sync::mpsc::Receiver<()>,
 }
 
-impl<J: Iterator<Item = Result<Record, Error>>, T: Sink<SinkItem = Record, SinkError = ()>>
-    JournaldServer<J, T>
+impl<J, T> JournaldServer<J, T>
+where
+    J: Iterator<Item = Result<Record, Error>>,
+    T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
