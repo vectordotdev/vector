@@ -36,6 +36,7 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
+  data_dir = "/var/lib/vector" # default
   fingerprint_bytes = 256 # default, bytes
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
@@ -57,6 +58,7 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["<string>", ...]
 
   # OPTIONAL - General
+  data_dir = "<string>"
   fingerprint_bytes = <int>
   glob_minimum_cooldown = <int>
   ignore_older = <int>
@@ -95,6 +97,14 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * required
   # * no default
   include = ["/var/log/nginx/*.log"]
+
+  # The directory used to persist file checkpoint positions. By default, the
+  # global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * default: "<global.data_dir>"
+  data_dir = "/var/lib/vector"
 
   # The number of bytes read off the head of the file to generate a unique
   # fingerprint.
@@ -166,19 +176,20 @@ The `file` source ingests data through one or more local files and outputs [`log
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "file"` |
-| `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
-| `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;file&quot;` |
+| `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*&lt;br /&gt;`required` `example: [&quot;/var/log/nginx/access.log&quot;]` |
+| `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.&lt;br /&gt;`required` `example: [&quot;/var/log/nginx/*.log&quot;]` |
 | **OPTIONAL** - General | | |
-| `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
-| `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
-| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |
-| `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
-| `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
-| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
+| `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.&lt;br /&gt;`default: &quot;&lt;global.data_dir&gt;&quot;` |
+| `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.&lt;br /&gt;`default: 256` `unit: bytes` |
+| `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.&lt;br /&gt;`default: 1000` `unit: milliseconds` |
+| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.&lt;br /&gt;`no default` `example: 86400` `unit: seconds` |
+| `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.&lt;br /&gt;`default: 0` `unit: bytes` |
+| `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.&lt;br /&gt;`default: 102400` `unit: bytes` |
+| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.&lt;br /&gt;`default: false` |
 | **OPTIONAL** - Context | | |
-| `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
+| `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.&lt;br /&gt;`default: &quot;file&quot;` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.&lt;br /&gt;`default: &quot;host&quot;` |
 
 ## Examples
 
@@ -230,7 +241,8 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global `data_dir` option][docs.configuration.data-directory].
+[global `data_dir` option][docs.configuration.data-directory] but can be
+overridden via the `data_dir` option in the `file` sink directly.
 
 ### Context
 

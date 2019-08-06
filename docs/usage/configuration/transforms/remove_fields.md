@@ -67,9 +67,9 @@ The `remove_fields` transform accepts [`log`][docs.log_event] and [`metric`][doc
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "remove_fields"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;remove_fields&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `fields` | `[string]` | The field names to drop.&lt;br /&gt;`required` `example: [&quot;field1&quot;, &quot;field2&quot;]` |
 
 ## How It Works
 

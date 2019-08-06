@@ -126,14 +126,14 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "regex_parser"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;regex_parser&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.&lt;br /&gt;`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
-| `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
+| `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.&lt;br /&gt;`default: true` |
+| `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.&lt;br /&gt;`default: &quot;message&quot;` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.&lt;br /&gt;`required` `enum: &quot;string&quot;, &quot;int&quot;, &quot;float&quot;, &quot;bool&quot;, and &quot;timestamp\|strftime&quot;` |
 
 ## Examples
 

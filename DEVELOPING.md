@@ -61,7 +61,7 @@ Vector includes a [`Makefile`](/Makefile) that exposes top-level commands. Ex:
 - `make check`
 - `make run`
 - `make bench`
-- `make generate-docs`
+- `make generate`
 
 The various commands are below within their respective sections.
 

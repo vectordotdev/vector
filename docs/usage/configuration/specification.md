@@ -85,6 +85,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   include = ["/var/log/nginx/*.log"]
 
+  # The directory used to persist file checkpoint positions. By default, the
+  # global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * default: "<global.data_dir>"
+  data_dir = "/var/lib/vector"
+
   # The number of bytes read off the head of the file to generate a unique
   # fingerprint.
   # 
@@ -551,7 +559,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # `<field>` for `gauge`.
     # 
     # * optional
-    # * default: "dynamic"
+    # * default: "<dynamic>"
     name = "duration_total"
 
     [transforms.log_to_metric.metrics.labels]
@@ -836,7 +844,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -979,7 +987,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1338,7 +1346,7 @@ end
   # The encoding format used to serialize the events before writing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1735,7 +1743,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -1893,7 +1901,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
@@ -2006,7 +2014,7 @@ end
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"

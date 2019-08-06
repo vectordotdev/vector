@@ -287,33 +287,33 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "http"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
-| `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;http&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.&lt;br /&gt;`required` `enum: &quot;ndjson&quot; or &quot;text&quot;` |
+| `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.&lt;br /&gt;`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
-| `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
+| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.&lt;br /&gt;`no default` `must be: &quot;gzip&quot;` |
+| `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.&lt;br /&gt;`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 5` `unit: seconds` |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.&lt;br /&gt;`default: 1049000` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.&lt;br /&gt;`default: 5` `unit: seconds` |
 | **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` `unit: seconds` |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 10` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.&lt;br /&gt;`default: 10` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.&lt;br /&gt;`default: 30` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.&lt;br /&gt;`default: 10` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.&lt;br /&gt;`default: 10` `unit: seconds` |
 | **OPTIONAL** - Basic auth | | |
-| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
-| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
+| `basic_auth.password` | `string` | The basic authentication password.&lt;br /&gt;`required` `example: &quot;password&quot;` |
+| `basic_auth.user` | `string` | The basic authentication user name.&lt;br /&gt;`required` `example: &quot;username&quot;` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| `buffer.type` | `string` | The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.&lt;br /&gt;`default: &quot;memory&quot;` `enum: &quot;memory&quot; or &quot;disk&quot;` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.&lt;br /&gt;`default: &quot;block&quot;` `enum: &quot;block&quot; or &quot;drop_newest&quot;` |
+| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = &quot;disk&quot;&lt;br /&gt;`no default` `example: 104900000` `unit: bytes` |
+| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = &quot;memory&quot;&lt;br /&gt;`default: 500` `unit: events` |
 | **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`required` `example: (see above)` |
+| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.&lt;br /&gt;`required` `example: (see above)` |
 
 ## Examples
 

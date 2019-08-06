@@ -123,14 +123,14 @@ The `vector` sink [streams](#streaming) [`log`][docs.log_event] events to anothe
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "vector"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `address` | `string` | The downstream Vector address.<br />`required` `example: "92.12.333.224:5000"` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;vector&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `address` | `string` | The downstream Vector address.&lt;br /&gt;`required` `example: &quot;92.12.333.224:5000&quot;` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| `buffer.type` | `string` | The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.&lt;br /&gt;`default: &quot;memory&quot;` `enum: &quot;memory&quot; or &quot;disk&quot;` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.&lt;br /&gt;`default: &quot;block&quot;` `enum: &quot;block&quot; or &quot;drop_newest&quot;` |
+| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = &quot;disk&quot;&lt;br /&gt;`no default` `example: 104900000` `unit: bytes` |
+| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = &quot;memory&quot;&lt;br /&gt;`default: 500` `unit: events` |
 
 ## How It Works
 

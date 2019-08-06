@@ -1,5 +1,6 @@
 require "active_support/core_ext/array/conversions"
 require "active_support/core_ext/string/indent"
+require "active_support/core_ext/string/output_safety"
 
 require_relative "metadata"
 require_relative "context/config_example"
@@ -144,6 +145,10 @@ class Context
 
   def get_binding
     binding
+  end
+
+  def h(string)
+    ERB::Util.html_escape(string)
   end
 
   def option_names(options)

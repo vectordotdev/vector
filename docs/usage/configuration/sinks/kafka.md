@@ -108,7 +108,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   # The encoding format used to serialize the events before flushing.
   # 
   # * optional
-  # * default: "dynamic"
+  # * default: "<dynamic>"
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
@@ -157,18 +157,18 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "kafka"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`required` `example: "user_id"` |
-| `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;kafka&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a &quot;bootstrap&quot; Kafka cluster that a Kafka client connects to initially to bootstrap itself&lt;br /&gt;`required` `example: (see above)` |
+| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.&lt;br /&gt;`required` `example: &quot;user_id&quot;` |
+| `topic` | `string` | The Kafka topic name to write events to.&lt;br /&gt;`required` `example: &quot;topic-1234&quot;` |
 | **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`default: "dynamic"` `enum: "json" or "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.&lt;br /&gt;`default: &quot;&lt;dynamic&gt;&quot;` `enum: &quot;json&quot; or &quot;text&quot;` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| `buffer.type` | `string` | The buffer&#39;s type / location. `disk` buffers are persistent and will be retained between restarts.&lt;br /&gt;`default: &quot;memory&quot;` `enum: &quot;memory&quot; or &quot;disk&quot;` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.&lt;br /&gt;`default: &quot;block&quot;` `enum: &quot;block&quot; or &quot;drop_newest&quot;` |
+| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = &quot;disk&quot;&lt;br /&gt;`no default` `example: 104900000` `unit: bytes` |
+| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = &quot;memory&quot;&lt;br /&gt;`default: 500` `unit: events` |
 
 ## How It Works
 

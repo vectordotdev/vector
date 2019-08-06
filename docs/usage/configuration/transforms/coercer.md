@@ -99,10 +99,10 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "coercer"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;coercer&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.&lt;br /&gt;`required` `enum: &quot;string&quot;, &quot;int&quot;, &quot;float&quot;, &quot;bool&quot;, and &quot;timestamp\|strftime&quot;` |
 
 ## Examples
 

@@ -11,7 +11,7 @@
 <% if !option.options.nil? -%>
 <%= options_table(option.options, header: false, path: name, titles: false) %>
 <% else -%>
-| `<%= name %>` | `<%= option.type %>` | <%= table.option_description(option) %> |
+| `<%= name %>` | `<%= option.type %>` | <%= h table.option_description(option) %> |
 <% end -%>
 <% end -%>
 <% end -%>

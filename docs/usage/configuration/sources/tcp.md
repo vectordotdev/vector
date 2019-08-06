@@ -102,13 +102,13 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
-| `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;tcp&quot;` |
+| `address` | `string` | The address to bind the socket to.&lt;br /&gt;`required` `example: &quot;0.0.0.0:9000&quot;` |
 | **OPTIONAL** - General | | |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
+| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.&lt;br /&gt;`default: 102400` `unit: bytes` |
+| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.&lt;br /&gt;`default: 30` `unit: seconds` |
 | **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
+| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.&lt;br /&gt;`default: &quot;host&quot;` |
 
 ## Examples
 

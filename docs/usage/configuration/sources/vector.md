@@ -75,10 +75,10 @@ The `vector` source ingests data through another upstream Vector instance and ou
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "vector"` |
-| `address` | `string` | The TCP address to bind to.<br />`required` `example: "0.0.0.0:9000"` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;vector&quot;` |
+| `address` | `string` | The TCP address to bind to.&lt;br /&gt;`required` `example: &quot;0.0.0.0:9000&quot;` |
 | **OPTIONAL** | | |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
+| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.&lt;br /&gt;`default: 30` `unit: seconds` |
 
 ## How It Works
 

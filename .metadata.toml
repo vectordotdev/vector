@@ -12,7 +12,7 @@
 # It is the source of truth used to generate docs, config examples, and more.
 # Once changed, please run to sync everything:
 #
-#     make generate-docs`
+#     make generate
 #
 
 # ------------------------------------------------------------------------------
@@ -39,18 +39,29 @@ guides = []
 resources = []
 through_description = "one or more local files"
 
+[sources.file.options.data_dir]
+type = "string"
+examples = ["/var/lib/vector"]
+default = "<global.data_dir>"
+null = true
+description = """\
+The directory used to persist file checkpoint positions. By default, the \
+global `data_dir` is used. Please make sure the Vector project has write \
+permissions to this dir.\
+"""
+
 [sources.file.options.include]
 type = "[string]"
-null = false
 examples = [["/var/log/nginx/*.log"]]
+null = false
 description = """\
 Array of file patterns to include. [Globbing](#globbing) is supported.\
 """
 
 [sources.file.options.exclude]
 type = "[string]"
-null = false
 examples = [["/var/log/nginx/access.log"]]
+null = false
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
@@ -59,8 +70,8 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 [sources.file.options.file_key]
 type = "string"
 category = "Context"
-null = false
 default = "file"
+null = false
 section = "context"
 description = """\
 The key name added to each event with the full path of the file.\
@@ -90,8 +101,8 @@ Vector searches for files.\
 name = "host_key"
 type = "string"
 category = "Context"
-null = false
 default = "host"
+null = false
 section = "context"
 description = """\
 The key name added to each event representing the current host.\
@@ -99,9 +110,9 @@ The key name added to each event representing the current host.\
 
 [sources.file.options.ignore_older]
 type = "int"
-unit = "seconds"
-null = true
 examples = [86400]
+null = true
+unit = "seconds"
 description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
@@ -526,7 +537,7 @@ the metric will be incremented by 1 regardless of the `field` value.\
 
 [transforms.log_to_metric.options.metrics.options.name]
 type = "string"
-default = "dynamic"
+default = "<dynamic>"
 examples = ["duration_total"]
 null = false
 description = """\
@@ -777,7 +788,7 @@ write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogE
 [sinks.aws_cloudwatch_logs.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -834,7 +845,7 @@ write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -975,7 +986,7 @@ write_to_description = "the console, `STDOUT` or `STDERR`"
 
 [sinks.console.options.encoding]
 type = "string"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before writing."
@@ -1121,7 +1132,7 @@ to initially to bootstrap itself\
 
 [sinks.kafka.options.encoding]
 type = "string"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -1179,7 +1190,7 @@ write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
 [sinks.splunk_hec.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["ndjson", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."
@@ -1214,7 +1225,7 @@ description = "The TCP address."
 [sinks.tcp.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
+default = "<dynamic>"
 enum = ["json", "text"]
 null = true
 description = "The encoding format used to serialize the events before flushing."

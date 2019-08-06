@@ -83,10 +83,10 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "field_filter"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
-| `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
+| `type` | `string` | The component type&lt;br /&gt;`required` `must be: &quot;field_filter&quot;` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.&lt;br /&gt;`required` `example: [&quot;my-source-id&quot;]` |
+| `field` | `string` | The target field to compare against the `value`.&lt;br /&gt;`required` `example: &quot;file&quot;` |
+| `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.&lt;br /&gt;`required` `example: &quot;/var/log/nginx.log&quot;` |
 
 ## How It Works
 
