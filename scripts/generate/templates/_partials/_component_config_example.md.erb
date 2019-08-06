@@ -9,4 +9,9 @@
 <%= config_schema(component.options.to_h.values.sort, path: "#{component.type.pluralize}.<#{component.type}-id>") %>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```toml
+<%= config_spec(component.options.to_h.values.sort, path: "#{component.type.pluralize}.#{component.id}") %>
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}

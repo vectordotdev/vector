@@ -26,7 +26,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # REQUIRED - General
   type = "http" # must be: "http"
   inputs = ["my-source-id"]
-  encoding = "ndjson" # enum: "ndjson", "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
   uri = "https://10.22.212.22:9000/endpoint"
   
   # OPTIONAL - General
@@ -52,8 +52,8 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   
   # OPTIONAL - Buffer
   [sinks.my_http_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
   
@@ -104,6 +104,182 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
     * = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.http_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "http"
+  type = "http"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The full URI to make HTTP requests to. This should include the protocol and
+  # host, but can also include the port, path, and any other valid part of a URI.
+  # 
+  # * required
+  # * no default
+  uri = "https://10.22.212.22:9000/endpoint"
+
+  # The compression strategy used to compress the payload before sending.
+  # 
+  # * optional
+  # * no default
+  # * must be: "gzip" (if supplied)
+  compression = "gzip"
+
+  # A URI that Vector can request in order to determine the service health.
+  # 
+  # * optional
+  # * no default
+  healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  batch_timeout = 5
+
+  #
+  # Requests
+  #
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 10
+  rate_limit_num = 10
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 10
+  request_in_flight_limit = 10
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 10
+  retry_attempts = 10
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 10
+  # * unit: seconds
+  retry_backoff_secs = 10
+
+  #
+  # Basic auth
+  #
+
+  [sinks.http_sink.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
+  # Buffer
+  #
+
+  [sinks.http_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+
+  #
+  # Headers
+  #
+
+  [sinks.http_sink.headers]
+    # A custom header to be added to each outgoing HTTP request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -111,12 +287,12 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "http"` |
+| `type` | `string` | The component type<br />`required` `must be: "http"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1049000` `unit: bytes` |
@@ -132,8 +308,8 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
 | `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Headers | | |
@@ -174,12 +350,11 @@ scheme][url.basic_auth].
 
 ![][images.sink-flow-serial]
 
-The `http` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `http` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -299,9 +474,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.http_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `http_sink` issues][url.http_sink_issues].
+2. If encountered a bug, please [file a bug report][url.new_http_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_http_sink_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -312,9 +488,9 @@ issue, please:
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
@@ -322,11 +498,12 @@ issue, please:
 [images.http_sink]: ../../../assets/http-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
-[url.community]: https://vector.dev/community
 [url.gzip]: https://www.gzip.org/
 [url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Bug%22
 [url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancement%22
 [url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22
 [url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
+[url.new_http_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http&labels=Type%3A+Bug
+[url.new_http_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http&labels=Type%3A+Enhancement
 [url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.vector_chat]: https://chat.vector.dev

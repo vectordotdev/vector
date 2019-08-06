@@ -16,11 +16,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_cloudwatch_logs: retry support added and more stablity improvements
 - coercer: New transform to convert fields into specified types.
 - file source: `data_dir` now falls back to global `data_dir` option if not specified
+- aws_kinesis_streams: Added configurable partition keys
 
 ### Changed
-  - [configuration] Empty inputs are treated as errors instead of warnings [#506]
 
+- [configuration] Empty inputs are treated as errors instead of warnings [#506]
 - aws_cloudwatch_logs: Now partitions events by `log_group`/`log_stream`.
+- All sinks now return structured events instead of flattened events.
+- elasticsearch: `doc_type` is now optional defaulting to `_doc_`.
 
 ### Deprecated
 

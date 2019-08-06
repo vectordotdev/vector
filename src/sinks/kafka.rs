@@ -184,21 +184,22 @@ fn encode_event(
     key_field: &Option<Atom>,
     encoding: &Option<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
-    let log = event.as_log();
+    let key = key_field
+        .as_ref()
+        .and_then(|f| event.as_log().get(f))
+        .map(|v| v.as_bytes().to_vec())
+        .unwrap_or(Vec::new());
 
-    let body = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.all_fields()).unwrap(),
-        (&Some(Encoding::Text), _) | (_, false) => log
+    let body = match (encoding, event.as_log().is_structured()) {
+        (&Some(Encoding::Json), _) | (_, true) => {
+            serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap()
+        }
+        (&Some(Encoding::Text), _) | (_, false) => event
+            .as_log()
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or(Vec::new()),
     };
-
-    let key = key_field
-        .as_ref()
-        .and_then(|f| log.get(f))
-        .map(|v| v.as_bytes().to_vec())
-        .unwrap_or(Vec::new());
 
     (key, body)
 }

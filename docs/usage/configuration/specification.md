@@ -206,7 +206,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # 
   # * required
   # * no default
-  # * enum: "tcp", "udp", "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
   mode = "udp"
   mode = "unix"
@@ -224,8 +224,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: bytes
   max_length = 102400
 
-  # The unix socket path. *This should be absolute path.* Only relevant when
-  # `mode` is `unix`.
+  # The unix socket path. *This should be absolute path.*
   # 
   # * optional
   # * no default
@@ -380,7 +379,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -464,7 +463,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -529,9 +528,11 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "counter", "gauge"
+    # * enum: "counter", "gauge", "histogram", and "set"
     type = "counter"
     type = "gauge"
+    type = "histogram"
+    type = "set"
 
     # The log field to use as the metric.
     # 
@@ -647,7 +648,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -753,7 +754,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -793,7 +794,8 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/my-log.log"
+  group_name = "/var/log/{{ file }}.log"
+  group_name = "ec2/{{ instance_id }}"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -805,7 +807,9 @@ end
   # 
   # * required
   # * no default
-  stream_name = "my-stream"
+  stream_name = "{{ instance_id }}"
+  stream_name = "stream-name"
+  stream_name = "%Y-%m-%d"
 
   #
   # Batching
@@ -833,7 +837,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -887,7 +891,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -895,7 +899,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -932,17 +936,23 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The AWS region of the target CloudWatch Logs stream resides.
+  # The AWS region of the target Kinesis stream resides.
   # 
   # * required
   # * no default
   region = "us-east-1"
 
-  # The stream name of the target CloudWatch Logs stream.
+  # The stream name of the target Kinesis Logs stream.
   # 
   # * required
   # * no default
   stream_name = "my-stream"
+
+  # The event field used as the Kinesis record's partition key value.
+  # 
+  # * optional
+  # * no default
+  partition_key_field = "user_id"
 
   #
   # Batching
@@ -970,7 +980,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1024,7 +1034,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1032,7 +1042,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1089,7 +1099,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1191,13 +1201,14 @@ end
 
   # A prefix to apply to all object key names. This should be used to partition
   # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
+  # this to be the root S3 "folder".
   # 
   # * optional
   # * default: "date=%F"
   key_prefix = "date=%F/"
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
   # Buffer
@@ -1209,7 +1220,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1217,7 +1228,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1271,7 +1282,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1279,7 +1290,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1320,7 +1331,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "stdout", "stderr"
+  # * enum: "stdout" or "stderr"
   target = "stdout"
   target = "stderr"
 
@@ -1328,7 +1339,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1342,7 +1353,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1350,7 +1361,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1402,11 +1413,12 @@ end
   # * default: "_doc"
   doc_type = "_doc"
 
-  # Index name to write events to. `strftime` specifiers are supported.
+  # Index name to write events to.
   # 
   # * optional
   # * default: "vector-%F"
-  index = "vector-%F"
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
 
   #
   # Batching
@@ -1480,7 +1492,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1488,7 +1500,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1529,7 +1541,7 @@ end
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1642,7 +1654,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1650,7 +1662,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1712,7 +1724,7 @@ end
   # 
   # * required
   # * no default
-  key_field = "partition_key"
+  key_field = "user_id"
 
   # The Kafka topic name to write events to.
   # 
@@ -1724,7 +1736,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1738,7 +1750,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1746,7 +1758,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1799,7 +1811,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1807,7 +1819,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1882,7 +1894,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1936,7 +1948,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1944,7 +1956,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1995,7 +2007,7 @@ end
   # 
   # * optional
   # * default: "dynamic"
-  # * enum: "json", "text"
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -2009,7 +2021,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2017,7 +2029,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -2070,7 +2082,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2078,7 +2090,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 

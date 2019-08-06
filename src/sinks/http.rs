@@ -238,7 +238,7 @@ fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
             .map(|v| v.to_string_lossy().into_bytes())
             .unwrap_or(Vec::new()),
 
-        Encoding::Ndjson => serde_json::to_vec(&event.all_fields())
+        Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
             .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,
     };
 

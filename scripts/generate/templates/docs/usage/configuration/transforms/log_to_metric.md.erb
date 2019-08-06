@@ -13,6 +13,62 @@
 ## Examples
 
 {% tabs %}
+{% tab title="Timings" %}
+This example demonstrates capturing timings in your logs.
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "host": "10.22.11.222",
+  "message": "Sent 200 in 54.2ms",
+  "status": 200,
+  "time": 54.2,
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can convert the `time` field into a `histogram` metric:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+  
+  [[transforms.log_to_metric.metrics]]
+    type = "histogram"
+    field = "time"
+    name = "time_ms" # optional
+    labels.status = "${event.status}" # optional
+    labels.host = "${event.host}" # optional
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`metric` event][docs.metric_event] will be emitted with the following
+structure:
+
+```javascript
+{
+  "histogram": {
+    "name": "time_ms",
+    "val": 52.2,
+    "smaple_rate": 1,
+    "labels": {
+      "status": "200",
+      "host": "10.22.11.222"
+    }
+  }
+}
+```
+
+This metric will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (such is the case for the [`prometheus` \
+sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+
+{% endtab %}
 {% tab title="Counting" %}
 This example demonstrates counting HTTP status codes.
 
@@ -41,7 +97,7 @@ You can count the number of responses by status code:
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "status"
-    name = "response_total"
+    name = "response_total" # optional
     labels.status = "${event.status}" 
     labels.host = "${event.host}"
 ```
@@ -65,8 +121,8 @@ structure:
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` \
+sink][docs.prometheus_sink]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Summing" %}
 In this example we'll demonstrate computing a sum. The scenario we've chosen
@@ -98,9 +154,9 @@ field's value:
   [[transforms.log_to_metric.metrics]]
     type = "counter"
     field = "total"
-    name = "order_total"
-    increment_by_value = true
-    labels.host = "${event.host}"
+    name = "order_total" # optional
+    increment_by_value = true # optional
+    labels.host = "${event.host}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -121,8 +177,8 @@ structure:
 ```
 
 This metric will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregated in the store itself.
+will be aggregated in Vector (such is the case for the [`prometheus` \
+sink][docs.prometheus_sink]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Gauges" %}
 In this example we'll demonstrate creating a gauge that represents the current
@@ -155,17 +211,17 @@ You can reduce this logs into multiple `gauge` metrics:
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "1m_load_avg"
-    labels.host = "${event.host}"
+    labels.host = "${event.host}" # optional
 
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "5m_load_avg"
-    labels.host = "${event.host}"
+    labels.host = "${event.host}" # optional
 
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "15m_load_avg"
-    labels.host = "${event.host}"
+    labels.host = "${event.host}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -205,21 +261,77 @@ structure:
 ]
 ```
 
-These metrics will then proceed down the pipeline, and depending on the sink,
-will be aggregated in Vector (ex: [prometheus][docs.prometheus_sink]) or will
-be aggregated in the store itself.
+This metric will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (such is the case for the [`prometheus` \
+sink][docs.prometheus_sink]) or will be aggregated in the store itself.
 {% endtab %}
-{% tab title="Timings" %}
-{% hint style="info" %}
-We are working on supporting timings and histograms. See
-[issue 540][url.issue_540] for more info.
-{% endhint %}
+{% tab title="Sets" %}
+In this example we'll demonstrate how to use sets. Sets are primarly a Statsd
+concept that represent the number of unique values seens for a given metric.
+The idea is that you pass the unique/high-cardinality value as the metric value
+and the metric store will count the number of unique values seen.
+
+For example, given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "host": "10.22.11.222",
+  "message": "Sent 200 in 54.2ms",
+  "remote_addr": "233.221.232.22"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can count the number of unique `remote_addr` values by using a set:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```toml
+[transforms.log_to_metric]
+  type = "log_to_metric"
+  
+  [[transforms.log_to_metric.metrics]]
+    type = "set"
+    field = "remote_addr"
+    labels.host = "${event.host}" # optional
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`metric` event][docs.metric_event] will be emitted with the following
+structure:
+
+```javascript
+{
+  "set": {
+    "name": "remote_addr",
+    "val": "233.221.232.22",
+    "labels": {
+      "host": "10.22.11.222"
+    }
+  }
+}
+```
+
+This metric will then proceed down the pipeline, and depending on the sink,
+will be aggregated in Vector (such is the case for the [`prometheus` \
+sink][docs.prometheus_sink]) or will be aggregated in the store itself.
 {% endtab %}
 {% endtabs %}
 
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
+
+### Multiple Metrics
+
+For clarification, when you convert a single `log` event into multiple `metric`
+events, the `metric` events are not emitted as a single array. They are emitted
+individually, and the downstream components treat them as individual events.
+Downstream components are not aware they were derived from a single log event.
 
 ### Null Fields
 

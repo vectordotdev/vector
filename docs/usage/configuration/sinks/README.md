@@ -44,11 +44,11 @@ Sinks are last in the [pipeline][docs.pipelines], responsible for sending
 [docs.blackhole_sink]: ../../../usage/configuration/sinks/blackhole.md
 [docs.console_sink]: ../../../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../../../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../../../about/data-model.md#event
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.http_sink]: ../../../usage/configuration/sinks/http.md
 [docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.pipelines]: ../../../usage/configuration/README.md#composition
 [docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
 [docs.splunk_hec_sink]: ../../../usage/configuration/sinks/splunk_hec.md

@@ -37,7 +37,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   region = "us-east-1"
   
   # REQUIRED - Requests
-  encoding = "ndjson" # enum: "ndjson", "text"
+  encoding = "ndjson" # enum: "ndjson" or "text"
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -61,8 +61,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   
   # OPTIONAL - Buffer
   [sinks.my_aws_s3_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
 ```
@@ -107,6 +107,195 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.aws_s3_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_s3"
+  type = "aws_s3"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+  # 
+  # * required
+  # * no default
+  bucket = "my-bucket"
+
+  # The AWS region of the target S3 bucket.
+  # 
+  # * required
+  # * no default
+  region = "us-east-1"
+
+  #
+  # Requests
+  #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The compression type to use before writing data.
+  # 
+  # * optional
+  # * no default
+  # * must be: "gzip" (if supplied)
+  compression = "gzip"
+
+  # Whether to Gzip the content before writing or not. Please note, enabling this
+  # has a slight performance cost but significantly reduces bandwidth.
+  # 
+  # * optional
+  # * default: false
+  gzip = false
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: seconds
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder".
+  # 
+  # * optional
+  # * default: "date=%F"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Buffer
+  #
+
+  [sinks.aws_s3_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -114,12 +303,12 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "aws_s3"` |
+| `type` | `string` | The component type<br />`required` `must be: "aws_s3"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`. See [Partitioning](#partitioning) for more info.<br />`required` `example: "my-bucket"` |
+| `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
 | `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
 | **REQUIRED** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson", "text"` |
+| `encoding` | `string` | The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 300` `unit: seconds` |
@@ -127,9 +316,9 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
 | `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
 | `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
-| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder". [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) and [Partitioning](#partitioning) for more info.<br />`default: "date=%F"` |
+| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
 | **OPTIONAL** - Requests | | |
-| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `enum: "gzip"` |
+| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
@@ -138,8 +327,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
@@ -184,9 +373,9 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. [`credential_process` command][url.aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-​3. [AWS credentials file][url.aws_credentials_file], usually located at `~/.aws/credentials`.
-4. ​[IAM instance profile][url.iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
+​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -203,12 +392,11 @@ how to do this.
  
 ![][images.sink-flow-partitioned]
 
-The `aws_s3` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `aws_s3` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -334,7 +522,7 @@ and `filename_append_uuid` options.
 
 ### Partitioning
 
-Partitioning is controlled via the `bucket` and `key_prefix`
+Partitioning is controlled via the `key_prefix`
 options and allows you to dynamically partition data on the fly. You'll notice
 that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
 enabling this partitioning. The interpolated result is effectively the internal
@@ -407,6 +595,27 @@ Vector has plans to support [columnar formats](#columnar-formats) in
 [`v0.6`][url.roadmap] which will allows for very fast and efficient querying on
 S3.
 
+### Template Syntax
+
+The `key_prefix` options
+support [Vector's template syntax][docs.configuration.template-syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```coffeescript
+[sinks.my_aws_s3_sink_id]
+  # ...
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template-syntax].
+
 ### Timeouts
 
 To ensure the pipeline does not halt when a service fails to respond Vector
@@ -427,9 +636,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.aws_s3_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `aws_s3_sink` issues][url.aws_s3_sink_issues].
+2. If encountered a bug, please [file a bug report][url.new_aws_s3_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_aws_s3_sink_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -441,9 +651,10 @@ issue, please:
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model.md#event
+[docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
@@ -463,11 +674,12 @@ issue, please:
 [url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22+label%3A%22Type%3A+Enhancement%22
 [url.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_s3%22
 [url.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-[url.community]: https://vector.dev/community
 [url.gzip]: https://www.gzip.org/
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[url.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3&labels=Type%3A+Bug
+[url.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3&labels=Type%3A+Enhancement
 [url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_s3
 [url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
+[url.vector_chat]: https://chat.vector.dev

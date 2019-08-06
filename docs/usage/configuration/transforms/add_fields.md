@@ -51,6 +51,47 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
     * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.add_fields_transform]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "add_fields"
+  type = "add_fields"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Fields
+  #
+
+  [transforms.add_fields_transform.fields]
+    # A key/value pair representing the new field to be added. Accepts all
+    # supported types. Use `.` for adding nested fields.
+    # 
+    # * required
+    # * no default
+    my_string_field = "string value"
+    my_env_var_field = "${ENV_VAR}"
+    my_int_field = 1
+    my_float_field = 1.2
+    my_bool_field = true
+    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_nested_fields = {key1 = "value1", key2 = "value2"}
+    my_list = ["first", "second", "third"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -58,7 +99,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "add_fields"` |
+| `type` | `string` | The component type<br />`required` `must be: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
 | `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`required` `example: (see above)` |
@@ -110,7 +151,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 
 While unrealistic, this example demonstrates the various accepted
 [types][docs.config_value_types] and how they're repsented in Vector's
-internal [log struction][docs.data_model.log].
+internal [log structure][docs.log].
 
 ## How It Works
 
@@ -138,7 +179,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data_model.log] are structured.
+Learn more about how [`log` events][docs.log] are structured.
 
 ### Complex Transforming
 
@@ -181,7 +222,7 @@ Results in:
 }
 ```
 
-Learn more about how [`log` events][docs.data_model.log] are structured.
+Learn more about how [`log` events][docs.log] are structured.
 
 ### Removing Fields
 
@@ -210,16 +251,17 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.add_fields_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `add_fields_transform` issues][url.add_fields_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_add_fields_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_add_fields_transform_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`coercer` transform][docs.coercer_transform]
+* [`lua` transform][docs.lua_transform]
 * [`remove_fields` transform][docs.remove_fields_transform]
 
 ## Resources
@@ -228,14 +270,13 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
-[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model.log]: ../../../about/data-model.md#log
-[docs.data_model]: ../../../about/data-model.md
-[docs.event_key_special_characters]: ../../../about/data-model.md#special-characters
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.data_model]: ../../../about/data-model
+[docs.event_key_special_characters]: ../../../about/data-model/log.md#special-characters
+[docs.log]: ../../../about/data-model/log.md
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
@@ -247,7 +288,8 @@ Finally, consider the following alternatives:
 [url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancement%22
 [url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22
 [url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
-[url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.new_add_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Bug
+[url.new_add_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Enhancement
 [url.toml_array]: https://github.com/toml-lang/toml#array
 [url.toml_table]: https://github.com/toml-lang/toml#table
+[url.vector_chat]: https://chat.vector.dev

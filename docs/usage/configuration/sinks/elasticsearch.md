@@ -37,7 +37,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - General
   doc_type = "_doc" # default
-  index = "vector-%F" # default
+  index = "vector-%Y-%m-%d" # default
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -53,8 +53,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   
   # OPTIONAL - Buffer
   [sinks.my_elasticsearch_sink_id.buffer]
-    type = "memory" # default, enum: "memory", "disk"
-    when_full = "block" # default, enum: "block", "drop_newest"
+    type = "memory" # default, enum: "memory" or "disk"
+    when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
 ```
@@ -91,6 +91,148 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     num_items = <int>
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sinks.elasticsearch_sink]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "elasticsearch"
+  type = "elasticsearch"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The host of your Elasticsearch cluster. This should be the full URL as shown
+  # in the example.
+  # 
+  # * required
+  # * no default
+  host = "http://10.24.32.122:9000"
+
+  # The `doc_type` for your index data. This is only relevant for Elasticsearch
+  # <= 6.X. If you are using >= 7.0 you do not need to set this option since
+  # Elasticsearch has removed it.
+  # 
+  # * optional
+  # * default: "_doc"
+  doc_type = "_doc"
+
+  # Index name to write events to.
+  # 
+  # * optional
+  # * default: "vector-%F"
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 60
+  # * unit: seconds
+  request_timeout_secs = 60
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
+
+  #
+  # Buffer
+  #
+
+  [sinks.elasticsearch_sink.buffer]
+    # The buffer's type / location. `disk` buffers are persistent and will be
+    # retained between restarts.
+    # 
+    # * optional
+    # * default: "memory"
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+    # The maximum size of the buffer on the disk.
+    # 
+    # * optional
+    # * no default
+    # * unit: bytes
+    max_size = 104900000
+
+    # The maximum number of events allowed in the buffer.
+    # 
+    # * optional
+    # * default: 500
+    # * unit: events
+    num_items = 500
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -98,12 +240,12 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "elasticsearch"` |
+| `type` | `string` | The component type<br />`required` `must be: "elasticsearch"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
 | **OPTIONAL** - General | | |
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
-| `index` | `string` | Index name to write events to. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Partitioning](#partitioning) for more info.<br />`default: "vector-%F"` |
+| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Batch flushing](#batch-flushing) for more info.<br />`default: 1` `unit: seconds` |
@@ -115,8 +257,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 | **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory", "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block", "drop_newest"` |
+| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
+| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
@@ -142,15 +284,13 @@ Content-Length: 654
 
 ### Buffers & Batches
 
- 
-![][images.sink-flow-partitioned]
+![][images.sink-flow-serial]
 
-The `elasticsearch` sink buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `elasticsearch` sink buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -215,20 +355,6 @@ Elasticsearch. Vector assumes keys with a . delimit nested fields. You can read
 more about how Vector handles nested documents in the [Data Model
 document][docs.data_model].
 
-### Partitioning
-
-Partitioning is controlled via the `index`
-options and allows you to dynamically partition data on the fly. You'll notice
-that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling this partitioning. The interpolated result is effectively the internal
-partition key. Let's look at a few examples:
-
-| Value          | Interpolation          | Desc                                   |
-|:---------------|:-----------------------|:---------------------------------------|
-| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
-| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
-
 ### Rate Limits
 
 Vector offers a few levers to control the rate and volume of requests to the
@@ -247,6 +373,25 @@ with the Vector team by [opening an issie][url.new_elasticsearch_sink_issue].
 Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
 Other responses will _not_ be retried. You can control the number of retry
 attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+
+### Template Syntax
+
+The `index` options
+support [Vector's template syntax][docs.configuration.template-syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```coffeescript
+[sinks.my_elasticsearch_sink_id]
+  # ...
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template-syntax].
 
 ### Timeouts
 
@@ -268,9 +413,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.elasticsearch_sink_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `elasticsearch_sink` issues][url.elasticsearch_sink_issues].
+2. If encountered a bug, please [file a bug report][url.new_elasticsearch_sink_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_elasticsearch_sink_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -281,23 +427,25 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model.md
-[docs.event]: ../../../about/data-model.md#event
+[docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
+[docs.data_model]: ../../../about/data-model
+[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.starting]: ../../../usage/administration/starting.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.community]: https://vector.dev/community
+[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22
 [url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22
 [url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
+[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Bug
+[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Enhancement
 [url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev
