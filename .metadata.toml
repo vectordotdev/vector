@@ -761,8 +761,10 @@ is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for 
 batch_size = 1049000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -818,8 +820,10 @@ description = "The [stream name][url.aws_cw_logs_stream_name] of the target Clou
 batch_size = 1049000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -864,8 +868,10 @@ description = "The [stream name][url.aws_cw_logs_stream_name] of the target Kine
 batch_size = 10490000
 batch_timeout = 300
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -950,8 +956,10 @@ description = "The [AWS region][url.aws_s3_regions] of the target S3 bucket."
 # sinks.blachole
 # ------------------------------------------------------------------------------
 [sinks.blackhole]
+buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = """\
 a blackhole that simply discards data, designed for testing and \
@@ -968,8 +976,10 @@ description = "The number of events that must be received in order to print a su
 # sinks.console
 # ------------------------------------------------------------------------------
 [sinks.console]
+buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = "the console, `STDOUT` or `STDERR`"
 
@@ -994,8 +1004,10 @@ description = "The [standard stream][url.standard_streams] to write to."
 batch_size = 10490000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -1035,8 +1047,10 @@ description = "Index name to write events to."
 [sinks.http]
 batch_size = 1049000
 batch_timeout = 5
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 10
@@ -1103,8 +1117,10 @@ description = "The full URI to make HTTP requests to. This should include the pr
 # sinks.kafka
 # ------------------------------------------------------------------------------
 [sinks.kafka]
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"
 write_to_description = "[Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]"
@@ -1147,8 +1163,10 @@ description = "The Kafka topic name to write events to."
 # ------------------------------------------------------------------------------
 [sinks.prometheus]
 beta = true
-delivery_guarantee = "at_least_once"
+buffer = false
+delivery_guarantee = "best_effort"
 egress_method = "exposing"
+healthcheck = false
 input_types = ["metric"]
 write_to_description = "[Prometheus][url.prometheus] metrics service"
 
@@ -1158,14 +1176,24 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.buckets]
+type = "string"
+default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+null = false
+description = """\
+Default buckets to use for [histogram][docs.metric_event.histogram] metrics.\
+"""
+
 # ------------------------------------------------------------------------------
 # sinks.splunk_hec
 # ------------------------------------------------------------------------------
 [sinks.splunk_hec]
 batch_size = 1049000
 batch_timeout = 1
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 10
@@ -1200,8 +1228,10 @@ description = "Your Splunk HEC token."
 # sinks.tcp
 # ------------------------------------------------------------------------------
 [sinks.tcp]
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"
 
@@ -1223,8 +1253,10 @@ description = "The encoding format used to serialize the events before flushing.
 # sinks.vector
 # ------------------------------------------------------------------------------
 [sinks.vector]
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 write_to_description = "another downstream Vector instance"
 
@@ -1348,6 +1380,13 @@ new_source = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+F
 new_transform = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 nginx = "https://www.nginx.com/"
 prometheus = "https://prometheus.io/"
+prometheus_counter = "https://prometheus.io/docs/concepts/metric_types/#counter"
+prometheus_gauge = "https://prometheus.io/docs/concepts/metric_types/#gauge"
+prometheus_high_cardinality = "https://prometheus.io/docs/practices/naming/#labels"
+prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histogram"
+prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
+prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
+prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
@@ -1361,6 +1400,7 @@ rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
+statsd_set = "https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets"
 strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
 systemd = "https://www.freedesktop.org/wiki/Software/systemd/"

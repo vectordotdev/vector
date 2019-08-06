@@ -10,13 +10,141 @@
 
 <%= options_table(component.options.to_h.values.sort) %>
 
+## Examples
+
+{% tabs %}
+{% tab title="Histograms" %}
+This example demonstrates how Vector's internal [`histogram` metric \
+type][docs.metric_event.histogram] is exposed via Prometheus' [text-based \
+exposition format][url.prometheus_text_based_exposition_format].
+
+For example, given the following internal Vector histograms:
+
+```javascript
+[
+  {
+    "histogram": {
+      "name": "response_time_ms",
+      "val": 24.3
+    }
+  },
+  {
+    "histogram": {
+      "name": "response_time_ms",
+      "val": 56.6
+    }
+  }
+]
+````
+
+The `<%= component.name %>` sink will expose this data in Prometheus'
+[text-based exposition format][url.prometheus_text_based_exposition_format]:
+
+```text
+# HELP response_time_ms response_time_ms
+# TYPE response_time_ms histogram
+response_time_ms_bucket{le="1"} 0
+response_time_ms_bucket{le="10"} 2
+response_time_ms_bucket{le="100"} 0
+response_time_ms_bucket{le="1000"} 0
+response_time_ms_bucket{le="10000"} 0
+response_time_ms_bucket{le="100000"} 0
+response_time_ms_bucket{le="+Inf"} 0
+response_time_ms_sum 80.9
+response_time_ms_count 2
+```
+
+You'll notice the the buckets (`le` label) are automatically defined. You can
+override these buckets via the `buckets` option.
+{% endtab %}
+{% endtabs %}
+
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
 
-## Troubleshooting
+### Buffers
+
+Due to the nature of Prometheus' pull model design the `<%= component.name %>`
+sink does not utilize a buffer. You can read more about this in the [in-memory \
+aggregation](#in-memory-aggregation) section.
+
+### High Cardinality Names
+
+High cardinality metric names and labels are [discouraged by \
+Prometheus][url.prometheus_high_cardinality] and you should consider alternative
+strategies to reduce the cardinality as this can provide performance and
+operation problems. In general, high cardinality analysis should be left logs
+and storages designed for this use case (not Promtheus).
+
+### Histogram Buckets
+
+Choosing the appropriate buckets for Prometheus histgorams is a complicated
+point of discussion. The [Histograms and Summaries Prometheus \
+guide][url.prometheus_histograms_guide] provides a good overview of histograms,
+buckets, summaries, and how you should think about configuring them. The buckets
+you choose should align with your known range and distribution of values as
+well as how you plan to report on them. The aforementioned guide provides
+examples on how you should align them, and the `buckets` option provides a
+global default for all histogram metrics.
+
+### In-Memory Aggregation
+
+Like other Prometheus instances, the `<%= component.name %>` sink aggregates
+metrics in memory which keeps the memory footprint to a minimum if Prometheus
+fails to scrape the Vector instance over an extended period of time. The
+downside is that data will be lost if Vector is restarted. This is by design of
+Prometheus' pull model approach, but is worth noting if restart Vector
+frequently.
+
+### Metric Definitions
+
+By default, Vector will use the original metric names and labels set upon
+creation. For most cases this makes Vector low friction, allowing you to define
+the `<%= component.name %>` sink without tedious metrics definitions. You can
+see examples of this in the [examples section](#examples).
+
+### Metric Types
+
+As described in the [metric data model][docs.metric_event] page, Vector offers
+a variety of metric types. Their support, as as well as their mappings, are
+described below:
+
+| Vector Metric Type                     | Prometheus Metric Type              |
+|:---------------------------------------|:------------------------------------|
+| [`counter`][docs.metric_event.counter] | ['counter'][url.prometheus_counter] |
+| [`gauge`][docs.metric_event.gauge]     | ['gauge'][url.prometheus_gauge]     |
+| [`histogram`][docs.metric_event.gauge] | ['histogram'][url.prometheus_gauge] |
+| [`set`][docs.metric_event.gauge]       | ⚠️ not supported                    |
+| -                                      | ['summary'][url.prometheus_summary] |
+
+#### Sets
+
+Prometheus does not have a [`set`][docs.metric_event.set] type. Sets are
+generally specific to [Statsd][url.statsd_set], and if a set is received in the
+`<%= component.name %>` sink it will be dropped, and a rate limited warning
+level log will be emitted.
+
+#### Summaries
+
+Summaries are a Prometheus specific type and Vector does not default to them
+by default. [issue #710][url.issue_710] addresses the ability to define metrics,
+including the ability change their types (such as changing them to `summary`
+types).
+
+## Troubleshooting [[sort]]
 
 <%= component_troubleshooting(component) %>
+
+### OOM Errors
+
+If you experience out of memory (OOM) errors it's likely you're using extremely
+[high cardinality](#high-cardinality) metric names or labels. This is
+[discouraged by Prometheus][url.prometheus_high_cardinality] and you should
+consider alternative strategies to reduce the cardinality. Such as leveraging
+logs for high cardinality analysis. [Issue #387][url.issue_387] discusses the
+ability to provide safeguards around this. We encourage you to add to that
+discussion with your use case if you find this to be a problem.
 
 ## Resources
 
