@@ -25,7 +25,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        Ok(statsd(self.address.clone(), out))
+        Ok(statsd(self.address, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
