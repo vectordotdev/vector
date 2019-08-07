@@ -62,13 +62,13 @@ impl CloudWatchMetricsService {
     ) -> Result<super::RouterSink, String> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
-        let batch_size = config.batch_size.unwrap_or(5);
+        let batch_size = config.batch_size.unwrap_or(20);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
 
         let timeout = config.request_timeout_secs.unwrap_or(30);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
-        let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(150);
         let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
         let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
@@ -342,7 +342,7 @@ mod integration_tests {
         let counter_name = random_string(10);
         for i in 0..10 {
             let event = Event::Metric(Metric::Counter {
-                name: counter_name.clone(),
+                name: format!("counter-{}", counter_name),
                 val: i as f32,
             });
             events.push(event);
@@ -351,7 +351,7 @@ mod integration_tests {
         let gauge_name = random_string(10);
         for i in 0..10 {
             let event = Event::Metric(Metric::Gauge {
-                name: gauge_name.clone(),
+                name: format!("gauge-{}", gauge_name),
                 val: i as f32,
                 direction: None,
             });
@@ -361,7 +361,7 @@ mod integration_tests {
         let histogram_name = random_string(10);
         for i in 0..10 {
             let event = Event::Metric(Metric::Histogram {
-                name: histogram_name.clone(),
+                name: format!("histogram-{}", histogram_name),
                 val: i as f32,
                 sample_rate: 100,
             });
