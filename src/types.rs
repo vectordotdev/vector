@@ -1,8 +1,15 @@
 use crate::event::ValueKind;
 use chrono::{DateTime, Local, TimeZone, Utc};
+use snafu::Snafu;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
+
+#[derive(Debug, Snafu)]
+pub enum ConversionError {
+    #[snafu(display("Unknown conversion name {:?}", name))]
+    UnknownConversion { name: String },
+}
 
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`Bytes`) `ValueKind` into another type. Every
@@ -19,7 +26,7 @@ pub enum Conversion {
 }
 
 impl FromStr for Conversion {
-    type Err = String;
+    type Err = ConversionError;
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
@@ -50,7 +57,7 @@ impl FromStr for Conversion {
                     Ok(Conversion::TimestampFmt(fmt.into()))
                 }
             }
-            _ => Err(format!("Invalid type conversion specifier: {:?}", s)),
+            _ => Err(ConversionError::UnknownConversion { name: s.into() }),
         }
     }
 }
@@ -59,7 +66,7 @@ impl FromStr for Conversion {
 pub fn parse_check_conversion_map(
     types: &HashMap<Atom, String>,
     names: &Vec<Atom>,
-) -> Result<HashMap<Atom, Conversion>, String> {
+) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
     let names: HashSet<Atom> = names.into_iter().map(|s| s.into()).collect();
     for (name, _) in types {
@@ -77,7 +84,7 @@ pub fn parse_check_conversion_map(
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
 pub fn parse_conversion_map(
     types: &HashMap<Atom, String>,
-) -> Result<HashMap<Atom, Conversion>, String> {
+) -> Result<HashMap<Atom, Conversion>, ConversionError> {
     types
         .into_iter()
         .map(|(field, typename)| {
@@ -85,8 +92,7 @@ pub fn parse_conversion_map(
                 .parse::<Conversion>()
                 .map(|conv| (field.clone(), conv))
         })
-        .collect::<Result<HashMap<Atom, Conversion>, _>>()
-        .map_err(|err| format!("Invalid conversion type: {}", err))
+        .collect()
 }
 
 impl Conversion {

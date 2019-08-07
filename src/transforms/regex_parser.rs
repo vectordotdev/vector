@@ -34,7 +34,8 @@ impl TransformConfig for RegexParserConfig {
                 .capture_names()
                 .filter_map(|s| s.map(|s| s.into()))
                 .collect(),
-        )?;
+        )
+        .map_err(|err| format!("{}", err))?;
 
         Ok(Box::new(RegexParser::new(
             regex,
