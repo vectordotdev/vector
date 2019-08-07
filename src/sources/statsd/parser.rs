@@ -12,7 +12,7 @@ lazy_static! {
 }
 
 pub fn parse(packet: &str) -> Result<Metric, ParseError> {
-    let key_and_body = packet.splitn(2, ":").collect::<Vec<_>>();
+    let key_and_body = packet.splitn(2, ':').collect::<Vec<_>>();
     if key_and_body.len() != 2 {
         return Err(ParseError::Malformed(
             "should be key and body with ':' separator",
@@ -20,7 +20,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     }
     let (key, body) = (key_and_body[0], key_and_body[1]);
 
-    let parts = body.split("|").collect::<Vec<_>>();
+    let parts = body.split('|').collect::<Vec<_>>();
     if parts.len() < 2 {
         return Err(ParseError::Malformed(
             "body should have at least two pipe separated components",
@@ -78,7 +78,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
 }
 
 fn parse_sampling(input: &str) -> Result<f64, ParseError> {
-    if input.chars().next() != Some('@') || input.len() < 2 {
+    if !input.starts_with('@') || input.len() < 2 {
         return Err(ParseError::Malformed(
             "expected '@'-prefixed sampling component",
         ));
