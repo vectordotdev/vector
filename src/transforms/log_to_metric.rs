@@ -18,8 +18,6 @@ pub struct LogToMetricConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct CounterConfig {
     field: Atom,
-    #[serde(skip)]
-    sanitized_name: Atom,
     name: Option<Atom>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
@@ -29,8 +27,6 @@ pub struct CounterConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct GaugeConfig {
     field: Atom,
-    #[serde(skip)]
-    sanitized_name: Atom,
     name: Option<Atom>,
 }
 
@@ -38,8 +34,6 @@ pub struct GaugeConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct SetConfig {
     field: Atom,
-    #[serde(skip)]
-    sanitized_name: Atom,
     name: Option<Atom>,
 }
 
@@ -47,8 +41,6 @@ pub struct SetConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct HistogramConfig {
     field: Atom,
-    #[serde(skip)]
-    sanitized_name: Atom,
     name: Option<Atom>,
 }
 
@@ -72,7 +64,7 @@ pub struct LogToMetric {
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        Ok(Box::new(LogToMetric::new(self)))
+        Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -85,33 +77,7 @@ impl TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: &LogToMetricConfig) -> Self {
-        let mut config = config.clone();
-
-        for metric in config.metrics.iter_mut() {
-            match metric {
-                MetricConfig::Counter(ref mut counter) => {
-                    let name = match &counter.name {
-                        Some(s) => s.to_string(),
-                        None => format!("{}_total", counter.field.to_string()),
-                    };
-                    counter.sanitized_name = Atom::from(name);
-                }
-                MetricConfig::Histogram(ref mut hist) => {
-                    let name = hist.name.as_ref().unwrap_or(&hist.field).to_string();
-                    hist.sanitized_name = Atom::from(name);
-                }
-                MetricConfig::Gauge(ref mut gauge) => {
-                    let name = gauge.name.as_ref().unwrap_or(&gauge.field).to_string();
-                    gauge.sanitized_name = Atom::from(name);
-                }
-                MetricConfig::Set(ref mut set) => {
-                    let name = set.name.as_ref().unwrap_or(&set.field).to_string();
-                    set.sanitized_name = Atom::from(name);
-                }
-            }
-        }
-
+    pub fn new(config: LogToMetricConfig) -> Self {
         LogToMetric { config }
     }
 }
@@ -148,7 +114,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = render_template(&counter.sanitized_name, &event)?;
+            let name = counter.name.as_ref().unwrap_or(&counter.field);
+            let name = render_template(&name, &event)?;
 
             Ok(Metric::Counter { name, val })
         }
@@ -159,7 +126,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 .parse()
                 .map_err(|_| TransformError::ParseError("histogram value"))?;
 
-            let name = render_template(&hist.sanitized_name, &event)?;
+            let name = hist.name.as_ref().unwrap_or(&hist.field);
+            let name = render_template(&name, &event)?;
 
             Ok(Metric::Histogram {
                 name,
@@ -174,7 +142,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 .parse()
                 .map_err(|_| TransformError::ParseError("gauge value"))?;
 
-            let name = render_template(&gauge.sanitized_name, &event)?;
+            let name = gauge.name.as_ref().unwrap_or(&gauge.field);
+            let name = render_template(&name, &event)?;
 
             Ok(Metric::Gauge {
                 name,
@@ -186,7 +155,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let val = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
             let val = val.to_string_lossy();
 
-            let name = render_template(&set.sanitized_name, &event)?;
+            let name = set.name.as_ref().unwrap_or(&set.field);
+            let name = render_template(&name, &event)?;
 
             Ok(Metric::Set { name, val })
         }
@@ -245,13 +215,13 @@ mod tests {
         );
 
         let event = create_event("status", "42");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric::Counter {
-                name: "status_total".into(),
+                name: "status".into(),
                 val: 1.0,
             }
         );
@@ -269,7 +239,7 @@ mod tests {
         );
 
         let event = create_event("backtrace", "message");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(
@@ -293,7 +263,7 @@ mod tests {
         );
 
         let event = create_event("success", "42");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event);
 
         assert!(metric.is_none());
@@ -312,7 +282,7 @@ mod tests {
         );
 
         let event = create_event("amount", "33.99");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(
@@ -336,7 +306,7 @@ mod tests {
         );
 
         let event = create_event("memory_rss", "123");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(
@@ -362,7 +332,7 @@ mod tests {
         );
 
         let event = create_event("status", "not a number");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
 
         assert!(transform.transform(event).is_none());
     }
@@ -379,7 +349,7 @@ mod tests {
         );
 
         let event = create_event("not foo", "not a number");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
 
         assert!(transform.transform(event).is_none());
     }
@@ -407,7 +377,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("backtrace".into(), "message".into());
 
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
         transform.transform_into(&mut output, event);
@@ -422,7 +392,7 @@ mod tests {
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric::Counter {
-                name: "status_total".into(),
+                name: "status".into(),
                 val: 1.0,
             }
         );
@@ -461,7 +431,7 @@ mod tests {
             .as_mut_log()
             .insert_implicit("service".into(), "xyz".into());
 
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
         transform.transform_into(&mut output, event);
@@ -494,7 +464,7 @@ mod tests {
         );
 
         let event = create_event("user_ip", "1.2.3.4");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(
@@ -517,7 +487,7 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
-        let mut transform = LogToMetric::new(&config);
+        let mut transform = LogToMetric::new(config);
         let metric = transform.transform(event).unwrap();
 
         assert_eq!(

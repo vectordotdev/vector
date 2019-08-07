@@ -12,7 +12,7 @@
 # It is the source of truth used to generate docs, config examples, and more.
 # Once changed, please run to sync everything:
 #
-#     make generate-docs`
+#     make generate
 #
 
 # ------------------------------------------------------------------------------
@@ -39,18 +39,28 @@ guides = []
 resources = []
 through_description = "one or more local files"
 
+[sources.file.options.data_dir]
+type = "string"
+examples = ["/var/lib/vector"]
+null = true
+description = """\
+The directory used to persist file checkpoint positions. By default, the \
+global `data_dir` is used. Please make sure the Vector project has write \
+permissions to this dir.\
+"""
+
 [sources.file.options.include]
 type = "[string]"
-null = false
 examples = [["/var/log/nginx/*.log"]]
+null = false
 description = """\
 Array of file patterns to include. [Globbing](#globbing) is supported.\
 """
 
 [sources.file.options.exclude]
 type = "[string]"
-null = false
 examples = [["/var/log/nginx/access.log"]]
+null = false
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\
@@ -59,8 +69,8 @@ Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 [sources.file.options.file_key]
 type = "string"
 category = "Context"
-null = false
 default = "file"
+null = false
 section = "context"
 description = """\
 The key name added to each event with the full path of the file.\
@@ -90,8 +100,8 @@ Vector searches for files.\
 name = "host_key"
 type = "string"
 category = "Context"
-null = false
 default = "host"
+null = false
 section = "context"
 description = """\
 The key name added to each event representing the current host.\
@@ -99,9 +109,9 @@ The key name added to each event representing the current host.\
 
 [sources.file.options.ignore_older]
 type = "int"
-unit = "seconds"
-null = true
 examples = [86400]
+null = true
+unit = "seconds"
 description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
@@ -226,8 +236,7 @@ examples = ["/path/to/socket"]
 null = true
 relevant_when = {mode = "unix"}
 description = """\
-The unix socket path. *This should be absolute path.* Only relevant \
-when `mode` is `unix`.
+The unix socket path. *This should be absolute path.*
 """
 
 # ------------------------------------------------------------------------------
@@ -341,7 +350,7 @@ A key/value pair representing the new field to be added. Accepts all \
 # ------------------------------------------------------------------------------
 [transforms.coercer]
 allow_you_to_description = "coerce event fields into fixed types"
-function_categories = ["change_fields", "convert"]
+function_categories = ["coerce"]
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -489,7 +498,7 @@ The field decode as JSON. Must be a `string` value.\
 # ------------------------------------------------------------------------------
 [transforms.log_to_metric]
 allow_you_to_description = "convert logs into one or more metrics"
-function_categories = ["convert"]
+function_categories = ["convert_types"]
 guides = []
 input_types = ["log"]
 output_types = ["metric"]
@@ -505,7 +514,7 @@ event.\
 
 [transforms.log_to_metric.options.metrics.options.type]
 type = "string"
-enum = ["counter", "gauge"]
+enum = ["counter", "gauge", "histogram", "set"]
 null = false
 description = "The metric type."
 
@@ -519,6 +528,7 @@ description = "The log field to use as the metric."
 type = "bool"
 default = false
 null = false
+relevant_when = {type = "counter"}
 description = """\
 If `true` the metric will be incremented by the `field` value. If `false` \
 the metric will be incremented by 1 regardless of the `field` value.\
@@ -526,7 +536,6 @@ the metric will be incremented by 1 regardless of the `field` value.\
 
 [transforms.log_to_metric.options.metrics.options.name]
 type = "string"
-default = "dynamic"
 examples = ["duration_total"]
 null = false
 description = """\
@@ -555,7 +564,7 @@ description = "Key/value pairs representing the metric labels."
 [transforms.lua]
 allow_you_to_description = "transform events with a full embedded [Lua][url.lua] engine"
 beta = true
-function_categories = ["parse"]
+function_categories = ["program"]
 guides = []
 input_types = ["log"]
 output_types = ["log"]
@@ -761,8 +770,10 @@ is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for 
 batch_size = 1049000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -777,16 +788,22 @@ write_to_description = "[AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogE
 [sinks.aws_cloudwatch_logs.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
-examples = ["/var/log/my-log.log"]
+examples = [
+  "/var/log/{{ file }}.log",
+  "ec2/{{ instance_id }}"
+]
 null = false
 partition_key = true
+templateable = true
 description = "The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream."
 
 [sinks.aws_cloudwatch_logs.options.region]
@@ -797,9 +814,14 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 
 [sinks.aws_cloudwatch_logs.options.stream_name]
 type = "string"
-examples = ["my-stream"]
+examples = [
+  "{{ instance_id }}",
+  "stream-name",
+  "%Y-%m-%d"
+]
 null = false
 partition_key = true
+templateable = true
 description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
 
 # ------------------------------------------------------------------------------
@@ -809,8 +831,10 @@ description = "The [stream name][url.aws_cw_logs_stream_name] of the target Clou
 batch_size = 1049000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -825,22 +849,30 @@ write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
+
+[sinks.aws_kinesis_streams.options.partition_key_field]
+type = "string"
+examples = ["user_id"]
+null = true
+description = "The event field used as the Kinesis record's partition key value."
 
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+description = "The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
 examples = ["my-stream"]
 null = false
-description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+description = "The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
 
 # ------------------------------------------------------------------------------
 # sinks.aws_s3
@@ -849,8 +881,10 @@ description = "The [stream name][url.aws_cw_logs_stream_name] of the target Clou
 batch_size = 10490000
 batch_timeout = 300
 beta = true
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -866,7 +900,6 @@ write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](
 type = "string"
 examples = ["my-bucket"]
 null = false
-partition_key = true
 description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 
 [sinks.aws_s3.options.compression]
@@ -880,8 +913,11 @@ description = "The compression type to use before writing data."
 type = "string"
 category = "Requests"
 enum = ["ndjson", "text"]
-null = false
-description = "The encoding format used to serialize the events before flushing."
+null = true
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"
@@ -918,11 +954,13 @@ default = "date=%F"
 examples = [
   "date=%F/",
   "date=%F/hour=%H/",
-  "year=%Y/month=%m/day=%d/"
+  "year=%Y/month=%m/day=%d/",
+  "application_id={{ application_id }}/date=%F/"
 ]
 null = true
 partition_key = true
-description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\". [`strftime` specifiers][url.strftime_specifiers] are supported. "
+templateable = true
+description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
 
 [sinks.aws_s3.options.region]
 type = "string"
@@ -934,8 +972,10 @@ description = "The [AWS region][url.aws_s3_regions] of the target S3 bucket."
 # sinks.blachole
 # ------------------------------------------------------------------------------
 [sinks.blackhole]
+buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = """\
 a blackhole that simply discards data, designed for testing and \
@@ -952,17 +992,21 @@ description = "The number of events that must be received in order to print a su
 # sinks.console
 # ------------------------------------------------------------------------------
 [sinks.console]
+buffer = false
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log", "metric"]
 write_to_description = "the console, `STDOUT` or `STDERR`"
 
 [sinks.console.options.encoding]
 type = "string"
-default = "dynamic"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before writing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.console.options.target]
 type = "string"
@@ -978,8 +1022,10 @@ description = "The [standard stream][url.standard_streams] to write to."
 batch_size = 10490000
 batch_timeout = 1
 beta = true
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 5
@@ -1005,9 +1051,13 @@ description = "The host of your Elasticsearch cluster. This should be the full U
 [sinks.elasticsearch.options.index]
 type = "string"
 default = "vector-%F"
+examples = [
+  "vector-%Y-%m-%d",
+  "application-{{ application_id }}-%Y-%m-%d"
+]
 null = false
-partition_key = true
-description = "Index name to write events to. [`strftime` specifiers][url.strftime_specifiers] are supported."
+templateable = true
+description = "Index name to write events to."
 
 # ------------------------------------------------------------------------------
 # sinks.http
@@ -1015,8 +1065,10 @@ description = "Index name to write events to. [`strftime` specifiers][url.strfti
 [sinks.http]
 batch_size = 1049000
 batch_timeout = 5
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 10
@@ -1054,7 +1106,10 @@ description = "The compression strategy used to compress the payload before send
 type = "string"
 enum = ["ndjson", "text"]
 null = false
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.http.options.headers]
 type = "table"
@@ -1083,8 +1138,10 @@ description = "The full URI to make HTTP requests to. This should include the pr
 # sinks.kafka
 # ------------------------------------------------------------------------------
 [sinks.kafka]
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"
 write_to_description = "[Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]"
@@ -1101,14 +1158,16 @@ to initially to bootstrap itself\
 
 [sinks.kafka.options.encoding]
 type = "string"
-default = "dynamic"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.kafka.options.key_field]
 type = "string"
-examples = ["partition_key"]
+examples = ["user_id"]
 null = false
 description = """\
 The field name to use for the topic key. If unspecified, the key will be \
@@ -1127,8 +1186,10 @@ description = "The Kafka topic name to write events to."
 # ------------------------------------------------------------------------------
 [sinks.prometheus]
 beta = true
-delivery_guarantee = "at_least_once"
+buffer = false
+delivery_guarantee = "best_effort"
 egress_method = "exposing"
+healthcheck = false
 input_types = ["metric"]
 write_to_description = "[Prometheus][url.prometheus] metrics service"
 
@@ -1138,14 +1199,25 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.buckets]
+type = "[float]"
+default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+null = false
+unit = "seconds"
+description = """\
+Default buckets to use for [histogram][docs.metric_event.histogram] metrics.\
+"""
+
 # ------------------------------------------------------------------------------
 # sinks.splunk_hec
 # ------------------------------------------------------------------------------
 [sinks.splunk_hec]
 batch_size = 1049000
 batch_timeout = 1
+buffer = true
 delivery_guarantee = "at_least_once"
 egress_method = "batching"
+healthcheck = true
 input_types = ["log"]
 rate_limit_duration = 1
 rate_limit_num = 10
@@ -1159,10 +1231,12 @@ write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
 [sinks.splunk_hec.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
 enum = ["ndjson", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 [sinks.splunk_hec.options.host]
 type = "string"
@@ -1180,8 +1254,10 @@ description = "Your Splunk HEC token."
 # sinks.tcp
 # ------------------------------------------------------------------------------
 [sinks.tcp]
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"
 
@@ -1194,17 +1270,21 @@ description = "The TCP address."
 [sinks.tcp.options.encoding]
 type = "string"
 category = "Requests"
-default = "dynamic"
 enum = ["json", "text"]
 null = true
-description = "The encoding format used to serialize the events before flushing."
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
 
 # ------------------------------------------------------------------------------
 # sinks.vector
 # ------------------------------------------------------------------------------
 [sinks.vector]
+buffer = true
 delivery_guarantee = "best_effort"
 egress_method = "streaming"
+healthcheck = true
 input_types = ["log"]
 write_to_description = "another downstream Vector instance"
 
@@ -1248,12 +1328,12 @@ best_effort_delivery = "/about/guarantees.md#best-effort-delivery"
 config_composition = "/usage/configuration/README.md#composition"
 config_value_types = "/usage/configuration/README.md#value-types"
 data_directory = "/usage/configuration/README.md#data-directory"
-default_schema = "/about/data-model.md#default-schema"
-event = "/about/data-model.md#event"
-event_key_special_characters = "/about/data-model.md#special-characters"
+default_schema = "/about/data-model/log.md#default-schema"
+event = "/about/data-model/README.md#event"
+event_key_special_characters = "/about/data-model/log.md#special-characters"
 from_source = "/setup/installation/manual/from-source.md"
-log_event = "/about/data-model.md#log"
-metric_event = "/about/data-model.md#metric"
+log_event = "/about/data-model/log.md"
+metric_event = "/about/data-model/metric.md"
 metrics = "/usage/administration/monitoring.md#metrics"
 monitoring_logs = "/usage/administration/monitoring.md#logs"
 pipelines = "/usage/configuration/README.md#composition"
@@ -1264,6 +1344,7 @@ apt = "https://wiki.debian.org/Apt"
 aws_athena = "https://aws.amazon.com/athena/"
 aws_athena_console = "https://console.aws.amazon.com/athena/home"
 aws_access_keys = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+aws_cloudwatch_logs_sink_source = "https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/mod.rs"
 aws_elb = "https://aws.amazon.com/elasticloadbalancing/"
 aws_credentials_file = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html"
 aws_credential_process = "https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html"
@@ -1273,7 +1354,9 @@ aws_cw_logs_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#
 aws_cw_logs_service_limits = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
 aws_cw_logs_stream_name = "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 aws_kinesis_data_streams = "https://aws.amazon.com/kinesis/data-streams/"
+aws_kinesis_partition_key = "https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey"
 aws_kinesis_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
+aws_kinesis_split_shards = "https://docs.aws.amazon.com/streams/latest/dev/kinesis-using-sdk-java-resharding-split.html"
 aws_s3 = "https://aws.amazon.com/s3/"
 aws_s3_regions = "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
 aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
@@ -1303,11 +1386,13 @@ homebrew_services = "https://github.com/Homebrew/homebrew-services"
 iam_instance_profile = "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html"
 initd = "https://bash.cyberciti.biz/guide//etc/init.d"
 journald = "https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html"
+json_types = "https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax"
 kafka = "https://kafka.apache.org/"
 kafka_partitioning_docs = "https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Partitioningandbootstrapping"
 kafka_protocol = "https://kafka.apache.org/protocol"
 kubernetes_limit_resources = "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/"
 leveldb = "https://github.com/google/leveldb"
+log_event_source = "https://github.com/timberio/vector/blob/master/src/event/mod.rs"
 lua = "https://www.lua.org/"
 lua_docs = "https://www.lua.org/manual/5.3/"
 lua_manual = "http://www.lua.org/manual/5.1/manual.html"
@@ -1315,13 +1400,21 @@ lua_require = "http://www.lua.org/manual/5.1/manual.html#pdf-require"
 lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
+metric_event_source = "https://github.com/timberio/vector/blob/master/src/event/metric.rs"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
-new_help_issue = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Help"
+new_feature_request = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_source = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_transform = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 nginx = "https://www.nginx.com/"
 prometheus = "https://prometheus.io/"
+prometheus_counter = "https://prometheus.io/docs/concepts/metric_types/#counter"
+prometheus_gauge = "https://prometheus.io/docs/concepts/metric_types/#gauge"
+prometheus_high_cardinality = "https://prometheus.io/docs/practices/naming/#labels"
+prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histogram"
+prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
+prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
+prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
@@ -1329,11 +1422,13 @@ regex_tester = "https://regex-golang.appspot.com/assets/html/index.html"
 releases = "https://github.com/timberio/vector/releases"
 roadmap = "https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open"
 rust = "https://www.rust-lang.org/"
+rust_date_time = "https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"
+statsd_set = "https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets"
 strftime_specifiers = "https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html"
 syslog_5424 = "https://tools.ietf.org/html/rfc5424"
 systemd = "https://www.freedesktop.org/wiki/Software/systemd/"
@@ -1342,6 +1437,7 @@ test_harness = "https://github.com/timberio/vector-test-harness/"
 toml = "https://github.com/toml-lang/toml"
 toml_array = "https://github.com/toml-lang/toml#array"
 toml_table = "https://github.com/toml-lang/toml#table"
+toml_types = "https://github.com/toml-lang/toml#table-of-contents"
 uuidv4 = "https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)"
 vector_repo = "https://github.com/timberio/vector"
 vector_initd_service = "https://github.com/timberio/vector/blob/master/distribution/init.d/vector"

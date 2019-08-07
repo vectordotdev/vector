@@ -52,9 +52,8 @@ test: ## Spins up Docker resources and runs _every_ test
 
 ##@ Releasing
 
-build-archive: FEATURES = "default"
 build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
-	@FEATURES=$(FEATURES) scripts/build-archive.sh
+	scripts/build-archive.sh
 
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh

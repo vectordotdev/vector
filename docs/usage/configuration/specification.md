@@ -85,6 +85,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   include = ["/var/log/nginx/*.log"]
 
+  # The directory used to persist file checkpoint positions. By default, the
+  # global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
+
   # The number of bytes read off the head of the file to generate a unique
   # fingerprint.
   # 
@@ -206,7 +214,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # 
   # * required
   # * no default
-  # * enum: "tcp", "udp", "unix"
+  # * enum: "tcp", "udp", and "unix"
   mode = "tcp"
   mode = "udp"
   mode = "unix"
@@ -224,8 +232,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: bytes
   max_length = 102400
 
-  # The unix socket path. *This should be absolute path.* Only relevant when
-  # `mode` is `unix`.
+  # The unix socket path. *This should be absolute path.*
   # 
   # * optional
   # * no default
@@ -380,7 +387,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -464,7 +471,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -529,9 +536,11 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # 
     # * required
     # * no default
-    # * enum: "counter", "gauge"
+    # * enum: "counter", "gauge", "histogram", and "set"
     type = "counter"
     type = "gauge"
+    type = "histogram"
+    type = "set"
 
     # The log field to use as the metric.
     # 
@@ -549,8 +558,8 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # The name of the metric. Defaults to `<field>_total` for `counter` and
     # `<field>` for `gauge`.
     # 
-    # * optional
-    # * default: "dynamic"
+    # * required
+    # * no default
     name = "duration_total"
 
     [transforms.log_to_metric.metrics.labels]
@@ -647,7 +656,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -753,7 +762,7 @@ end
     # 
     # * required
     # * no default
-    # * enum: "string", "int", "float", "bool", "timestamp|strftime"
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
     status = "int"
     duration = "float"
     success = "bool"
@@ -793,7 +802,8 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/my-log.log"
+  group_name = "/var/log/{{ file }}.log"
+  group_name = "ec2/{{ instance_id }}"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -805,7 +815,9 @@ end
   # 
   # * required
   # * no default
-  stream_name = "my-stream"
+  stream_name = "{{ instance_id }}"
+  stream_name = "stream-name"
+  stream_name = "%Y-%m-%d"
 
   #
   # Batching
@@ -829,11 +841,12 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "json", "text"
+  # * no default
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -887,7 +900,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -895,7 +908,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -932,17 +945,23 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The AWS region of the target CloudWatch Logs stream resides.
+  # The AWS region of the target Kinesis stream resides.
   # 
   # * required
   # * no default
   region = "us-east-1"
 
-  # The stream name of the target CloudWatch Logs stream.
+  # The stream name of the target Kinesis Logs stream.
   # 
   # * required
   # * no default
   stream_name = "my-stream"
+
+  # The event field used as the Kinesis record's partition key value.
+  # 
+  # * optional
+  # * no default
+  partition_key_field = "user_id"
 
   #
   # Batching
@@ -966,11 +985,12 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "json", "text"
+  # * no default
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1024,7 +1044,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1032,7 +1052,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1082,16 +1102,61 @@ end
   region = "us-east-1"
 
   #
-  # Requests
+  # Batching
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The maximum size of a batch before it is flushed.
   # 
-  # * required
+  # * optional
+  # * default: 10490000
+  # * unit: bytes
+  batch_size = 10490000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 300
+  # * unit: seconds
+  batch_timeout = 300
+
+  #
+  # Object Names
+  #
+
+  # Whether or not to append a UUID v4 token to the end of the file. This ensures
+  # there are no name collisions high volume use cases.
+  # 
+  # * optional
+  # * default: true
+  filename_append_uuid = true
+
+  # The extension to use in the object name.
+  # 
+  # * optional
+  # * default: "log"
+  filename_extension = "log"
+
+  # The format of the resulting object file name. `strftime` specifiers are
+  # supported.
+  # 
+  # * optional
+  # * default: "%s"
+  filename_time_format = "%s"
+
+  # A prefix to apply to all object key names. This should be used to partition
+  # your objects, and it's important to end this value with a `/` if you want
+  # this to be the root S3 "folder".
+  # 
+  # * optional
   # * no default
-  # * enum: "ndjson", "text"
-  encoding = "ndjson"
-  encoding = "text"
+  key_prefix = "date=%F/"
+  key_prefix = "date=%F/hour=%H/"
+  key_prefix = "year=%Y/month=%m/day=%d/"
+  key_prefix = "application_id={{ application_id }}/date=%F/"
+
+  #
+  # Requests
+  #
 
   # The compression type to use before writing data.
   # 
@@ -1099,6 +1164,15 @@ end
   # * no default
   # * must be: "gzip" (if supplied)
   compression = "gzip"
+
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
+  # 
+  # * optional
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
 
   # Whether to Gzip the content before writing or not. Please note, enabling this
   # has a slight performance cost but significantly reduces bandwidth.
@@ -1148,58 +1222,6 @@ end
   retry_backoff_secs = 5
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: seconds
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The extension to use in the object name.
-  # 
-  # * optional
-  # * default: "log"
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder". `strftime` specifiers are supported.
-  # 
-  # * optional
-  # * default: "date=%F"
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-
-  #
   # Buffer
   #
 
@@ -1209,7 +1231,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1217,7 +1239,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1236,10 +1258,6 @@ end
     num_items = 500
 
 [sinks.blackhole]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1261,47 +1279,7 @@ end
   # * no default
   print_amount = 1000
 
-  #
-  # Buffer
-  #
-
-  [sinks.blackhole.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
 [sinks.console]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1320,53 +1298,18 @@ end
   # 
   # * required
   # * no default
-  # * enum: "stdout", "stderr"
+  # * enum: "stdout" or "stderr"
   target = "stdout"
   target = "stderr"
 
-  # The encoding format used to serialize the events before writing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "json", "text"
+  # * no default
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
-
-  #
-  # Buffer
-  #
-
-  [sinks.console.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 
 [sinks.elasticsearch]
   #
@@ -1402,11 +1345,12 @@ end
   # * default: "_doc"
   doc_type = "_doc"
 
-  # Index name to write events to. `strftime` specifiers are supported.
+  # Index name to write events to.
   # 
   # * optional
-  # * default: "vector-%F"
-  index = "vector-%F"
+  # * no default
+  index = "vector-%Y-%m-%d"
+  index = "application-{{ application_id }}-%Y-%m-%d"
 
   #
   # Batching
@@ -1480,7 +1424,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1488,7 +1432,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1525,11 +1469,12 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * required
   # * no default
-  # * enum: "ndjson", "text"
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1642,7 +1587,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1650,7 +1595,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1712,7 +1657,7 @@ end
   # 
   # * required
   # * no default
-  key_field = "partition_key"
+  key_field = "user_id"
 
   # The Kafka topic name to write events to.
   # 
@@ -1720,11 +1665,12 @@ end
   # * no default
   topic = "topic-1234"
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "json", "text"
+  # * no default
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -1738,7 +1684,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1746,7 +1692,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1765,10 +1711,6 @@ end
     num_items = 500
 
 [sinks.prometheus]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -1789,41 +1731,12 @@ end
   # * no default
   address = "0.0.0.0:9598"
 
-  #
-  # Buffer
-  #
-
-  [sinks.prometheus.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory", "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block", "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
+  # Default buckets to use for histogram metrics.
+  # 
+  # * optional
+  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+  # * unit: seconds
+  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
 [sinks.splunk_hec]
   #
@@ -1878,11 +1791,12 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "ndjson", "text"
+  # * no default
+  # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
 
@@ -1936,7 +1850,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -1944,7 +1858,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -1991,11 +1905,12 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing.
+  # The encoding format used to serialize the events before flushing. The default
+  # is dynamic based on if the event is structured or not.
   # 
   # * optional
-  # * default: "dynamic"
-  # * enum: "json", "text"
+  # * no default
+  # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
 
@@ -2009,7 +1924,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2017,7 +1932,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 
@@ -2070,7 +1985,7 @@ end
     # 
     # * optional
     # * default: "memory"
-    # * enum: "memory", "disk"
+    # * enum: "memory" or "disk"
     type = "memory"
     type = "disk"
 
@@ -2078,7 +1993,7 @@ end
     # 
     # * optional
     # * default: "block"
-    # * enum: "block", "drop_newest"
+    # * enum: "block" or "drop_newest"
     when_full = "block"
     when_full = "drop_newest"
 

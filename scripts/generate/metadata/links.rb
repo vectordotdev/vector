@@ -215,7 +215,7 @@ class Links
         raise <<~EOF
         #{name.inspect} is ambiguous and matches multiple doc.
 
-        * #{matched_files.join("\n* ")}
+        * #{docs.join("\n* ")}
         EOF
       else
         raise <<~EOF
@@ -233,7 +233,7 @@ class Links
         raise <<~EOF
         #{name.inspect} is ambiguous and matches multiple images.
 
-        * #{matched_files.join("\n* ")}
+        * #{images.join("\n* ")}
         EOF
       else
         raise <<~EOF
@@ -243,6 +243,19 @@ class Links
     end
 
     def find(files, name)
+      exact_matches =
+        files.select do |file|
+          normalized_file = file.downcase
+          
+          [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
+            !(file_name =~ /\/#{name}(\..*)$/).nil?
+          end
+        end
+
+      if exact_matches.any?
+        return exact_matches
+      end
+
       files.select do |file|
         normalized_file = file.downcase
         
@@ -315,7 +328,15 @@ class Links
         label = "#{type.titleize}: #{name}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [label]}.to_query
 
-      when /^url\.vector_(edge|latest)_(.*)/
+      when /^url\.new_(.*)_(sink|source|transform)_(bug|enhancement)$/
+        name = $1
+        type = $2
+        issue_type = $3.singularize
+        component_label = "#{type.titleize}: #{name}"
+        type_label = "Type: #{issue_type.titleize}"
+        VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
+
+      when /^url\.vector_(latest|nightly)_(.*)/
         channel = $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"

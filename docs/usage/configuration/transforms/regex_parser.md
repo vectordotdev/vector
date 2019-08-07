@@ -22,7 +22,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_regex_parser_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
@@ -33,7 +33,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   field = "message" # default
   
   # OPTIONAL - Types
-  [transforms.my_regex_parser_transform_id.types]
+  [transforms.my_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -60,6 +60,65 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.regex_parser_transform]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "regex_parser"
+  type = "regex_parser"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
+  # 
+  # * required
+  # * no default
+  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
+
+  # If the `field` should be dropped (removed) after parsing.
+  # 
+  # * optional
+  # * default: true
+  drop_field = true
+
+  # The field to parse.
+  # 
+  # * optional
+  # * default: "message"
+  field = "message"
+
+  #
+  # Types
+  #
+
+  [transforms.regex_parser_transform.types]
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # 
+    # * required
+    # * no default
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -67,14 +126,14 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "regex_parser"` |
+| `type` | `string` | The component type<br />`required` `must be: "regex_parser"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -249,8 +308,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open transform issues][url.regex_parser_transform_issues].
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `regex_parser_transform` issues][url.regex_parser_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_regex_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_regex_parser_transform_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -272,7 +333,7 @@ Finally, consider the following alternatives:
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
@@ -281,7 +342,8 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
-[url.community]: https://vector.dev/community
+[url.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+regex_parser&labels=Type%3A+Bug
+[url.new_regex_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+regex_parser&labels=Type%3A+Enhancement
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [url.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
 [url.regex_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+regex_parser%22+label%3A%22Type%3A+Bug%22
@@ -292,3 +354,4 @@ Finally, consider the following alternatives:
 [url.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
 [url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

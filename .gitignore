@@ -7,3 +7,4 @@ miniodat
 .DS_Store
 .idea/
 checkpoints/*
+*.iml

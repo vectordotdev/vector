@@ -17,6 +17,15 @@ pub fn next_addr() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
+pub fn trace_init() {
+    let env = std::env::var("TEST_LOG").unwrap_or_else(|_| "off".to_string());
+
+    let subscriber = tracing_fmt::FmtSubscriber::builder()
+        .with_filter(tracing_fmt::filter::EnvFilter::from(env))
+        .finish();
+    let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
+}
+
 pub fn send_lines(
     addr: SocketAddr,
     lines: impl Iterator<Item = String>,

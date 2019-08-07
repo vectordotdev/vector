@@ -14,7 +14,9 @@
 ## About
 
 * [Concepts](about/concepts.md)
-* [Data Model](about/data-model.md)
+* [Data Model](about/data-model/README.md)
+  * [Log Event](about/data-model/log.md)
+  * [Metric Event](about/data-model/metric.md)
 * [Guarantees](about/guarantees.md)
 
 ## Setup

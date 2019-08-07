@@ -1,7 +1,7 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Slack Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/mailing_list">Mailing List<a/></strong>
+    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
+  </strong>
 </p>
 
 ---
@@ -31,12 +31,12 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model]
+* [**Data model**][docs.data_model] - [log][docs.log_event], [metric][docs.metric_event]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
 
-* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], and [more][docs.installation]
+* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [archives][docs.archives], and [more][docs.installation]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -48,7 +48,7 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][url.community] - [slack chat][url.vector_chat], [mailing list][url.mailing_list]
+* [**Community**][url.community] - [chat/forum][url.vector_chat], [mailing list][url.mailing_list]
 * [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
 
 
@@ -182,6 +182,7 @@ the License.
 [docs.administration]: https://docs.vector.dev/usage/administration
 [docs.agent_role]: https://docs.vector.dev/setup/deployment/roles/agent
 [docs.apt]: https://docs.vector.dev/setup/installation/package-managers/apt
+[docs.archives]: https://docs.vector.dev/setup/installation/manual/from-archives
 [docs.aws_cloudwatch_logs_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
 [docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
@@ -206,10 +207,10 @@ the License.
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.log_event]: https://docs.vector.dev/about/data-model#log
+[docs.log_event]: https://docs.vector.dev/about/data-model/log
 [docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.metric_event]: https://docs.vector.dev/about/data-model#metric
+[docs.metric_event]: https://docs.vector.dev/about/data-model/metric
 [docs.performance]: https://docs.vector.dev/performance
 [docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.regex_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/regex_parser

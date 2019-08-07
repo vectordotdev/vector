@@ -1,5 +1,5 @@
 use super::fanout::{self, Fanout};
-use crate::buffers;
+use crate::{buffers, topology::config::GlobalOptions};
 use futures::{sync::mpsc, Future, Stream};
 use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
@@ -28,13 +28,15 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     let mut errors = vec![];
     let mut warnings = vec![];
 
+    let globals = GlobalOptions::from(config);
+
     // Build sources
     for (name, source) in &config.sources {
         let (tx, rx) = mpsc::channel(1000);
 
-        let server = match source.build(tx) {
+        let server = match source.build(&name, &globals, tx) {
             Err(error) => {
-                errors.push(format!("Transform \"{}\": {}", name, error));
+                errors.push(format!("Source \"{}\": {}", name, error));
                 continue;
             }
             Ok(server) => server,

@@ -1,11 +1,12 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
 use file_source::FileServer;
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
+use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -24,7 +25,7 @@ pub struct FileConfig {
     pub fingerprint_bytes: usize,
     pub ignored_header_bytes: usize,
     pub host_key: Option<String>,
-    pub data_dir: PathBuf,
+    pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
 }
 
@@ -44,7 +45,7 @@ impl Default for FileConfig {
             fingerprint_bytes: 256,
             ignored_header_bytes: 0,
             host_key: None,
-            data_dir: PathBuf::new(),
+            data_dir: None,
             glob_minimum_cooldown: 1000, // millis
         }
     }
@@ -52,9 +53,26 @@ impl Default for FileConfig {
 
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
-        // TODO: validate paths
-        Ok(file_source(self, out))
+    fn build(
+        &self,
+        name: &str,
+        globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
+        let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
+        // now before passing on the validated data_dir, we add the source_name as a subdir,
+        // so that multiple sources can operate within the same given data_dir (e.g. the global one)
+        // without the file servers' checkpointers interfering with each other
+        data_dir.push(name);
+        if let Err(e) = DirBuilder::new().create(&data_dir) {
+            return Err(format!(
+                "could not create subdirectory '{}' inside of data_dir '{}': {}",
+                name,
+                data_dir.parent().unwrap().display(),
+                e
+            ));
+        };
+        Ok(file_source(self, data_dir, out))
     }
 
     fn output_type(&self) -> DataType {
@@ -62,7 +80,37 @@ impl SourceConfig for FileConfig {
     }
 }
 
-pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Source {
+fn resolve_and_validate_data_dir(
+    config: &FileConfig,
+    globals: &GlobalOptions,
+) -> Result<PathBuf, String> {
+    let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
+        Some(v) => v.clone(),
+        None => return Err("data_dir option required, but not given here or globally".into()),
+    };
+    if !data_dir.exists() {
+        return Err(format!(
+            "data_dir '{}' does not exist",
+            data_dir.to_string_lossy()
+        ));
+    }
+    let readonly = std::fs::metadata(&data_dir)
+        .map(|meta| meta.permissions().readonly())
+        .unwrap_or(true);
+    if readonly {
+        return Err(format!(
+            "data_dir '{}' is not writable",
+            data_dir.to_string_lossy()
+        ));
+    }
+    Ok(data_dir)
+}
+
+pub fn file_source(
+    config: &FileConfig,
+    data_dir: PathBuf,
+    out: mpsc::Sender<Event>,
+) -> super::Source {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
     let ignore_before = config
@@ -79,7 +127,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
         max_line_bytes: config.max_line_bytes,
         fingerprint_bytes: config.fingerprint_bytes,
         ignored_header_bytes: config.ignored_header_bytes,
-        data_dir: config.data_dir.clone(),
+        data_dir,
         glob_minimum_cooldown: glob_minimum_cooldown,
     };
 
@@ -90,7 +138,7 @@ pub fn file_source(config: &FileConfig, out: mpsc::Sender<Event>) -> super::Sour
     let out = out
         .sink_map_err(|_| ())
         .with(move |(line, file): (Bytes, String)| {
-            trace!(message = "Recieved one event.", file = file.as_str());
+            trace!(message = "Received one event.", file = file.as_str());
 
             let event = create_event(line, file, &host_key, &hostname, &file_key);
 
@@ -149,6 +197,7 @@ mod tests {
     use crate::event;
     use crate::sources::file;
     use crate::test_util::{block_on, shutdown_on_idle};
+    use crate::topology::Config;
     use futures::{Future, Stream};
     use std::collections::HashSet;
     use std::fs::{self, File};
@@ -160,7 +209,7 @@ mod tests {
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint_bytes: 8,
-            data_dir: dir.path().to_path_buf(),
+            data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown: 0, // millis
             ..Default::default()
         }
@@ -178,6 +227,31 @@ mod tests {
             "Unclosed channel: may indicate file-server could not shutdown gracefully."
         );
         result.unwrap()
+    }
+
+    #[test]
+    fn resolve_data_dir() {
+        let global_dir = tempdir().unwrap();
+        let local_dir = tempdir().unwrap();
+
+        let mut config = Config::empty();
+        config.data_dir = global_dir.into_path().into();
+
+        // local path given -- local should win
+        let res = super::resolve_and_validate_data_dir(
+            &test_default_file_config(&local_dir),
+            &GlobalOptions::from(&config),
+        )
+        .unwrap();
+        assert_eq!(res, local_dir.path());
+
+        // no local path given -- global fallback should be in effect
+        let res = super::resolve_and_validate_data_dir(
+            &Default::default(),
+            &GlobalOptions::from(&config),
+        )
+        .unwrap();
+        assert_eq!(res, config.data_dir.unwrap());
     }
 
     #[test]
@@ -208,7 +282,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -269,7 +343,7 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -338,7 +412,7 @@ mod tests {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -410,7 +484,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -472,7 +546,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -502,7 +576,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -532,7 +606,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
             rt.spawn(source.select(tripwire.clone()).map(|_| ()).map_err(|_| ()));
 
@@ -578,7 +652,7 @@ mod tests {
         // First time server runs it picks up existing lines.
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -600,7 +674,7 @@ mod tests {
         // Restart server, read file from checkpoint.
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -627,7 +701,7 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -663,7 +737,7 @@ mod tests {
         // Run server first time, collect some lines.
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -689,7 +763,7 @@ mod tests {
         // even though it has a new name.
         {
             let (tx, rx) = futures::sync::mpsc::channel(10);
-            let source = file::file_source(&config, tx);
+            let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
             let mut rt = tokio::runtime::Runtime::new().unwrap();
             let (trigger, tripwire) = Tripwire::new();
             rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
@@ -727,7 +801,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -812,7 +886,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, tx);
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
 
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 

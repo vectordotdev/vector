@@ -4,9 +4,9 @@
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. [`credential_process` command][url.aws_credential_process] in the AWS config file, usually located at `~/.aws/config`.
-​3. [AWS credentials file][url.aws_credentials_file], usually located at `~/.aws/credentials`.
-4. ​[IAM instance profile][url.iam_instance_profile]. Will only work if running on an EC2 instance with an instance profile/role.
+​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -18,7 +18,7 @@ cases where this is not possible you can generate an AWS access key for any user
 within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
 how to do this.
 <%- end -%>
-<%- if component.sink? && component.batching? -%>
+<%- if component.sink? && component.buffer? && component.batching? -%>
 
 ### Buffers & Batches
 
@@ -28,12 +28,11 @@ how to do this.
 ![][images.sink-flow-serial]
 <%- end -%>
 
-The `<%= component.name %>` <%= component.type %> buffers, batches, and
-partitions data as shown in the diagram above. You'll notice that Vector treats
-these concepts differently, instead of treating them as global concepts, Vector
-treats them as sink specific concepts. This isolates sinks, ensuring services
-disruptions are contained and [delivery guarantees][docs.guarantees] are
-honored.
+The `<%= component.name %>` <%= component.type %> buffers & batches data as
+shown in the diagram above. You'll notice that Vector treats these concepts
+differently, instead of treating them as global concepts, Vector treats them
+as sink specific concepts. This isolates sinks, ensuring services disruptions
+are contained and [delivery guarantees][docs.guarantees] are honored.
 
 #### Buffers types
 
@@ -110,6 +109,21 @@ the following options:
 <%- component.options.encoding.enum.each do |encoding| -%>
 | `<%= encoding %>` | <%= encoding_description(encoding) %> |
 <%- end -%>
+<%- if component.options.encoding.default.nil? -%>
+
+#### Dynamic encoding
+
+By default, the `encoding` chosen is dynamic based on the explicit/implcit
+nature of the event's structure. For example, if this event is parsed (explicit
+structuring), Vector will use `json` to encode the structured data. If the event
+was not explicitly structured, the `text` encoding will be used.
+
+To further explain why Vector adopts this default, take the simple example of
+accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+it directly to the `<%= component.name %>` <%= component.type %>. It is less
+surprising that the outgoing data reflects the incoming data exactly since it
+was not explicitly structured.
+<%- end -%>
 <%- end -%>
 
 ### Environment Variables
@@ -129,7 +143,7 @@ The `address` option determines the address and port the data is made available
 on. You'll need to configure your networking so that the configured port is
 accessible by the downstream service doing the scraping.
 <%- end -%>
-<% if component.sink? -%>
+<% if component.sink? && component.healthcheck? -%>
 
 ### Health Checks
 
@@ -199,6 +213,29 @@ attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` opt
 
 The `<%= component.name %>` <%= component.type %> streams data on a real-time
 event-by-event basis. It does not batch data.
+<%- end -%>
+<%- if component.templateable_options.any? -%>
+
+### Template Syntax
+
+The <%= option_names(component.templateable_options).to_sentence %> options
+support [Vector's template syntax][docs.configuration.template-syntax],
+enabling dynamic values derived from the event's data. This syntax accepts
+[strftime specifiers][url.strftime_specifiers] as well as the
+`{{ field_name }}` syntax for accessing event fields. For example:
+
+```toml
+[<%= component.type.pluralize %>.my_<%= component.id %>_id]
+  # ...
+  <%- option = component.templateable_options.fetch(0) -%>
+  <%- option.examples.each do |example| -%>
+  <%= option.name %> = <%= example.to_toml %>
+  <%- end -%>
+  # ...
+```
+
+You can read more about the complete syntax in the
+[template syntax section][docs.configuration.template-syntax].
 <%- end -%>
 <%- if component.options.request_timeout_secs -%>
 

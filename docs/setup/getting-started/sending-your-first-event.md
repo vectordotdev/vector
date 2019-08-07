@@ -114,7 +114,7 @@ you'll need to combine to create your pipelines.
 [docs.concepts]: ../../about/concepts.md
 [docs.configuration]: ../../usage/configuration
 [docs.console_sink]: ../../usage/configuration/sinks/console.md
-[docs.event]: ../../about/data-model.md#event
+[docs.event]: ../../about/data-model/README.md#event
 [docs.installation]: ../../setup/installation
 [docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
 [docs.sinks]: ../../usage/configuration/sinks

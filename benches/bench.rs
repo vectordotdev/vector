@@ -14,8 +14,30 @@ use vector::{sinks, sources, transforms};
 
 mod batch;
 mod buffering;
+mod event;
 mod http;
 mod lua;
+
+criterion_group!(
+    benches,
+    benchmark_simple_pipe,
+    benchmark_simple_pipe_with_tiny_lines,
+    benchmark_simple_pipe_with_huge_lines,
+    benchmark_simple_pipe_with_many_writers,
+    benchmark_interconnected,
+    benchmark_transforms,
+    benchmark_complex,
+    bench_elasticsearch_index,
+    benchmark_regex,
+);
+criterion_main!(
+    benches,
+    buffering::buffers,
+    http::http,
+    batch::batch,
+    lua::lua,
+    event::event
+);
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -537,8 +559,7 @@ fn benchmark_complex(c: &mut Criterion) {
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use chrono::Utc;
-    use vector::event;
-    use vector::sinks::elasticsearch::*;
+    use vector::{event, template::Template};
 
     c.bench(
         "elasticsearch_indexes",
@@ -550,9 +571,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
 
-                    ("index-%Y.%m.%d".to_string(), event)
+                    (Template::from("index-%Y.%m.%d"), event)
                 },
-                |(index, event)| build_index_name(&index, &event, true),
+                |(index, event)| index.render(&event),
             )
         }),
     );
@@ -567,33 +588,13 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                         .as_mut_log()
                         .insert_implicit(event::TIMESTAMP.clone(), Utc::now().into());
 
-                    ("index".to_string(), event)
+                    (Template::from("index"), event)
                 },
-                |(index, event)| build_index_name(&index, &event, false),
+                |(index, event)| index.render(&event),
             )
         }),
     );
 }
-
-criterion_group!(
-    benches,
-    benchmark_simple_pipe,
-    benchmark_simple_pipe_with_tiny_lines,
-    benchmark_simple_pipe_with_huge_lines,
-    benchmark_simple_pipe_with_many_writers,
-    benchmark_interconnected,
-    benchmark_transforms,
-    benchmark_complex,
-    bench_elasticsearch_index,
-    benchmark_regex,
-);
-criterion_main!(
-    benches,
-    buffering::buffers,
-    http::http,
-    batch::batch,
-    lua::lua
-);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();

@@ -29,13 +29,14 @@ The `file` source ingests data through one or more local files and outputs [`log
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_file_source_id]
+[sources.my_source_id]
   # REQUIRED - General
   type = "file" # must be: "file"
   exclude = ["/var/log/nginx/access.log"]
   include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
+  data_dir = "/var/lib/vector" # no default
   fingerprint_bytes = 256 # default, bytes
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
@@ -57,6 +58,7 @@ The `file` source ingests data through one or more local files and outputs [`log
   include = ["<string>", ...]
 
   # OPTIONAL - General
+  data_dir = "<string>"
   fingerprint_bytes = <int>
   glob_minimum_cooldown = <int>
   ignore_older = <int>
@@ -69,6 +71,104 @@ The `file` source ingests data through one or more local files and outputs [`log
   host_key = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.file_source]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "file"
+  type = "file"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
+  # 
+  # * required
+  # * no default
+  exclude = ["/var/log/nginx/access.log"]
+
+  # Array of file patterns to include. Globbing is supported.
+  # 
+  # * required
+  # * no default
+  include = ["/var/log/nginx/*.log"]
+
+  # The directory used to persist file checkpoint positions. By default, the
+  # global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
+
+  # The number of bytes read off the head of the file to generate a unique
+  # fingerprint.
+  # 
+  # * optional
+  # * default: 256
+  # * unit: bytes
+  fingerprint_bytes = 256
+
+  # Delay between file discovery calls. This controls the interval at which
+  # Vector searches for files.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  glob_minimum_cooldown = 1000
+
+  # Ignore files with a data modification date that does not exceed this age.
+  # 
+  # * optional
+  # * no default
+  # * unit: seconds
+  ignore_older = 86400
+
+  # The number of bytes to skipe ahead (or ignore) when generating a unique
+  # fingerprint. This is helpful if all files share a common header.
+  # 
+  # * optional
+  # * default: 0
+  # * unit: bytes
+  ignored_header_bytes = 0
+
+  # The maximum number of a bytes a line can contain before being discarded. This
+  # protects against malformed lines or tailing incorrect files.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_line_bytes = 102400
+
+  # When `true` Vector will read from the beginning of new files, when `false`
+  # Vector will only read new data added to the file.
+  # 
+  # * optional
+  # * default: false
+  start_at_beginning = false
+
+  #
+  # Context
+  #
+
+  # The key name added to each event with the full path of the file.
+  # 
+  # * optional
+  # * default: "file"
+  file_key = "file"
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -76,13 +176,14 @@ The `file` source ingests data through one or more local files and outputs [`log
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "file"` |
+| `type` | `string` | The component type<br />`required` `must be: "file"` |
 | `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
+| `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.<br />`no default` `example: "/var/lib/vector"` |
 | `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
 | `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
-| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [  If historical data is compressed, or altered in any way, Vector will not be](#if-historical-data-is-compressed-or-altered-in-any-way-vector-will-not-be) for more info.<br />`no default` `example: 86400` `unit: seconds` |
+| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [File Rotation](#file-rotation) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
 | `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
@@ -140,7 +241,8 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global `data_dir` option][docs.configuration.data-directory].
+[global `data_dir` option][docs.configuration.data-directory] but can be
+overridden via the `data_dir` option in the `file` sink directly.
 
 ### Context
 
@@ -224,8 +326,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open source issues][url.file_source_issues].
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `file_source` issues][url.file_source_issues].
+2. If encountered a bug, please [file a bug report][url.new_file_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_file_source_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -237,17 +341,19 @@ issue, please:
 [docs.configuration.data-directory]: ../../../usage/configuration#data-directory
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.file_source]: ../../../assets/file-source.svg
-[url.community]: https://vector.dev/community
 [url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
 [url.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Bug%22
 [url.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22+label%3A%22Type%3A+Enhancement%22
 [url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+file%22
 [url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
 [url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
+[url.new_file_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+file&labels=Type%3A+Bug
+[url.new_file_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+file&labels=Type%3A+Enhancement
 [url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+file
+[url.vector_chat]: https://chat.vector.dev

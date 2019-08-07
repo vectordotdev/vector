@@ -19,7 +19,7 @@ class Context
 
       tags << (option.required? && option.default.nil? ? "required" : "optional")
 
-      if !option.default.nil?
+      if option.examples.first == option.default
         tags << "default: #{option.default.to_toml}"
       else
         tags << "no default"
@@ -31,7 +31,7 @@ class Context
 
       if option.enum
         if option.enum.length > 1
-          tags << "enum: #{option.enum.collect(&:to_toml).join(", ")}"
+          tags << "enum: #{option.enum.collect(&:to_toml).to_sentence(two_words_connector: " or ")}"
         else
           tag = "must be: #{option.enum.first.to_toml}"
           if option.optional?
