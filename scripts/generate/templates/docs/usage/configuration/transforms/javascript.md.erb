@@ -98,16 +98,17 @@ Transformations are done using _handlers_. Handler is a user-defined
 JavaScript function that takes one event object as input and outputs either of:
 
 * Event: a JavaScript object with values of types `Boolean`, `Number`, `String`, or `Date`.
+  If you need nested objects, use dot-separated key values, for example `a.b.c`.
 * Null: if handler returns `null`, the event is discarded.
 * Array: an array of event objects.
 
-The handler code is specified in `source` field of the transform config. If `handler`
+The handler code is specified in the `source` field of the transform config. If `handler`
 parameter of the config is not specified, entire source should be a single function.
 
 If `handler` parameter is specified, the source should contain a definition of the handler
 function with the same name as the value of `handler`. In addition, the source can contain
 other top-level functions, variables, constants, or classes. The value of `handler`
-should be a valid JavaScript identifier.
+should consist of ASCII characters and be a valid JavaScript identifier.
 
 ## Troubleshooting
 
