@@ -4,7 +4,7 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchServiceSink, Partition, SinkExt,
+        BatchServiceSink, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
@@ -87,7 +87,7 @@ impl CloudWatchMetricsService {
             .timeout(Duration::from_secs(timeout))
             .service(cloudwatch_metrics);
 
-        let sink = BatchServiceSink::new(svc, acker).partitioned_batched_with_min(
+        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
             Vec::new(),
             batch_size,
             Duration::from_secs(batch_timeout),
@@ -133,14 +133,6 @@ impl CloudWatchMetricsService {
         {
             Ok(CloudWatchClient::new(region))
         }
-    }
-}
-
-use bytes::Bytes;
-
-impl Partition<Bytes> for Event {
-    fn partition(&self) -> Bytes {
-        "key".into()
     }
 }
 
