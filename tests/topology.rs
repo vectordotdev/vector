@@ -3,12 +3,26 @@ extern crate tracing;
 
 pub mod support;
 
-use crate::support::{sink, source, transform};
+use crate::support::{sink, sink_failing_healthcheck, source, transform};
 use futures::{sink::Sink, stream::Stream};
 use vector::event::{Event, MESSAGE};
 use vector::test_util::{runtime, shutdown_on_idle};
 use vector::topology;
 use vector::topology::config::Config;
+
+fn basic_config() -> Config {
+    let mut config = Config::empty();
+    config.add_source("in1", source().1);
+    config.add_sink("out1", &["in1"], sink().1);
+    config
+}
+
+fn basic_config_with_sink_failing_healthcheck() -> Config {
+    let mut config = Config::empty();
+    config.add_source("in1", source().1);
+    config.add_sink("out1", &["in1"], sink_failing_healthcheck().1);
+    config
+}
 
 fn into_message(event: Event) -> String {
     event.as_log().get(&MESSAGE).unwrap().to_string_lossy()
@@ -296,4 +310,45 @@ fn topology_swap_transform() {
     shutdown_on_idle(rt);
     assert_eq!(Vec::<String>::new(), res1v1);
     assert_eq!(vec!["this replaced"], res1v2);
+}
+
+#[test]
+fn topology_required_healthcheck_fails_start() {
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology::start(config, &mut runtime(), true).is_none());
+}
+
+#[test]
+fn topology_optional_healthcheck_does_not_fail_start() {
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology::start(config, &mut runtime(), false).is_some());
+}
+
+#[test]
+fn topology_optional_healthcheck_does_not_fail_reload() {
+    let mut rt = runtime();
+    let config = basic_config();
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+}
+
+#[test]
+fn topology_healthcheck_not_run_on_unchanged_reload() {
+    let mut rt = runtime();
+    let config = basic_config();
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology.reload_config_and_respawn(config, &mut rt, true));
+}
+
+#[test]
+fn topology_healthcheck_run_for_changes_on_reload() {
+    let mut rt = runtime();
+    let config = basic_config();
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    let mut config = Config::empty();
+    config.add_source("in1", source().1);
+    config.add_sink("out2", &["in1"], sink_failing_healthcheck().1);
+    assert!(topology.reload_config_and_respawn(config, &mut rt, true) == false);
 }
