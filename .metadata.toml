@@ -618,8 +618,14 @@ examples = [
 event => ({...event, field: 'value'})
 """
 ]
-null = false
+null = true
 description = "The inline JavaScript source with handler function."
+
+[transforms.javascript.options.path]
+type = "string"
+examples = ["/etc/vector/transform.js"]
+null = true
+description = "The path to JavaScript source file with handler function."
 
 [transforms.javascript.options.handler]
 type = "string"

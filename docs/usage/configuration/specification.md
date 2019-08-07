@@ -495,16 +495,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   inputs = ["my-source-id"]
 
-  # The inline JavaScript source with handler function.
-  # 
-  # * required
-  # * no default
-  source = """
-event => ({...event, field: 'value'})
-
-"""
-
-
   # Name of the handler function.
   # 
   # * optional
@@ -516,6 +506,21 @@ event => ({...event, field: 'value'})
   # * optional
   # * no default
   memory_limit = 10000000
+
+  # The path to JavaScript source file with handler function.
+  # 
+  # * optional
+  # * no default
+  path = "/etc/vector/transform.js"
+
+  # The inline JavaScript source with handler function.
+  # 
+  # * optional
+  # * no default
+  source = """
+event => ({...event, field: 'value'})
+
+"""
 
 [transforms.json_parser]
   # The component type
