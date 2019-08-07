@@ -5,16 +5,16 @@ use serde::Serialize;
 pub enum Metric {
     Counter {
         name: String,
-        val: f32,
+        val: f64,
     },
     Histogram {
         name: String,
-        val: f32,
+        val: f64,
         sample_rate: u32,
     },
     Gauge {
         name: String,
-        val: f32,
+        val: f64,
         direction: Option<Direction>,
     },
     Set {
