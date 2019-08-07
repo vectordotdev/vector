@@ -35,7 +35,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             } else {
                 1.0
             };
-            let val: f32 = parts[0].parse()?;
+            let val: f64 = parts[0].parse()?;
             Metric::Counter {
                 name: sanitize_key(key),
                 val: val * sample_rate,
@@ -47,7 +47,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             } else {
                 1.0
             };
-            let val: f32 = parts[0].parse()?;
+            let val: f64 = parts[0].parse()?;
             Metric::Histogram {
                 name: sanitize_key(key),
                 val: convert_to_base_units(unit, val),
@@ -77,14 +77,14 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     Ok(metric)
 }
 
-fn parse_sampling(input: &str) -> Result<f32, ParseError> {
+fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     if input.chars().next() != Some('@') || input.len() < 2 {
         return Err(ParseError::Malformed(
             "expected '@'-prefixed sampling component",
         ));
     }
 
-    let num: f32 = input[1..].parse()?;
+    let num: f64 = input[1..].parse()?;
     if num.is_sign_positive() {
         Ok(num)
     } else {
@@ -112,7 +112,7 @@ fn sanitize_key(key: &str) -> String {
     s.into()
 }
 
-fn sanitize_sampling(sampling: f32) -> f32 {
+fn sanitize_sampling(sampling: f64) -> f64 {
     if sampling == 0.0 {
         1.0
     } else {
@@ -120,7 +120,7 @@ fn sanitize_sampling(sampling: f32) -> f32 {
     }
 }
 
-fn convert_to_base_units(unit: &str, val: f32) -> f32 {
+fn convert_to_base_units(unit: &str, val: f64) -> f64 {
     match unit {
         "ms" => val / 1000.0,
         _ => val,
