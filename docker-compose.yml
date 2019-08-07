@@ -41,19 +41,3 @@ services:
         - "9300:9300"
       environment:
         - discovery.type=single-node
-
-    musl-builder:
-      build:
-        context: ./scripts/ci-docker-images/builder-x86_64-unknown-linux-musl
-        args:
-          LTO: lto=thin
-      volumes:
-        - .:/vector
-      working_dir: /vector
-      environment:
-        VERSION: 0.4.0-dev
-        RUST_LTO: "lto"
-        FEATURES: "default rdkafka/cmake_build"
-        TARGET: "x86_64-unknown-linux-musl"
-      command: ["make", "build-archive"]
-      # command: ["cargo", "build", "--release", "--target", "x86_64-unknown-linux-musl", "--features", "default rdkafka/cmake_build"]
