@@ -2,13 +2,14 @@ use crate::{
     buffers::Acker,
     event::Event,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
-        retries::FixedRetryPolicy,
+        http::{HttpRetryLogic, HttpService, Response},
+        retries::{FixedRetryPolicy, RetryLogic},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
 use futures::{Future, Sink};
+use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
@@ -72,7 +73,9 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
     let policy = FixedRetryPolicy::new(
         retry_attempts,
         Duration::from_secs(retry_backoff_secs),
-        HttpRetryLogic,
+        ClickhouseRetryLogic {
+            inner: HttpRetryLogic,
+        },
     );
 
     let uri = encode_uri(&host, &database, &table)?;
@@ -105,7 +108,8 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSin
             Duration::from_secs(batch_timeout),
         )
         .with(move |event: Event| {
-            let mut body = serde_json::to_vec(&event.as_log().all_fields()).unwrap();
+            let mut body = serde_json::to_vec(&event.as_log().all_fields())
+                .expect("Events should be valid json!");
             body.push(b'\n');
             Ok(body)
         });
@@ -157,6 +161,35 @@ fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
         .map_err(|e| format!("Unable to parse host as URI: {}", e))
 }
 
+#[derive(Clone)]
+struct ClickhouseRetryLogic {
+    inner: HttpRetryLogic,
+}
+
+impl RetryLogic for ClickhouseRetryLogic {
+    type Response = Response;
+    type Error = hyper::Error;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        self.inner.is_retriable_error(error)
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> bool {
+        if response.status() == StatusCode::INTERNAL_SERVER_ERROR {
+            let body = response.body();
+
+            // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
+            // This attempts to check if the body starts with `Code: {code_num}` and to not
+            // retry those errors.
+            //
+            // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
+            !(body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53"))
+        } else {
+            self.inner.should_retry_response(response)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,17 +213,21 @@ mod tests {
 #[cfg(feature = "clickhouse-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
+        buffers::Acker,
         test_util::{block_on, random_string},
         topology::config::SinkConfig,
         Event,
     };
     use futures::Sink;
     use serde_json::Value;
+    use std::time::Duration;
+    use tokio::util::FutureExt;
 
     #[test]
     fn insert_events() {
+        crate::test_util::trace_init();
+
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
@@ -204,7 +241,7 @@ mod integration_tests {
         };
 
         let client = ClickhouseClient::new(host);
-        client.create_table(&table);
+        client.create_table(&table, "host String, timestamp String, message String");
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
@@ -223,6 +260,40 @@ mod integration_tests {
         assert_eq!(expected, output.data[0]);
     }
 
+    #[test]
+    fn no_retry_on_incorrect_data() {
+        crate::test_util::trace_init();
+
+        let table = gen_table();
+        let host = String::from("http://localhost:8123");
+
+        let config = ClickhouseConfig {
+            host: host.clone(),
+            table: table.clone(),
+            compression: Some(Compression::None),
+            batch_size: Some(1),
+            ..Default::default()
+        };
+
+        let client = ClickhouseClient::new(host);
+        // the event contains a message field, but its being omited to
+        // fail the request.
+        client.create_table(&table, "host String, timestamp String");
+
+        let (sink, _hc) = config.build(Acker::Null).unwrap();
+
+        let mut input_event = Event::from("raw log line");
+        input_event
+            .as_mut_log()
+            .insert_explicit("host".into(), "example.com".into());
+
+        let pump = sink.send(input_event.clone());
+
+        // Retries should go on forever, so if we are retrying incorrectly
+        // this timeout should trigger.
+        block_on(pump.timeout(Duration::from_secs(5))).unwrap();
+    }
+
     struct ClickhouseClient {
         host: String,
         client: reqwest::Client,
@@ -236,17 +307,18 @@ mod integration_tests {
             }
         }
 
-        fn create_table(&self, table: &str) {
+        fn create_table(&self, table: &str, schema: &str) {
             let mut response = self
                 .client
                 .post(&self.host)
+                //
                 .body(format!(
                     "CREATE TABLE {}
-                     (host String, timestamp String, message String)
+                     ({})
                      ENGINE = MergeTree()
                      PARTITION BY substring(timestamp, 1, 7)
                      ORDER BY (host, timestamp);",
-                    table,
+                    table, schema
                 ))
                 .send()
                 .unwrap();
