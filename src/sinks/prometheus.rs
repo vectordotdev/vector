@@ -186,20 +186,15 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         match event.into_metric() {
-            Metric::Counter { name, val } => {
-                self.with_counter(name, |counter| counter.inc_by(val as f64))
-            }
+            Metric::Counter { name, val } => self.with_counter(name, |counter| counter.inc_by(val)),
             Metric::Gauge {
                 name,
                 val,
                 direction,
-            } => self.with_gauge(name, |gauge| {
-                let val = val as f64;
-                match direction {
-                    None => gauge.set(val),
-                    Some(Direction::Plus) => gauge.add(val),
-                    Some(Direction::Minus) => gauge.sub(val),
-                }
+            } => self.with_gauge(name, |gauge| match direction {
+                None => gauge.set(val),
+                Some(Direction::Plus) => gauge.add(val),
+                Some(Direction::Minus) => gauge.sub(val),
             }),
             Metric::Histogram {
                 name,
@@ -207,7 +202,7 @@ impl Sink for PrometheusSink {
                 sample_rate,
             } => self.with_histogram(name, |hist| {
                 for _ in 0..sample_rate {
-                    hist.observe(val as f64);
+                    hist.observe(val);
                 }
             }),
             Metric::Set { .. } => {

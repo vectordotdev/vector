@@ -63,7 +63,7 @@ jobs:
           RUST_BACKTRACE: full
           AWS_ACCESS_KEY_ID: "fake-aws-key"
           AWS_SECRET_ACCESS_KEY: "fake-aws-key"
-      - image: localstack/localstack:latest
+      - image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
         environment:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
@@ -528,7 +528,6 @@ workflows:
           <<: *require-builds
       # Installs directly from S3
       - release-docker:
-          <<: *tag-workflow-filters
           requires:
             - release-s3
 

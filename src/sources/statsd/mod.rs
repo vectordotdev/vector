@@ -25,7 +25,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        Ok(statsd(self.address.clone(), out))
+        Ok(statsd(self.address, out))
     }
 
     fn output_type(&self) -> crate::topology::config::DataType {
@@ -79,6 +79,16 @@ mod test {
     use futures::Stream;
     use std::{thread, time::Duration};
 
+    fn parse_count(lines: &Vec<&str>, prefix: &str) -> usize {
+        lines
+            .iter()
+            .find(|s| s.starts_with(prefix))
+            .map(|s| s.split_whitespace().nth(1).unwrap())
+            .unwrap()
+            .parse::<usize>()
+            .unwrap()
+    }
+
     #[test]
     fn test_statsd() {
         let in_addr = next_addr();
@@ -91,7 +101,7 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                buckets: vec![0.0, 10.0],
+                buckets: vec![1.0, 2.0, 4.0],
             },
         );
 
@@ -104,7 +114,10 @@ mod test {
 
         for _ in 0..100 {
             socket
-                .send_to(b"foo:1|c\nbar:42|g\nfoo:1|c\n", &in_addr)
+                .send_to(
+                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\n",
+                    &in_addr,
+                )
                 .unwrap();
             // Space things out slightly to try to avoid dropped packets
             thread::sleep(Duration::from_millis(1));
@@ -124,25 +137,29 @@ mod test {
             .lines()
             .collect::<Vec<_>>();
 
-        let foo = lines
-            .iter()
-            .find(|s| s.starts_with("foo "))
-            .map(|s| s.split_whitespace().nth(1).unwrap())
-            .unwrap()
-            .parse::<usize>()
-            .unwrap();
-        let bar = lines
-            .iter()
-            .find(|s| s.starts_with("bar "))
-            .map(|s| s.split_whitespace().nth(1).unwrap())
-            .unwrap()
-            .parse::<usize>()
-            .unwrap();
-
-        assert_eq!(42, bar);
+        let foo = parse_count(&lines, "foo");
         // packets get lost :(
         assert!(foo % 2 == 0);
         assert!(foo > 180);
+
+        let bar = parse_count(&lines, "bar");
+        assert_eq!(42, bar);
+
+        assert_eq!(parse_count(&lines, "glork_bucket{le=\"1\"}"), 0);
+        assert_eq!(parse_count(&lines, "glork_bucket{le=\"2\"}"), 0);
+        assert!(parse_count(&lines, "glork_bucket{le=\"4\"}") > 0);
+        assert!(parse_count(&lines, "glork_bucket{le=\"+Inf\"}") > 0);
+        let glork_sum = parse_count(&lines, "glork_sum");
+        let glork_count = parse_count(&lines, "glork_count");
+        assert_eq!(glork_count * 3, glork_sum);
+
+        assert_eq!(parse_count(&lines, "milliglork_bucket{le=\"1\"}"), 0);
+        assert_eq!(parse_count(&lines, "milliglork_bucket{le=\"2\"}"), 0);
+        assert!(parse_count(&lines, "milliglork_bucket{le=\"4\"}") > 0);
+        assert!(parse_count(&lines, "milliglork_bucket{le=\"+Inf\"}") > 0);
+        let milliglork_sum = parse_count(&lines, "milliglork_sum");
+        let milliglork_count = parse_count(&lines, "milliglork_count");
+        assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Shut down server
         block_on(topology.stop()).unwrap();

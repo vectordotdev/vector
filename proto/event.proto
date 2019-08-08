@@ -37,18 +37,18 @@ message Metric {
 
 message Counter {
   string name = 1;
-  float val = 2;
+  double val = 2;
 }
 
 message Histogram {
   string name = 1;
-  float val = 2;
+  double val = 2;
   uint32 sample_rate = 3;
 }
 
 message Gauge {
   string name = 1;
-  float val = 2;
+  double val = 2;
   enum Direction {
     None = 0;
     Plus = 1;
