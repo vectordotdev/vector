@@ -195,12 +195,6 @@ impl JavaScript {
 
     pub fn process(&self, output: &mut Vec<Event>, event: Event) -> Result<(), String> {
         let encoded = encode(event)?;
-        println!("encoded: {}", encoded);
-        // println!(
-        //     r"__vector_encode({}(__vector_decode({})))",
-        //     self.handler,
-        //     serde_json::to_string(&encoded).unwrap(),
-        // );
         let transformed: String = self
             .ctx
             .eval_as(&format!(
@@ -209,7 +203,6 @@ impl JavaScript {
                 serde_json::to_string(&encoded).unwrap(),
             ))
             .map_err(|err| format!("Runtime error in JavaScript code: {}", err))?;
-        println!("transformed: {}", transformed);
         decode_and_write(&transformed, output)?;
         Ok(())
     }
@@ -321,7 +314,7 @@ impl Transform for JavaScript {
 
     fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
         self.process(output, event).unwrap_or_else(|err| {
-            println!("Error in JavaScript transform; discarding event\n{}", err)
+            error!("Error in JavaScript transform; discarding event\n{}", err)
         });
     }
 }
