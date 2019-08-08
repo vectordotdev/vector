@@ -16,6 +16,7 @@ mod batch;
 mod buffering;
 mod event;
 mod http;
+mod javascript;
 mod lua;
 
 criterion_group!(
@@ -36,6 +37,7 @@ criterion_main!(
     http::http,
     batch::batch,
     lua::lua,
+    javascript::javascript,
     event::event
 );
 
