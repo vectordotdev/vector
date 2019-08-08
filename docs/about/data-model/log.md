@@ -132,9 +132,9 @@ Vector will represent this data internally as a log event:
 {% code-tabs-item title="internal LogEvent" %}
 ```rust
 LogEvent {
-    "array.0": "item1",
-    "array.1": "item2",
-    "array.2": "item3"
+    "array[0]": "item1",
+    "array[1]": "item2",
+    "array[2]": "item3"
 }
 ```
 {% endcode-tabs-item %}
@@ -156,6 +156,32 @@ back into it's original structure:
 This normalizes the event structure and simplifies data processing throughout
 the Vector pipeline. This not only helps with performance, but it helps to
 avoid type human error when configuring Vector.
+
+If vector receives flattened array items that contain a missing index during the 
+unflatten process it will insert `null` values. For example:
+
+{% code-tabs %}
+{% code-tabs-item title="internal LogEvent" %}
+```rust
+LogEvent {
+    "array[0]": "item1",
+    "array[2]": "item3"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The output will contain a `null` value for `array[1]` like so:
+
+{% code-tabs %}
+{% code-tabs-item title="output" %}
+```javascript
+{
+    "array": ["item1", null, "item3"]
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 ### Special Characters
 
