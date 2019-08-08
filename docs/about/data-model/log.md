@@ -82,9 +82,9 @@ For example, if Vector ingests the following JSON data:
 Vector will represent this data internally as a `LogEvent`:
 
 {% code-tabs %}
-{% code-tabs-item title="internal LogEvent" %}
-```rust
-LogEvent {
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
     "parent.child": "..."
 }
 ```
@@ -131,9 +131,9 @@ For example, if Vector ingests the following data:
 Vector will represent this data internally as a log event:
 
 {% code-tabs %}
-{% code-tabs-item title="internal LogEvent" %}
-```rust
-LogEvent {
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
     "array[0]": "item1",
     "array[1]": "item2",
     "array[2]": "item3"
@@ -163,9 +163,9 @@ If vector receives flattened array items that contain a missing index during the
 unflatten process it will insert `null` values. For example:
 
 {% code-tabs %}
-{% code-tabs-item title="internal LogEvent" %}
-```rust
-LogEvent {
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
     "array[0]": "item1",
     "array[2]": "item3"
 }

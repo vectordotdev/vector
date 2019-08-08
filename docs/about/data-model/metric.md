@@ -66,12 +66,25 @@ message Set {
 }
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="example" %}
+{% code-tabs-item title="counter example" %}
 ```javascript
 {
   "counter": {
     "name": "login.count",
-    "val": 2.0
+    "val": 2.0,
+    "timestamp": "2019-05-02T12:44:21.433184Z" // optional
+  }
+}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="histogram example" %}
+```javascript
+{
+  "histogram": {
+    "name": "duration_ms",
+    "val": 2.0,
+    "sample_rate": 1,
+    "timestamp": "2019-05-02T12:44:21.433184Z" // optional
   }
 }
 ```
@@ -88,130 +101,56 @@ A vector metric must be one of the following types: `Counter`, `Histogram`,
 
 ### Counter
 
-A counter is a single value that can _only_ be incremented, it cannot be
-decremented. For example:
+A `counter` is a single value that can _only_ be incremented, it cannot be
+decremented. Your downstream metrics [sink][docs.sinks] will receive this value
+and aggregate appropriately.
 
-{% code-tabs %}
-{% code-tabs-item title="example" %}
-```javascript
-{
-  "counter": {
-    "name": "login.invocations",
-    "val": 2.0
-  }
-}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="schema" %}
-```javascript
-{
-  "counter": {
-    "name": <string>,
-    "val": <float> // 32 bit
-  }
-}
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-Your downstream metrics [sink][docs.sinks] will receive this value and
-increment appropriately.
+| Name        | Type        | Description                       |
+|:------------|:------------|:----------------------------------|
+| `name`      | `string`    | Counter metric name.              |
+| `val`       | `double`    | Amount to increment.              |
+| `timestamp` | `timestamp` | Time metric was created/ingested. |
 
 ### Histogram
 
-Also called a "timer". A histogram represents the frequency distribution of a
+Also called a "timer". A `histogram` represents the frequency distribution of a
 value. This is commonly used for timings, helping to understand quantiles, max,
 min, and other aggregations.
-
-{% code-tabs %}
-{% code-tabs-item title="example" %}
-```javascript
-{
-  "histogram": {
-    "name": "memory_rss",
-    "val": 201.0,
-    "sample_rate": 1
-  }
-}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="schema" %}
-```javascript
-{
-  "histogram": {
-    "name": "<string>",
-    "val": <float> // 32 bit,
-    "sample_rate": <int> // 32 bit
-  }
-}
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
 
 Depending on the downstream service Vector will aggregate histograms internally
 (such is the case for the [`prometheus` sink][docs.prometheus_sink]) or forward
 them immediately to the service for aggregation.
 
+| Name          | Type        | Description                                      |
+|:--------------|:------------|:-------------------------------------------------|
+| `name`        | `string`    | Histogram metric name.                           |
+| `val`         | `double`    | Specific value.                                  |
+| `sample_rate` | `int`       | The bucket/distribution the metric is a part of. |
+| `timestamp`   | `timestamp` | Time metric was created/ingested.                |
+
 ### Gauge
 
 A gauge represents a point-in-time value that can increase and decrease.
-Vector's internal gauge type represents changes to that value:
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage.
 
-{% code-tabs %}
-{% code-tabs-item title="example" %}
-```javascript
-{
-  "gauge": {
-    "name": "memory_rss",
-    "val": 222443.0,
-    "direction": "plus"
-  }
-}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="schema" %}
-```javascript
-{
-  "gauge": {
-    "name": "<string>",
-    "val": <float> // 32 bit,
-    "direction": {"plus"|"minus"}
-  }
-}
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
-
-Gauges should be used to track fluctuations in values, like current memory or
-CPU usage.
+| Name        | Type        | Description                                                                   |
+|:------------|:------------|:------------------------------------------------------------------------------|
+| `name`      | `string`    | Histogram metric name.                                                        |
+| `val`       | `double`    | Specific value.                                                               |
+| `direction` | `string`    | The value direction. If it should increase or descrease the aggregated value. |
+| `timestamp` | `timestamp` | Time metric was created/ingested.                                             |
 
 ### Set
 
 A set represents a count of unique values. The `val` attribute below represents
 that unique value.
 
-{% code-tabs %}
-{% code-tabs-item title="example" %}
-```javascript
-{
-  "set": {
-    "name": "memory_rss",
-    "val": "my_unique_value"
-  }
-}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="schema" %}
-```javascript
-{
-  "set": {
-    "name": "<string>",
-    "val": "<string>"
-  }
-}
-```
-{% endcode-tabs-item %}
-{% endcode-tabs %}
+| Name        | Type        | Description                       |
+|:------------|:------------|:----------------------------------|
+| `name`      | `string`    | Set metric name.                  |
+| `val`       | `string`    | Specific value.                   |
+| `timestamp` | `timestamp` | Time metric was created/ingested. |
 
 
 [docs.configuration]: ../../usage/configuration
