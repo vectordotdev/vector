@@ -88,6 +88,7 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<String, ()>
 mod test {
     use super::encode_event;
     use crate::{event::Metric, Event};
+    use chrono::{offset::TimeZone, Utc};
 
     #[test]
     fn encodes_raw_logs() {
@@ -96,13 +97,28 @@ mod test {
     }
 
     #[test]
-    fn encodes_metrics() {
+    fn encodes_counter() {
         let event = Event::Metric(Metric::Counter {
             name: "foos".into(),
             val: 100.0,
+            timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
         });
         assert_eq!(
-            Ok(r#"{"type":"counter","name":"foos","val":100.0}"#.to_string()),
+            Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z"}"#.to_string()),
+            encode_event(event, &None)
+        );
+    }
+
+    #[test]
+    fn encodes_histogram_without_timestamp() {
+        let event = Event::Metric(Metric::Histogram {
+            name: "glork".into(),
+            val: 10.0,
+            sample_rate: 1,
+            timestamp: None,
+        });
+        assert_eq!(
+            Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null}"#.to_string()),
             encode_event(event, &None)
         );
     }
