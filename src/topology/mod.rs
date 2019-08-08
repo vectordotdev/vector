@@ -1303,5 +1303,20 @@ mod tests {
             let received = block_on(receive).unwrap();
             assert_matches!(received, Either::A(_));
         }
+
+        // disable healthcheck
+        {
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
+            config.sinks["out"].healthcheck = false;
+
+            topology.reload_config_and_respawn(config.clone(), &mut rt, false);
+
+            let receive = receive_one(&out1_addr, &out2_addr);
+
+            block_on(send_lines(in_addr, vec!["hello".to_string()].into_iter())).unwrap();
+
+            let received = block_on(receive).unwrap();
+            assert_matches!(received, Either::A(_));
+        }
     }
 }

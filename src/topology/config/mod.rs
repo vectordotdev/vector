@@ -53,6 +53,8 @@ pub trait SourceConfig: core::fmt::Debug {
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
+    #[serde(default = "healthcheck_default")]
+    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<SinkConfig>,
@@ -103,6 +105,7 @@ impl Config {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
             buffer: Default::default(),
+            healthcheck: true,
             inner: Box::new(sink),
             inputs,
         };
@@ -161,4 +164,8 @@ impl Clone for Config {
         let json = serde_json::to_vec(self).unwrap();
         serde_json::from_slice(&json[..]).unwrap()
     }
+}
+
+fn healthcheck_default() -> bool {
+    true
 }

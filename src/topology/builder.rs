@@ -1,6 +1,10 @@
 use super::fanout::{self, Fanout};
 use crate::{buffers, topology::config::GlobalOptions};
-use futures::{sync::mpsc, Future, Stream};
+use futures::{
+    future::{lazy, Either},
+    sync::mpsc,
+    Future, Stream,
+};
 use std::{collections::HashMap, time::Duration};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::util::FutureExt;
@@ -92,6 +96,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     // Build sinks
     for (name, sink) in &config.sinks {
         let sink_inputs = &sink.inputs;
+        let enable_healthcheck = sink.healthcheck;
 
         let buffer = sink.buffer.build(&config.data_dir, &name);
         let (tx, rx, acker) = match buffer {
@@ -113,15 +118,24 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let task = rx.forward(sink).map(|_| ());
         let task: Task = Box::new(task);
 
-        let healthcheck_task = healthcheck
-            .timeout(Duration::from_secs(10))
-            .map(move |_| info!("Healthcheck: Passed."))
-            .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
-        let healthcheck_span = info_span!("healthcheck", name = name.as_str());
-        let healthcheck_task: Task = Box::new(healthcheck_task.instrument(healthcheck_span));
+        let healthcheck_task = if enable_healthcheck {
+            let healthcheck_task = healthcheck
+                // TODO: Add healthcheck timeouts per sink
+                .timeout(Duration::from_secs(10))
+                .map(move |_| info!("Healthcheck: Passed."))
+                .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
+            Either::A(healthcheck_task)
+        } else {
+            Either::B(lazy(|| {
+                info!("Healthcheck: Disabled.");
+                Ok(())
+            }))
+        };
+        let healthcheck_fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static> =
+            Box::new(healthcheck_task.instrument(info_span!("healthcheck", %name)));
 
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
-        healthchecks.insert(name.clone(), healthcheck_task);
+        healthchecks.insert(name.clone(), healthcheck_fut);
         tasks.insert(name.clone(), task);
     }
 
