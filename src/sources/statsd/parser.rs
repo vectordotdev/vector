@@ -39,6 +39,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             Metric::Counter {
                 name: sanitize_key(key),
                 val: val * sample_rate,
+                timestamp: None,
             }
         }
         unit @ "h" | unit @ "ms" => {
@@ -52,6 +53,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 name: sanitize_key(key),
                 val: convert_to_base_units(unit, val),
                 sample_rate: sample_rate as u32,
+                timestamp: None,
             }
         }
         "g" => Metric::Gauge {
@@ -67,10 +69,12 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 parts[0][1..].parse()?
             },
             direction: parse_direction(parts[0])?,
+            timestamp: None,
         },
         "s" => Metric::Set {
             name: sanitize_key(key),
             val: parts[0].into(),
+            timestamp: None,
         },
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };
@@ -169,6 +173,7 @@ mod test {
             Ok(Metric::Counter {
                 name: "foo".into(),
                 val: 1.0,
+                timestamp: None,
             }),
         );
     }
@@ -180,6 +185,7 @@ mod test {
             Ok(Metric::Counter {
                 name: "bar".into(),
                 val: 20.0,
+                timestamp: None,
             }),
         );
     }
@@ -191,6 +197,7 @@ mod test {
             Ok(Metric::Counter {
                 name: "bar".into(),
                 val: 2.0,
+                timestamp: None,
             }),
         );
     }
@@ -202,7 +209,8 @@ mod test {
             Ok(Metric::Histogram {
                 name: "glork".into(),
                 val: 0.320,
-                sample_rate: 10
+                sample_rate: 10,
+                timestamp: None,
             }),
         );
     }
@@ -214,7 +222,8 @@ mod test {
             Ok(Metric::Histogram {
                 name: "glork".into(),
                 val: 320.0,
-                sample_rate: 10
+                sample_rate: 10,
+                timestamp: None,
             }),
         );
     }
@@ -226,7 +235,8 @@ mod test {
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
                 val: 333.0,
-                direction: None
+                direction: None,
+                timestamp: None,
             }),
         );
     }
@@ -238,7 +248,8 @@ mod test {
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
                 val: 4.0,
-                direction: Some(Direction::Minus)
+                direction: Some(Direction::Minus),
+                timestamp: None,
             }),
         );
         assert_eq!(
@@ -246,7 +257,8 @@ mod test {
             Ok(Metric::Gauge {
                 name: "gaugor".into(),
                 val: 10.0,
-                direction: Some(Direction::Plus)
+                direction: Some(Direction::Plus),
+                timestamp: None,
             }),
         );
     }
@@ -258,6 +270,7 @@ mod test {
             Ok(Metric::Set {
                 name: "uniques".into(),
                 val: "765".into(),
+                timestamp: None,
             }),
         );
     }
