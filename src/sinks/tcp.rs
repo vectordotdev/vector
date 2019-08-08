@@ -38,6 +38,7 @@ pub enum Encoding {
 #[serde(rename_all = "snake_case")]
 pub struct TcpSinkTlsConfig {
     pub enabled: Option<bool>,
+    pub verify: Option<bool>,
 }
 
 impl TcpSinkConfig {
@@ -63,6 +64,7 @@ impl SinkConfig for TcpSinkConfig {
         let tls = match self.tls {
             Some(ref tls) => TcpSinkTls {
                 enabled: tls.enabled.unwrap_or(false),
+                verify: tls.verify.unwrap_or(true),
             },
             None => TcpSinkTls::default(),
         };
@@ -103,6 +105,7 @@ enum TcpSinkState {
 #[derive(Default)]
 pub struct TcpSinkTls {
     enabled: bool,
+    verify: bool,
 }
 
 impl TcpSink {
@@ -150,6 +153,7 @@ impl TcpSink {
                         match self.tls.enabled {
                             true => {
                                 let c = native_tls::TlsConnector::builder()
+                                    .danger_accept_invalid_certs(!self.tls.verify)
                                     .build()
                                     .expect("Could not build TLS connector?!?");
                                 TcpSinkState::TlsConnecting(

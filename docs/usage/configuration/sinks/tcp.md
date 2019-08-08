@@ -44,6 +44,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
   # OPTIONAL - Tls
   [sinks.my_tcp_sink_id.tls]
     enabled = false # default
+    verify = true # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -70,6 +71,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
   # OPTIONAL - Tls
   [sinks.<sink-id>.tls]
     enabled = <bool>
+    verify = <bool>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -164,6 +166,14 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # * optional
     # * default: false
     enabled = false
+
+    # If `true`, Vector will force certificate validation.
+    # Do NOT set this to `false` unless you know the risks of not verifying
+    # the remote certificate.
+    #
+    # * optional
+    # * default: true
+    verify = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -187,6 +197,9 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Tls | | |
 | `tls.enabled` | `bool` | Enable TLS during connections to the remote.<br />`default: false` |
+| `tls.verify` | `bool` | If `true`, Vector will force certificate validation.
+Do NOT set this to `false` unless you know the risks of not verifying
+the remote certificate.<br />`default: true` |
 
 ## How It Works
 
