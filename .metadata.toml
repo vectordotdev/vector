@@ -1366,6 +1366,17 @@ The encoding format used to serialize the events before flushing. The default \
 is dynamic based on if the event is structured or not.\
 """
 
+[sinks.tcp.options.tls]
+type = "table"
+null = true
+description = "Options for TLS support"
+
+[sinks.tcp.options.tls.options.enabled]
+type = "bool"
+null = true
+default = false
+description = "Enable TLS during connections to the remote."
+
 # ------------------------------------------------------------------------------
 # sinks.vector
 # ------------------------------------------------------------------------------

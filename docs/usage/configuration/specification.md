@@ -2188,6 +2188,17 @@ end
     # * unit: events
     num_items = 500
 
+  #
+  # Tls
+  #
+
+  [sinks.tcp.tls]
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    enabled = false
+
 [sinks.vector]
   #
   # General
