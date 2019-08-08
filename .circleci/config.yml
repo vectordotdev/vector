@@ -528,7 +528,6 @@ workflows:
           <<: *require-builds
       # Installs directly from S3
       - release-docker:
-          <<: *tag-workflow-filters
           requires:
             - release-s3
 
