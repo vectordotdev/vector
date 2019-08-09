@@ -183,7 +183,11 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
     let metric_data: Vec<_> = events
         .into_iter()
         .filter_map(|event| match event.as_metric() {
-            Metric::Counter { name, val } => Some(MetricDatum {
+            Metric::Counter {
+                name,
+                val,
+                timestamp: _,
+            } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 value: Some(*val as f64),
                 ..Default::default()
@@ -192,6 +196,7 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
                 name,
                 val,
                 direction: None,
+                timestamp: _,
             } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 value: Some(*val as f64),
@@ -201,6 +206,7 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
                 name,
                 val,
                 sample_rate,
+                timestamp: _,
             } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 values: Some(vec![*val as f64]),
@@ -233,10 +239,12 @@ mod tests {
             Event::Metric(Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
+                timestamp: None,
             }),
             Event::Metric(Metric::Counter {
                 name: "bytes_out".into(),
                 val: 2.5,
+                timestamp: None,
             }),
         ];
 
@@ -268,6 +276,7 @@ mod tests {
             name: "temperature".into(),
             val: 10.0,
             direction: None,
+            timestamp: None,
         })];
 
         assert_eq!(
@@ -291,6 +300,7 @@ mod tests {
             name: "latency".into(),
             val: 11.0,
             sample_rate: 100,
+            timestamp: None,
         })];
 
         assert_eq!(
@@ -343,7 +353,8 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric::Counter {
                 name: format!("counter-{}", counter_name),
-                val: i as f32,
+                val: i as f64,
+                timestamp: None,
             });
             events.push(event);
         }
@@ -352,8 +363,9 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", gauge_name),
-                val: i as f32,
+                val: i as f64,
                 direction: None,
+                timestamp: None,
             });
             events.push(event);
         }
@@ -362,8 +374,9 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric::Histogram {
                 name: format!("histogram-{}", histogram_name),
-                val: i as f32,
+                val: i as f64,
                 sample_rate: 100,
+                timestamp: None,
             });
             events.push(event);
         }
