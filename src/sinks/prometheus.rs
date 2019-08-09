@@ -10,7 +10,11 @@ use hyper::{
 };
 use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::Arc,
+};
 use stream_cancel::{Trigger, Tripwire};
 use tracing::field;
 
@@ -56,6 +60,7 @@ struct PrometheusSink {
     counters: HashMap<String, prometheus::Counter>,
     gauges: HashMap<String, prometheus::Gauge>,
     histograms: HashMap<String, prometheus::Histogram>,
+    sets: HashMap<String, (prometheus::IntCounter, HashSet<String>)>,
     acker: Acker,
 }
 
@@ -99,6 +104,7 @@ impl PrometheusSink {
             counters: HashMap::new(),
             gauges: HashMap::new(),
             histograms: HashMap::new(),
+            sets: HashMap::new(),
             acker,
         }
     }
@@ -141,6 +147,25 @@ impl PrometheusSink {
             };
             f(&hist);
             self.histograms.insert(name, hist);
+        }
+    }
+
+    /// Calls f with entry corresponding to name. Creates entry if needed.
+    fn with_set(
+        &mut self,
+        name: String,
+        f: impl FnOnce(&mut (prometheus::IntCounter, HashSet<String>)),
+    ) {
+        if let Some(set) = self.sets.get_mut(&name) {
+            f(set);
+        } else {
+            let counter = prometheus::IntCounter::new(name.clone(), name.clone()).unwrap();
+            if let Err(e) = self.registry.register(Box::new(counter.clone())) {
+                error!("Error registering Prometheus counter for set: {}", e);
+            };
+            let mut set = (counter, HashSet::new());
+            f(&mut set);
+            self.sets.insert(name, set);
         }
     }
 
@@ -205,8 +230,14 @@ impl Sink for PrometheusSink {
                     hist.observe(val);
                 }
             }),
-            Metric::Set { .. } => {
-                trace!("Sets are not supported in Prometheus sink");
+            Metric::Set { name, val } => {
+                // Sets are implemented using promethius integer counters.
+                self.with_set(name, move |&mut (ref mut counter, ref mut set)| {
+                    if set.insert(val) {
+                        // Val is a new unique value, therefor counter should be incremented.
+                        counter.inc_by(1);
+                    }
+                })
             }
         }
 
