@@ -893,6 +893,7 @@ mod tests {
 
     #[test]
     fn topology_replace_source_transform_and_sink() {
+        crate::test_util::trace_init();
         let mut rt = runtime();
 
         let in_addr1 = next_addr();
@@ -936,6 +937,7 @@ mod tests {
         );
 
         topology.reload_config_and_respawn(new_config, &mut rt, false);
+        std::thread::sleep(std::time::Duration::from_millis(500));
 
         let output_lines2 = receive(&out_addr2);
         let input_lines2 = random_lines(100).take(1).collect::<Vec<_>>();
