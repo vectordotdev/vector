@@ -68,8 +68,12 @@ class Metadata
     transforms_list = @transforms.to_h.values
     transforms_list.each do |transform|
       alternatives = transforms_list.select do |alternative|
-        function_diff = alternative.function_categories - transform.function_categories
-        alternative != transform && function_diff != alternative.function_categories
+        if transform.function_categories != ["convert_types"] && alternative.function_categories.include?("program")
+          true
+        else
+          function_diff = alternative.function_categories - transform.function_categories
+          alternative != transform && function_diff != alternative.function_categories
+        end
       end
 
       transform.alternatives = alternatives.sort

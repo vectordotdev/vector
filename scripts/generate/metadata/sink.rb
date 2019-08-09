@@ -1,15 +1,15 @@
 #encoding: utf-8
 
 require_relative "component"
-require_relative "example"
 
 class Sink < Component
   EGRESS_METHODS = ["batching", "exposing", "streaming"]
 
-  attr_reader :delivery_guarantee,
+  attr_reader :buffer,
+    :delivery_guarantee,
     :egress_method,
     :input_types,
-    :examples,
+    :healthcheck,
     :service_limits_short_link,
     :service_provider,
     :write_to_description
@@ -18,8 +18,10 @@ class Sink < Component
     @type = "sink"
     super(hash)
 
+    @buffer = hash.fetch("buffer")
     @delivery_guarantee = hash.fetch("delivery_guarantee")
     @egress_method = hash.fetch("egress_method")
+    @healthcheck = hash.fetch("healthcheck")
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
@@ -37,10 +39,20 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
+    # Healthcheck option
+
+    @options.healthcheck = Option.new({
+      "name" => "healthcheck",
+      "default" => true,
+      "description" => "Enables/disables the sink healthcheck upon start.",
+      "null" => false,
+      "type" => "bool"
+    })
+
     # Hostname option
 
     if service_provider == "AWS"
-      buffer_option = Option.new({
+      @options.hostname = Option.new({
         "name" => "hostname",
         "examples" => ["127.0.0.0:5000"],
         "default" => "<aws-service-hostname>",
@@ -50,58 +62,54 @@ class Sink < Component
       })
     end
 
-    # Buffer options
+    if buffer?
+      # Buffer options
 
-    buffer_options = {}
+      buffer_options = {}
 
-    buffer_options["type"] = {
-      "description" => "The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.",
-      "enum" => ["memory", "disk"],
-      "default" => "memory",
-      "null" => false,
-      "type" => "string"
-    }
+      buffer_options["type"] = {
+        "description" => "The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.",
+        "enum" => ["memory", "disk"],
+        "default" => "memory",
+        "null" => false,
+        "type" => "string"
+      }
 
-    buffer_options["when_full"] = {
-      "description" => "The behavior when the buffer becomes full.",
-      "enum" => ["block", "drop_newest"],
-      "default" => "block",
-      "null" => false,
-      "type" => "string"
-    }
+      buffer_options["when_full"] = {
+        "description" => "The behavior when the buffer becomes full.",
+        "enum" => ["block", "drop_newest"],
+        "default" => "block",
+        "null" => false,
+        "type" => "string"
+      }
 
-    buffer_options["max_size"] = {
-      "description" => "The maximum size of the buffer on the disk.",
-      "examples" => [104900000],
-      "null" => true,
-      "relevant_when" => {"type" => "disk"},
-      "type" => "int",
-      "unit" => "bytes"
-    }
+      buffer_options["max_size"] = {
+        "description" => "The maximum size of the buffer on the disk.",
+        "examples" => [104900000],
+        "null" => true,
+        "relevant_when" => {"type" => "disk"},
+        "type" => "int",
+        "unit" => "bytes"
+      }
 
-    buffer_options["num_items"] = {
-      "description" => "The maximum number of [events][docs.event] allowed in the buffer.",
-      "default" => 500,
-      "null" => true,
-      "relevant_when" => {"type" => "memory"},
-      "type" => "int",
-      "unit" => "events"
-    }
+      buffer_options["num_items"] = {
+        "description" => "The maximum number of [events][docs.event] allowed in the buffer.",
+        "default" => 500,
+        "null" => true,
+        "relevant_when" => {"type" => "memory"},
+        "type" => "int",
+        "unit" => "events"
+      }
 
-    buffer_option = Option.new({
-      "name" => "buffer",
-      "description" => "Configures the sink specific buffer.",
-      "options" => buffer_options,
-      "null" => true,
-      "type" => "table"
-    })
+      buffer_option = Option.new({
+        "name" => "buffer",
+        "description" => "Configures the sink specific buffer.",
+        "options" => buffer_options,
+        "null" => true,
+        "type" => "table"
+      })
 
-    @options.buffer = buffer_option
-
-    # examples
-
-    @examples = (hash["examples"] || []).collect do |example_hash|
-      Example.new(example_hash)
+      @options.buffer = buffer_option
     end
 
     # resources
@@ -115,8 +123,16 @@ class Sink < Component
     egress_method == "batching"
   end
 
+  def buffer?
+    buffer == true
+  end
+
   def exposing?
     egress_method == "exposing"
+  end
+
+  def healthcheck?
+    healthcheck == true
   end
 
   def plural_write_verb

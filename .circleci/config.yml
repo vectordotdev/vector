@@ -63,7 +63,7 @@ jobs:
           RUST_BACKTRACE: full
           AWS_ACCESS_KEY_ID: "fake-aws-key"
           AWS_SECRET_ACCESS_KEY: "fake-aws-key"
-      - image: localstack/localstack:latest
+      - image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
         environment:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
@@ -105,27 +105,30 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            export FEATURES="jemallocator"
+            export STRIP=false
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
             - "*-armv7-unknown-linux-gnueabihf.tar.gz"
 
-  build-armv7-unknown-linux-musleabihf-archive:
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-armv7-unknown-linux-musleabihf.tar.gz"
+  # build-armv7-unknown-linux-musleabihf-archive:
+  #   docker:
+  #     - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
+  #   resource_class: xlarge
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: Build archive
+  #         command: |
+  #           export VERSION=$(make version)
+  #           export FEATURES="jemallocator"
+  #           make build-archive 
+  #     - persist_to_workspace:
+  #         root: target/artifacts
+  #         paths:
+  #           - "*-armv7-unknown-linux-musleabihf.tar.gz"
 
   build-x86_64-apple-darwin-archive:
     resource_class: large
@@ -183,7 +186,10 @@ jobs:
           name: Build archive
           command: |
             export VERSION=$(make version)
-            make build-archive FEATURES="jemallocator"
+            export RUST_LTO="lto"
+            export FEATURES="jemallocator leveldb rdkafka rdkafka/cmake_build"
+            export TARGET="x86_64-unknown-linux-musl"
+            make build-archive
       - persist_to_workspace:
           root: target/artifacts
           paths:
@@ -436,42 +442,35 @@ test-filters: &test-filters
     branches:
       only: /.*/
     tags:
-      only: /.*/
+      ignore: /.*/
 
-release-workflow-filters: &release-workflow-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      only: /v.*/
-
-tag-release-workflow-filters: &tag-release-workflow-filters
+tag-workflow-filters: &tag-workflow-filters
   filters:
     branches:
       ignore: /.*/
     tags:
       only: /v.*/
 
-build-requires: &build-requires
+require-checks-and-tests: &require-checks-and-tests
   requires:
     - check-code
     - check-fmt
     - check-generate
     - test-stable
 
-package-requires: &package-requires
+require-builds: &require-builds
   requires:
     - build-armv7-unknown-linux-gnueabihf-archive
-    - build-armv7-unknown-linux-musleabihf-archive
+    # - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
 
-verify-requires: &verify-requires
+require-packages: &require-packages
   requires:
     - package-rpm
 
-release-requires: &release-requires
+require-verifies: &require-verifies
   requires:
     - verify-amazon-linux-1
     - verify-amazon-linux-2
@@ -490,7 +489,7 @@ release-requires: &release-requires
 workflows:
   version: 2
 
-  build:
+  test:
     jobs:
       - check-code:
           <<: *test-filters
@@ -500,70 +499,112 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - check-code
+      - check-fmt
+      - check-generate
+      - test-stable
       - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
-      - build-armv7-unknown-linux-musleabihf-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
+      # - build-armv7-unknown-linux-musleabihf-archive:
+      #     <<: *tag-workflow-filters
+      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
+          <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
-          <<: *release-workflow-filters
-          <<: *build-requires
-      - package-rpm:
-          <<: *release-workflow-filters
-          <<: *package-requires
-      - verify-amazon-linux-1:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-amazon-linux-2:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-centos-7:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-8:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-9:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-deb-10:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-16-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-18-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - verify-ubuntu-19-04:
-          <<: *release-workflow-filters
-          <<: *verify-requires
-      - release-deb:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
-      - release-github:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
-      - release-rpm:
-          <<: *tag-release-workflow-filters
-          <<: *release-requires
+          <<: *require-checks-and-tests
       - release-s3:
-          <<: *release-workflow-filters
-          <<: *release-requires
+          <<: *require-builds
       # Installs directly from S3
       - release-docker:
-          <<: *tag-release-workflow-filters
+          requires:
+            - release-s3
+
+  tag:
+    jobs:
+      - check-code:
+          <<: *tag-workflow-filters
+      - check-fmt:
+          <<: *tag-workflow-filters
+      - check-generate:
+          <<: *tag-workflow-filters
+      - test-stable:
+          <<: *tag-workflow-filters
+      - build-armv7-unknown-linux-gnueabihf-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      # - build-armv7-unknown-linux-musleabihf-archive:
+      #     <<: *tag-workflow-filters
+      #     <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-gnu-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-musl-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - build-x86_64-apple-darwin-archive:
+          <<: *tag-workflow-filters
+          <<: *require-checks-and-tests
+      - package-rpm:
+          <<: *tag-workflow-filters
+          <<: *require-builds
+      - verify-amazon-linux-1:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-amazon-linux-2:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-centos-7:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-8:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-9:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-deb-10:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-16-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-18-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - verify-ubuntu-19-04:
+          <<: *tag-workflow-filters
+          <<: *require-packages
+      - release-deb:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-github:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-rpm:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      - release-s3:
+          <<: *tag-workflow-filters
+          <<: *require-verifies
+      # Installs directly from S3
+      - release-docker:
+          <<: *tag-workflow-filters
           requires:
             - release-s3
       # Installs directly from S3
       - release-homebrew:
-          <<: *tag-release-workflow-filters
+          <<: *tag-workflow-filters
           requires:
             - release-s3

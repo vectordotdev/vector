@@ -58,7 +58,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
     }
 
     fn event(&self, event: &Event) {
-        if event.fields().any(|f| f.name() == "rate_limit") {
+        if event.fields().any(|f| f.name() == "rate_limit_secs") {
             let mut limit_visitor = LimitVisitor::default();
             event.record(&mut limit_visitor);
 
@@ -73,12 +73,37 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
                 let events = self.events.read().unwrap();
                 if let Some((count, start)) = events.get(&id) {
                     let local_count = count.fetch_add(1, Ordering::Relaxed);
+                    let start = start.load(Ordering::Relaxed);
 
-                    if ts - start.load(Ordering::Relaxed) < limit {
-                        // If we have seen this event more than once,
+                    if ts - start < limit {
+                        // If this log is being limited and we've seen it for
+                        // a second time within that window. We will log out that
+                        // we are now rate limiting this log.
+                        //
+                        // If we have seen this event more than twice,
                         // then lets early return to avoid passing this
                         // event to the inner subscriber.
-                        if local_count >= 1 {
+                        if local_count == 1 {
+                            let mut visitor = FmtVisitor::default();
+                            event.record(&mut visitor);
+
+                            let message = if let Some(message) = &visitor.message {
+                                &message
+                            } else {
+                                "unknown event"
+                            };
+
+                            let meta = event.metadata();
+
+                            println!(
+                                "{} {} Limiting the output of \"{}\" for the next {} seconds",
+                                FmtLevel(&tracing_core::Level::INFO),
+                                meta.target(),
+                                message,
+                                limit
+                            );
+                            return;
+                        } else if local_count > 1 {
                             return;
                         }
                     } else {
@@ -147,7 +172,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
 
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name() == "rate_limit" {
+        if field.name() == "rate_limit_secs" {
             self.limit = Some(value as usize);
         }
     }

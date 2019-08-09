@@ -17,7 +17,7 @@ use tracing::field;
 /// event notification is used by `FileServer`.
 ///
 /// `FileServer` is configured on a path to watch. The files do _not_ need to
-/// exist at cernan startup. `FileServer` will discover new files which match
+/// exist at startup. `FileServer` will discover new files which match
 /// its path in at most 60 seconds.
 pub struct FileServer {
     pub include: Vec<PathBuf>,
@@ -40,7 +40,7 @@ pub struct FileServer {
 /// versa but there's no one perfect approach. Very fast files _will_ be lost if
 /// your system aggressively rolls log files. `FileServer` will keep a file
 /// handler open but should your system move so quickly that a file disappears
-/// before cernan is able to open it the contents will be lost. This should be a
+/// before `FileServer` is able to open it the contents will be lost. This should be a
 /// rare occurence.
 ///
 /// Specific operating systems support evented interfaces that correct this
@@ -219,7 +219,10 @@ impl FileServer {
                 .wait()
             {
                 Ok((_, sink)) => chans = sink,
-                Err(_) => unreachable!("Output channel is closed"),
+                Err(_) => {
+                    debug!("Output channel closed.");
+                    return;
+                }
             }
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its

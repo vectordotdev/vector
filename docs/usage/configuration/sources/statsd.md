@@ -15,7 +15,7 @@ description: Ingests data through the StatsD UDP protocol and outputs `log` even
 ![][images.statsd_source]
 
 {% hint style="warning" %}
-The `statsd` sink is in beta. Please see the current
+The `statsd` source is in beta. Please see the current
 [enhancements][url.statsd_source_enhancements] and
 [bugs][url.statsd_source_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_statsd_source_issue]
@@ -29,7 +29,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[sources.my_statsd_source_id]
+[sources.my_source_id]
   type = "statsd" # must be: "statsd"
   address = "127.0.0.1:8126"
 ```
@@ -41,6 +41,23 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
   address = "<string>"
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[sources.statsd_source]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "statsd"
+  type = "statsd"
+
+  # UDP socket address to bind to.
+  # 
+  # * required
+  # * no default
+  address = "127.0.0.1:8126"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -48,7 +65,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`l
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "statsd"` |
+| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
 | `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## Examples
@@ -69,7 +86,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "counter": {
     "name": "login.invocations",
-    "val": 1
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -92,7 +110,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "gauge": {
     "name": "gas_tank",
-    "val": 0.5
+    "val": 0.5,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -115,7 +134,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "set": {
     "name": "unique_users",
-    "val": 1
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -138,7 +158,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "timer": {
     "name": "login.time",
-    "val": 22
+    "val": 22,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -164,6 +185,13 @@ will be replaced before being evaluated.
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
 
+### Timestamp
+
+You'll notice that each metric contains a `timestamp` field. This is an optional
+descriptive field that represents when the metric was received. It helps to
+more closely represent the metric's time in situations here it can be used. See
+the [metric][docs.metric_event] data model page for more info.
+
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
@@ -174,9 +202,10 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.statsd_source_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `statsd_source` issues][url.statsd_source_issues].
+2. If encountered a bug, please [file a bug report][url.new_statsd_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_statsd_source_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
@@ -186,15 +215,16 @@ issue, please:
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.metric_event]: ../../../about/data-model.md#metric
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.statsd_source]: ../../../assets/statsd-source.svg
-[url.community]: https://vector.dev/community
+[url.new_statsd_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd&labels=Type%3A+Bug
+[url.new_statsd_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd&labels=Type%3A+Enhancement
 [url.new_statsd_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
 [url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22
 [url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22
 [url.statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22
 [url.statsd_source_source]: https://github.com/timberio/vector/tree/master/src/sources/statsd/mod.rs
+[url.vector_chat]: https://chat.vector.dev

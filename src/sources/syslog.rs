@@ -1,7 +1,7 @@
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -53,7 +53,12 @@ impl SyslogConfig {
 
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
         match self.mode.clone() {
@@ -150,11 +155,7 @@ pub fn unix(
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
 
-        info!(
-            message = "listening.",
-            path = &field::debug(path),
-            r#type = "unix"
-        );
+        info!(message = "listening.", ?path, r#type = "unix");
 
         listener
             .incoming()

@@ -17,6 +17,19 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
+#[derive(Default)]
+pub struct GlobalOptions {
+    pub data_dir: Option<PathBuf>,
+}
+
+impl GlobalOptions {
+    pub fn from(config: &Config) -> Self {
+        Self {
+            data_dir: config.data_dir.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
     Any,
@@ -26,7 +39,12 @@ pub enum DataType {
 
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<sources::Source, String>;
+    fn build(
+        &self,
+        name: &str,
+        globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<sources::Source, String>;
 
     fn output_type(&self) -> DataType;
 }
@@ -35,6 +53,8 @@ pub trait SourceConfig: core::fmt::Debug {
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
+    #[serde(default = "healthcheck_default")]
+    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<SinkConfig>,
@@ -85,6 +105,7 @@ impl Config {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
             buffer: Default::default(),
+            healthcheck: true,
             inner: Box::new(sink),
             inputs,
         };
@@ -143,4 +164,8 @@ impl Clone for Config {
         let json = serde_json::to_vec(self).unwrap();
         serde_json::from_slice(&json[..]).unwrap()
     }
+}
+
+fn healthcheck_default() -> bool {
+    true
 }

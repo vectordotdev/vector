@@ -22,13 +22,13 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_coercer_transform_id]
+[transforms.my_transform_id]
   # REQUIRED - General
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
   
   # OPTIONAL - Types
-  [transforms.my_coercer_transform_id.types]
+  [transforms.my_transform_id.types]
     status = "int"
     duration = "float"
     success = "bool"
@@ -50,6 +50,48 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
     * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.coercer_transform]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "coercer"
+  type = "coercer"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Types
+  #
+
+  [transforms.coercer_transform.types]
+    # A definition of field type conversions. They key is the field name and the
+    # value is the type. `strftime` specifiers are supported for the `timestamp`
+    # type.
+    # 
+    # * required
+    # * no default
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -57,10 +99,10 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `enum: "coercer"` |
+| `type` | `string` | The component type<br />`required` `must be: "coercer"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -167,18 +209,17 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.coercer_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `coercer_transform` issues][url.coercer_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_coercer_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_coercer_transform_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`add_fields` transform][docs.add_fields_transform]
-* [`log_to_metric` transform][docs.log_to_metric_transform]
-* [`remove_fields` transform][docs.remove_fields_transform]
+* [`lua` transform][docs.lua_transform]
 
 ## Resources
 
@@ -186,13 +227,11 @@ Finally, consider the following alternatives:
 * [**Source code**][url.coercer_transform_source]
 
 
-[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model.md#log
-[docs.log_to_metric_transform]: ../../../usage/configuration/transforms/log_to_metric.md
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
@@ -201,6 +240,7 @@ Finally, consider the following alternatives:
 [url.coercer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+coercer%22+label%3A%22Type%3A+Enhancement%22
 [url.coercer_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+coercer%22
 [url.coercer_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/coercer.rs
-[url.community]: https://vector.dev/community
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.new_coercer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+coercer&labels=Type%3A+Bug
+[url.new_coercer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+coercer&labels=Type%3A+Enhancement
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[url.vector_chat]: https://chat.vector.dev

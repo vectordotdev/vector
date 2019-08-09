@@ -14,11 +14,19 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use stream_cancel::{Trigger, Tripwire};
 use tracing::field;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+    #[serde(default = "default_histogram_buckets")]
+    pub buckets: Vec<f64>,
+}
+
+pub fn default_histogram_buckets() -> Vec<f64> {
+    vec![
+        0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+    ]
 }
 
 pub fn default_address() -> SocketAddr {
@@ -30,7 +38,7 @@ pub fn default_address() -> SocketAddr {
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = Box::new(PrometheusSink::new(self.address, acker));
+        let sink = Box::new(PrometheusSink::new(self.clone(), acker));
         let healthcheck = Box::new(future::ok(()));
 
         Ok((sink, healthcheck))
@@ -44,9 +52,10 @@ impl SinkConfig for PrometheusSinkConfig {
 struct PrometheusSink {
     registry: Arc<Registry>,
     server_shutdown_trigger: Option<Trigger>,
-    address: SocketAddr,
+    config: PrometheusSinkConfig,
     counters: HashMap<String, prometheus::Counter>,
     gauges: HashMap<String, prometheus::Gauge>,
+    histograms: HashMap<String, prometheus::Histogram>,
     acker: Acker,
 }
 
@@ -82,13 +91,14 @@ fn handle(
 }
 
 impl PrometheusSink {
-    fn new(address: SocketAddr, acker: Acker) -> Self {
+    fn new(config: PrometheusSinkConfig, acker: Acker) -> Self {
         Self {
             registry: Arc::new(Registry::new()),
             server_shutdown_trigger: None,
-            address,
+            config,
             counters: HashMap::new(),
             gauges: HashMap::new(),
+            histograms: HashMap::new(),
             acker,
         }
     }
@@ -98,7 +108,9 @@ impl PrometheusSink {
             f(counter);
         } else {
             let counter = prometheus::Counter::new(name.clone(), name.clone()).unwrap();
-            self.registry.register(Box::new(counter.clone())).unwrap();
+            if let Err(e) = self.registry.register(Box::new(counter.clone())) {
+                error!("Error registering Prometheus counter: {}", e);
+            };
             f(&counter);
             self.counters.insert(name, counter);
         }
@@ -109,9 +121,26 @@ impl PrometheusSink {
             f(gauge);
         } else {
             let gauge = prometheus::Gauge::new(name.clone(), name.clone()).unwrap();
-            self.registry.register(Box::new(gauge.clone())).unwrap();
+            if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
+                error!("Error registering Prometheus gauge: {}", e);
+            };
             f(&gauge);
             self.gauges.insert(name.clone(), gauge);
+        }
+    }
+
+    fn with_histogram(&mut self, name: String, f: impl Fn(&prometheus::Histogram)) {
+        if let Some(hist) = self.histograms.get(&name) {
+            f(hist);
+        } else {
+            let buckets = self.config.buckets.clone();
+            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone()).buckets(buckets);
+            let hist = prometheus::Histogram::with_opts(opts).unwrap();
+            if let Err(e) = self.registry.register(Box::new(hist.clone())) {
+                error!("Error registering Prometheus histogram: {}", e);
+            };
+            f(&hist);
+            self.histograms.insert(name, hist);
         }
     }
 
@@ -136,7 +165,7 @@ impl PrometheusSink {
 
         let (trigger, tripwire) = Tripwire::new();
 
-        let server = Server::bind(&self.address)
+        let server = Server::bind(&self.config.address)
             .serve(new_service)
             .with_graceful_shutdown(tripwire)
             .map_err(|e| eprintln!("server error: {}", e));
@@ -157,23 +186,33 @@ impl Sink for PrometheusSink {
         self.start_server_if_needed();
 
         match event.into_metric() {
-            Metric::Counter { name, val } => {
-                self.with_counter(name, |counter| counter.inc_by(val as f64))
-            }
+            Metric::Counter {
+                name,
+                val,
+                timestamp: _,
+            } => self.with_counter(name, |counter| counter.inc_by(val)),
             Metric::Gauge {
                 name,
                 val,
                 direction,
-            } => self.with_gauge(name, |gauge| {
-                let val = val as f64;
-                match direction {
-                    None => gauge.set(val),
-                    Some(Direction::Plus) => gauge.add(val),
-                    Some(Direction::Minus) => gauge.sub(val),
+                timestamp: _,
+            } => self.with_gauge(name, |gauge| match direction {
+                None => gauge.set(val),
+                Some(Direction::Plus) => gauge.add(val),
+                Some(Direction::Minus) => gauge.sub(val),
+            }),
+            Metric::Histogram {
+                name,
+                val,
+                sample_rate,
+                timestamp: _,
+            } => self.with_histogram(name, |hist| {
+                for _ in 0..sample_rate {
+                    hist.observe(val);
                 }
             }),
-            _ => {
-                // TODO: support all the metric types
+            Metric::Set { .. } => {
+                trace!("Sets are not supported in Prometheus sink");
             }
         }
 

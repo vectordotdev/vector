@@ -1,7 +1,7 @@
 use super::util::TcpSource;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
@@ -43,7 +43,12 @@ impl TcpConfig {
 
 #[typetag::serde(name = "tcp")]
 impl SourceConfig for TcpConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
         let tcp = RawTcpSource {
             config: self.clone(),
         };
@@ -95,7 +100,7 @@ mod test {
     use super::TcpConfig;
     use crate::event;
     use crate::test_util::{block_on, next_addr, send_lines, wait_for_tcp};
-    use crate::topology::config::SourceConfig;
+    use crate::topology::config::{GlobalOptions, SourceConfig};
     use futures::sync::mpsc;
     use futures::Stream;
 
@@ -105,7 +110,9 @@ mod test {
 
         let addr = next_addr();
 
-        let server = TcpConfig::new(addr).build(tx).unwrap();
+        let server = TcpConfig::new(addr)
+            .build("default", &GlobalOptions::default(), tx)
+            .unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);
@@ -147,7 +154,9 @@ mod test {
         let mut config = TcpConfig::new(addr);
         config.max_length = 10;
 
-        let server = config.build(tx).unwrap();
+        let server = config
+            .build("default", &GlobalOptions::default(), tx)
+            .unwrap();
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         rt.spawn(server);
         wait_for_tcp(addr);

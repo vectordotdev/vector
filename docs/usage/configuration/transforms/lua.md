@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to transform events with a full
 ![][images.lua_transform]
 
 {% hint style="warning" %}
-The `lua` sink is in beta. Please see the current
+The `lua` transform is in beta. Please see the current
 [enhancements][url.lua_transform_enhancements] and
 [bugs][url.lua_transform_bugs] for known issues.
 We kindly ask that you [add any missing issues][url.new_lua_transform_issue]
@@ -29,7 +29,7 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
-[transforms.my_lua_transform_id]
+[transforms.my_transform_id]
   type = "lua" # must be: "lua"
   inputs = ["my-source-id"]
   source = """
@@ -57,6 +57,48 @@ end
   search_dirs = ["<string>", ...]
 ```
 {% endcode-tabs-item %}
+{% code-tabs-item title="vector.toml (specification)" %}
+```coffeescript
+[transforms.lua_transform]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "lua"
+  type = "lua"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The inline Lua source to evaluate.
+  # 
+  # * required
+  # * no default
+  source = """
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\n$", "")
+  event["host"] = hostname
+end
+"""
+
+
+  # A list of directories search when loading a Lua file via the `require`
+  # function.
+  # 
+  # * optional
+  # * no default
+  search_dirs = ["/etc/vector/lua"]
+```
+{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## Options
@@ -64,7 +106,7 @@ end
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `enum: "lua"` |
+| `type` | `string` | The component type<br />`required` `must be: "lua"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
@@ -101,11 +143,8 @@ event["parent.child"] = nil
 Drop an event entirely. Supply this as a the `source` value:
 
 ```lua
-# Remove root level field
-event["field"] = nil
-
-# Remove nested field
-event["parent.child"] = nil
+# Drop event entirely
+event = nil
 ```
 
 {% endtab %}
@@ -175,18 +214,17 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open sink issues][url.lua_transform_issues].
-2. [Search the forum][url.search_forum] for any similar issues.
-2. Reach out to the [community][url.community] for help.
+1. Check for any [open `lua_transform` issues][url.lua_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_lua_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_lua_transform_enhancement].
+4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`grok_parser` transform][docs.grok_parser_transform]
-* [`regex_parser` transform][docs.regex_parser_transform]
-* [`tokenizer` transform][docs.tokenizer_transform]
+* [`lua` transform][docs.lua_transform]
 
 ## Resources
 
@@ -197,18 +235,15 @@ Finally, consider the following alternatives:
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model.md
-[docs.default_schema]: ../../../about/data-model.md#default-schema
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.log_event]: ../../../about/data-model.md#log
+[docs.data_model]: ../../../about/data-model
+[docs.default_schema]: ../../../about/data-model/log.md#default-schema
+[docs.log_event]: ../../../about/data-model/log.md
+[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.lua_transform]: ../../../assets/lua-transform.svg
-[url.community]: https://vector.dev/community
 [url.lua]: https://www.lua.org/
 [url.lua_docs]: https://www.lua.org/manual/5.3/
 [url.lua_manual]: http://www.lua.org/manual/5.1/manual.html
@@ -219,5 +254,7 @@ Finally, consider the following alternatives:
 [url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+lua%22
 [url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
 [url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
+[url.new_lua_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua&labels=Type%3A+Bug
+[url.new_lua_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua&labels=Type%3A+Enhancement
 [url.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+lua
-[url.search_forum]: https://forum.vector.dev/search?expanded=true
+[url.vector_chat]: https://chat.vector.dev

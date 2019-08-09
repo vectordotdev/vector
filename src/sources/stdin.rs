@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, SourceConfig},
+    topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
@@ -34,7 +34,12 @@ fn default_max_length() -> usize {
 
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    fn build(&self, out: mpsc::Sender<Event>) -> Result<super::Source, String> {
+    fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        out: mpsc::Sender<Event>,
+    ) -> Result<super::Source, String> {
         Ok(stdin_source(stdin(), self.clone(), out))
     }
 

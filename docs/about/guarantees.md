@@ -40,7 +40,7 @@ and [source][docs.sources].
 | [`elasticsearch` sink][docs.elasticsearch_sink] | `best_effort` |
 | [`http` sink][docs.http_sink] | `at_least_once` |
 | [`kafka` sink][docs.kafka_sink] | `at_least_once` |
-| [`prometheus` sink][docs.prometheus_sink] | `at_least_once` |
+| [`prometheus` sink][docs.prometheus_sink] | `best_effort` |
 | [`splunk_hec` sink][docs.splunk_hec_sink] | `at_least_once` |
 | [`tcp` sink][docs.tcp_sink] | `best_effort` |
 | [`vector` sink][docs.vector_sink] | `best_effort` |
@@ -112,7 +112,7 @@ keep you in the loop if this ever changes.
 [docs.blackhole_sink]: ../usage/configuration/sinks/blackhole.md
 [docs.console_sink]: ../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../about/data-model.md#event
+[docs.event]: ../about/data-model/README.md#event
 [docs.file_source]: ../usage/configuration/sources/file.md
 [docs.http_sink]: ../usage/configuration/sinks/http.md
 [docs.kafka_sink]: ../usage/configuration/sinks/kafka.md

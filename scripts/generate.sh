@@ -96,7 +96,7 @@ puts "Generating files"
 puts ""
 
 context = Context.new(metadata)
-templates = Dir.glob("templates/**/*.erb").to_a
+templates = Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).to_a
 templates.each do |template|
   basename = File.basename(template)
 

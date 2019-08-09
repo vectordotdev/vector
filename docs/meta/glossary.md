@@ -2,11 +2,11 @@
 
 ## Batch
 
-"Batch" refers to a [batched payload](../about/data-model.md#batched-payload) within a sink. It is a batch of events encoded into a payload that the downstream service understands.
+"Batch" refers to a [batched payload][docs.log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
 
 ## Benchmark
 
-"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks](../performance.md) section.
+"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks][docs.performance] section.
 
 ## Binary
 
@@ -18,7 +18,7 @@
 
 ## Configuration
 
-"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration](../usage/configuration/) section.
+"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration][docs.configuration] section.
 
 ## Durability
 
@@ -26,11 +26,11 @@
 
 ## Event
 
-"Event" refers to a single unit of data that flows through Vector. You can learn more about events in the [Data Model](../about/data-model.md) section.
+"Event" refers to a single unit of data that flows through Vector. You can learn more about events in the [Data Model][docs.data_model] section.
 
 ## Filter
 
-"Filter" refers to a type of [transform](../usage/configuration/transforms/) that filters events or fields on an event.
+"Filter" refers to a type of [transform][docs.transforms] that filters events or fields on an event.
 
 ## Flush
 
@@ -42,7 +42,7 @@
 
 ## Guide
 
-"Guide" is a tutorial or walk through on a specific subject. You can see Vector's guides in the [Guides](../usage/guides/) section.
+"Guide" is a tutorial or walk through on a specific subject. You can see Vector's guides in the [Guides][docs.guides] section.
 
 ## Log
 
@@ -143,8 +143,13 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
+[docs.configuration]: ../usage/configuration
+[docs.data_model]: ../about/data-model
 [docs.docker]: ../setup/installation/platforms/docker.md
-[docs.metric_event]: ../about/data-model.md#metric
+[docs.guides]: ../usage/guides
+[docs.log]: ../about/data-model/log.md
+[docs.metric_event]: ../about/data-model/metric.md
+[docs.performance]: ../performance.md
 [docs.platforms]: ../setup/installation/platforms
 [docs.roles]: ../setup/deployment/roles
 [docs.sinks]: ../usage/configuration/sinks

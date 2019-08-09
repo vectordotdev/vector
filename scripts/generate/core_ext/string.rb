@@ -30,6 +30,10 @@ class String
       wrap(width)
   end
 
+  def html_escape
+    ERB::Util.html_escape(self)
+  end
+
   def remove_markdown_links
     self.
       gsub(/\[([^\]]+)\]\(([^) ]+)\)/, '\1').

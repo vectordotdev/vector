@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -71,11 +70,11 @@ impl Transform for GrokParser {
                     let conv = self.types.get(&name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.into()) {
                         Ok(value) => event.insert_explicit(name, value),
-                        Err(err) => {
+                        Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
                                 name = &name[..],
-                                error = &field::display(err),
+                                %error,
                             );
                         }
                     }

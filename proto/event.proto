@@ -37,27 +37,31 @@ message Metric {
 
 message Counter {
   string name = 1;
-  float val = 2;
+  double val = 2;
+  google.protobuf.Timestamp timestamp = 3;
 }
 
 message Histogram {
   string name = 1;
-  float val = 2;
+  double val = 2;
   uint32 sample_rate = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
 
 message Gauge {
   string name = 1;
-  float val = 2;
+  double val = 2;
   enum Direction {
     None = 0;
     Plus = 1;
     Minus = 2;
   }
   Direction direction = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
 
 message Set {
   string name = 1;
   string val = 2;
+  google.protobuf.Timestamp timestamp = 3;
 }

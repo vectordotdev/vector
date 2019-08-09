@@ -211,7 +211,7 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> 
 
     let b = match (encoding, log.is_structured()) {
         (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
+            serde_json::to_vec(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
         }
         (&Some(Encoding::Text), _) | (_, false) => {
             let bytes = log
