@@ -1385,6 +1385,12 @@ description = """If `true`, Vector will force certificate validation.
 Do NOT set this to `false` unless you know the risks of not verifying
 the remote certificate."""
 
+[sinks.tcp.options.tls.options.ca_file]
+type = "string"
+null = true
+description = "Absolute path to additional CA certificate file, in PEM format."
+examples = ["/path/to/certificate_authority.crt"]
+
 # ------------------------------------------------------------------------------
 # sinks.vector
 # ------------------------------------------------------------------------------

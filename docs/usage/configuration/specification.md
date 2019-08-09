@@ -2207,6 +2207,12 @@ end
     # * default: true
     verify = true
 
+    # Absolute path to additional CA certificate file, in PEM format.
+    #
+    # * optional
+    # * no default
+    ca_file = "/path/to/certificate_authority.crt"
+
 [sinks.vector]
   #
   # General
