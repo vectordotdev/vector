@@ -8,6 +8,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig},
 };
+use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -179,6 +180,10 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
     }
 }
 
+fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
 fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataInput, ()> {
     let metric_data: Vec<_> = events
         .into_iter()
@@ -186,31 +191,34 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
             Metric::Counter {
                 name,
                 val,
-                timestamp: _,
+                timestamp,
             } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 value: Some(*val as f64),
+                timestamp: timestamp.map(timestamp_to_string),
                 ..Default::default()
             }),
             Metric::Gauge {
                 name,
                 val,
                 direction: None,
-                timestamp: _,
+                timestamp,
             } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 value: Some(*val as f64),
+                timestamp: timestamp.map(timestamp_to_string),
                 ..Default::default()
             }),
             Metric::Histogram {
                 name,
                 val,
                 sample_rate,
-                timestamp: _,
+                timestamp,
             } => Some(MetricDatum {
                 metric_name: name.to_string(),
                 values: Some(vec![*val as f64]),
                 counts: Some(vec![*sample_rate as f64]),
+                timestamp: timestamp.map(timestamp_to_string),
                 ..Default::default()
             }),
             _ => None,
@@ -229,6 +237,8 @@ fn encode_events(events: Vec<Event>, namespace: String) -> Result<PutMetricDataI
 mod tests {
     use super::*;
     use crate::{event::metric::Metric, Event};
+    use chrono::offset::TimeZone;
+    use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
 
     #[test]
@@ -244,7 +254,7 @@ mod tests {
             Event::Metric(Metric::Counter {
                 name: "bytes_out".into(),
                 val: 2.5,
-                timestamp: None,
+                timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
             }),
         ];
 
@@ -261,6 +271,7 @@ mod tests {
                     MetricDatum {
                         metric_name: "bytes_out".into(),
                         value: Some(2.5),
+                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
                         ..Default::default()
                     }
                 ],
@@ -324,6 +335,7 @@ mod integration_tests {
     use super::*;
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
+    use chrono::offset::TimeZone;
     use futures::{stream, Sink};
 
     fn config() -> CloudWatchMetricsSinkConfig {
@@ -376,7 +388,7 @@ mod integration_tests {
                 name: format!("histogram-{}", histogram_name),
                 val: i as f64,
                 sample_rate: 100,
-                timestamp: None,
+                timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
             });
             events.push(event);
         }
