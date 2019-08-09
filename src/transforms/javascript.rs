@@ -5,7 +5,7 @@ use crate::{
 };
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
-use quick_js::Context;
+use quick_js::{Context, JsValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
@@ -116,7 +116,6 @@ impl TransformConfig for JavaScriptConfig {
 
 pub struct JavaScript {
     ctx: Context,
-    handler: String,
 }
 
 // See https://www.freelists.org/post/quickjs-devel/Usage-of-QuickJS-in-multithreaded-environments,1
@@ -182,29 +181,37 @@ impl JavaScript {
             .map_err(|err| format!("Cannot create handler: {}", err))?;
 
         // check that handler is a function
-        let handler_is_ok: bool = ctx
+        let handler_is_a_function: bool = ctx
             .eval_as(&format!(r"typeof {} === 'function'", handler))
             .map_err(|err| format!("Cannot validate handler: {}", err))?;
-
-        if handler_is_ok {
-            Ok(Self { ctx, handler })
-        } else {
-            Err("Handler is not a function".to_string())
+        if !handler_is_a_function {
+            return Err("Handler is not a function".to_string());
         }
+
+        // create wrapped handler that can be called using ctx.call_function
+        ctx.eval(&format!(
+            r#"
+            __vector_handler_wrapped = event => __vector_encode({}(__vector_decode(event))); null
+            "#,
+            handler
+        ))
+        .map_err(|err| format!("Cannot create wrapped handler: {}", err))?;
+
+        Ok(Self { ctx })
     }
 
     pub fn process(&self, output: &mut Vec<Event>, event: Event) -> Result<(), String> {
         let encoded = encode(event)?;
-        let transformed: String = self
+        let transformed = self
             .ctx
-            .eval_as(&format!(
-                r"__vector_encode({}(__vector_decode({})))",
-                self.handler,
-                serde_json::to_string(&encoded).unwrap(),
-            ))
+            .call_function("__vector_handler_wrapped", vec![JsValue::String(encoded)])
             .map_err(|err| format!("Runtime error in JavaScript code: {}", err))?;
-        decode_and_write(&transformed, output)?;
-        Ok(())
+        if let JsValue::String(transformed) = transformed {
+            decode_and_write(&transformed, output)?;
+            Ok(())
+        } else {
+            Err("JavaScript returned unexpected data type".to_string())
+        }
     }
 }
 
