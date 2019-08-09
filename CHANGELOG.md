@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - aws_s3: Fixed #517 and trailing slash issues with the generated key.
 - aws_cloudwatch_logs: Fixes #586 and now dynamically creates streams if they do not exist.
+- topology: Reloading a configuration which removes both a sink and its source now works (#681). 
 
 ### Removed
 
