@@ -35,6 +35,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   address = "0.0.0.0:9598"
   
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -44,6 +45,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   inputs = ["<string>", ...]
   address = "<string>"
   buckets = [<float>, ...]
+  healthcheck = <bool>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -75,6 +77,12 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
   # * unit: seconds
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -89,6 +97,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 | `address` | `string` | The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.<br />`required` `example: "0.0.0.0:9598"` |
 | **OPTIONAL** | | |
 | `buckets` | `[float]` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `unit: seconds` |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
 
 ## Examples
 

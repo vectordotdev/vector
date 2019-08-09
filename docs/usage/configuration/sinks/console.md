@@ -28,6 +28,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   target = "stdout" # enum: "stdout" or "stderr"
   
   encoding = "json" # no default, enum: "json" or "text"
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -37,6 +38,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   inputs = ["<string>", ...]
   target = {"stdout" | "stderr"}
   encoding = {"json" | "text"}
+  healthcheck = <bool>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -72,6 +74,12 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -86,6 +94,7 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 | `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
 | **OPTIONAL** | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 
 ## How It Works
 
@@ -129,19 +138,19 @@ section.
 
 ### Health Checks
 
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Streaming
 
@@ -176,7 +185,6 @@ issue, please:
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

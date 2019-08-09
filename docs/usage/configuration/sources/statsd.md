@@ -86,7 +86,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "counter": {
     "name": "login.invocations",
-    "val": 1
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -109,7 +110,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "gauge": {
     "name": "gas_tank",
-    "val": 0.5
+    "val": 0.5,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -132,7 +134,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "set": {
     "name": "unique_users",
-    "val": 1
+    "val": 1,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -155,7 +158,8 @@ A [`metric` event][docs.metric_event] will be emitted with the following structu
 {
   "timer": {
     "name": "login.time",
-    "val": 22
+    "val": 22,
+    "timestamp": "2019-05-02T12:22:46.658503Z" // current time / time ingested
   }
 }
 ```
@@ -180,6 +184,13 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
+
+### Timestamp
+
+You'll notice that each metric contains a `timestamp` field. This is an optional
+descriptive field that represents when the metric was received. It helps to
+more closely represent the metric's time in situations here it can be used. See
+the [metric][docs.metric_event] data model page for more info.
 
 ## Troubleshooting
 

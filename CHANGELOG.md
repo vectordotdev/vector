@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - coercer: New transform to convert fields into specified types.
 - file source: `data_dir` now falls back to global `data_dir` option if not specified
 - aws_kinesis_streams: Added configurable partition keys
+- topology: Added ability to disable individual sink healthchecks
 
 ### Changed
 
