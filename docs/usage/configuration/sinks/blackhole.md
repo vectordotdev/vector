@@ -26,6 +26,8 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
   type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
   print_amount = 1000
+  
+  healthcheck = true # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -34,6 +36,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
   type = "blackhole"
   inputs = ["<string>", ...]
   print_amount = <int>
+  healthcheck = <bool>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -59,6 +62,12 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
   # * required
   # * no default
   print_amount = 1000
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -71,6 +80,8 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
 | `type` | `string` | The component type<br />`required` `must be: "blackhole"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `print_amount` | `int` | The number of events that must be received in order to print a summary of activity.<br />`required` `example: 1000` |
+| **OPTIONAL** | | |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 
 ## How It Works
 
@@ -90,19 +101,19 @@ section.
 
 ### Health Checks
 
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Streaming
 
@@ -137,7 +148,6 @@ issue, please:
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.blackhole_sink]: ../../../assets/blackhole-sink.svg

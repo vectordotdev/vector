@@ -31,6 +31,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   
   # OPTIONAL - General
   compression = "gzip" # no default, must be: "gzip" (if supplied)
+  healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
   
   # OPTIONAL - Batching
@@ -73,6 +74,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 
   # OPTIONAL - General
   compression = "gzip"
+  healthcheck = <bool>
   healthcheck_uri = "<string>"
 
   # OPTIONAL - Batching
@@ -147,6 +149,12 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # * no default
   # * must be: "gzip" (if supplied)
   compression = "gzip"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
   # A URI that Vector can request in order to determine the service health.
   # 
@@ -294,6 +302,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
@@ -434,20 +443,21 @@ section.
 
 ### Health Checks
 
-If the `healthcheck_uri` option is provided, Vector will issue a request
-to this URI to ensure Vector can properly community with the service. This
-helps to ensure that data will be successfully delivered after Vector is
-started.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+In order to run this check you must provide a value for the `healthcheck_uri`
+option.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Rate Limits
 

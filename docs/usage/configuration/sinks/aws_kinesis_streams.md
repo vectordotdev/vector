@@ -37,6 +37,8 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "my-stream"
   
   # OPTIONAL - General
+  healthcheck = true # default
+  hostname = "127.0.0.0:5000"
   partition_key_field = "user_id" # no default
   
   # OPTIONAL - Batching
@@ -70,6 +72,8 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "<string>"
 
   # OPTIONAL - General
+  healthcheck = <bool>
+  hostname = "<string>"
   partition_key_field = "<string>"
 
   # OPTIONAL - Batching
@@ -125,6 +129,18 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # * required
   # * no default
   stream_name = "my-stream"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  # Custom hostname to send requests to. Useful for testing.
+  # 
+  # * optional
+  # * no default
+  hostname = "127.0.0.0:5000"
 
   # The event field used as the Kinesis record's partition key value.
   # 
@@ -252,6 +268,8 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
 | **OPTIONAL** - General | | |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+| `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
 | `partition_key_field` | `string` | The event field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.<br />`no default` `example: "user_id"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
@@ -397,19 +415,19 @@ section.
 
 ### Health Checks
 
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Partitioning
 
@@ -510,7 +528,6 @@ issue, please:
 [docs.monitoring.logs]: ../../../usage/administration/monitoring.md#logs
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

@@ -37,6 +37,10 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   region = "us-east-1"
   stream_name = "{{ instance_id }}"
   
+  # OPTIONAL - General
+  healthcheck = true # default
+  hostname = "127.0.0.0:5000"
+  
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 1 # default, seconds
@@ -67,6 +71,10 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   group_name = "<string>"
   region = "<string>"
   stream_name = "<string>"
+
+  # OPTIONAL - General
+  healthcheck = <bool>
+  hostname = "<string>"
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -130,6 +138,18 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "{{ instance_id }}"
   stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  # Custom hostname to send requests to. Useful for testing.
+  # 
+  # * optional
+  # * no default
+  hostname = "127.0.0.0:5000"
 
   #
   # Batching
@@ -251,6 +271,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
+| **OPTIONAL** - General | | |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+| `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
@@ -397,19 +420,19 @@ section.
 
 ### Health Checks
 
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Partitioning
 
@@ -504,7 +527,6 @@ issue, please:
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

@@ -819,6 +819,18 @@ end
   stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  # Custom hostname to send requests to. Useful for testing.
+  # 
+  # * optional
+  # * no default
+  hostname = "127.0.0.0:5000"
+
   #
   # Batching
   #
@@ -956,6 +968,18 @@ end
   # * required
   # * no default
   stream_name = "my-stream"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  # Custom hostname to send requests to. Useful for testing.
+  # 
+  # * optional
+  # * no default
+  hostname = "127.0.0.0:5000"
 
   # The event field used as the Kinesis record's partition key value.
   # 
@@ -1100,6 +1124,18 @@ end
   # * required
   # * no default
   region = "us-east-1"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  # Custom hostname to send requests to. Useful for testing.
+  # 
+  # * optional
+  # * no default
+  hostname = "127.0.0.0:5000"
 
   #
   # Batching
@@ -1279,6 +1315,12 @@ end
   # * no default
   print_amount = 1000
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 [sinks.console]
   # The component type
   # 
@@ -1310,6 +1352,12 @@ end
   # * enum: "json" or "text"
   encoding = "json"
   encoding = "text"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
 [sinks.elasticsearch]
   #
@@ -1344,6 +1392,12 @@ end
   # * optional
   # * default: "_doc"
   doc_type = "_doc"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
   # Index name to write events to.
   # 
@@ -1491,6 +1545,12 @@ end
   # * no default
   # * must be: "gzip" (if supplied)
   compression = "gzip"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
   # A URI that Vector can request in order to determine the service health.
   # 
@@ -1674,6 +1734,12 @@ end
   encoding = "json"
   encoding = "text"
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
   #
   # Buffer
   #
@@ -1738,6 +1804,12 @@ end
   # * unit: seconds
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 [sinks.splunk_hec]
   #
   # General
@@ -1768,6 +1840,12 @@ end
   # * required
   # * no default
   token = "A94A8FE5CCB19BA61C4C08"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
   #
   # Batching
@@ -1901,6 +1979,12 @@ end
   # * no default
   address = "92.12.333.224:5000"
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
   #
   # Requests
   #
@@ -1974,6 +2058,12 @@ end
   # * required
   # * no default
   address = "92.12.333.224:5000"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
   #
   # Buffer

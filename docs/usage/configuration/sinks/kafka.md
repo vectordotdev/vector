@@ -32,6 +32,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   
   # OPTIONAL - General
   encoding = "json" # no default, enum: "json" or "text"
+  healthcheck = true # default
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
@@ -53,6 +54,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 
   # OPTIONAL - General
   encoding = {"json" | "text"}
+  healthcheck = <bool>
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
@@ -114,6 +116,12 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   encoding = "json"
   encoding = "text"
 
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
   #
   # Buffer
   #
@@ -165,6 +173,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
 | **OPTIONAL** - General | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
@@ -213,19 +222,19 @@ section.
 
 ### Health Checks
 
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 
 ### Streaming
 
@@ -260,7 +269,6 @@ issue, please:
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
-[docs.starting]: ../../../usage/administration/starting.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

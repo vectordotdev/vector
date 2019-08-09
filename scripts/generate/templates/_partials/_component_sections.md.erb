@@ -147,26 +147,23 @@ accessible by the downstream service doing the scraping.
 
 ### Health Checks
 
+Health checks ensure that the downstream service is accessible and ready to
+accept data. This check is performed upon sink initialization.
 <%- if component.options.healthcheck_uri -%>
-If the `healthcheck_uri` option is provided, Vector will issue a request
-to this URI to ensure Vector can properly community with the service. This
-helps to ensure that data will be successfully delivered after Vector is
-started.
-<%- else -%>
-Upon [starting][docs.starting], Vector will perform a simple health check
-against this sink. The ensures that the downstream service is healthy and
-reachable.
+In order to run this check you must provide a value for the `healthcheck_uri`
+option.
 <%- end -%>
-By default, if the health check fails an error will be logged and
-Vector will proceed to start. If you'd like to exit immediately upomn healt
-check failure, you can pass the `--require-healthy` flag:
+
+If the health check fails an error will be logged and Vector will proceed to
+start. If you'd like to exit immediately upon health check failure, you can
+pass the `--require-healthy` flag:
 
 ```bash
 vector --config /etc/vector/vector.toml --require-healthy
 ```
 
-Be careful when doing this, one unhealthy sink can prevent other healthy sinks
-from processing data at all.
+And finally, if you'd like to disable health checks entirely for this sink
+you can set the `healthcheck` option to `false`.
 <%- end -%>
 <%- if component.partition_options.any? -%>
 
