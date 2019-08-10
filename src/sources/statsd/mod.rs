@@ -115,7 +115,7 @@ mod test {
         for _ in 0..100 {
             socket
                 .send_to(
-                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\n",
+                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\nset:0|s\n",
                     &in_addr,
                 )
                 .unwrap();
@@ -160,6 +160,9 @@ mod test {
         let milliglork_sum = parse_count(&lines, "milliglork_sum");
         let milliglork_count = parse_count(&lines, "milliglork_count");
         assert_eq!(milliglork_count * 3, milliglork_sum);
+
+        // Set test
+        assert_eq!(parse_count(&lines, "set"), 2);
 
         // Shut down server
         block_on(topology.stop()).unwrap();
