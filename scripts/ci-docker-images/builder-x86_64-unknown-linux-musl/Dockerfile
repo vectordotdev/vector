@@ -280,6 +280,9 @@ RUN sed -i \
   crypto/compat/getprogname_linux.c
 ENV CC=$LIBS_PREFIX/bin/musl-cc
 ENV CXX=$LIBS_PREFIX/bin/musl-c++
+ENV CFLAGS=""
+ENV CXXFLAGS=""
+ENV LDFLAGS=""
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -336,7 +339,7 @@ ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
 
 # Set up linker and enable LTO plugin in rustc if necessary.
 ARG LTO
-ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="${LTO:+-Clinker-plugin-lto }-Clink-arg=${LTO:+-f$LTO}"
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="${LTO:+-Clinker-plugin-lto -Clink-arg=-O3 }-Clink-arg=${LTO:+-f$LTO}"
 
 # Set up pkg-config.
 ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig
