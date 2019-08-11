@@ -892,6 +892,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn topology_replace_source_transform_and_sink() {
         crate::test_util::trace_init();
         let mut rt = runtime();
