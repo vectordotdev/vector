@@ -4,7 +4,12 @@ extern crate tracing;
 pub mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform};
-use futures::{sink::Sink, stream::Stream};
+use futures::{future, future::Future, sink::Sink, stream::iter_ok, stream::Stream};
+use std::iter;
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
 use vector::event::{Event, MESSAGE};
 use vector::test_util::{runtime, shutdown_on_idle};
 use vector::topology;
@@ -310,6 +315,67 @@ fn topology_swap_transform() {
     shutdown_on_idle(rt);
     assert_eq!(Vec::<String>::new(), res1v1);
     assert_eq!(vec!["this replaced"], res1v2);
+}
+
+#[test]
+fn topology_swap_transform_is_atomic() {
+    let mut rt = runtime();
+    let (in1, source1) = source();
+    let transform1v1 = transform(" transformed");
+    let (out1, sink1) = sink();
+
+    let running = Arc::new(AtomicBool::new(true));
+    let run_control = running.clone();
+
+    let send_counter = Arc::new(AtomicUsize::new(0));
+    let recv_counter = Arc::new(AtomicUsize::new(0));
+    let send_total = send_counter.clone();
+    let recv_total = recv_counter.clone();
+
+    let events = move || match running.load(Ordering::Acquire) {
+        true => {
+            send_counter.fetch_add(1, Ordering::Release);
+            Some(Event::from("this"))
+        }
+        false => None,
+    };
+    let input = iter_ok::<_, ()>(iter::from_fn(events));
+    let output = out1.map_err(|_| ()).for_each(move |_| {
+        recv_counter.fetch_add(1, Ordering::Release);
+        future::ok(())
+    });
+    rt.spawn(
+        input
+            .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
+            .map(|_| ()),
+    );
+    rt.spawn(output);
+
+    let mut config = Config::empty();
+    config.add_source("in1", source1);
+    config.add_transform("t1", &["in1"], transform1v1);
+    config.add_sink("out1", &["t1"], sink1);
+
+    let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+
+    let transform1v2 = transform(" replaced");
+
+    let mut config = Config::empty();
+    config.add_source("in1", source().1);
+    config.add_transform("t1", &["in1"], transform1v2);
+    config.add_sink("out1", &["t1"], sink().1);
+
+    assert!(topology.reload_config_and_respawn(config, &mut rt, false));
+    std::thread::sleep(std::time::Duration::from_millis(10));
+
+    run_control.store(false, Ordering::Release);
+    rt.block_on(topology.stop()).unwrap();
+    shutdown_on_idle(rt);
+    assert_eq!(
+        send_total.load(Ordering::Acquire),
+        recv_total.load(Ordering::Acquire)
+    );
 }
 
 #[test]
