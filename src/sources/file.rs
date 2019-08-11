@@ -64,7 +64,7 @@ impl SourceConfig for FileConfig {
         // so that multiple sources can operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each other
         data_dir.push(name);
-        if let Err(e) = DirBuilder::new().create(&data_dir) {
+        if let Err(e) = DirBuilder::new().recursive(true).create(&data_dir) {
             return Err(format!(
                 "could not create subdirectory '{}' inside of data_dir '{}': {}",
                 name,
