@@ -5,7 +5,7 @@ description: Vector documentation conventions
 # Conventions
 
 The Vector documentation uses the following conventions. It's important all
-documenters follow a consistent style to producive cohesive documentation.
+documenters follow a consistent style to productive cohesive documentation.
 Documentation is _very_ important to Vector since it is a significant piece
 of the user experience.
 

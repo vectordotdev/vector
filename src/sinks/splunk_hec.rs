@@ -56,9 +56,9 @@ impl SinkConfig for HecSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
-        let healtcheck = healthcheck(self.token.clone(), self.host.clone())?;
+        let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
 
-        Ok((sink, healtcheck))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

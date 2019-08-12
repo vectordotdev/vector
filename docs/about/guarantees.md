@@ -76,7 +76,7 @@ Each [sink][docs.sinks] documents the buffer options.
 ## Best Effort Delivery
 
 "Best effort" delivery has no guarantees and means that Vector will make a best
-effort to deliver each event. This means it is possible for the occassional
+effort to deliver each event. This means it is possible for the occasional
 event to not be lost.
 
 ## FAQs
@@ -84,12 +84,12 @@ event to not be lost.
 ### Do I need at least once delivery?
 
 One of the unique advantages of the logging use case is that data is usually
-used for diagnostic purposes only. Therefore, losing the occassional event
+used for diagnostic purposes only. Therefore, losing the occasional event
 has little impact on your business. This affords you the opportunity to
 provision your pipeline towards performance, simplicity, and cost reduction.
 On the other hand, if you're using your data to perform business critical
 functions, then data loss is not acceptable and therefore requires "at least
-once" deliery.
+once" delivery.
 
 To clarify, even though a source or sink is marked as "best effort" it does
 not mean Vector takes delivery lightly. In fact, once data is within the

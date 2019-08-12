@@ -232,7 +232,7 @@ impl RunningTopology {
         }
 
         for name in sources_to_change {
-            info!("Rebuiling source {:?}", name);
+            info!("Rebuilding source {:?}", name);
 
             self.remove_outputs(&name);
             self.shutdown_source(&name);
@@ -697,7 +697,7 @@ mod tests {
         assert_eq!(input_lines2, output_lines2);
     }
 
-    // The previous test pauses to make sure the old version of the sink has receieved all messages
+    // The previous test pauses to make sure the old version of the sink has received all messages
     // sent before the reload. This test does not pause, making sure the new sink is atomically
     // swapped in for the old one and that no events are lost in the changeover.
     #[test]
