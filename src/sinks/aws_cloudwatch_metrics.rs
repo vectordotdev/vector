@@ -371,6 +371,12 @@ mod tests {
                 direction: Some(Direction::Minus),
                 timestamp: None,
             }),
+            Event::Metric(Metric::Gauge {
+                name: "temperature".into(),
+                val: 3.2,
+                direction: None,
+                timestamp: None,
+            }),
         ];
 
         assert_eq!(
@@ -391,6 +397,11 @@ mod tests {
                     MetricDatum {
                         metric_name: "temperature".into(),
                         value: Some(9.5),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "temperature".into(),
+                        value: Some(3.2),
                         ..Default::default()
                     },
                 ],
