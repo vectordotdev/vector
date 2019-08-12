@@ -1,5 +1,4 @@
 use crate::{
-    
     buffers::Acker,
     event::{self, Event},
     sinks::util::MetadataFuture,
