@@ -71,7 +71,7 @@ impl Fanout {
     }
 
     fn handle_sink_error(&mut self) -> Result<(), ()> {
-        // If there's only one sink, propogate the error to the source ASAP
+        // If there's only one sink, propagate the error to the source ASAP
         // so it stops reading from its input. If there are multiple sinks,
         // keep pushing to the non-errored ones (while the errored sink
         // triggers a more graceful shutdown).

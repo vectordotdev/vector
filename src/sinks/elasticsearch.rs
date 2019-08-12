@@ -42,9 +42,9 @@ pub struct ElasticSearchConfig {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = es(self.clone(), acker);
-        let healtcheck = healthcheck(self.host.clone());
+        let healthcheck = healthcheck(self.host.clone());
 
-        Ok((sink, healtcheck))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
