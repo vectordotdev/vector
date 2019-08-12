@@ -1059,6 +1059,23 @@ null = false
 templateable = true
 description = "Index name to write events to."
 
+[sinks.elasticsearch.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.elasticsearch.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.elasticsearch.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
 # ------------------------------------------------------------------------------
 # sinks.http
 # ------------------------------------------------------------------------------

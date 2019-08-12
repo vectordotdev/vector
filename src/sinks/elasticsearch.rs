@@ -36,6 +36,15 @@ pub struct ElasticSearchConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+
+    pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ElasticSearchBasicAuthConfig {
+    pub password: String,
+    pub user: String,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -83,6 +92,11 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         HttpRetryLogic,
     );
 
+    let authorization = config.basic_auth.clone().map(|auth| {
+        let token = format!("{}:{}", auth.user, auth.password);
+        format!("Basic {}", base64::encode(token.as_bytes()))
+    });
+
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let uri = format!("{}/_bulk", host);
         let uri: Uri = uri.parse().unwrap();
@@ -92,6 +106,9 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         builder.uri(uri);
 
         builder.header("Content-Type", "application/x-ndjson");
+        if let Some(ref auth) = authorization {
+            builder.header("Authorization", &auth[..]);
+        }
 
         if gzip {
             builder.header("Content-Encoding", "gzip");
