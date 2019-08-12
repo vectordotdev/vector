@@ -41,8 +41,8 @@ pub struct ElasticSearchConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = es(self.clone(), acker);
-        let healthcheck = healthcheck(self.host.clone());
+        let sink = es(self, acker);
+        let healthcheck = healthcheck(&self.host);
 
         Ok((sink, healthcheck))
     }
@@ -52,7 +52,7 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
+fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let host = config.host.clone();
     let id_key = config.id_key.clone();
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
@@ -75,7 +75,7 @@ fn es(config: ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     } else {
         Template::from("vector-%Y.%m.%d")
     };
-    let doc_type = config.clone().doc_type.unwrap_or("_doc".into());
+    let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -154,7 +154,7 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(host: String) -> super::Healthcheck {
+fn healthcheck(host: &str) -> super::Healthcheck {
     let uri = format!("{}/_cluster/health", host);
     let request = Request::get(uri).body(Body::empty()).unwrap();
 
