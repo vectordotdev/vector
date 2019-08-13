@@ -1521,6 +1521,17 @@ end
     # * unit: events
     num_items = 500
 
+  #
+  # Headers
+  #
+
+  [sinks.elasticsearch.headers]
+    # A custom header to be added to each outgoing Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+
 [sinks.http]
   #
   # General

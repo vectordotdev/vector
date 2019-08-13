@@ -15,6 +15,7 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -38,6 +39,8 @@ pub struct ElasticSearchConfig {
     pub request_retry_backoff_secs: Option<u64>,
 
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
+
+    pub headers: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -96,6 +99,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         let token = format!("{}:{}", auth.user, auth.password);
         format!("Basic {}", base64::encode(token.as_bytes()))
     });
+    let headers = config.headers.clone();
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let uri = format!("{}/_bulk", host);
@@ -108,6 +112,9 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         builder.header("Content-Type", "application/x-ndjson");
         if let Some(ref auth) = authorization {
             builder.header("Authorization", &auth[..]);
+        }
+        for (header, value) in &headers {
+            builder.header(&header[..], &value[..]);
         }
 
         if gzip {
