@@ -52,6 +52,11 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
   
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password"
+    user = "username"
+  
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
@@ -84,6 +89,11 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   request_timeout_secs = <int>
   retry_attempts = <int>
   retry_backoff_secs = <int>
+
+  # OPTIONAL - Basic auth
+  [sinks.<sink-id>.basic_auth]
+    password = "<string>"
+    user = "<string>"
 
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
@@ -205,6 +215,23 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   retry_backoff_secs = 5
 
   #
+  # Basic auth
+  #
+
+  [sinks.elasticsearch_sink.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
   # Buffer
   #
 
@@ -265,6 +292,9 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
+| **OPTIONAL** - Basic auth | | |
+| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
+| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |

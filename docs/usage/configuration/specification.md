@@ -1469,6 +1469,23 @@ end
   retry_backoff_secs = 5
 
   #
+  # Basic auth
+  #
+
+  [sinks.elasticsearch.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
   # Buffer
   #
 
