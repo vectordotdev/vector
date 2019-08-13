@@ -190,7 +190,7 @@ fn encode(event: Event) -> Result<JsValue, String> {
                     ValueKind::Bytes(v) => {
                         JsValue::String(std::str::from_utf8(v).unwrap().to_string())
                     }
-                    ValueKind::Integer(v) => JsValue::Int(*v as i32),
+                    ValueKind::Integer(v) => JsValue::Float(*v as f64), // JS `Number`s are floats
                     ValueKind::Float(v) => JsValue::Float(*v),
                     ValueKind::Boolean(v) => JsValue::Bool(*v),
                     ValueKind::Timestamp(v) => JsValue::Date(*v),
