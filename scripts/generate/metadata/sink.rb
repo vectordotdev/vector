@@ -39,10 +39,20 @@ class Sink < Component
       raise("#{self.class.name}#write_to_description cannot not end with a period")
     end
 
+    # Healthcheck option
+
+    @options.healthcheck = Option.new({
+      "name" => "healthcheck",
+      "default" => true,
+      "description" => "Enables/disables the sink healthcheck upon start.",
+      "null" => false,
+      "type" => "bool"
+    })
+
     # Hostname option
 
     if service_provider == "AWS"
-      buffer_option = Option.new({
+      @options.hostname = Option.new({
         "name" => "hostname",
         "examples" => ["127.0.0.0:5000"],
         "default" => "<aws-service-hostname>",

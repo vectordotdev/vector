@@ -4,7 +4,7 @@ description: How to install Vector on your operating system
 
 # Platforms
 
-Vector provides high level install instructions for the followig platforms:
+Vector provides high level install instructions for the following platforms:
 
 {% page-ref page="docker.md" %}
 

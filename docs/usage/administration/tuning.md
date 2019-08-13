@@ -4,7 +4,7 @@ description: Tuning Vector
 
 # Tuning
 
-Vector is written in [Rust][url.rust] and therefore does not inclue a runtime
+Vector is written in [Rust][url.rust] and therefore does not include a runtime
 or VM. There are no special service level steps you need to do to improve
 performance. By default, Vector will take full advantage of all system
 resources.

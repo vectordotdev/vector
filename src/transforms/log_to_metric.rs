@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::metric::Metric,
+    event::{self, ValueKind},
     template::Template,
     topology::config::{DataType, TransformConfig},
     Event,
@@ -101,6 +102,12 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
+
+    let timestamp = log
+        .get(&event::TIMESTAMP)
+        .and_then(ValueKind::as_timestamp)
+        .cloned();
+
     match config {
         MetricConfig::Counter(counter) => {
             let val = log
@@ -117,7 +124,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
-            Ok(Metric::Counter { name, val })
+            Ok(Metric::Counter {
+                name,
+                val,
+                timestamp,
+            })
         }
         MetricConfig::Histogram(hist) => {
             let val = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
@@ -133,6 +144,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 val,
                 sample_rate: 1,
+                timestamp,
             })
         }
         MetricConfig::Gauge(gauge) => {
@@ -149,6 +161,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 val,
                 direction: None,
+                timestamp,
             })
         }
         MetricConfig::Set(set) => {
@@ -158,7 +171,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
-            Ok(Metric::Set { name, val })
+            Ok(Metric::Set {
+                name,
+                val,
+                timestamp,
+            })
         }
     }
 }
@@ -192,15 +209,26 @@ impl Transform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
-    use crate::{event::metric::Metric, transforms::Transform, Event};
+    use crate::{
+        event::{self, Metric},
+        transforms::Transform,
+        Event,
+    };
+    use chrono::{offset::TimeZone, DateTime, Utc};
 
     fn parse_config(s: &str) -> LogToMetricConfig {
         toml::from_str(s).unwrap()
     }
 
+    fn ts() -> DateTime<Utc> {
+        Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+    }
+
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert_explicit(key.into(), value.into());
+        log.as_mut_log()
+            .insert_implicit(event::TIMESTAMP.clone(), ts().into());
         log
     }
 
@@ -223,6 +251,7 @@ mod tests {
             Metric::Counter {
                 name: "status".into(),
                 val: 1.0,
+                timestamp: Some(ts()),
             }
         );
     }
@@ -247,6 +276,7 @@ mod tests {
             Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
+                timestamp: Some(ts()),
             }
         );
     }
@@ -290,6 +320,7 @@ mod tests {
             Metric::Counter {
                 name: "amount_total".into(),
                 val: 33.99,
+                timestamp: Some(ts()),
             }
         );
     }
@@ -315,6 +346,7 @@ mod tests {
                 name: "memory_rss_bytes".into(),
                 val: 123.0,
                 direction: None,
+                timestamp: Some(ts()),
             }
         );
     }
@@ -372,6 +404,9 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
+            .insert_implicit(event::TIMESTAMP.clone(), ts().into());
+        event
+            .as_mut_log()
             .insert_explicit("status".into(), "42".into());
         event
             .as_mut_log()
@@ -387,6 +422,7 @@ mod tests {
             Metric::Counter {
                 name: "exception_total".into(),
                 val: 1.0,
+                timestamp: Some(ts()),
             }
         );
         assert_eq!(
@@ -394,6 +430,7 @@ mod tests {
             Metric::Counter {
                 name: "status".into(),
                 val: 1.0,
+                timestamp: Some(ts()),
             }
         );
     }
@@ -415,6 +452,9 @@ mod tests {
         );
 
         let mut event = Event::from("i am a log");
+        event
+            .as_mut_log()
+            .insert_implicit(event::TIMESTAMP.clone(), ts().into());
         event
             .as_mut_log()
             .insert_explicit("status".into(), "42".into());
@@ -441,6 +481,7 @@ mod tests {
             Metric::Counter {
                 name: "xyz_exception_total".into(),
                 val: 1.0,
+                timestamp: Some(ts()),
             }
         );
         assert_eq!(
@@ -448,6 +489,7 @@ mod tests {
             Metric::Set {
                 name: "local_abc_status_set".into(),
                 val: "42".into(),
+                timestamp: Some(ts()),
             }
         );
     }
@@ -472,6 +514,7 @@ mod tests {
             Metric::Set {
                 name: "unique_user_ip".into(),
                 val: "1.2.3.4".into(),
+                timestamp: Some(ts()),
             }
         );
     }
@@ -496,6 +539,7 @@ mod tests {
                 name: "response_time".into(),
                 val: 2.5,
                 sample_rate: 1,
+                timestamp: Some(ts()),
             }
         );
     }

@@ -14,31 +14,33 @@ Vector for your use case.
 
 ## Structure
 
-Vector characterizes a `LogEvent` as a _flat_ map of arbitrary fields:
+Vector characterizes a `log` as a _flat_ map of arbitrary fields:
 
 {% code-tabs %}
-{% code-tabs-item title="definition" %}
-```rust
-pub struct LogEvent {
-    structured: HashMap<Atom, Value>,
+{% code-tabs-item title="log.proto" %}
+```coffeescript
+message Log {
+  map<string, Value> structured = 1;
 }
 
-// Where Value is defined by
-pub enum ValueKind {
-    Bytes(Bytes),
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
-    Timestamp(chrono::DateTime<Utc>),
+message Value {
+  oneof kind {
+    bytes raw_bytes = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    int64 integer = 4;
+    double float = 5;
+    bool boolean = 6;
+  }
+  bool explicit = 3;
 }
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="example" %}
-```rust
-LogEvent {
-    "timestamp": chrono::DateTime<2019-05-02T00:23:22Z>,
-    "parent.child": "..."
-    "message": "message"
+```javascript
+{
+    "timestamp": "2019-05-02T00:23:22Z",
+    "parent.child": "...",
+    "message": "message",
     "host": "my.host.com",
     "key": "value",
     "parent.child": "value"
@@ -47,8 +49,8 @@ LogEvent {
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-You can view a complete definition in the
-[log event source file][url.log_event_source].
+You can view a complete definition in the [event proto \
+definition][url.event_proto].
 
 You'll notice that Vector does not restrict your schema in any way, you are
 free to use whatever fields and shape you like. In places where Vector must
@@ -80,9 +82,9 @@ For example, if Vector ingests the following JSON data:
 Vector will represent this data internally as a `LogEvent`:
 
 {% code-tabs %}
-{% code-tabs-item title="internal LogEvent" %}
-```rust
-LogEvent {
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
     "parent.child": "..."
 }
 ```
@@ -129,12 +131,12 @@ For example, if Vector ingests the following data:
 Vector will represent this data internally as a log event:
 
 {% code-tabs %}
-{% code-tabs-item title="internal LogEvent" %}
-```rust
-LogEvent {
-    "array.0": "item1",
-    "array.1": "item2",
-    "array.2": "item3"
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
+    "array[0]": "item1",
+    "array[1]": "item2",
+    "array[2]": "item3"
 }
 ```
 {% endcode-tabs-item %}
@@ -156,6 +158,32 @@ back into it's original structure:
 This normalizes the event structure and simplifies data processing throughout
 the Vector pipeline. This not only helps with performance, but it helps to
 avoid type human error when configuring Vector.
+
+If vector receives flattened array items that contain a missing index during the 
+unflatten process it will insert `null` values. For example:
+
+{% code-tabs %}
+{% code-tabs-item title="internal log event" %}
+```javascript
+{
+    "array[0]": "item1",
+    "array[2]": "item3"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+The output will contain a `null` value for `array[1]` like so:
+
+{% code-tabs %}
+{% code-tabs-item title="output" %}
+```javascript
+{
+    "array": ["item1", null, "item3"]
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 ### Special Characters
 
@@ -226,8 +254,8 @@ remove, or rename fields as desired.
 [docs.sources]: ../../usage/configuration/sources
 [docs.transforms]: ../../usage/configuration/transforms
 [images.data-model-log]: ../../assets/data-model-log.svg
+[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.issue_551]: https://github.com/timberio/vector/issues/551
 [url.json_types]: https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax
-[url.log_event_source]: https://github.com/timberio/vector/blob/master/src/event/mod.rs
 [url.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
 [url.toml_types]: https://github.com/toml-lang/toml#table-of-contents
