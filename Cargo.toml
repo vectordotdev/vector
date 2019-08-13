@@ -83,7 +83,7 @@ prost-types = "0.5"
 # External libs
 atty = "0.2"
 derivative = "1.0"
-chrono = "0.4.6"
+chrono = "0.4.7"
 rand = "0.5.5"
 regex = "1.0.5"
 bytes = { version = "0.4.10", features = ["serde"] }
@@ -110,7 +110,7 @@ seahash = "3.0.6"
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
 rlua = "0.16.3"
-quick-js = { git = "https://github.com/a-rodin/quickjs-rs-1", rev = "7e3ca2f1cd760621a42cfc9893cd8f3097c426bf" }
+quick-js = { version = "0.2.2", features=["patched", "chrono"] }
 num_cpus = "1.10.0"
 bytesize = "1.0.0"
 grok = "1.0.0"

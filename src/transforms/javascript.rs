@@ -3,16 +3,12 @@ use crate::{
     event::{Event, ValueKind},
     topology::config::{DataType, TransformConfig},
 };
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use quick_js::{Context, JsValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value as JsonValue};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
-
-type JsonObject = serde_json::map::Map<String, JsonValue>;
 
 lazy_static! {
     // although JavaScript identifiers can also contain Unicode characters, we don't allow them
@@ -62,26 +58,6 @@ lazy_static! {
     .iter()
     .cloned()
     .collect();
-    static ref JS_RUNTIME_LIBRARY: &'static str = r#"
-        function __vector_json_reviver(key, value) {
-            if (value && value.hasOwnProperty('$date')) {
-                return new Date(value.$date)
-            }
-            return value
-        }
-
-        function __vector_json_replacer(key, value) {
-            if (this[key] instanceof Date) {
-                return {
-                    $date: this[key].toISOString()
-                }
-            }
-            return value
-        }
-
-        const __vector_decode = data => JSON.parse(data,  __vector_json_reviver)
-        const __vector_encode = data => JSON.stringify(data , __vector_json_replacer)
-        "#;
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -166,12 +142,10 @@ impl JavaScript {
         let ctx = builder
             .build()
             .map_err(|err| format!("Cannot create JavaScript runtime: {}", err))?;
-        ctx.eval(&JS_RUNTIME_LIBRARY)
-            .map_err(|err| format!("Cannot load JavaScript runtime library: {}", err))?;
 
         // inject handler
         let (handler, source) = if let Some(handler) = handler {
-            (handler, format!(r"{}; null", source))
+            (handler, format!(r"{}", source))
         } else {
             let handler = "__vector_handler".to_string();
             let source = format!(r"const {} = ({})", handler, source);
@@ -188,14 +162,9 @@ impl JavaScript {
             return Err("Handler is not a function".to_string());
         }
 
-        // create wrapped handler that can be called using ctx.call_function
-        ctx.eval(&format!(
-            r#"
-            __vector_handler_wrapped = event => __vector_encode({}(__vector_decode(event))); null
-            "#,
-            handler
-        ))
-        .map_err(|err| format!("Cannot create wrapped handler: {}", err))?;
+        // create set handler function that can be called using ctx.call_function
+        ctx.eval(&format!(r"__vector_handler = {}", handler))
+            .map_err(|err| format!("Cannot set global handler function: {}", err))?;
 
         Ok(Self { ctx })
     }
@@ -204,45 +173,39 @@ impl JavaScript {
         let encoded = encode(event)?;
         let transformed = self
             .ctx
-            .call_function("__vector_handler_wrapped", vec![JsValue::String(encoded)])
+            .call_function("__vector_handler", vec![encoded])
             .map_err(|err| format!("Runtime error in JavaScript code: {}", err))?;
-        if let JsValue::String(transformed) = transformed {
-            decode_and_write(&transformed, output)?;
-            Ok(())
-        } else {
-            Err("JavaScript returned unexpected data type".to_string())
-        }
+        write_value(transformed, output)
     }
 }
 
-fn encode(event: Event) -> Result<String, String> {
-    let mut json_event = serde_json::map::Map::new();
-    for (key, value) in event.as_log().all_fields() {
-        let value = match value {
-            // encode dates
-            ValueKind::Timestamp(timestamp) => json!({
-                "$date": timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
-            }),
-            // encode other types of fields
-            _ => serde_json::to_value(value)
-                .map_err(|err| format!("Cannot serialize field \"{}\": {}", key, err))?,
-        };
-        json_event.insert(key.to_string(), value);
-    }
-    Ok(serde_json::to_string(&JsonValue::Object(json_event)).unwrap())
+fn encode(event: Event) -> Result<JsValue, String> {
+    let js_event = event
+        .as_log()
+        .all_fields()
+        .map(|(key, value)| {
+            (
+                key.to_string(),
+                match value {
+                    ValueKind::Bytes(v) => {
+                        JsValue::String(std::str::from_utf8(v).unwrap().to_string())
+                    }
+                    ValueKind::Integer(v) => JsValue::Int(*v as i32),
+                    ValueKind::Float(v) => JsValue::Float(*v),
+                    ValueKind::Boolean(v) => JsValue::Bool(*v),
+                    ValueKind::Timestamp(v) => JsValue::Date(*v),
+                },
+            )
+        })
+        .collect();
+    Ok(JsValue::Object(js_event))
 }
 
-fn decode_and_write(json: &str, output: &mut Vec<Event>) -> Result<(), String> {
-    let value = serde_json::from_str(json)
-        .map_err(|err| format!("Cannot parse JSON returned from JavaScript: {}", err))?;
-    write_value(value, output)
-}
-
-fn write_value(value: JsonValue, output: &mut Vec<Event>) -> Result<(), String> {
+fn write_value(value: JsValue, output: &mut Vec<Event>) -> Result<(), String> {
     match value {
-        JsonValue::Array(json_events) => {
-            for json_event in json_events {
-                write_event(json_event, output)?;
+        JsValue::Array(js_events) => {
+            for js_event in js_events {
+                write_event(js_event, output)?;
             }
             Ok(())
         }
@@ -250,58 +213,44 @@ fn write_value(value: JsonValue, output: &mut Vec<Event>) -> Result<(), String> 
     }
 }
 
-fn write_event(json_event: JsonValue, output: &mut Vec<Event>) -> Result<(), String> {
-    match json_event {
-        JsonValue::Null => Ok(()),
-        JsonValue::Object(object) => {
+fn write_event(js_event: JsValue, output: &mut Vec<Event>) -> Result<(), String> {
+    match js_event {
+        JsValue::Null => Ok(()),
+        JsValue::Object(object) => {
             let event = object_to_event(object)?;
             output.push(event);
             Ok(())
         }
         _ => Err(format!(
-            "Expected event object or null, found: {}",
-            serde_json::to_string(&json_event).unwrap()
+            "Expected event object or null, found: {:?}",
+            js_event
         )),
     }
 }
 
-fn object_to_event(object: JsonObject) -> Result<Event, String> {
+fn object_to_event(object: HashMap<String, JsValue>) -> Result<Event, String> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
     for (k, v) in object.into_iter() {
         let v = match v {
-            JsonValue::Null => continue,
-            JsonValue::Bool(v) => ValueKind::Boolean(v),
-            JsonValue::Number(v) => {
-                // NB: maybe use BigInt as integer type in JavaScript?
-                if v.is_i64() {
-                    ValueKind::Integer(v.as_i64().unwrap())
-                } else {
-                    ValueKind::Float(v.as_f64().unwrap())
-                }
+            JsValue::Null => continue,
+            JsValue::Bool(v) => ValueKind::Boolean(v),
+            JsValue::Int(v) => ValueKind::Integer(v as i64),
+            JsValue::Float(v) => ValueKind::Float(v),
+            JsValue::String(v) => ValueKind::Bytes(v.into()),
+            JsValue::Date(v) => ValueKind::Timestamp(v),
+            JsValue::Object(v) => {
+                return Err(format!(
+                    "Nested objects inside events are not supported, \
+                     but field \"{}\" contains an object: {:?}",
+                    k, v
+                ));
             }
-            JsonValue::String(v) => ValueKind::Bytes(v.into()),
-            JsonValue::Object(v) => {
-                if let Some(JsonValue::String(date)) = v.get("$date") {
-                    DateTime::parse_from_rfc3339(&date)
-                        .map(|timestamp| Utc.from_utc_datetime(&timestamp.naive_utc()))
-                        .map(ValueKind::Timestamp)
-                        .map_err(|err| format!("Unable to deserialize date: {}", err))?
-                } else {
-                    return Err(format!(
-                        "Nested objects inside events are not supported, \
-                         but field \"{}\" contains an object: {}",
-                        k,
-                        serde_json::to_string(&v).unwrap()
-                    ));
-                }
-            }
-            JsonValue::Array(v) => {
+            JsValue::Array(v) => {
                 return Err(format!(
                     "Arrays inside events are not supported, \
-                     but field \"{}\" contains an array: {}",
-                    k,
-                    serde_json::to_string(&v).unwrap()
+                     but field \"{}\" contains an array: {:?}",
+                    k, v
                 ))
             }
         };
@@ -321,7 +270,7 @@ impl Transform for JavaScript {
 
     fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
         self.process(output, event).unwrap_or_else(|err| {
-            error!("Error in JavaScript transform; discarding event\n{}", err)
+            eprintln!("Error in JavaScript transform; discarding event\n{}", err)
         });
     }
 }
@@ -681,7 +630,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // See https://www.freelists.org/post/quickjs-devel/Bug-report-JSONstringify-produces-invalid-JSON-with-replacer-that-returns-undefined
     fn javascript_transform_remove_field_set_undefined() {
         let mut js = make_js(
             r#"
