@@ -27,7 +27,7 @@ use tracing::field;
 /// Should be greater than 1ms to avoid accidentaly causing infinite loop.
 /// Limits minimal acceptable flush_period for PrometheusSinkConfig.
 /// 3ms to account for timer and time source inprecisions.
-const MIN_FLUSH_PERIOD_MS: u64=3;//ms
+const MIN_FLUSH_PERIOD_MS: u64 = 3; //ms
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -61,8 +61,11 @@ pub fn default_flush_period() -> Duration {
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         // Checks
-        if self.flush_period<Duration::from_millis(MIN_FLUSH_PERIOD_MS){
-            return Err(format!("Flush period for sets must be greater or equal to {} ms",MIN_FLUSH_PERIOD_MS));
+        if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
+            return Err(format!(
+                "Flush period for sets must be greater or equal to {} ms",
+                MIN_FLUSH_PERIOD_MS
+            ));
         }
 
         // Build
