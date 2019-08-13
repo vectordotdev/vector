@@ -24,6 +24,11 @@ use stream_cancel::{Trigger, Tripwire};
 use tokio::timer::Delay;
 use tracing::field;
 
+/// Should be greater than 1ms to avoid accidentaly causing infinite loop.
+/// Limits minimal acceptable flush_period for PrometheusSinkConfig.
+/// 3ms to account for timer and time source inprecisions.
+const MIN_FLUSH_PERIOD_MS: u64=3;//ms
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
@@ -55,6 +60,12 @@ pub fn default_flush_period() -> Duration {
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        // Checks
+        if self.flush_period<Duration::from_millis(MIN_FLUSH_PERIOD_MS){
+            return Err(format!("Flush period for sets must be greater or equal to {} ms",MIN_FLUSH_PERIOD_MS));
+        }
+
+        // Build
         let sink = Box::new(PrometheusSink::new(self.clone(), acker));
         let healthcheck = Box::new(future::ok(()));
 

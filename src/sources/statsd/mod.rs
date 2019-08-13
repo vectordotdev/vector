@@ -163,7 +163,8 @@ mod test {
         assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Set test
-        assert_eq!(parse_count(&lines, "set"), 2);
+        // Flush could have occured
+        assert!(parse_count(&lines, "set") <= 2);
 
         // Flush test
         {
