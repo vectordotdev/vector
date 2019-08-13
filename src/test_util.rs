@@ -1,5 +1,6 @@
 use crate::Event;
-use futures::{future, stream, Async, Future, Poll, Sink, Stream};
+use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use std::mem;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -81,6 +82,18 @@ pub fn random_string(len: usize) -> String {
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
     std::iter::repeat(()).map(move |_| random_string(len))
+}
+
+pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
+    let mut events = Vec::new();
+
+    future::poll_fn(move || {
+        while events.len() < n {
+            let e = try_ready!(rx.poll()).unwrap();
+            events.push(e);
+        }
+        Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
+    })
 }
 
 pub fn wait_for(f: impl Fn() -> bool) {

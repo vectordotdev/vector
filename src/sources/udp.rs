@@ -2,13 +2,12 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use codec::{self, BytesDelimitedCodec};
+use codec::BytesDelimitedCodec;
 use futures::{future, stream::iter_ok, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
 use tokio::{
-    self,
     codec::{BytesCodec, Decoder},
     net::{UdpFramed, UdpSocket},
 };
@@ -55,9 +54,9 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
         future::lazy(move || {
             let socket = UdpSocket::bind(&address).expect("failed to bind to udp listener socket");
 
-            info!(message = "listening.", addr = &field::display(address),);
+            info!(message = "listening.", %address);
 
-            future::ok(socket)
+            Ok(socket)
         })
         .and_then(move |socket| {
             let host_key = host_key.clone();
@@ -90,7 +89,7 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
                 })
                 // Flatten messages from single packet
                 .flatten()
-                .map_err(|e: io::Error| error!("error reading datagram: {:?}", e))
+                .map_err(|error: io::Error| error!(message = "error decoding datagram.", %error))
                 .forward(out)
                 .map(|_| info!("finished sending"))
         }),
@@ -101,16 +100,14 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
 mod test {
     use super::UdpConfig;
     use crate::event;
-    use crate::test_util::next_addr;
+    use crate::test_util::{collect_n, next_addr};
     use crate::topology::config::{GlobalOptions, SourceConfig};
-    use futures::{future::poll_fn, sync::mpsc, try_ready, Future, Stream};
+    use futures::sync::mpsc;
     use std::{
-        mem,
         net::{SocketAddr, UdpSocket},
         thread,
         time::Duration,
     };
-    use tokio::prelude::Async;
 
     fn send_lines<'a>(addr: SocketAddr, lines: impl IntoIterator<Item = &'a str>) -> SocketAddr {
         let bind = next_addr();
@@ -135,21 +132,9 @@ mod test {
 
         // Give packets some time to flow through
         thread::sleep(Duration::from_millis(10));
+
         // Done
-
         bind
-    }
-
-    fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
-        let mut events = Vec::new();
-
-        poll_fn(move || {
-            while events.len() < n {
-                let e = try_ready!(rx.poll()).unwrap();
-                events.push(e);
-            }
-            Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
-        })
     }
 
     fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, tokio::runtime::Runtime) {
