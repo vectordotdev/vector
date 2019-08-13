@@ -143,28 +143,22 @@ impl JavaScript {
             .build()
             .map_err(|err| format!("Cannot create JavaScript runtime: {}", err))?;
 
-        // inject handler
-        let (handler, source) = if let Some(handler) = handler {
-            (handler, format!(r"{}", source))
+        // inject handler source
+        let source = if let Some(handler) = handler {
+            format!("{}; __vector_handler = {}", source, handler)
         } else {
-            let handler = "__vector_handler".to_string();
-            let source = format!(r"const {} = ({})", handler, source);
-            (handler, source)
+            format!(r"__vector_handler = ({})", source)
         };
         ctx.eval(&source)
             .map_err(|err| format!("Cannot create handler: {}", err))?;
 
         // check that handler is a function
         let handler_is_a_function: bool = ctx
-            .eval_as(&format!(r"typeof {} === 'function'", handler))
+            .eval_as(r"typeof __vector_handler === 'function'")
             .map_err(|err| format!("Cannot validate handler: {}", err))?;
         if !handler_is_a_function {
             return Err("Handler is not a function".to_string());
         }
-
-        // create set handler function that can be called using ctx.call_function
-        ctx.eval(&format!(r"__vector_handler = {}", handler))
-            .map_err(|err| format!("Cannot set global handler function: {}", err))?;
 
         Ok(Self { ctx })
     }
