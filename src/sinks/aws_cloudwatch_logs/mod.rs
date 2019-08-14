@@ -12,7 +12,7 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
     Region,
@@ -36,9 +36,10 @@ use tower::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
-    pub stream_name: String,
-    pub group_name: String,
+    pub group_name: Template,
+    pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub batch_timeout: Option<u64>,
@@ -113,8 +114,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
-        let log_group = self.group_name.clone().into();
-        let log_stream = Template::from(self.stream_name.as_str());
+        let log_group = self.group_name.clone();
+        let log_stream = self.stream_name.clone();
 
         let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
 
@@ -333,14 +334,25 @@ pub struct CloudwatchKey {
 
 fn partition(
     event: Event,
-    group: &Bytes,
+    group: &Template,
     stream: &Template,
 ) -> Option<PartitionInnerBuffer<Event, CloudwatchKey>> {
+    let group = match group.render(&event) {
+        Ok(b) => b,
+        Err(missing_keys) => {
+            warn!(
+                message = "group keys do not exist on the event; dropping event.",
+                keys = ?missing_keys
+            );
+            return None;
+        }
+    };
+
     let stream = match stream.render(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "stream keys do not exist on the event; dropping event.",
                 keys = ?missing_keys
             );
             return None;
@@ -356,17 +368,24 @@ fn partition(
 }
 
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
+    if config.group_name.is_dynamic() {
+        info!("cloudwatch group_name is dynamic; skipping healthcheck.");
+        return Ok(Box::new(future::ok(())));
+    }
+
+    let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+
     let region = config.region.clone();
 
     let client = create_client(region.try_into()?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
-        log_group_name_prefix: config.group_name.clone().into(),
+        log_group_name_prefix: Some(group_name.clone()),
         ..Default::default()
     };
 
-    let expected_group_name = config.group_name.clone();
+    let expected_group_name = group_name;
 
     // This will attempt to find the group name passed in and verify that
     // it matches the one that AWS sends back.
