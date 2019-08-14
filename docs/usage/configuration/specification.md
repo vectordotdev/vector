@@ -819,6 +819,20 @@ end
   stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
 
+  # Dynamically create a log group if it does not already exist. This will ignore
+  # `create_missing_stream` directly after creating the group and will create the
+  # first stream.
+  # 
+  # * optional
+  # * default: true
+  create_missing_group = true
+
+  # Dynamically create a log stream if it does not already exist.
+  # 
+  # * optional
+  # * default: true
+  create_missing_stream = true
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
