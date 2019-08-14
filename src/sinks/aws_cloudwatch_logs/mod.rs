@@ -19,8 +19,8 @@ use rusoto_core::{
 };
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, DescribeLogGroupsRequest,
-    DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
+    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
+    DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
@@ -103,6 +103,7 @@ pub enum CloudwatchError {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
     CreateStream(CreateLogStreamError),
+    CreateGroup(CreateLogGroupError),
     NoStreamsFound,
     ServiceDropped,
     MakeService,
@@ -523,6 +524,7 @@ impl fmt::Display for CloudwatchError {
             CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
             CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
             CloudwatchError::CreateStream(e) => write!(f, "CloudwatchError::CreateStream: {}", e),
+            CloudwatchError::CreateGroup(e) => write!(f, "CloudwatchError::CreateGroup: {}", e),
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
