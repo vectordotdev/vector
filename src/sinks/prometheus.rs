@@ -307,7 +307,11 @@ impl Sink for PrometheusSink {
                     hist.observe(val);
                 }
             }),
-            Metric::Set { name, val } => {
+            Metric::Set {
+                name,
+                val,
+                timestamp: _,
+            } => {
                 // Sets are implemented using promethius integer gauges.
                 self.with_set(name, move |&mut (ref mut counter, ref mut set)| {
                     // Check if counter was reseted
