@@ -79,10 +79,14 @@ impl Future for CloudwatchFuture {
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(e) => {
                             if let DescribeLogStreamsError::ResourceNotFound(_) = e {
-                                info!("log group provided does not exist; creating a new one.");
+                                if self.create_missing_group {
+                                    info!("log group provided does not exist; creating a new one.");
 
-                                self.state = State::CreateGroup(self.client.create_log_group());
-                                continue;
+                                    self.state = State::CreateGroup(self.client.create_log_group());
+                                    continue;
+                                } else {
+                                    return Err(CloudwatchError::Describe(e));
+                                }
                             } else {
                                 return Err(CloudwatchError::Describe(e));
                             }
@@ -107,8 +111,12 @@ impl Future for CloudwatchFuture {
                         trace!(message = "putting logs.", ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
                     } else {
-                        trace!("provided stream does not exist; creating a new one.");
-                        self.state = State::CreateStream(self.client.create_log_stream());
+                        if self.create_missing_stream {
+                            debug!("provided stream does not exist; creating a new one.");
+                            self.state = State::CreateStream(self.client.create_log_stream());
+                        } else {
+                            return Err(CloudwatchError::NoStreamsFound);
+                        }
                     }
                 }
 
@@ -117,6 +125,9 @@ impl Future for CloudwatchFuture {
 
                     trace!("group created.");
 
+                    // This does not abide by `create_missing_stream` since a group
+                    // never has any streams and thus we need to create one if a group
+                    // is created no matter what.
                     self.state = State::CreateStream(self.client.create_log_stream());
                 }
 
