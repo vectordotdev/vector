@@ -156,6 +156,9 @@ fn main() {
 
         let config = vector::topology::Config::load(file);
         let config = handle_config_errors(config);
+        let config = config.unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
 
         let mut rt = {
             let mut builder = tokio::runtime::Builder::new();
@@ -252,9 +255,13 @@ fn main() {
             trace!("Parsing config");
             let config = vector::topology::Config::load(file);
             let config = handle_config_errors(config);
-
-            let success = topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
-            if !success {
+            if let Some(config) = config {
+                let success =
+                    topology.reload_config_and_respawn(config, &mut rt, opts.require_healthy);
+                if !success {
+                    error!("Reload was not successful.");
+                }
+            } else {
                 error!("Reload aborted.");
             }
         };
@@ -285,17 +292,15 @@ fn main() {
     });
 }
 
-fn handle_config_errors(config: Result<Config, Vec<String>>) -> Config {
+fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
     match config {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
-            std::process::exit(exitcode::CONFIG);
+            None
         }
-        Ok(config) => {
-            return config;
-        }
+        Ok(config) => Some(config),
     }
 }
 
