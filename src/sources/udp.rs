@@ -97,9 +97,11 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
                 })
                 // Flatten messages from single packet
                 .flatten()
-                .map_err(|_: io::Error| ())
+                // Error from UdpSocket
+                .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
                 .forward(out)
-                .map(|_| info!("finished sending"))
+                // Done with listening and sending
+                .map(|_| ())
         }),
     )
 }
