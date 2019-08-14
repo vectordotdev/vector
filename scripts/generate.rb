@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# generate.sh
+# generate.rb
 #
 # SUMMARY
 #
