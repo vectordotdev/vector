@@ -63,6 +63,10 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
+  
+  # OPTIONAL - Headers
+  [sinks.my_sink_id.headers]
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -101,6 +105,10 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
+
+  # OPTIONAL - Headers
+  [sinks.<sink-id>.headers]
+    * = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -266,6 +274,17 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Headers
+  #
+
+  [sinks.elasticsearch_sink.headers]
+    # A custom header to be added to each outgoing Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -300,6 +319,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| **OPTIONAL** - Headers | | |
+| `headers.*` | `string` | A custom header to be added to each outgoing Elasticsearch request.<br />`required` `example: (see above)` |
 
 ## Examples
 
