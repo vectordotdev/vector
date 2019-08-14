@@ -756,6 +756,54 @@ mod integration_tests {
     }
 
     #[test]
+    fn cloudwatch_dynamic_group_and_stream_creation() {
+        let mut rt = Runtime::new().unwrap();
+
+        let stream_name = gen_stream();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: stream_name.clone().into(),
+            group_name: GROUP_NAME.into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+
+        let (sink, _) = config.build(Acker::Null).unwrap();
+
+        let timestamp = chrono::Utc::now();
+
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+
+        let pump = sink.send_all(events);
+        let (sink, _) = rt.block_on(pump).unwrap();
+        // drop the sink so it closes all its connections
+        drop(sink);
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = stream_name.clone().into();
+        request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some(timestamp.timestamp_millis());
+
+        let client = create_client(region).unwrap();
+
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(output_lines, input_lines);
+    }
+
+    #[test]
     fn cloudwatch_insert_log_event_batched() {
         let mut rt = Runtime::new().unwrap();
 
