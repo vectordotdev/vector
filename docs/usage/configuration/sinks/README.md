@@ -71,6 +71,13 @@ negative result. Even in simpler cases, we need to think about the effects of
 writing test data and whether the user would find that surprising or invasive.
 The answer usually depends on the system we're interfacing with.
 
+In some cases, like the Kinesis example above, the right thing to do might be
+nothing at all. If we require dynamic information to figure out what entity
+(i.e. Kinesis stream in this case) that we're even dealing with, odds are very
+low that we'll be able to come up with a way to meaningfully validate that it's
+in working order. It's perfectly valid to have a healthcheck that falls back to
+doing nothing when there is a data dependency like this.
+
 With all that in mind, here is a simple checklist to go over when writing a new
 healthcheck:
 
