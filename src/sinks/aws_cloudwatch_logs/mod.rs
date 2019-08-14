@@ -42,6 +42,8 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub create_missing_group: Option<bool>,
+    pub create_missing_stream: Option<bool>,
     pub batch_timeout: Option<u64>,
     pub batch_size: Option<usize>,
     pub encoding: Option<Encoding>,
@@ -60,6 +62,8 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
+    create_missing_group: bool,
+    create_missing_stream: bool,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
@@ -239,11 +243,16 @@ impl CloudwatchLogsSvc {
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
 
+        let create_missing_group = config.create_missing_group.unwrap_or(true);
+        let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+
         Ok(CloudwatchLogsSvc {
             client,
             encoding: config.encoding.clone(),
             stream_name,
             group_name,
+            create_missing_group,
+            create_missing_stream,
             token: None,
             token_rx: None,
         })
@@ -317,6 +326,8 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 self.client.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
+                self.create_missing_group,
+                self.create_missing_stream,
                 events,
                 self.token.take(),
                 tx,

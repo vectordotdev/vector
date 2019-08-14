@@ -11,6 +11,8 @@ use rusoto_logs::{
 pub struct CloudwatchFuture {
     client: Client,
     state: State,
+    create_missing_group: bool,
+    create_missing_stream: bool,
     events: Option<Vec<InputLogEvent>>,
     token_tx: Option<oneshot::Sender<Option<String>>>,
 }
@@ -33,6 +35,8 @@ impl CloudwatchFuture {
         client: CloudWatchLogsClient,
         stream_name: String,
         group_name: String,
+        create_missing_group: bool,
+        create_missing_stream: bool,
         events: Vec<InputLogEvent>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -56,6 +60,8 @@ impl CloudwatchFuture {
             events,
             state,
             token_tx: Some(token_tx),
+            create_missing_group,
+            create_missing_stream,
         }
     }
 }
