@@ -54,7 +54,7 @@ pub fn default_address() -> SocketAddr {
 }
 
 pub fn default_flush_period() -> Duration {
-    Duration::from_secs(10)
+    Duration::from_secs(60)
 }
 
 #[typetag::serde(name = "prometheus")]
