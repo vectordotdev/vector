@@ -1,0 +1,509 @@
+use crate::{
+    buffers::Acker,
+    event::{metric::Direction, Event, Metric},
+    region::RegionOrEndpoint,
+    sinks::util::{
+        retries::{FixedRetryPolicy, RetryLogic},
+        BatchServiceSink, SinkExt,
+    },
+    topology::config::{DataType, SinkConfig},
+};
+use chrono::{DateTime, SecondsFormat, Utc};
+use futures::{Future, Poll};
+use rusoto_cloudwatch::{
+    CloudWatch, CloudWatchClient, MetricDatum, PutMetricDataError, PutMetricDataInput,
+};
+use rusoto_core::{Region, RusotoFuture};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::{convert::TryInto, time::Duration};
+use tower::{Service, ServiceBuilder};
+
+#[derive(Clone, Default)]
+struct State {
+    gauges: HashMap<String, f64>,
+}
+
+#[derive(Clone)]
+pub struct CloudWatchMetricsSvc {
+    client: CloudWatchClient,
+    config: CloudWatchMetricsSinkConfig,
+    state: State,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct CloudWatchMetricsSinkConfig {
+    pub namespace: String,
+    #[serde(flatten)]
+    pub region: RegionOrEndpoint,
+    pub batch_size: Option<usize>,
+    pub batch_timeout: Option<u64>,
+
+    // Tower Request based configuration
+    pub request_in_flight_limit: Option<usize>,
+    pub request_timeout_secs: Option<u64>,
+    pub request_rate_limit_duration_secs: Option<u64>,
+    pub request_rate_limit_num: Option<u64>,
+    pub request_retry_attempts: Option<usize>,
+    pub request_retry_backoff_secs: Option<u64>,
+}
+
+#[typetag::serde(name = "aws_cloudwatch_metrics")]
+impl SinkConfig for CloudWatchMetricsSinkConfig {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        let sink = CloudWatchMetricsSvc::new(self.clone(), acker)?;
+        let healthcheck = CloudWatchMetricsSvc::healthcheck(self)?;
+        Ok((sink, healthcheck))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Metric
+    }
+}
+
+impl CloudWatchMetricsSvc {
+    pub fn new(
+        config: CloudWatchMetricsSinkConfig,
+        acker: Acker,
+    ) -> Result<super::RouterSink, String> {
+        let client = Self::create_client(config.region.clone().try_into()?)?;
+
+        let batch_size = config.batch_size.unwrap_or(20);
+        let batch_timeout = config.batch_timeout.unwrap_or(1);
+
+        let timeout = config.request_timeout_secs.unwrap_or(30);
+        let in_flight_limit = config.request_in_flight_limit.unwrap_or(5);
+        let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
+        let rate_limit_num = config.request_rate_limit_num.unwrap_or(150);
+        let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
+        let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
+
+        let policy = FixedRetryPolicy::new(
+            retry_attempts,
+            Duration::from_secs(retry_backoff_secs),
+            CloudWatchMetricsRetryLogic,
+        );
+
+        let state = State::default();
+
+        let cloudwatch_metrics = CloudWatchMetricsSvc {
+            client,
+            config,
+            state,
+        };
+
+        let svc = ServiceBuilder::new()
+            .concurrency_limit(in_flight_limit)
+            .rate_limit(rate_limit_num, Duration::from_secs(rate_limit_duration))
+            .retry(policy)
+            .timeout(Duration::from_secs(timeout))
+            .service(cloudwatch_metrics);
+
+        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
+            Vec::new(),
+            batch_size,
+            Duration::from_secs(batch_timeout),
+        );
+
+        Ok(Box::new(sink))
+    }
+
+    fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> Result<super::Healthcheck, String> {
+        let client = Self::create_client(config.region.clone().try_into()?)?;
+
+        let datum = MetricDatum {
+            metric_name: "healthcheck".into(),
+            value: Some(1.0),
+            ..Default::default()
+        };
+        let request = PutMetricDataInput {
+            namespace: config.namespace.clone(),
+            metric_data: vec![datum],
+        };
+
+        let response = client.put_metric_data(request);
+        let healthcheck = response.map_err(|err| err.to_string());
+
+        Ok(Box::new(healthcheck))
+    }
+
+    fn create_client(region: Region) -> Result<CloudWatchClient, String> {
+        #[cfg(test)]
+        {
+            // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
+            let region = match region {
+                Region::Custom { endpoint, .. } => Region::Custom {
+                    name: "us-east-1".into(),
+                    endpoint,
+                },
+                _ => panic!("Only Custom regions are supported for CloudWatchClient testing"),
+            };
+            Ok(CloudWatchClient::new(region))
+        }
+
+        #[cfg(not(test))]
+        {
+            Ok(CloudWatchClient::new(region))
+        }
+    }
+
+    fn encode_events(&mut self, events: Vec<Event>) -> PutMetricDataInput {
+        let metric_data: Vec<_> = events
+            .into_iter()
+            .filter_map(|event| match event.into_metric() {
+                Metric::Counter {
+                    name,
+                    val,
+                    timestamp,
+                } => Some(MetricDatum {
+                    metric_name: name.to_string(),
+                    value: Some(val),
+                    timestamp: timestamp.map(timestamp_to_string),
+                    ..Default::default()
+                }),
+                Metric::Gauge {
+                    name,
+                    val,
+                    direction,
+                    timestamp,
+                } => {
+                    let delta = match direction {
+                        None => 0.0,
+                        Some(Direction::Plus) => val,
+                        Some(Direction::Minus) => -val,
+                    };
+
+                    let val = self
+                        .state
+                        .gauges
+                        .entry(name.clone())
+                        .and_modify(|v| {
+                            if direction.is_none() {
+                                *v = val
+                            } else {
+                                *v += delta
+                            }
+                        })
+                        .or_insert(val);
+
+                    Some(MetricDatum {
+                        metric_name: name.to_string(),
+                        value: Some(*val),
+                        timestamp: timestamp.map(timestamp_to_string),
+                        ..Default::default()
+                    })
+                }
+                Metric::Histogram {
+                    name,
+                    val,
+                    sample_rate,
+                    timestamp,
+                } => Some(MetricDatum {
+                    metric_name: name.to_string(),
+                    values: Some(vec![val]),
+                    counts: Some(vec![sample_rate as f64]),
+                    timestamp: timestamp.map(timestamp_to_string),
+                    ..Default::default()
+                }),
+                _ => None,
+            })
+            .collect();
+
+        let namespace = self.config.namespace.clone();
+
+        let datum = PutMetricDataInput {
+            namespace,
+            metric_data,
+        };
+
+        datum
+    }
+}
+
+impl Service<Vec<Event>> for CloudWatchMetricsSvc {
+    type Response = ();
+    type Error = PutMetricDataError;
+    type Future = RusotoFuture<(), PutMetricDataError>;
+
+    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+        Ok(().into())
+    }
+
+    fn call(&mut self, items: Vec<Event>) -> Self::Future {
+        let input = self.encode_events(items);
+
+        if !input.metric_data.is_empty() {
+            debug!(message = "sending data.", ?input);
+            self.client.put_metric_data(input)
+        } else {
+            Ok(()).into()
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CloudWatchMetricsRetryLogic;
+
+impl RetryLogic for CloudWatchMetricsRetryLogic {
+    type Error = PutMetricDataError;
+    type Response = ();
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            PutMetricDataError::HttpDispatch(_) => true,
+            PutMetricDataError::InternalServiceFault(_) => true,
+            PutMetricDataError::Unknown(res)
+                if res.status.is_server_error()
+                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{event::metric::Metric, Event};
+    use chrono::offset::TimeZone;
+    use pretty_assertions::assert_eq;
+    use rusoto_cloudwatch::PutMetricDataInput;
+
+    fn config() -> CloudWatchMetricsSinkConfig {
+        CloudWatchMetricsSinkConfig {
+            namespace: "vector".into(),
+            region: RegionOrEndpoint::with_endpoint("local".to_owned()),
+            ..Default::default()
+        }
+    }
+
+    fn svc() -> CloudWatchMetricsSvc {
+        let config = config();
+        let region = config.region.clone().try_into().unwrap();
+        let client = CloudWatchMetricsSvc::create_client(region).unwrap();
+        let state = State::default();
+
+        CloudWatchMetricsSvc {
+            client,
+            config,
+            state,
+        }
+    }
+
+    #[test]
+    fn encode_events_basic_counter() {
+        let events = vec![
+            Event::Metric(Metric::Counter {
+                name: "exception_total".into(),
+                val: 1.0,
+                timestamp: None,
+            }),
+            Event::Metric(Metric::Counter {
+                name: "bytes_out".into(),
+                val: 2.5,
+                timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
+            }),
+        ];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![
+                    MetricDatum {
+                        metric_name: "exception_total".into(),
+                        value: Some(1.0),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "bytes_out".into(),
+                        value: Some(2.5),
+                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                        ..Default::default()
+                    }
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn encode_events_absolute_gauge() {
+        let events = vec![Event::Metric(Metric::Gauge {
+            name: "temperature".into(),
+            val: 10.0,
+            direction: None,
+            timestamp: None,
+        })];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![MetricDatum {
+                    metric_name: "temperature".into(),
+                    value: Some(10.0),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn encode_events_relative_gauge() {
+        let events = vec![
+            Event::Metric(Metric::Gauge {
+                name: "temperature".into(),
+                val: 10.0,
+                direction: None,
+                timestamp: None,
+            }),
+            Event::Metric(Metric::Gauge {
+                name: "temperature".into(),
+                val: 1.0,
+                direction: Some(Direction::Plus),
+                timestamp: None,
+            }),
+            Event::Metric(Metric::Gauge {
+                name: "temperature".into(),
+                val: 1.5,
+                direction: Some(Direction::Minus),
+                timestamp: None,
+            }),
+            Event::Metric(Metric::Gauge {
+                name: "temperature".into(),
+                val: 3.2,
+                direction: None,
+                timestamp: None,
+            }),
+        ];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![
+                    MetricDatum {
+                        metric_name: "temperature".into(),
+                        value: Some(10.0),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "temperature".into(),
+                        value: Some(11.0),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "temperature".into(),
+                        value: Some(9.5),
+                        ..Default::default()
+                    },
+                    MetricDatum {
+                        metric_name: "temperature".into(),
+                        value: Some(3.2),
+                        ..Default::default()
+                    },
+                ],
+            }
+        );
+    }
+    #[test]
+    fn encode_events_histogram() {
+        let events = vec![Event::Metric(Metric::Histogram {
+            name: "latency".into(),
+            val: 11.0,
+            sample_rate: 100,
+            timestamp: None,
+        })];
+
+        assert_eq!(
+            svc().encode_events(events),
+            PutMetricDataInput {
+                namespace: "vector".into(),
+                metric_data: vec![MetricDatum {
+                    metric_name: "latency".into(),
+                    values: Some(vec![11.0]),
+                    counts: Some(vec![100.0]),
+                    ..Default::default()
+                }],
+            }
+        );
+    }
+}
+
+#[cfg(feature = "cloudwatch-metrics-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::region::RegionOrEndpoint;
+    use crate::test_util::{random_string, runtime};
+    use chrono::offset::TimeZone;
+    use futures::{stream, Sink};
+
+    fn config() -> CloudWatchMetricsSinkConfig {
+        CloudWatchMetricsSinkConfig {
+            namespace: "vector".into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4582".to_owned()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn cloudwatch_metrics_healthchecks() {
+        let mut rt = runtime();
+
+        let healthcheck = CloudWatchMetricsSvc::healthcheck(&config()).unwrap();
+        rt.block_on(healthcheck).unwrap();
+    }
+
+    #[test]
+    fn cloudwatch_metrics_put_data() {
+        let mut rt = runtime();
+        let sink = CloudWatchMetricsSvc::new(config(), Acker::Null).unwrap();
+
+        let mut events = Vec::new();
+
+        let counter_name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Counter {
+                name: format!("counter-{}", counter_name),
+                val: i as f64,
+                timestamp: None,
+            });
+            events.push(event);
+        }
+
+        let gauge_name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Gauge {
+                name: format!("gauge-{}", gauge_name),
+                val: i as f64,
+                direction: None,
+                timestamp: None,
+            });
+            events.push(event);
+        }
+
+        let histogram_name = random_string(10);
+        for i in 0..10 {
+            let event = Event::Metric(Metric::Histogram {
+                name: format!("histogram-{}", histogram_name),
+                val: i as f64,
+                sample_rate: 100,
+                timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
+            });
+            events.push(event);
+        }
+
+        let stream = stream::iter_ok(events.clone().into_iter());
+
+        let pump = sink.send_all(stream);
+        rt.block_on(pump).unwrap();
+    }
+}

@@ -64,6 +64,7 @@ hotmic = "0.8"
 rusoto_core = "0.37.0"
 rusoto_s3 = "0.37.0"
 rusoto_logs = "0.37.0"
+rusoto_cloudwatch = "0.37.0"
 rusoto_kinesis = "0.37.0"
 rusoto_credential = "0.16.0"
 
@@ -139,14 +140,16 @@ tower-test = "0.1"
 [features]
 default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
-  "cloudwatch-integration-tests",
+  "cloudwatch-logs-integration-tests",
+  "cloudwatch-metrics-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
   "splunk-integration-tests",
 ]
-cloudwatch-integration-tests = []
+cloudwatch-logs-integration-tests = []
+cloudwatch-metrics-integration-tests = []
 es-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []

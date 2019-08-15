@@ -667,7 +667,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "cloudwatch-integration-tests")]
+#[cfg(feature = "cloudwatch-logs-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
