@@ -560,6 +560,6 @@ mod integration_tests {
         let stream = stream::iter_ok(events.clone().into_iter());
 
         let pump = sink.send_all(stream);
-        rt.block_on(pump).unwrap();
+        let _ = rt.block_on(pump).unwrap();
     }
 }

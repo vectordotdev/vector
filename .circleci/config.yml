@@ -44,7 +44,9 @@ jobs:
           name: Check fmt
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check-fmt
+          command: |
+            rustup component add rustfmt
+            make check-fmt
 
   check-generate:
     docker:

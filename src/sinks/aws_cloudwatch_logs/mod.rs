@@ -175,7 +175,7 @@ impl CloudwatchLogsPartitionSvc {
 
 impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogsPartitionSvc {
     type Response = ();
-    type Error = Box<std::error::Error + Send + Sync + 'static>;
+    type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
@@ -530,7 +530,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 }
 
 impl fmt::Display for CloudwatchError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
             CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),

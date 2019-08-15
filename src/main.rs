@@ -90,10 +90,10 @@ fn main() {
         0 => match opts.verbose {
             0 => "info",
             1 => "debug",
-            2...255 => "trace",
+            2..=255 => "trace",
         },
         1 => "warn",
-        2...255 => "error",
+        2..=255 => "error",
     };
 
     let mut levels = [
