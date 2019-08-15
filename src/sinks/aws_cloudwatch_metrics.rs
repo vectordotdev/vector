@@ -11,7 +11,7 @@ use crate::{
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{Future, Poll};
 use rusoto_cloudwatch::{
-    CloudWatch, CloudWatchClient, MetricDatum, PutMetricDataError, PutMetricDataInput,
+    CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
 use rusoto_core::{Region, RusotoFuture};
 use serde::{Deserialize, Serialize};
@@ -156,10 +156,12 @@ impl CloudWatchMetricsSvc {
                     name,
                     val,
                     timestamp,
+                    tags,
                 } => Some(MetricDatum {
                     metric_name: name.to_string(),
                     value: Some(val),
                     timestamp: timestamp.map(timestamp_to_string),
+                    dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
                 }),
                 Metric::Gauge {
@@ -167,6 +169,7 @@ impl CloudWatchMetricsSvc {
                     val,
                     direction,
                     timestamp,
+                    tags,
                 } => {
                     let delta = match direction {
                         None => 0.0,
@@ -191,6 +194,7 @@ impl CloudWatchMetricsSvc {
                         metric_name: name.to_string(),
                         value: Some(*val),
                         timestamp: timestamp.map(timestamp_to_string),
+                        dimensions: tags.map(tags_to_dimensions),
                         ..Default::default()
                     })
                 }
@@ -199,11 +203,13 @@ impl CloudWatchMetricsSvc {
                     val,
                     sample_rate,
                     timestamp,
+                    tags,
                 } => Some(MetricDatum {
                     metric_name: name.to_string(),
                     values: Some(vec![val]),
                     counts: Some(vec![sample_rate as f64]),
                     timestamp: timestamp.map(timestamp_to_string),
+                    dimensions: tags.map(tags_to_dimensions),
                     ..Default::default()
                 }),
                 _ => None,
@@ -268,6 +274,17 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
+fn tags_to_dimensions(tags: HashMap<String, String>) -> Vec<Dimension> {
+    // according to the API, up to 10 dimensions per metric can be provided
+    tags.iter()
+        .take(10)
+        .map(|(k, v)| Dimension {
+            name: k.to_string(),
+            value: v.to_string(),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,11 +321,23 @@ mod tests {
                 name: "exception_total".into(),
                 val: 1.0,
                 timestamp: None,
+                tags: None,
             }),
             Event::Metric(Metric::Counter {
                 name: "bytes_out".into(),
                 val: 2.5,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
+                tags: None,
+            }),
+            Event::Metric(Metric::Counter {
+                name: "healthcheck".into(),
+                val: 1.0,
+                timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
+                tags: Some(
+                    vec![("region".to_owned(), "local".to_owned())]
+                        .into_iter()
+                        .collect(),
+                ),
             }),
         ];
 
@@ -327,7 +356,17 @@ mod tests {
                         value: Some(2.5),
                         timestamp: Some("2018-11-14T08:09:10.123Z".into()),
                         ..Default::default()
-                    }
+                    },
+                    MetricDatum {
+                        metric_name: "healthcheck".into(),
+                        value: Some(1.0),
+                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                        dimensions: Some(vec![Dimension {
+                            name: "region".into(),
+                            value: "local".into()
+                        }]),
+                        ..Default::default()
+                    },
                 ],
             }
         );
@@ -340,6 +379,7 @@ mod tests {
             val: 10.0,
             direction: None,
             timestamp: None,
+            tags: None,
         })];
 
         assert_eq!(
@@ -363,24 +403,28 @@ mod tests {
                 val: 10.0,
                 direction: None,
                 timestamp: None,
+                tags: None,
             }),
             Event::Metric(Metric::Gauge {
                 name: "temperature".into(),
                 val: 1.0,
                 direction: Some(Direction::Plus),
                 timestamp: None,
+                tags: None,
             }),
             Event::Metric(Metric::Gauge {
                 name: "temperature".into(),
                 val: 1.5,
                 direction: Some(Direction::Minus),
                 timestamp: None,
+                tags: None,
             }),
             Event::Metric(Metric::Gauge {
                 name: "temperature".into(),
                 val: 3.2,
                 direction: None,
                 timestamp: None,
+                tags: None,
             }),
         ];
 
@@ -420,6 +464,7 @@ mod tests {
             val: 11.0,
             sample_rate: 100,
             timestamp: None,
+            tags: None,
         })];
 
         assert_eq!(
@@ -475,6 +520,15 @@ mod integration_tests {
                 name: format!("counter-{}", counter_name),
                 val: i as f64,
                 timestamp: None,
+                tags: Some(
+                    vec![
+                        ("region".to_owned(), "us-west-1".to_owned()),
+                        ("production".to_owned(), "true".to_owned()),
+                        ("e".to_owned(), "".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
             });
             events.push(event);
         }
@@ -486,6 +540,7 @@ mod integration_tests {
                 val: i as f64,
                 direction: None,
                 timestamp: None,
+                tags: None,
             });
             events.push(event);
         }
@@ -497,6 +552,7 @@ mod integration_tests {
                 val: i as f64,
                 sample_rate: 100,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
+                tags: None,
             });
             events.push(event);
         }

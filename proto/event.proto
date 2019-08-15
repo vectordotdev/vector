@@ -39,6 +39,7 @@ message Counter {
   string name = 1;
   double val = 2;
   google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
 }
 
 message Histogram {
@@ -46,6 +47,7 @@ message Histogram {
   double val = 2;
   uint32 sample_rate = 3;
   google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
 }
 
 message Gauge {
@@ -58,10 +60,12 @@ message Gauge {
   }
   Direction direction = 3;
   google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
 }
 
 message Set {
   string name = 1;
   string val = 2;
   google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
 }
