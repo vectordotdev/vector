@@ -721,7 +721,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -770,7 +770,8 @@ mod integration_tests {
     fn cloudwatch_dynamic_group_and_stream_creation() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let group_name = gen_name();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -779,7 +780,7 @@ mod integration_tests {
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             ..Default::default()
         };
@@ -797,7 +798,7 @@ mod integration_tests {
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = GROUP_NAME.into();
+        request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
         let client = create_client(region).unwrap();
@@ -818,7 +819,8 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_batched() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let group_name = gen_name();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -828,7 +830,7 @@ mod integration_tests {
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             batch_size: Some(2),
             ..Default::default()
@@ -847,7 +849,7 @@ mod integration_tests {
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = GROUP_NAME.into();
+        request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
         let client = create_client(region).unwrap();
@@ -868,7 +870,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_partitioned() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -985,7 +987,7 @@ mod integration_tests {
         };
     }
 
-    fn gen_stream() -> String {
+    fn gen_name() -> String {
         format!("test-{}", random_string(10).to_lowercase())
     }
 }
