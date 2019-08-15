@@ -45,8 +45,8 @@ jobs:
           environment:
             RUSTFLAGS: "-D warnings"
           command: |
-          rustup component add rustfmt
-          make check-fmt
+            rustup component add rustfmt
+            make check-fmt
 
   check-generate:
     docker:
