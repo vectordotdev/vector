@@ -41,15 +41,15 @@ impl<S> LimitSubscriber<S> {
 }
 
 impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         self.inner.enabled(metadata)
     }
 
-    fn new_span(&self, span: &Attributes) -> Id {
+    fn new_span(&self, span: &Attributes<'_>) -> Id {
         self.inner.new_span(span)
     }
 
-    fn record(&self, span: &Id, values: &Record) {
+    fn record(&self, span: &Id, values: &Record<'_>) {
         self.inner.record(span, values);
     }
 
@@ -57,7 +57,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
         self.inner.record_follows_from(span, follows);
     }
 
-    fn event(&self, event: &Event) {
+    fn event(&self, event: &Event<'_>) {
         if event.fields().any(|f| f.name() == "rate_limit_secs") {
             let mut limit_visitor = LimitVisitor::default();
             event.record(&mut limit_visitor);
@@ -157,7 +157,7 @@ impl<S: Subscriber> Subscriber for LimitSubscriber<S> {
         self.inner.exit(span);
     }
 
-    fn register_callsite(&self, metadata: &'static Metadata) -> Interest {
+    fn register_callsite(&self, metadata: &'static Metadata<'_>) -> Interest {
         self.inner.register_callsite(metadata)
     }
 
@@ -177,13 +177,13 @@ impl Visit for LimitVisitor {
         }
     }
 
-    fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
+    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
 }
 
 struct FmtLevel<'a>(&'a Level);
 
 impl<'a> fmt::Display for FmtLevel<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self.0 {
             Level::TRACE => write!(f, "{}", Colour::Purple.paint("TRACE")),
             Level::DEBUG => write!(f, "{}", Colour::Blue.paint("DEBUG")),
@@ -206,5 +206,5 @@ impl Visit for FmtVisitor {
         }
     }
 
-    fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
+    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
 }
