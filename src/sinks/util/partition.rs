@@ -241,7 +241,7 @@ where
 }
 
 impl<B, S, K> fmt::Debug for PartitionedBatchSink<B, S, K> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PartitionedBatchSink")
             .field("max_linger", &self.config.max_linger)
             .field("max_size", &self.config.max_size)

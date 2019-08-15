@@ -95,7 +95,7 @@ struct PrometheusSink {
 fn handle(
     req: Request<Body>,
     registry: &Registry,
-) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
