@@ -17,7 +17,7 @@ lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Template {
     src: String,
     src_bytes: Bytes,
@@ -33,6 +33,12 @@ impl From<&str> for Template {
             has_ts: StrftimeItems::new(src).count() > 0,
             has_fields: RE.is_match(src),
         }
+    }
+}
+
+impl From<String> for Template {
+    fn from(s: String) -> Self {
+        Template::from(s.as_str())
     }
 }
 
@@ -52,6 +58,14 @@ impl Template {
     pub fn render_string(&self, event: &Event) -> Result<String, Vec<Atom>> {
         self.render(event)
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
+    }
+
+    pub fn is_dynamic(&self) -> bool {
+        !(self.has_fields && self.has_ts)
+    }
+
+    pub fn get_ref(&self) -> &Bytes {
+        &self.src_bytes
     }
 }
 

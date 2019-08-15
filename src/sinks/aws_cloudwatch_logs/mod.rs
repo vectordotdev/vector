@@ -12,15 +12,15 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
-use futures::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures::{future, stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
 use rusoto_core::{
     request::{BufferedHttpResponse, HttpClient},
     Region,
 };
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogStreamError, DescribeLogGroupsRequest,
-    DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
+    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
+    DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
@@ -36,11 +36,14 @@ use tower::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
-    pub stream_name: String,
-    pub group_name: String,
+    pub group_name: Template,
+    pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub create_missing_group: Option<bool>,
+    pub create_missing_stream: Option<bool>,
     pub batch_timeout: Option<u64>,
     pub batch_size: Option<usize>,
     pub encoding: Option<Encoding>,
@@ -59,6 +62,8 @@ pub struct CloudwatchLogsSvc {
     encoding: Option<Encoding>,
     stream_name: String,
     group_name: String,
+    create_missing_group: bool,
+    create_missing_stream: bool,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
@@ -102,6 +107,7 @@ pub enum CloudwatchError {
     Put(PutLogEventsError),
     Describe(DescribeLogStreamsError),
     CreateStream(CreateLogStreamError),
+    CreateGroup(CreateLogGroupError),
     NoStreamsFound,
     ServiceDropped,
     MakeService,
@@ -113,8 +119,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
-        let log_group = self.group_name.clone().into();
-        let log_stream = Template::from(self.stream_name.as_str());
+        let log_group = self.group_name.clone();
+        let log_stream = self.stream_name.clone();
 
         let in_flight_limit = self.request_in_flight_limit.unwrap_or(5);
 
@@ -237,11 +243,16 @@ impl CloudwatchLogsSvc {
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
         let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
 
+        let create_missing_group = config.create_missing_group.unwrap_or(true);
+        let create_missing_stream = config.create_missing_stream.unwrap_or(true);
+
         Ok(CloudwatchLogsSvc {
             client,
             encoding: config.encoding.clone(),
             stream_name,
             group_name,
+            create_missing_group,
+            create_missing_stream,
             token: None,
             token_rx: None,
         })
@@ -315,6 +326,8 @@ impl Service<Vec<Event>> for CloudwatchLogsSvc {
                 self.client.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
+                self.create_missing_group,
+                self.create_missing_stream,
                 events,
                 self.token.take(),
                 tx,
@@ -333,15 +346,26 @@ pub struct CloudwatchKey {
 
 fn partition(
     event: Event,
-    group: &Bytes,
+    group: &Template,
     stream: &Template,
 ) -> Option<PartitionInnerBuffer<Event, CloudwatchKey>> {
+    let group = match group.render(&event) {
+        Ok(b) => b,
+        Err(missing_keys) => {
+            warn!(
+                message = "keys in group template do not exist on the event; dropping event.",
+                ?missing_keys
+            );
+            return None;
+        }
+    };
+
     let stream = match stream.render(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
-                keys = ?missing_keys
+                message = "keys in stream template do not exist on the event; dropping event.",
+                ?missing_keys
             );
             return None;
         }
@@ -356,17 +380,24 @@ fn partition(
 }
 
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
+    if config.group_name.is_dynamic() {
+        info!("cloudwatch group_name is dynamic; skipping healthcheck.");
+        return Ok(Box::new(future::ok(())));
+    }
+
+    let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+
     let region = config.region.clone();
 
     let client = create_client(region.try_into()?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
-        log_group_name_prefix: config.group_name.clone().into(),
+        log_group_name_prefix: Some(group_name.clone()),
         ..Default::default()
     };
 
-    let expected_group_name = config.group_name.clone();
+    let expected_group_name = group_name;
 
     // This will attempt to find the group name passed in and verify that
     // it matches the one that AWS sends back.
@@ -504,6 +535,7 @@ impl fmt::Display for CloudwatchError {
             CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
             CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
             CloudwatchError::CreateStream(e) => write!(f, "CloudwatchError::CreateStream: {}", e),
+            CloudwatchError::CreateGroup(e) => write!(f, "CloudwatchError::CreateGroup: {}", e),
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
@@ -689,7 +721,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -718,6 +750,55 @@ mod integration_tests {
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
         request.log_group_name = GROUP_NAME.into();
+        request.start_time = Some(timestamp.timestamp_millis());
+
+        let client = create_client(region).unwrap();
+
+        let response = rt.block_on(client.get_log_events(request)).unwrap();
+
+        let events = response.events.unwrap();
+
+        let output_lines = events
+            .into_iter()
+            .map(|e| e.message.unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(output_lines, input_lines);
+    }
+
+    #[test]
+    fn cloudwatch_dynamic_group_and_stream_creation() {
+        let mut rt = Runtime::new().unwrap();
+
+        let group_name = gen_name();
+        let stream_name = gen_name();
+
+        let region = Region::Custom {
+            name: "localstack".into(),
+            endpoint: "http://localhost:6000".into(),
+        };
+
+        let config = CloudwatchLogsSinkConfig {
+            stream_name: stream_name.clone().into(),
+            group_name: group_name.clone().into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            ..Default::default()
+        };
+
+        let (sink, _) = config.build(Acker::Null).unwrap();
+
+        let timestamp = chrono::Utc::now();
+
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+
+        let pump = sink.send_all(events);
+        let (sink, _) = rt.block_on(pump).unwrap();
+        // drop the sink so it closes all its connections
+        drop(sink);
+
+        let mut request = GetLogEventsRequest::default();
+        request.log_stream_name = stream_name.clone().into();
+        request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
         let client = create_client(region).unwrap();
@@ -738,7 +819,8 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_batched() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let group_name = gen_name();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -748,7 +830,7 @@ mod integration_tests {
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: stream_name.clone().into(),
-            group_name: GROUP_NAME.into(),
+            group_name: group_name.clone().into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
             batch_size: Some(2),
             ..Default::default()
@@ -767,7 +849,7 @@ mod integration_tests {
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = GROUP_NAME.into();
+        request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
         let client = create_client(region).unwrap();
@@ -788,7 +870,7 @@ mod integration_tests {
     fn cloudwatch_insert_log_event_partitioned() {
         let mut rt = Runtime::new().unwrap();
 
-        let stream_name = gen_stream();
+        let stream_name = gen_name();
 
         let region = Region::Custom {
             name: "localstack".into(),
@@ -905,7 +987,7 @@ mod integration_tests {
         };
     }
 
-    fn gen_stream() -> String {
+    fn gen_name() -> String {
         format!("test-{}", random_string(10).to_lowercase())
     }
 }

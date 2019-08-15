@@ -38,6 +38,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "{{ instance_id }}"
   
   # OPTIONAL - General
+  create_missing_group = true # default
+  create_missing_stream = true # default
   healthcheck = true # default
   hostname = "127.0.0.0:5000"
   
@@ -73,6 +75,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "<string>"
 
   # OPTIONAL - General
+  create_missing_group = <bool>
+  create_missing_stream = <bool>
   healthcheck = <bool>
   hostname = "<string>"
 
@@ -138,6 +142,20 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "{{ instance_id }}"
   stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+
+  # Dynamically create a log group if it does not already exist. This will ignore
+  # `create_missing_stream` directly after creating the group and will create the
+  # first stream.
+  # 
+  # * optional
+  # * default: true
+  create_missing_group = true
+
+  # Dynamically create a log stream if it does not already exist.
+  # 
+  # * optional
+  # * default: true
+  create_missing_stream = true
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -272,6 +290,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
 | **OPTIONAL** - General | | |
+| `create_missing_group` | `bool` | Dynamically create a [log group][url.aws_cw_logs_group_name] if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream.<br />`default: true` |
+| `create_missing_stream` | `bool` | Dynamically create a [log stream][url.aws_cw_logs_stream_name] if it does not already exist.<br />`default: true` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
 | **OPTIONAL** - Batching | | |
