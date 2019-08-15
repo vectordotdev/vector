@@ -353,8 +353,8 @@ fn partition(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "group keys do not exist on the event; dropping event.",
-                keys = ?missing_keys
+                message = "keys in group template do not exist on the event; dropping event.",
+                ?missing_keys
             );
             return None;
         }
@@ -364,8 +364,8 @@ fn partition(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "stream keys do not exist on the event; dropping event.",
-                keys = ?missing_keys
+                message = "keys in stream template do not exist on the event; dropping event.",
+                ?missing_keys
             );
             return None;
         }
