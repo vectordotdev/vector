@@ -28,9 +28,6 @@
 //! })
 //! ```
 
-
-
-
 use hotmic::Sink;
 use std::{
     collections::{HashMap, HashSet},
