@@ -1,10 +1,10 @@
-extern crate futures;
-extern crate hyper;
+
+use hyper;
 #[macro_use]
 extern crate tracing;
-extern crate tokio;
-extern crate tracing_fmt;
-extern crate tracing_futures;
+use tokio;
+use tracing_fmt;
+
 
 use futures::future;
 use hyper::rt::{Future, Stream};
@@ -17,7 +17,7 @@ use std::str;
 use tracing::field;
 use tracing_futures::{Instrument, Instrumented};
 
-type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
 fn echo(req: Request<Body>) -> Instrumented<BoxFut> {
     trace_span!(

@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate tracing;
-extern crate hotmic;
-extern crate serde_json;
-extern crate tracing_env_logger;
-extern crate tracing_fmt;
-extern crate tracing_metrics;
+
+
+use tracing_env_logger;
+use tracing_fmt;
+use tracing_metrics;
 
 use hotmic::Receiver;
 use std::thread;
