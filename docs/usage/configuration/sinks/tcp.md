@@ -48,6 +48,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     ca_file = "/path/to/certificate_authority.crt" # no default
     crt_file = "/path/to/host_certificate.crt" # no default
     key_file = "/path/to/host_certificate.key" # no default
+    key_phrase = "PassWord1" # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -78,6 +79,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     ca_file = "<string>"
     crt_file = "<string>"
     key_file = "<string>"
+    key_phrase = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -200,6 +202,13 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # * optional
     # * no default
     key_file = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file.
+    # This has no effect unless `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -231,6 +240,8 @@ the remote certificate.<br />`default: true` |
 connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
 | `tls.key_file` | `string` | Absolute path to key file used to identify this
 connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_phrase` | `string` | Pass phrase to unlock the encrypted key file.
+This has no effect unless `key_file` above is set.<br />`no default` `example: "PassWord1"` |
 
 ## How It Works
 

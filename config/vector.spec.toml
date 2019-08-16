@@ -2207,6 +2207,13 @@ end
     # * no default
     key_file = "/path/to/host_certificate.key"
 
+    # Pass phrase to unlock the encrypted key file.
+    # This has no effect unless `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
+
 [sinks.vector]
   #
   # General

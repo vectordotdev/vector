@@ -1405,6 +1405,13 @@ description = """Absolute path to key file used to identify this
 connection, in PEM format. If this is set, `crt_file` must also be set."""
 examples = ["/path/to/host_certificate.key"]
 
+[sinks.tcp.options.tls.options.key_phrase]
+type = "string"
+null = true
+description = """Pass phrase to unlock the encrypted key file.
+This has no effect unless `key_file` above is set."""
+examples = ["PassWord1"]
+
 # ------------------------------------------------------------------------------
 # sinks.vector
 # ------------------------------------------------------------------------------

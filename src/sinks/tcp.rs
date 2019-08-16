@@ -52,6 +52,7 @@ pub struct TcpSinkTlsConfig {
     pub verify: Option<bool>,
     pub crt_file: Option<String>,
     pub key_file: Option<String>,
+    pub key_phrase: Option<String>,
     pub ca_file: Option<String>,
 }
 
@@ -89,7 +90,7 @@ impl SinkConfig for TcpSinkConfig {
                         None => None,
                         Some(ref filename) => {
                             // This unwrap is safe because of the crt/key check above
-                            let key = load_key(tls.key_file.as_ref().unwrap())?;
+                            let key = load_key(tls.key_file.as_ref().unwrap(), &tls.key_phrase)?;
                             let crt = load_x509(filename)?;
                             Some(Pkcs12::builder().build("", "FIXME", &key, &crt).map_err(
                                 |err| {
@@ -129,18 +130,26 @@ fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, 
     open_read_parse(filename, "certificate authority", Certificate::from_pem)
 }
 
-fn load_key<T: AsRef<Path> + Debug>(filename: T) -> Result<PKey<Private>, String> {
-    open_read_parse(filename, "key", PKey::private_key_from_pem)
+fn load_key<T: AsRef<Path> + Debug>(
+    filename: T,
+    pass_phrase: &Option<String>,
+) -> Result<PKey<Private>, String> {
+    match pass_phrase {
+        None => open_read_parse(filename, "key", PKey::private_key_from_pem),
+        Some(phrase) => open_read_parse(filename, "key", |data| {
+            PKey::private_key_from_pem_passphrase(data, phrase.as_bytes())
+        }),
+    }
 }
 
 fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, String> {
     open_read_parse(filename, "certificate", X509::from_pem)
 }
 
-fn open_read_parse<F: AsRef<Path> + Debug, O, E: Error>(
+fn open_read_parse<F: AsRef<Path> + Debug, O, E: Error, P: Fn(&[u8]) -> Result<O, E>>(
     filename: F,
     note: &str,
-    parser: fn(&[u8]) -> Result<O, E>,
+    parser: P,
 ) -> Result<O, String> {
     let mut text = Vec::<u8>::new();
 
