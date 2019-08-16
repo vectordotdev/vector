@@ -78,15 +78,15 @@ impl SinkConfig for TcpSinkConfig {
 
         let tls = match self.tls {
             Some(ref tls) => {
-                if tls.key_file.is_some() != tls.crt_file.is_some() {
-                    return Err("Must specify both tls key_file and crt_file".into());
-                }
-                let add_ca = match tls.ca_file {
-                    None => None,
-                    Some(ref filename) => Some(load_certificate(filename)?),
-                };
-                let identity =
-                    match tls.crt_file {
+                if tls.enabled.unwrap_or(false) {
+                    if tls.key_file.is_some() != tls.crt_file.is_some() {
+                        return Err("Must specify both tls key_file and crt_file".into());
+                    }
+                    let add_ca = match tls.ca_file {
+                        None => None,
+                        Some(ref filename) => Some(load_certificate(filename)?),
+                    };
+                    let identity = match tls.crt_file {
                         None => None,
                         Some(ref filename) => {
                             // This unwrap is safe because of the crt/key check above
@@ -99,14 +99,16 @@ impl SinkConfig for TcpSinkConfig {
                             )?)
                         }
                     };
-                TcpSinkTls {
-                    enabled: tls.enabled.unwrap_or(false),
-                    verify: tls.verify.unwrap_or(true),
-                    add_ca,
-                    identity,
+                    Some(TcpSinkTls {
+                        verify: tls.verify.unwrap_or(true),
+                        add_ca,
+                        identity,
+                    })
+                } else {
+                    None
                 }
             }
-            None => TcpSinkTls::default(),
+            None => None,
         };
 
         let sink = raw_tcp(
@@ -164,7 +166,7 @@ fn open_read_parse<F: AsRef<Path> + Debug, O, E: Error, P: Fn(&[u8]) -> Result<O
 pub struct TcpSink {
     hostname: String,
     addr: SocketAddr,
-    tls: TcpSinkTls,
+    tls: Option<TcpSinkTls>,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
 }
@@ -179,7 +181,6 @@ enum TcpSinkState {
 
 #[derive(Default)]
 pub struct TcpSinkTls {
-    enabled: bool,
     verify: bool,
     add_ca: Option<Certificate>,
     identity: Option<Pkcs12>,
@@ -209,7 +210,7 @@ impl TcpSinkTls {
 }
 
 impl TcpSink {
-    pub fn new(hostname: String, addr: SocketAddr, tls: TcpSinkTls) -> Self {
+    pub fn new(hostname: String, addr: SocketAddr, tls: Option<TcpSinkTls>) -> Self {
         Self {
             hostname,
             addr,
@@ -250,8 +251,8 @@ impl TcpSink {
                         let addr = socket.peer_addr().unwrap_or(self.addr);
                         debug!(message = "connected", addr = &field::display(&addr));
                         self.backoff = Self::fresh_backoff();
-                        match self.tls.enabled {
-                            true => match self.tls.make_connector() {
+                        match self.tls {
+                            Some(ref tls) => match tls.make_connector() {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
                                     connector.connect(&self.hostname, socket),
                                 ),
@@ -262,7 +263,7 @@ impl TcpSink {
                                     TcpSinkState::Backoff(delay)
                                 }
                             },
-                            false => TcpSinkState::Connected(Box::new(FramedWrite::new(
+                            None => TcpSinkState::Connected(Box::new(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
                             ))),
@@ -361,7 +362,7 @@ pub fn raw_tcp(
     addr: SocketAddr,
     acker: Acker,
     encoding: Option<Encoding>,
-    tls: TcpSinkTls,
+    tls: Option<TcpSinkTls>,
 ) -> super::RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, tls)
