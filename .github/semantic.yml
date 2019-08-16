@@ -36,6 +36,7 @@ scopes:
   - aws_kinesis_streams sink
   - aws_s3 sink
   - blackhole sink
+  - clickhouse sink
   - console sink
   - elasticsearch sink
   - http sink

@@ -26,6 +26,7 @@ Sinks are last in the [pipeline][docs.pipelines], responsible for sending
 | [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.aws_s3_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.blackhole_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
 | [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
@@ -98,6 +99,7 @@ to detect common problems.
 [docs.aws_kinesis_streams_sink]: ../../../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.aws_s3_sink]: ../../../usage/configuration/sinks/aws_s3.md
 [docs.blackhole_sink]: ../../../usage/configuration/sinks/blackhole.md
+[docs.clickhouse_sink]: ../../../usage/configuration/sinks/clickhouse.md
 [docs.console_sink]: ../../../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../../../usage/configuration/sinks/elasticsearch.md
 [docs.event]: ../../../about/data-model/README.md#event
@@ -114,6 +116,8 @@ to detect common problems.
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
+[url.clickhouse]: https://clickhouse.yandex/
+[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.kafka]: https://kafka.apache.org/
 [url.kafka_protocol]: https://kafka.apache.org/protocol

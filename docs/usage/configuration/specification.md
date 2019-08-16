@@ -1335,6 +1335,118 @@ end
   # * default: true
   healthcheck = true
 
+[sinks.clickhouse]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "clickhouse"
+  type = "clickhouse"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The host url of the Clickhouse server.
+  # 
+  # * required
+  # * no default
+  host = "http://localhost:8123"
+
+  # The table that data will be inserted into.
+  # 
+  # * required
+  # * no default
+  table = "mytable"
+
+  # The database that contains the stable that data will be inserted into.
+  # 
+  # * optional
+  # * no default
+  database = "mydatabase"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The compression type to use before writing data.
+  # 
+  # * optional
+  # * no default
+  # * must be: "gzip" (if supplied)
+  compression = "gzip"
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  retry_attempts = 9223372036854775807
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  # * unit: seconds
+  retry_backoff_secs = 9223372036854775807
+
 [sinks.console]
   # The component type
   # 
