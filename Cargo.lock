@@ -587,6 +587,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "doc-comment"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "dtoa"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2707,6 +2712,26 @@ version = "0.6.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "snafu"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "backtrace 0.3.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "snafu-derive 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "snafu-derive"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.34 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "socket2"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3705,6 +3730,7 @@ dependencies = [
  "seahash 3.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "snafu 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "stream-cancel 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "string_cache 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3938,6 +3964,7 @@ dependencies = [
 "checksum digest 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)" = "03b072242a8cbaf9c145665af9d250c59af3b958f83ed6824e13533cf76d5b90"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 "checksum dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
+"checksum doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
 "checksum dtoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "ea57b42383d091c85abcc2706240b94ab2a8fa1fc81c10ff23c4de06e2a90b5e"
 "checksum either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5527cfe0d098f36e3f8839852688e63c8fff1c90b2b405aef730615f9a7bcf7b"
 "checksum elastic 0.21.0-pre.4 (git+https://github.com/elastic-rs/elastic)" = "<none>"
@@ -4165,6 +4192,8 @@ dependencies = [
 "checksum siphasher 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0b8de496cf83d4ed58b6be86c3a275b8602f6ffe98d3024a869e124147a9a3ac"
 "checksum slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
 "checksum smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ab606a9c5e214920bb66c458cd7be8ef094f813f20fe77a54cc7dbfff220d4b7"
+"checksum snafu 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "79d884045d4614afb070a006793407e83d4e09f255434c512845533912f56dc5"
+"checksum snafu-derive 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "613f9b621d975eb530861729e0c995a2ac74e0cd2e8ded25d4edde00258e9993"
 "checksum socket2 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "4e626972d3593207547f14bf5fc9efa4d0e7283deb73fef1dff313dae9ab8878"
 "checksum spade 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "455f01c2e40cd1bb23fa2f315bfe8d4be0c54f77703456d604b2db2f2dcddf7e"
 "checksum spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ceac490aa12c567115b40b7b7fceca03a6c9d53d5defea066123debc83c5dc1f"

@@ -28,7 +28,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(&self.types).map_err(|err| format!("{}", err))?;
 
         grok.compile(&self.pattern, true)
             .map_err(|err| format!("Grok pattern failed to compile: {}", err))

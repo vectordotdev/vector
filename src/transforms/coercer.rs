@@ -17,7 +17,7 @@ pub struct CoercerConfig {
 #[typetag::serde(name = "coercer")]
 impl crate::topology::config::TransformConfig for CoercerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(&self.types).map_err(|err| format!("{}", err))?;
         Ok(Box::new(Coercer { types }))
     }
 
