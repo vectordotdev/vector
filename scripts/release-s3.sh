@@ -8,7 +8,7 @@
 
 set -eu
 
-CHANNEL=$(util/release-channel.sh)
+CHANNEL=$(scripts/util/release-channel.sh)
 escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
 
 #

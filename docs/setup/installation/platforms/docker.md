@@ -64,7 +64,7 @@ your `$PATH`.
 
 You'll notice in the [Installation](#installation) section a custom
 configuration is mounted with the `-v` flag. This is how we recommend
-cusomtizing conofiguration in the Docker environment. Alternatively,
+customizing configuration in the Docker environment. Alternatively,
 you can extend the `timberio/vector` images and `COPY` your custom config
 into your own image.
 

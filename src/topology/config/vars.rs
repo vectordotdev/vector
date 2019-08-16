@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> String {
     let re = Regex::new(r"\$\$|\$(\w+)|\$\{(\w+)\}").unwrap();
-    re.replace_all(input, |caps: &Captures| {
+    re.replace_all(input, |caps: &Captures<'_>| {
         caps.get(1)
             .or(caps.get(2))
             .map(|m| m.as_str())

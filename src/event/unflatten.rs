@@ -192,7 +192,7 @@ impl Serialize for MapValue {
             MapValue::Value(v) => v.serialize(serializer),
             MapValue::Map(m) => serializer.collect_map(m.clone()),
             MapValue::Array(a) => serializer.collect_seq(a.clone()),
-            MapValue::Null => serializer.serialize_str("null"),
+            MapValue::Null => serializer.serialize_none(),
         }
     }
 }

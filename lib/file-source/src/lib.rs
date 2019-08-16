@@ -166,12 +166,12 @@ mod test {
                 // These weights are more or less arbitrary. 'Pause' maybe
                 // doesn't have a use but we keep it in place to allow for
                 // variations in file-system flushes.
-                0...50 => FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect()),
-                51...69 => FWAction::Read,
-                70...75 => FWAction::Pause(pause),
-                76...85 => FWAction::RotateFile,
-                86...90 => FWAction::TruncateFile,
-                91...95 => FWAction::DeleteFile,
+                0..=50 => FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect()),
+                51..=69 => FWAction::Read,
+                70..=75 => FWAction::Pause(pause),
+                76..=85 => FWAction::RotateFile,
+                86..=90 => FWAction::TruncateFile,
+                91..=95 => FWAction::DeleteFile,
                 _ => FWAction::Exit,
             }
         }

@@ -12,7 +12,7 @@ set -eu
 
 echo "Checking for pending generation changes..."
 
-changes=$(scripts/generate.sh --dry-run | grep 'Will be changed' || true)
+changes=$(scripts/generate.rb --dry-run | grep 'Will be changed' || true)
 
 if [[ -n "$changes" ]]; then
   echo 'It looks like the following files would change if `make generate` was run:'

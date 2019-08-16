@@ -102,6 +102,7 @@ mod test {
             PrometheusSinkConfig {
                 address: out_addr,
                 buckets: vec![1.0, 2.0, 4.0],
+                flush_period: Duration::from_millis(100),
             },
         );
 
@@ -115,7 +116,7 @@ mod test {
         for _ in 0..100 {
             socket
                 .send_to(
-                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\n",
+                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\n",
                     &in_addr,
                 )
                 .unwrap();
@@ -160,6 +161,52 @@ mod test {
         let milliglork_sum = parse_count(&lines, "milliglork_sum");
         let milliglork_count = parse_count(&lines, "milliglork_count");
         assert_eq!(milliglork_count * 3, milliglork_sum);
+
+        // Set test
+        // Flush could have occured
+        assert!(parse_count(&lines, "set") <= 2);
+
+        // Flush test
+        {
+            // Wait for flush to happen
+            thread::sleep(Duration::from_millis(200));
+
+            let response =
+                block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))
+                    .unwrap();
+            assert!(response.status().is_success());
+
+            let body = block_on(response.into_body().concat2()).unwrap();
+            let lines = std::str::from_utf8(&body)
+                .unwrap()
+                .lines()
+                .collect::<Vec<_>>();
+
+            // Check rested
+            assert_eq!(parse_count(&lines, "set"), 0);
+
+            // Recheck that set is also reseted------------
+
+            socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
+            // Space things out slightly to try to avoid dropped packets
+            thread::sleep(Duration::from_millis(1));
+            // Give packets some time to flow through
+            thread::sleep(Duration::from_millis(10));
+
+            let response =
+                block_on(client.get(format!("http://{}/metrics", out_addr).parse().unwrap()))
+                    .unwrap();
+            assert!(response.status().is_success());
+
+            let body = block_on(response.into_body().concat2()).unwrap();
+            let lines = std::str::from_utf8(&body)
+                .unwrap()
+                .lines()
+                .collect::<Vec<_>>();
+
+            // Set test
+            assert_eq!(parse_count(&lines, "set"), 2);
+        }
 
         // Shut down server
         block_on(topology.stop()).unwrap();

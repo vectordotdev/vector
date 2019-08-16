@@ -23,8 +23,8 @@ architectures. If you don't see an architecture, then we recommend
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_latest_x86_64-apple-darwin] | `latest` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
-| [`uknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
+| [`unknown-linux-musl`][url.vector_latest_x86_64-unknown-linux-musl] | `latest` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
+| [`unknown-linux-gnu`][url.vector_latest_x86_64-unknown-linux-gnu] | `latest` | 64-bit Linux (2.6.18+) |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_latest_armv7-unknown-linux-gnueabihf] ⚠️ | `latest` | ARMv7 Linux |
 
 {% endtab %}
@@ -40,8 +40,8 @@ using them over the "latest" alternatives.
 | Architecture | Channel | Notes |
 | :------------| :-----: | :---- |
 | [`x86_64-apple-darwin`][url.vector_nightly_x86_64-apple-darwin] | `nightly` | 64-bit OSX (10.7+, Lion+) |
-| [`uknown-linux-musl`][url.vector_nightly_x86_64-unknown-linux-musl] | `nightly` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
-| [`uknown-linux-gnu`][url.vector_nightly_x86_64-unknown-linux-gnu] | `nightly` | 64-bit Linux (2.6.18+) |
+| [`unknown-linux-musl`][url.vector_nightly_x86_64-unknown-linux-musl] | `nightly` | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
+| [`unknown-linux-gnu`][url.vector_nightly_x86_64-unknown-linux-gnu] | `nightly` | 64-bit Linux (2.6.18+) |
 | [`armv7-unknown-linux-gnueabihf`][url.vector_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | `nightly` | ARMv7 Linux |
 {% endtab %}
 {% endtabs %}
@@ -134,7 +134,7 @@ the following features:
 
 The reason these features are not included is due to the libraries required
 to power them. Specifically, we use [`leveldb`][url.leveldb] and
-[`rdkafka`][url.rdkafka] to power these features. Unforutnately, compiling
+[`rdkafka`][url.rdkafka] to power these features. Unfortunately, compiling
 and/or statically linking these libraries has proven to be a challenge. This
 is something we are working to resolve. You can track progress on
 [issue 546][url.issue_661].

@@ -232,7 +232,7 @@ impl RunningTopology {
         }
 
         for name in sources_to_change {
-            info!("Rebuiling source {:?}", name);
+            info!("Rebuilding source {:?}", name);
 
             self.remove_outputs(&name);
             self.shutdown_source(&name);
@@ -388,9 +388,11 @@ impl RunningTopology {
 
         if let Some(inputs) = inputs {
             for input in inputs {
-                self.outputs[input]
-                    .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
-                    .unwrap();
+                if let Some(output) = self.outputs.get(input) {
+                    output
+                        .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
+                        .unwrap();
+                }
             }
         }
     }
@@ -695,7 +697,7 @@ mod tests {
         assert_eq!(input_lines2, output_lines2);
     }
 
-    // The previous test pauses to make sure the old version of the sink has receieved all messages
+    // The previous test pauses to make sure the old version of the sink has received all messages
     // sent before the reload. This test does not pause, making sure the new sink is atomically
     // swapped in for the old one and that no events are lost in the changeover.
     #[test]
@@ -887,6 +889,64 @@ mod tests {
         let output_lines2 = output_lines2.wait();
         assert_eq!(num_lines, output_lines2.len());
         assert_eq!(input_lines2, output_lines2);
+    }
+
+    #[test]
+    #[ignore]
+    fn topology_replace_source_transform_and_sink() {
+        crate::test_util::trace_init();
+        let mut rt = runtime();
+
+        let in_addr1 = next_addr();
+        let out_addr1 = next_addr();
+        let mut old_config = Config::empty();
+        old_config.add_source("in1", TcpConfig::new(in_addr1));
+        old_config.add_transform(
+            "trans1",
+            &["in1"],
+            SamplerConfig {
+                rate: 2,
+                pass_list: vec![],
+            },
+        );
+        old_config.add_sink(
+            "out1",
+            &["trans1"],
+            TcpSinkConfig::new(out_addr1.to_string()),
+        );
+
+        let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
+
+        wait_for_tcp(in_addr1);
+
+        let in_addr2 = next_addr();
+        let out_addr2 = next_addr();
+        let mut new_config = Config::empty();
+        new_config.add_source("in2", TcpConfig::new(in_addr2));
+        new_config.add_transform(
+            "trans2",
+            &["in2"],
+            SamplerConfig {
+                rate: 2,
+                pass_list: vec![],
+            },
+        );
+        new_config.add_sink(
+            "out2",
+            &["trans2"],
+            TcpSinkConfig::new(out_addr2.to_string()),
+        );
+
+        topology.reload_config_and_respawn(new_config, &mut rt, false);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let output_lines2 = receive(&out_addr2);
+        let input_lines2 = random_lines(100).take(1).collect::<Vec<_>>();
+        let send = send_lines(in_addr2, input_lines2.clone().into_iter());
+        rt.block_on(send).unwrap();
+        block_on(topology.stop()).unwrap();
+        shutdown_on_idle(rt);
+        assert_eq!(input_lines2, output_lines2.wait());
     }
 
     #[test]
@@ -1293,6 +1353,21 @@ mod tests {
         // non-require-healthy reload with failing healthcheck
         {
             config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
+
+            topology.reload_config_and_respawn(config.clone(), &mut rt, false);
+
+            let receive = receive_one(&out1_addr, &out2_addr);
+
+            block_on(send_lines(in_addr, vec!["hello".to_string()].into_iter())).unwrap();
+
+            let received = block_on(receive).unwrap();
+            assert_matches!(received, Either::A(_));
+        }
+
+        // disable healthcheck
+        {
+            config.sinks["out"].inner = Box::new(TcpSinkConfig::new(out1_addr.to_string()));
+            config.sinks["out"].healthcheck = false;
 
             topology.reload_config_and_respawn(config.clone(), &mut rt, false);
 

@@ -764,7 +764,7 @@ is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for 
 """
 
 # ------------------------------------------------------------------------------
-# sinks.aws_cloudwatch_logs
+
 # ------------------------------------------------------------------------------
 [sinks.aws_cloudwatch_logs]
 batch_size = 1049000
@@ -823,6 +823,21 @@ null = false
 partition_key = true
 templateable = true
 description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+
+[sinks.aws_cloudwatch_logs.options.create_missing_group]
+type = "bool"
+default = true
+null = true
+description = """\
+Dynamically create a [log group][url.aws_cw_logs_group_name] if it does not already exist. This will ignore \
+`create_missing_stream` directly after creating the group and will create the first stream. \
+"""
+
+[sinks.aws_cloudwatch_logs.options.create_missing_stream]
+type = "bool"
+default = true
+null = true
+description = "Dynamically create a [log stream][url.aws_cw_logs_stream_name] if it does not already exist."
 
 # ------------------------------------------------------------------------------
 # sinks.aws_kinesis_streams
@@ -1058,6 +1073,34 @@ examples = [
 null = false
 templateable = true
 description = "Index name to write events to."
+
+[sinks.elasticsearch.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.elasticsearch.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.elasticsearch.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
+[sinks.elasticsearch.options.headers]
+type = "table"
+null = true
+description = "Options for custom headers."
+
+[sinks.elasticsearch.options.headers.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom header to be added to each outgoing Elasticsearch request."
 
 # ------------------------------------------------------------------------------
 # sinks.http

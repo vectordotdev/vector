@@ -113,7 +113,8 @@ mod test {
             Event::from("source"),
         ];
 
-        rt.block_on(sink.send_all(stream::iter_ok(events.clone().into_iter())))
+        let _ = rt
+            .block_on(sink.send_all(stream::iter_ok(events.clone().into_iter())))
             .unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(50));

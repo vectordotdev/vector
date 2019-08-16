@@ -369,3 +369,21 @@ fn cycle() {
 
     assert_eq!(errors, vec!["Configured topology contains a cycle"])
 }
+
+#[test]
+fn disabled_healthcheck() {
+    load(
+        r#"
+      [sources.in]
+      type = "tcp"
+      address = "127.0.0.1:1234"
+
+      [sinks.out]
+      type = "tcp"
+      inputs = ["in"]
+      address = "0.0.0.0:0"
+      healthcheck = false
+      "#,
+    )
+    .unwrap();
+}

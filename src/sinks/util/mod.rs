@@ -132,7 +132,7 @@ where
     }
 }
 
-type Error = Box<std::error::Error + 'static + Send + Sync>;
+type Error = Box<dyn std::error::Error + 'static + Send + Sync>;
 
 impl<T, S, B> Sink for BatchServiceSink<T, S, B>
 where
