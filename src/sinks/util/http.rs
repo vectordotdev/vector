@@ -1,16 +1,18 @@
 use super::retries::RetryLogic;
-use futures::{Future, Poll};
+use bytes::Bytes;
+use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
-use tower_hyper::{body::Body, client::Client};
+use tower_hyper::client::Client;
 use tracing::field;
 use tracing_tower_http::InstrumentedHttpService;
 
-type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
+pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
+pub type Response = hyper::Response<Bytes>;
 
 #[derive(Clone)]
 pub struct HttpService {
@@ -36,7 +38,7 @@ impl HttpService {
 }
 
 impl Service<Vec<u8>> for HttpService {
-    type Response = hyper::Response<Body>;
+    type Response = Response;
     type Error = hyper::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
@@ -49,13 +51,21 @@ impl Service<Vec<u8>> for HttpService {
 
         debug!(message = "sending request.");
 
-        let fut = self.inner.call(request).inspect(|res| {
-            debug!(
-                message = "response.",
-                status = &field::display(res.status()),
-                version = &field::debug(res.version()),
-            )
-        });
+        let fut = self
+            .inner
+            .call(request)
+            .inspect(|res| {
+                debug!(
+                    message = "response.",
+                    status = &field::display(res.status()),
+                    version = &field::debug(res.version()),
+                )
+            })
+            .and_then(|r| {
+                let (parts, body) = r.into_parts();
+                body.concat2()
+                    .map(|b| hyper::Response::from_parts(parts, b.into_bytes()))
+            });
 
         Box::new(fut)
     }
@@ -66,7 +76,7 @@ pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
-    type Response = hyper::Response<Body>;
+    type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_connect() || error.is_closed()
@@ -93,22 +103,10 @@ mod test {
     fn util_http_retry_logic() {
         let logic = HttpRetryLogic;
 
-        let response_429 = Response::builder()
-            .status(429)
-            .body(Body::empty().into())
-            .unwrap();
-        let response_500 = Response::builder()
-            .status(500)
-            .body(Body::empty().into())
-            .unwrap();
-        let response_400 = Response::builder()
-            .status(400)
-            .body(Body::empty().into())
-            .unwrap();
-        let response_501 = Response::builder()
-            .status(501)
-            .body(Body::empty().into())
-            .unwrap();
+        let response_429 = Response::builder().status(429).body(Bytes::new()).unwrap();
+        let response_500 = Response::builder().status(500).body(Bytes::new()).unwrap();
+        let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
+        let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
         assert!(logic.should_retry_response(&response_429));
         assert!(logic.should_retry_response(&response_500));

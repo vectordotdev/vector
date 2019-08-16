@@ -102,18 +102,18 @@ impl<'a> field::Visit for Visitor<'a> {
 }
 
 impl tracing::Subscriber for VisitingSubscriber {
-    fn new_span(&self, span: &span::Attributes) -> Id {
+    fn new_span(&self, span: &span::Attributes<'_>) -> Id {
         let mut visitor = Visitor(self.0.lock().unwrap());
         span.record(&mut visitor);
         Id::from_u64(0xDEADFACE)
     }
 
-    fn record(&self, _span: &Id, values: &span::Record) {
+    fn record(&self, _span: &Id, values: &span::Record<'_>) {
         let mut visitor = Visitor(self.0.lock().unwrap());
         values.record(&mut visitor);
     }
 
-    fn event(&self, event: &Event) {
+    fn event(&self, event: &Event<'_>) {
         let mut visitor = Visitor(self.0.lock().unwrap());
         event.record(&mut visitor);
     }
@@ -122,7 +122,7 @@ impl tracing::Subscriber for VisitingSubscriber {
         let _ = (span, follows);
     }
 
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         let _ = metadata;
         true
     }

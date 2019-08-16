@@ -1,6 +1,3 @@
-extern crate bytes;
-extern crate tokio_codec;
-
 #[macro_use]
 extern crate tracing;
 

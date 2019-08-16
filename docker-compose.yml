@@ -4,8 +4,9 @@ services:
       image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
       ports:
         - "4568:4568"
+        - "4582:4582"
       environment:
-        SERVICES: kinesis
+        SERVICES: kinesis:4568,cloudwatch:4582
     minio:
       image: minio/minio
       ports:
@@ -41,3 +42,7 @@ services:
         - "9300:9300"
       environment:
         - discovery.type=single-node
+    clickhouse:
+      image: yandex/clickhouse-server:19
+      ports:
+        - "8123:8123"

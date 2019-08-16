@@ -68,6 +68,10 @@ if [ -n "$RUST_LTO" ]; then
   printf "[profile.release]\nlto = $lto_value" >> Cargo.toml
 fi
 
+# Rename the rust-toolchain file so that we can use our custom version of rustc installed
+# on release containers.
+mv rust-toolchain rust-toolchain.bak
+
 if [ "$FEATURES" != "default" ]; then
     cargo build $build_flags --no-default-features --features "$FEATURES"
 else

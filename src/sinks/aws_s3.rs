@@ -451,7 +451,7 @@ mod integration_tests {
         });
 
         let pump = sink.send_all(futures::stream::iter_ok(events));
-        block_on(pump).unwrap();
+        let _ = block_on(pump).unwrap();
 
         let keys = get_keys(prefix.unwrap());
         assert_eq!(keys.len(), 3);

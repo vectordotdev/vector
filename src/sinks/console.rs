@@ -102,9 +102,14 @@ mod test {
             name: "foos".into(),
             val: 100.0,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
+            tags: Some(
+                vec![("key".to_owned(), "value".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
         });
         assert_eq!(
-            Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z"}"#.to_string()),
+            Ok(r#"{"type":"counter","name":"foos","val":100.0,"timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"key":"value"}}"#.to_string()),
             encode_event(event, &None)
         );
     }
@@ -116,9 +121,10 @@ mod test {
             val: 10.0,
             sample_rate: 1,
             timestamp: None,
+            tags: None,
         });
         assert_eq!(
-            Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null}"#.to_string()),
+            Ok(r#"{"type":"histogram","name":"glork","val":10.0,"sample_rate":1,"timestamp":null,"tags":null}"#.to_string()),
             encode_event(event, &None)
         );
     }

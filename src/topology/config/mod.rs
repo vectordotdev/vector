@@ -8,6 +8,7 @@ mod validation;
 mod vars;
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub data_dir: Option<PathBuf>,
@@ -53,9 +54,11 @@ pub trait SourceConfig: core::fmt::Debug {
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
+    #[serde(default = "healthcheck_default")]
+    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Box<SinkConfig>,
+    pub inner: Box<dyn SinkConfig>,
 }
 
 #[typetag::serde(tag = "type")]
@@ -72,7 +75,7 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Box<TransformConfig>,
+    pub inner: Box<dyn TransformConfig>,
 }
 
 #[typetag::serde(tag = "type")]
@@ -103,6 +106,7 @@ impl Config {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
             buffer: Default::default(),
+            healthcheck: true,
             inner: Box::new(sink),
             inputs,
         };
@@ -139,7 +143,18 @@ impl Config {
         }
         let with_vars = vars::interpolate(&source_string, &vars);
 
-        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
+        toml::from_str(&with_vars)
+            .map_err(|e| vec![e.to_string()])
+            .and_then(|config: Config| {
+                if config.sources.is_empty() {
+                    return Err(vec!["No sources defined in the config.".to_owned()]);
+                }
+                if config.sinks.is_empty() {
+                    return Err(vec!["No sinks defined in the config.".to_owned()]);
+                }
+
+                Ok(config)
+            })
     }
 
     pub fn contains_cycle(&self) -> bool {
@@ -161,4 +176,8 @@ impl Clone for Config {
         let json = serde_json::to_vec(self).unwrap();
         serde_json::from_slice(&json[..]).unwrap()
     }
+}
+
+fn healthcheck_default() -> bool {
+    true
 }

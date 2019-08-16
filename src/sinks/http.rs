@@ -76,8 +76,8 @@ impl SinkConfig for HttpSinkConfig {
         let sink = http(self.clone(), acker)?;
 
         if let Some(healthcheck_uri) = self.healthcheck_uri.clone() {
-            let healtcheck = healthcheck(healthcheck_uri, self.basic_auth.clone())?;
-            Ok((sink, healtcheck))
+            let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone())?;
+            Ok((sink, healthcheck))
         } else {
             Ok((sink, Box::new(future::ok(()))))
         }

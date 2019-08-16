@@ -108,6 +108,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .and_then(ValueKind::as_timestamp)
         .cloned();
 
+    // https://github.com/timberio/vector/issues/684
+    let tags = None;
+
     match config {
         MetricConfig::Counter(counter) => {
             let val = log
@@ -128,6 +131,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 val,
                 timestamp,
+                tags,
             })
         }
         MetricConfig::Histogram(hist) => {
@@ -145,6 +149,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 val,
                 sample_rate: 1,
                 timestamp,
+                tags,
             })
         }
         MetricConfig::Gauge(gauge) => {
@@ -162,6 +167,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 val,
                 direction: None,
                 timestamp,
+                tags,
             })
         }
         MetricConfig::Set(set) => {
@@ -175,6 +181,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 val,
                 timestamp,
+                tags,
             })
         }
     }
@@ -252,6 +259,7 @@ mod tests {
                 name: "status".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -277,6 +285,7 @@ mod tests {
                 name: "exception_total".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -321,6 +330,7 @@ mod tests {
                 name: "amount_total".into(),
                 val: 33.99,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -347,6 +357,7 @@ mod tests {
                 val: 123.0,
                 direction: None,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -423,6 +434,7 @@ mod tests {
                 name: "exception_total".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
         assert_eq!(
@@ -431,6 +443,7 @@ mod tests {
                 name: "status".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -482,6 +495,7 @@ mod tests {
                 name: "xyz_exception_total".into(),
                 val: 1.0,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
         assert_eq!(
@@ -490,6 +504,7 @@ mod tests {
                 name: "local_abc_status_set".into(),
                 val: "42".into(),
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -515,6 +530,7 @@ mod tests {
                 name: "unique_user_ip".into(),
                 val: "1.2.3.4".into(),
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }
@@ -540,6 +556,7 @@ mod tests {
                 val: 2.5,
                 sample_rate: 1,
                 timestamp: Some(ts()),
+                tags: None,
             }
         );
     }

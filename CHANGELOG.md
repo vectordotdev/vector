@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - [configuration] Added `--dry-run` and `--healthchecks-only` options [#233]
 - aws_s3: Add `filename_extension` options.
-- aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` synatx for extracting values from events.
-- aws_cloudwatch_logs: retry support added and more stablity improvements
+- aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` syntax for extracting values from events.
+- aws_cloudwatch_logs: retry support added and more stability improvements
 - coercer: New transform to convert fields into specified types.
 - file source: `data_dir` now falls back to global `data_dir` option if not specified
 - aws_kinesis_streams: Added configurable partition keys
+- topology: Added ability to disable individual sink healthchecks
+- aws_cloudwatch_logs: Add dynamic group and stream creation
 
 ### Changed
 
@@ -31,6 +33,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - aws_s3: Fixed #517 and trailing slash issues with the generated key.
 - aws_cloudwatch_logs: Fixes #586 and now dynamically creates streams if they do not exist.
+- topology: Reloading a configuration which removes both a sink and its source now works (#681). 
+- config: abort reload on unparsable config
 
 ### Removed
 

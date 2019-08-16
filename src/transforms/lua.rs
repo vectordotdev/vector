@@ -47,7 +47,7 @@ impl Lua {
 
         lua.context(|ctx| {
             if !additional_paths.is_empty() {
-                let package = ctx.globals().get::<_, rlua::Table>("package")?;
+                let package = ctx.globals().get::<_, rlua::Table<'_>>("package")?;
                 let current_paths = package
                     .get::<_, String>("path")
                     .unwrap_or_else(|_| ";".to_string());
@@ -70,7 +70,7 @@ impl Lua {
 
             globals.set("event", event)?;
 
-            let func = ctx.named_registry_value::<_, rlua::Function>("vector_func")?;
+            let func = ctx.named_registry_value::<_, rlua::Function<'_>>("vector_func")?;
             func.call(())?;
 
             globals.get::<_, Option<Event>>("event")

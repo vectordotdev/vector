@@ -72,7 +72,7 @@ fn test_sink_panic() {
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
 
-    std::panic::take_hook();
+    let _ = std::panic::take_hook();
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
     shutdown_on_idle(rt);
@@ -257,7 +257,7 @@ fn test_source_panic() {
     let send = send_lines(in_addr, input_lines.clone().into_iter());
     let mut rt2 = runtime();
     rt2.block_on(send).unwrap();
-    std::panic::take_hook();
+    let _ = std::panic::take_hook();
 
     assert!(crash.wait().next().is_some());
     block_on(topology.stop()).unwrap();
