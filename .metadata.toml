@@ -764,7 +764,7 @@ is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for 
 """
 
 # ------------------------------------------------------------------------------
-
+# sinks.aws_cloudwatch_logs
 # ------------------------------------------------------------------------------
 [sinks.aws_cloudwatch_logs]
 batch_size = 1049000
@@ -1002,6 +1002,52 @@ type = "int"
 examples = [1000]
 null = false
 description = "The number of events that must be received in order to print a summary of activity."
+
+# ------------------------------------------------------------------------------
+# sinks.console
+# ------------------------------------------------------------------------------
+
+[sinks.clickhouse]
+batch_size = 1049000
+batch_timeout = 1
+beta = true
+buffer = false
+delivery_guarantee = "best_effort"
+healthcheck = true
+egress_method = "batching"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 9223372036854775807
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+write_to_description = "[Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]"
+
+[sinks.clickhouse.options.compression]
+type = "string"
+category = "Requests"
+enum = ["gzip"]
+null = true
+description = "The compression type to use before writing data."
+
+[sinks.clickhouse.options.host]
+type = "string"
+examples = ["http://localhost:8123"]
+null = false
+description = "The host url of the [Clickhouse][url.clickhouse] server."
+
+[sinks.clickhouse.options.table]
+type = "string"
+examples = ["mytable"]
+null = false
+description = "The table that data will be inserted into."
+
+[sinks.clickhouse.options.database]
+type = "string"
+examples = ["mydatabase"]
+null = true
+description = "The database that contains the stable that data will be inserted into."
 
 # ------------------------------------------------------------------------------
 # sinks.console
@@ -1406,6 +1452,8 @@ aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-
 basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"
 big_query_streaming = "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
 cgroups_limit_resources = "https://the.binbashtheory.com/control-resources-cgroups/"
+clickhouse = "https://clickhouse.yandex/"
+clickhouse_http = "https://clickhouse.yandex/docs/en/interfaces/http/"
 community = "https://vector.dev/community"
 configuration = "https://docs.vector.dev/usage/configuration"
 crc = "https://en.wikipedia.org/wiki/Cyclic_redundancy_check"

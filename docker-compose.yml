@@ -42,3 +42,7 @@ services:
         - "9300:9300"
       environment:
         - discovery.type=single-node
+    clickhouse:
+      image: yandex/clickhouse-server:19
+      ports:
+        - "8123:8123"

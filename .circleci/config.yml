@@ -85,6 +85,7 @@ jobs:
       - image: elasticsearch:6.6.2
         environment:
           - discovery.type=single-node
+      - image: yandex/clickhouse-server:19
     steps:
       - checkout
       - run:
