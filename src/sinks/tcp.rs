@@ -185,6 +185,29 @@ pub struct TcpSinkTls {
     identity: Option<Pkcs12>,
 }
 
+impl TcpSinkTls {
+    fn make_connector(&self) -> Result<TlsConnector, String> {
+        let mut connector = native_tls::TlsConnector::builder();
+        connector.danger_accept_invalid_certs(!self.verify);
+        if let Some(ref certificate) = self.add_ca {
+            connector.add_root_certificate(certificate.clone());
+        }
+        if let Some(ref identity) = self.identity {
+            let identity = Identity::from_pkcs12(
+                &identity
+                    .to_der()
+                    .map_err(|err| format!("Could not export identity to DER: {}", err))?,
+                "",
+            )
+            .map_err(|err| format!("Could not set TCP TLS identity: {}", err))?;
+            connector.identity(identity);
+        }
+        Ok(TlsConnector::from(connector.build().map_err(|err| {
+            format!("Could not build TLS connector: {}", err)
+        })?))
+    }
+}
+
 impl TcpSink {
     pub fn new(hostname: String, addr: SocketAddr, tls: TcpSinkTls) -> Self {
         Self {
@@ -228,31 +251,17 @@ impl TcpSink {
                         debug!(message = "connected", addr = &field::display(&addr));
                         self.backoff = Self::fresh_backoff();
                         match self.tls.enabled {
-                            true => {
-                                let mut connector = native_tls::TlsConnector::builder();
-                                connector.danger_accept_invalid_certs(!self.tls.verify);
-                                if let Some(ref certificate) = self.tls.add_ca {
-                                    connector.add_root_certificate(certificate.clone());
+                            true => match self.tls.make_connector() {
+                                Ok(connector) => TcpSinkState::TlsConnecting(
+                                    connector.connect(&self.hostname, socket),
+                                ),
+                                Err(err) => {
+                                    error!("{}", err);
+                                    let delay =
+                                        Delay::new(Instant::now() + self.backoff.next().unwrap());
+                                    TcpSinkState::Backoff(delay)
                                 }
-                                if let Some(ref identity) = self.tls.identity {
-                                    connector.identity(
-                                        Identity::from_pkcs12(
-                                            &identity.to_der().unwrap_or_else(|err| {
-                                                panic!("Could not export identity to DER: {}", err)
-                                            }),
-                                            "",
-                                        )
-                                        .unwrap_or_else(
-                                            |err| panic!("Could not set TCP TLS identity: {}", err),
-                                        ),
-                                    );
-                                }
-                                let connector =
-                                    connector.build().expect("Could not build TLS connector?!?");
-                                TcpSinkState::TlsConnecting(
-                                    TlsConnector::from(connector).connect(&self.hostname, socket),
-                                )
-                            }
+                            },
                             false => TcpSinkState::Connected(Box::new(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
