@@ -227,6 +227,10 @@ impl TcpSink {
             .max_delay(Duration::from_secs(60))
     }
 
+    fn next_delay(&mut self) -> Delay {
+        Delay::new(Instant::now() + self.backoff.next().unwrap())
+    }
+
     fn poll_connection(&mut self) -> Poll<&mut Box<dyn FramedConnection + Send>, ()> {
         loop {
             self.state = match self.state {
@@ -258,9 +262,7 @@ impl TcpSink {
                                 ),
                                 Err(err) => {
                                     error!("{}", err);
-                                    let delay =
-                                        Delay::new(Instant::now() + self.backoff.next().unwrap());
-                                    TcpSinkState::Backoff(delay)
+                                    TcpSinkState::Backoff(self.next_delay())
                                 }
                             },
                             None => TcpSinkState::Connected(Box::new(FramedWrite::new(
@@ -274,8 +276,7 @@ impl TcpSink {
                     }
                     Err(err) => {
                         error!("Error connecting to {}: {}", self.addr, err);
-                        let delay = Delay::new(Instant::now() + self.backoff.next().unwrap());
-                        TcpSinkState::Backoff(delay)
+                        TcpSinkState::Backoff(self.next_delay())
                     }
                 },
                 TcpSinkState::TlsConnecting(ref mut connect_future) => {
@@ -291,8 +292,7 @@ impl TcpSink {
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(err) => {
                             error!("Error negotiating TLS with {}: {}", self.addr, err);
-                            let delay = Delay::new(Instant::now() + self.backoff.next().unwrap());
-                            TcpSinkState::Backoff(delay)
+                            TcpSinkState::Backoff(self.next_delay())
                         }
                     }
                 }
