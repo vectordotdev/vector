@@ -2174,7 +2174,7 @@ end
 
   [sinks.tcp.tls]
     # Enable TLS during connections to the remote.
-    #
+    # 
     # * optional
     # * default: false
     enabled = false
@@ -2182,16 +2182,30 @@ end
     # If `true`, Vector will force certificate validation.
     # Do NOT set this to `false` unless you know the risks of not verifying
     # the remote certificate.
-    #
+    # 
     # * optional
     # * default: true
     verify = true
 
     # Absolute path to additional CA certificate file, in PEM format.
-    #
+    # 
     # * optional
     # * no default
     ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this
+    # connection, in PEM format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this
+    # connection, in PEM format. If this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_file = "/path/to/host_certificate.key"
 
 [sinks.vector]
   #

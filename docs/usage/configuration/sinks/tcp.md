@@ -40,12 +40,14 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
-
+  
   # OPTIONAL - Tls
-  [sinks.my_tcp_sink_id.tls]
+  [sinks.my_sink_id.tls]
     enabled = false # default
     verify = true # default
     ca_file = "/path/to/certificate_authority.crt" # no default
+    crt_file = "/path/to/host_certificate.crt" # no default
+    key_file = "/path/to/host_certificate.key" # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -74,6 +76,8 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     enabled = <bool>
     verify = <bool>
     ca_file = "<string>"
+    crt_file = "<string>"
+    key_file = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -164,7 +168,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 
   [sinks.tcp_sink.tls]
     # Enable TLS during connections to the remote.
-    #
+    # 
     # * optional
     # * default: false
     enabled = false
@@ -172,16 +176,30 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # If `true`, Vector will force certificate validation.
     # Do NOT set this to `false` unless you know the risks of not verifying
     # the remote certificate.
-    #
+    # 
     # * optional
     # * default: true
     verify = true
 
     # Absolute path to additional CA certificate file, in PEM format.
-    #
+    # 
     # * optional
     # * no default
     ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this
+    # connection, in PEM format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this
+    # connection, in PEM format. If this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_file = "/path/to/host_certificate.key"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -209,6 +227,10 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 Do NOT set this to `false` unless you know the risks of not verifying
 the remote certificate.<br />`default: true` |
 | `tls.ca_file` | `string` | Absolute path to additional CA certificate file, in PEM format.<br />`no default` `example: (see above)` |
+| `tls.crt_file` | `string` | Absolute path to certificate file used to identify this
+connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_file` | `string` | Absolute path to key file used to identify this
+connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
 
 ## How It Works
 

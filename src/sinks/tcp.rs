@@ -6,9 +6,16 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use native_tls::Certificate;
+use native_tls::{Certificate, Identity};
+use openssl::{
+    pkcs12::Pkcs12,
+    pkey::{PKey, Private},
+    x509::X509,
+};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fmt::Debug;
+use std::fs::File;
 use std::io::Read;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
@@ -43,6 +50,8 @@ pub enum Encoding {
 pub struct TcpSinkTlsConfig {
     pub enabled: Option<bool>,
     pub verify: Option<bool>,
+    pub crt_file: Option<String>,
+    pub key_file: Option<String>,
     pub ca_file: Option<String>,
 }
 
@@ -68,14 +77,32 @@ impl SinkConfig for TcpSinkConfig {
 
         let tls = match self.tls {
             Some(ref tls) => {
+                if tls.key_file.is_some() != tls.crt_file.is_some() {
+                    return Err("Must specify both tls key_file and crt_file".into());
+                }
                 let add_ca = match tls.ca_file {
                     None => None,
                     Some(ref filename) => Some(load_certificate(filename)?),
                 };
+                let identity =
+                    match tls.crt_file {
+                        None => None,
+                        Some(ref filename) => {
+                            // This unwrap is safe because of the crt/key check above
+                            let key = load_key(tls.key_file.as_ref().unwrap())?;
+                            let crt = load_x509(filename)?;
+                            Some(Pkcs12::builder().build("", "FIXME", &key, &crt).map_err(
+                                |err| {
+                                    format!("Could not build PKCS#12 archive for identity: {}", err)
+                                },
+                            )?)
+                        }
+                    };
                 TcpSinkTls {
                     enabled: tls.enabled.unwrap_or(false),
                     verify: tls.verify.unwrap_or(true),
                     add_ca,
+                    identity,
                 }
             }
             None => TcpSinkTls::default(),
@@ -99,27 +126,30 @@ impl SinkConfig for TcpSinkConfig {
 }
 
 fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, String> {
-    let mut cert_text = Vec::<u8>::new();
-    std::fs::File::open(filename.as_ref())
-        .map_err(|err| {
-            format!(
-                "Could not open certificate authority file {:?}: {}",
-                filename, err
-            )
-        })?
-        .read_to_end(&mut cert_text)
-        .map_err(|err| {
-            format!(
-                "Could not read certificate authority file {:?}: {}",
-                filename, err
-            )
-        })?;
-    Certificate::from_pem(&cert_text).map_err(|err| {
-        format!(
-            "Could not parse certificate authority file {:?}: {}",
-            filename, err
-        )
-    })
+    open_read_parse(filename, "certificate authority", Certificate::from_pem)
+}
+
+fn load_key<T: AsRef<Path> + Debug>(filename: T) -> Result<PKey<Private>, String> {
+    open_read_parse(filename, "key", PKey::private_key_from_pem)
+}
+
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, String> {
+    open_read_parse(filename, "certificate", X509::from_pem)
+}
+
+fn open_read_parse<F: AsRef<Path> + Debug, O, E: Error>(
+    filename: F,
+    note: &str,
+    parser: fn(&[u8]) -> Result<O, E>,
+) -> Result<O, String> {
+    let mut text = Vec::<u8>::new();
+
+    File::open(filename.as_ref())
+        .map_err(|err| format!("Could not open {} file {:?}: {}", note, filename, err))?
+        .read_to_end(&mut text)
+        .map_err(|err| format!("Could not read {} file {:?}: {}", note, filename, err))?;
+
+    parser(&text).map_err(|err| format!("Could not parse {} file {:?}: {}", note, filename, err))
 }
 
 pub struct TcpSink {
@@ -143,6 +173,7 @@ pub struct TcpSinkTls {
     enabled: bool,
     verify: bool,
     add_ca: Option<Certificate>,
+    identity: Option<Pkcs12>,
 }
 
 impl TcpSink {
@@ -193,6 +224,19 @@ impl TcpSink {
                                 connector.danger_accept_invalid_certs(!self.tls.verify);
                                 if let Some(ref certificate) = self.tls.add_ca {
                                     connector.add_root_certificate(certificate.clone());
+                                }
+                                if let Some(ref identity) = self.tls.identity {
+                                    connector.identity(
+                                        Identity::from_pkcs12(
+                                            &identity.to_der().unwrap_or_else(|err| {
+                                                panic!("Could not export identity to DER: {}", err)
+                                            }),
+                                            "",
+                                        )
+                                        .unwrap_or_else(
+                                            |err| panic!("Could not set TCP TLS identity: {}", err),
+                                        ),
+                                    );
                                 }
                                 let connector =
                                     connector.build().expect("Could not build TLS connector?!?");
