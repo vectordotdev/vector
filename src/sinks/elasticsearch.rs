@@ -66,7 +66,6 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
-    let host = config.host.clone();
     let id_key = config.id_key.clone();
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -106,12 +105,8 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     for (p, v) in &config.query {
         path_query.append_pair(&p[..], &v[..]);
     }
-    let path_query = String::from(path_query.finish());
-    let uri = Uri::builder()
-        .authority(&host[..])
-        .path_and_query(&path_query[..])
-        .build()
-        .unwrap();
+    let uri = format!("{}{}", config.host, path_query.finish());
+    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
