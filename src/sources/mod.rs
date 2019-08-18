@@ -1,6 +1,8 @@
 use futures::Future;
 
 pub mod file;
+#[cfg(feature = "rdkafka")]
+pub mod kafka;
 pub mod statsd;
 pub mod stdin;
 pub mod syslog;
