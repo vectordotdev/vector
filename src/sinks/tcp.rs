@@ -291,7 +291,7 @@ impl TcpSink {
                         }
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(err) => {
-                            error!("Error negotiating TLS with {}: {}", self.addr, err);
+                            error!(message = "unable to negotiate TLS.", addr = %self.addr, error = %err);
                             TcpSinkState::Backoff(self.next_delay())
                         }
                     }
