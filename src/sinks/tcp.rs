@@ -22,12 +22,11 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
-    io::AsyncWrite,
     net::tcp::{ConnectFuture, TcpStream},
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_tls::{Connect as TlsConnect, TlsConnector};
+use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -175,9 +174,14 @@ enum TcpSinkState {
     Disconnected,
     Connecting(ConnectFuture),
     TlsConnecting(TlsConnect<TcpStream>),
-    Connected(Box<dyn FramedConnection + Send>),
+    Connected(TcpOrTlsStream),
     Backoff(Delay),
 }
+
+type TcpOrTlsStream = MaybeTlsStream<
+    FramedWrite<TcpStream, BytesCodec>,
+    FramedWrite<TlsStream<TcpStream>, BytesCodec>,
+>;
 
 #[derive(Default)]
 pub struct TcpSinkTls {
@@ -231,7 +235,7 @@ impl TcpSink {
         Delay::new(Instant::now() + self.backoff.next().unwrap())
     }
 
-    fn poll_connection(&mut self) -> Poll<&mut Box<dyn FramedConnection + Send>, ()> {
+    fn poll_connection(&mut self) -> Poll<&mut TcpOrTlsStream, ()> {
         loop {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
@@ -265,7 +269,7 @@ impl TcpSink {
                                     TcpSinkState::Backoff(self.next_delay())
                                 }
                             },
-                            None => TcpSinkState::Connected(Box::new(FramedWrite::new(
+                            None => TcpSinkState::Connected(MaybeTlsStream::Raw(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
                             ))),
@@ -284,7 +288,7 @@ impl TcpSink {
                         Ok(Async::Ready(socket)) => {
                             debug!(message = "negotiated TLS.");
                             self.backoff = Self::fresh_backoff();
-                            TcpSinkState::Connected(Box::new(FramedWrite::new(
+                            TcpSinkState::Connected(MaybeTlsStream::Tls(FramedWrite::new(
                                 socket,
                                 BytesCodec::new(),
                             )))
@@ -315,7 +319,7 @@ impl Sink for TcpSink {
                     message = "sending event.",
                     bytes = &field::display(line.len())
                 );
-                match connection.start(line) {
+                match connection.start_send(line) {
                     Err(err) => {
                         debug!(
                             message = "disconnected.",
@@ -342,7 +346,7 @@ impl Sink for TcpSink {
 
         let connection = try_ready!(self.poll_connection());
 
-        match connection.poll() {
+        match connection.poll_complete() {
             Err(err) => {
                 debug!(
                     message = "disconnected.",
@@ -404,16 +408,30 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> 
     })
 }
 
-trait FramedConnection {
-    fn start(&mut self, line: Bytes) -> std::io::Result<AsyncSink<Bytes>>;
-    fn poll(&mut self) -> std::io::Result<Async<()>>;
+enum MaybeTlsStream<R, T> {
+    Raw(R),
+    Tls(T),
 }
 
-impl<T: AsyncWrite> FramedConnection for FramedWrite<T, BytesCodec> {
-    fn start(&mut self, line: Bytes) -> std::io::Result<AsyncSink<Bytes>> {
-        FramedWrite::<T, BytesCodec>::start_send(self, line)
+impl<R, T, I, E> Sink for MaybeTlsStream<R, T>
+where
+    R: Sink<SinkItem = I, SinkError = E>,
+    T: Sink<SinkItem = I, SinkError = E>,
+{
+    type SinkItem = I;
+    type SinkError = E;
+
+    fn start_send(&mut self, item: I) -> futures::StartSend<I, E> {
+        match self {
+            MaybeTlsStream::Raw(r) => r.start_send(item),
+            MaybeTlsStream::Tls(t) => t.start_send(item),
+        }
     }
-    fn poll(&mut self) -> std::io::Result<Async<()>> {
-        FramedWrite::<T, BytesCodec>::poll_complete(self)
+
+    fn poll_complete(&mut self) -> futures::Poll<(), E> {
+        match self {
+            MaybeTlsStream::Raw(r) => r.poll_complete(),
+            MaybeTlsStream::Tls(t) => t.poll_complete(),
+        }
     }
 }
