@@ -82,13 +82,13 @@ impl SinkConfig for TcpSinkConfig {
                     if tls.key_file.is_some() != tls.crt_file.is_some() {
                         return Err("Must specify both tls key_file and crt_file".into());
                     }
-                    let add_ca = match tls.ca_file {
+                    let add_ca = match &tls.ca_file {
                         None => None,
-                        Some(ref filename) => Some(load_certificate(filename)?),
+                        Some(filename) => Some(load_certificate(filename)?),
                     };
-                    let identity = match tls.crt_file {
+                    let identity = match &tls.crt_file {
                         None => None,
-                        Some(ref filename) => {
+                        Some(filename) => {
                             // This unwrap is safe because of the crt/key check above
                             let key = load_key(tls.key_file.as_ref().unwrap(), &tls.key_phrase)?;
                             let crt = load_x509(filename)?;
