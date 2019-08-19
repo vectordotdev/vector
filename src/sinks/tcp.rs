@@ -261,7 +261,7 @@ impl TcpSink {
                                     connector.connect(&self.hostname, socket),
                                 ),
                                 Err(err) => {
-                                    error!("{}", err);
+                                    error!(message = "unable to establish TLS connection.", error = %err);
                                     TcpSinkState::Backoff(self.next_delay())
                                 }
                             },
