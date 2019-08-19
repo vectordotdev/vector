@@ -92,7 +92,7 @@ impl SinkConfig for TcpSinkConfig {
                             // This unwrap is safe because of the crt/key check above
                             let key = load_key(tls.key_file.as_ref().unwrap(), &tls.key_phrase)?;
                             let crt = load_x509(filename)?;
-                            Some(Pkcs12::builder().build("", "FIXME", &key, &crt).map_err(
+                            Some(Pkcs12::builder().build("", filename, &key, &crt).map_err(
                                 |err| {
                                     format!("Could not build PKCS#12 archive for identity: {}", err)
                                 },
