@@ -35,7 +35,7 @@ use tracing::field;
 pub struct TcpSinkConfig {
     pub address: String,
     pub encoding: Option<Encoding>,
-    pub tls: Option<TcpSinkTlsConfig>,
+    pub tls: Option<TlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -47,7 +47,7 @@ pub enum Encoding {
 
 #[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-pub struct TcpSinkTlsConfig {
+pub struct TlsConfig {
     pub enabled: Option<bool>,
     pub verify: Option<bool>,
     pub crt_file: Option<String>,
