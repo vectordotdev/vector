@@ -282,7 +282,7 @@ impl TcpSink {
                 TcpSinkState::TlsConnecting(ref mut connect_future) => {
                     match connect_future.poll() {
                         Ok(Async::Ready(socket)) => {
-                            debug!(message = "negotiated TLS");
+                            debug!(message = "negotiated TLS.");
                             self.backoff = Self::fresh_backoff();
                             TcpSinkState::Connected(Box::new(FramedWrite::new(
                                 socket,
