@@ -1658,6 +1658,17 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+  #
+  # Query
+  #
+
+  [sinks.elasticsearch.query]
+    # A custom parameter to be added to each Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+
 [sinks.http]
   #
   # General
