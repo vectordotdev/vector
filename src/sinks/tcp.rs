@@ -22,8 +22,8 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
+    io::AsyncWrite,
     net::tcp::{ConnectFuture, TcpStream},
-    prelude::AsyncWrite,
     timer::Delay,
 };
 use tokio_retry::strategy::ExponentialBackoff;
