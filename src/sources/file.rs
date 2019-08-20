@@ -12,7 +12,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 use tracing::dispatcher;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
@@ -22,11 +22,36 @@ pub struct FileConfig {
     pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
-    pub fingerprint_bytes: usize,
-    pub ignored_header_bytes: usize,
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
+    pub fingerprinting: FingerprintingConfig,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "strategy", rename_all = "snake_case")]
+pub enum FingerprintingConfig {
+    Checksum {
+        fingerprint_bytes: usize,
+        ignored_header_bytes: usize,
+    },
+    #[serde(rename = "device_and_inode")]
+    DevInode,
+}
+
+impl From<FingerprintingConfig> for Fingerprinter {
+    fn from(config: FingerprintingConfig) -> Fingerprinter {
+        match config {
+            FingerprintingConfig::Checksum {
+                fingerprint_bytes,
+                ignored_header_bytes,
+            } => Fingerprinter::Checksum {
+                fingerprint_bytes,
+                ignored_header_bytes,
+            },
+            FingerprintingConfig::DevInode => Fingerprinter::DevInode,
+        }
+    }
 }
 
 fn default_max_line_bytes() -> usize {
@@ -42,8 +67,10 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
-            fingerprint_bytes: 256,
-            ignored_header_bytes: 0,
+            fingerprinting: FingerprintingConfig::Checksum {
+                fingerprint_bytes: 256,
+                ignored_header_bytes: 0,
+            },
             host_key: None,
             data_dir: None,
             glob_minimum_cooldown: 1000, // millis
@@ -118,11 +145,6 @@ pub fn file_source(
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
-    let fingerprinter = Fingerprinter::Checksum {
-        fingerprint_bytes: config.fingerprint_bytes,
-        ignored_header_bytes: config.ignored_header_bytes,
-    };
-
     let file_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
@@ -132,7 +154,7 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown: glob_minimum_cooldown,
-        fingerprinter,
+        fingerprinter: config.fingerprinting.clone().into(),
     };
 
     let file_key = config.file_key.clone();
@@ -212,7 +234,10 @@ mod tests {
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
-            fingerprint_bytes: 8,
+            fingerprinting: FingerprintingConfig::Checksum {
+                fingerprint_bytes: 8,
+                ignored_header_bytes: 0,
+            },
             data_dir: Some(dir.path().to_path_buf()),
             glob_minimum_cooldown: 0, // millis
             ..Default::default()
@@ -231,6 +256,49 @@ mod tests {
             "Unclosed channel: may indicate file-server could not shutdown gracefully."
         );
         result.unwrap()
+    }
+
+    #[test]
+    fn parse_config() {
+        let config: FileConfig = toml::from_str(
+            r#"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config, FileConfig::default());
+        assert_eq!(
+            config.fingerprinting,
+            FingerprintingConfig::Checksum {
+                fingerprint_bytes: 256,
+                ignored_header_bytes: 0,
+            }
+        );
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        [fingerprinting]
+        strategy = "device_and_inode"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.fingerprinting, FingerprintingConfig::DevInode);
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        [fingerprinting]
+        strategy = "checksum"
+        fingerprint_bytes = 128
+        ignored_header_bytes = 512
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.fingerprinting,
+            FingerprintingConfig::Checksum {
+                fingerprint_bytes: 128,
+                ignored_header_bytes: 512,
+            }
+        );
     }
 
     #[test]
