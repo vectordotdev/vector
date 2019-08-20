@@ -336,10 +336,18 @@ class Links
         type_label = "Type: #{issue_type.titleize}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
 
-      when /^url\.vector_(latest|nightly)_(.*)/
+      when /^url\.vector_latest_(release|nightly)_(.*)/
         channel = $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
+
+      when /^url\.vector_historical_nightly_(.*)/
+        target = $1
+        "https://packages.timber.io/vector/nightly/vector-2019-08-19-#{target}.tar.gz"
+
+      when /^url\.vector_historical_release_(.*)/
+        target = $1
+        "https://packages.timber.io/vector/0.3.0/vector-0.3.0-#{target}.tar.gz"
 
       when /^url\.(.*)_test$/
         name = $1
