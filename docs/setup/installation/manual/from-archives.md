@@ -14,7 +14,7 @@ versions as well as nightly builds.
 ### 1. Download The Archive
 
 {% hint style="info" %}
-If you don't see an architecture, then we recommend [building Vector from \
+If you don't see your architecture, then we recommend [building Vector from \
 source][docs.from_source].
 {% endhint %}
 
@@ -29,7 +29,7 @@ Vector retains archives for all [releases][url.releases].
 | Architecture                                                                                         | Notes                                                                            |
 |:-----------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
 | [`latest-x86_64-apple-darwin`][url.vector_latest_release_x86_64-apple-darwin]                        | 64-bit OSX (10.7+, Lion+)                                                        |
-| [`latest--unknown-linux-musl`][url.vector_latest_release_x86_64-unknown-linux-musl]            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
+| [`latest-unknown-linux-musl`][url.vector_latest_release_x86_64-unknown-linux-musl]            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`latest-x86_64-unknown-linux-gnu`][url.vector_latest_release_x86_64-unknown-linux-gnu]              | 64-bit Linux (2.6.18+)                                                           |
 | [`latest-armv7-unknown-linux-gnueabihf`][url.vector_latest_release_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
@@ -58,7 +58,7 @@ every night. They contain the latest features but may be less stable.
 | [`nightly-x86_64-apple-darwin`][url.vector_latest_nightly_x86_64-apple-darwin]                                        | 64-bit OSX (10.7+, Lion+)                                                        |
 | [`nightly-x86_64-unknown-linux-musl`][url.vector_latest_nightly_x86_64-unknown-linux-musl]                            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`nightly-x86_64-unknown-linux-gnu`][url.vector_latest_nightly_x86_64-unknown-linux-gnu]                              | 64-bit Linux (2.6.18+)                                                           |
-| [`nightly-armv7-unknown-linux-gnueabihf`][<url class="v"></url>ector_latest_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
+| [`nightly-armv7-unknown-linux-gnueabihf`][url.vector_latest_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
 #### Historical
 
@@ -156,11 +156,11 @@ If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
 {% endhint %}
 
-## Service Managers
+### Service Managers
 
 Vector archives ship with service files in case you need them:
 
-### Init.d
+#### Init.d
 
 To install Vector into Init.d run:
 
@@ -168,7 +168,7 @@ To install Vector into Init.d run:
 cp -a etc/init.d/vector /etc/init.d
 ```
 
-### Systemd
+#### Systemd
 
 To install Vector into Systemd run:
 
@@ -176,7 +176,7 @@ To install Vector into Systemd run:
 cp -a etc/systemd/vector /etc/systemd/system
 ```
 
-## Updating
+### Updating
 
 Simply follow the same [installation instructions above](#installation).
 
