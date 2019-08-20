@@ -3,7 +3,7 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
-use file_source::FileServer;
+use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
 use std::fs::DirBuilder;
@@ -118,6 +118,11 @@ pub fn file_source(
         .map(|secs| SystemTime::now() - Duration::from_secs(secs));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
+    let fingerprinter = Fingerprinter::Checksum {
+        fingerprint_bytes: config.fingerprint_bytes,
+        ignored_header_bytes: config.ignored_header_bytes,
+    };
+
     let file_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
@@ -125,10 +130,9 @@ pub fn file_source(
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
-        fingerprint_bytes: config.fingerprint_bytes,
-        ignored_header_bytes: config.ignored_header_bytes,
         data_dir,
         glob_minimum_cooldown: glob_minimum_cooldown,
+        fingerprinter,
     };
 
     let file_key = config.file_key.clone();
