@@ -10,12 +10,12 @@ description: Ingests data through the TCP protocol and outputs `log` events.
      scripts/generate/templates/docs/usage/configuration/sources/udp.md.erb
 -->
 
-# tcp source
+# udp source
 
-![][images.tcp_source]
+![][images.udp_source]
 
 
-The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.log_event] events.
+The `udp` source ingests data through the TCP protocol and outputs [`log`][docs.log_event] events.
 
 ## Config File
 
@@ -24,12 +24,11 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = "tcp" # must be: "tcp"
+  type = "udp" # must be: "udp"
   address = "0.0.0.0:9000"
   
   # OPTIONAL - General
   max_length = 102400 # default, bytes
-  shutdown_timeout_secs = 30 # default, seconds
   
   # OPTIONAL - Context
   host_key = "host" # default
@@ -39,12 +38,11 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "tcp"
+  type = "udp"
   address = "<string>"
 
   # OPTIONAL - General
   max_length = <int>
-  shutdown_timeout_secs = <int>
 
   # OPTIONAL - Context
   host_key = "<string>"
@@ -52,7 +50,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sources.tcp_source]
+[sources.udp_source]
   #
   # General
   #
@@ -61,8 +59,8 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
   # 
   # * required
   # * no default
-  # * must be: "tcp"
-  type = "tcp"
+  # * must be: "udp"
+  type = "udp"
 
   # The address to bind the socket to.
   # 
@@ -76,13 +74,6 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
   # * default: 102400
   # * unit: bytes
   max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
 
   #
   # Context
@@ -102,11 +93,10 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
+| `type` | `string` | The component type<br />`required` `must be: "udp"` |
 | `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
 | **OPTIONAL** - General | | |
 | `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
@@ -142,7 +132,7 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Context
 
-By default, the `tcp` source will add context
+By default, the `udp` source will add context
 keys to your events via the `host_key`
 options.
 
@@ -174,15 +164,15 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `tcp_source` issues][url.tcp_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_tcp_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_tcp_source_enhancement].
+1. Check for any [open `udp_source` issues][url.udp_source_issues].
+2. If encountered a bug, please [file a bug report][url.new_udp_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_udp_source_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.tcp_source_issues] - [enhancements][url.tcp_source_enhancements] - [bugs][url.tcp_source_bugs]
-* [**Source code**][url.tcp_source_source]
+* [**Issues**][url.udp_source_issues] - [enhancements][url.udp_source_enhancements] - [bugs][url.udp_source_bugs]
+* [**Source code**][url.udp_source_source]
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
@@ -192,11 +182,11 @@ issue, please:
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.tcp_source]: ../../../assets/tcp-source.svg
-[url.new_tcp_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Bug
-[url.new_tcp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Enhancement
-[url.tcp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Bug%22
-[url.tcp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Enhancement%22
-[url.tcp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22
-[url.tcp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/tcp.rs
+[images.udp_source]: ../../../assets/udp-source.svg
+[url.new_udp_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+udp&labels=Type%3A+Bug
+[url.new_udp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+udp&labels=Type%3A+Enhancement
+[url.udp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+udp%22+label%3A%22Type%3A+Bug%22
+[url.udp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+udp%22+label%3A%22Type%3A+Enhancement%22
+[url.udp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+udp%22
+[url.udp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
 [url.vector_chat]: https://chat.vector.dev

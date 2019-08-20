@@ -190,6 +190,7 @@ Simply follow the same [installation instructions above](#installation).
 [url.issue_661]: https://github.com/timberio/vector/issues/661
 [url.releases]: https://github.com/timberio/vector/releases
 [url.rust_target_triples]: https://forge.rust-lang.org/platform-support.html
+[url.vector_latest_nightly_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/nightly/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz
 [url.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
 [url.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
 [url.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
