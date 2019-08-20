@@ -337,7 +337,7 @@ class Links
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
 
       when /^url\.vector_latest_(release|nightly)_(.*)/
-        channel = $1
+        channel = $1 == "release" ? "latest" : $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
 

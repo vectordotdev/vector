@@ -9,7 +9,7 @@ support your [platform][docs.platforms],
 [operating system][docs.operating_systems], or provide a pre-built
 [archive][docs.from_archives]. Because Vector is written in [Rust][url.rust]
 it can compile to a single static binary. You can view an example of this
-in the [musl builder Docker image][urls.musl_builder_docker_image].
+in the [musl builder Docker image][url.musl_builder_docker_image].
 
 ## Installation
 
@@ -141,7 +141,7 @@ Simply follow the same [installation instructions above](#installation).
 [docs.configuration]: ../../../usage/configuration
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory
 [docs.from_archives]: ../../../setup/installation/manual/from-archives.md
-[docs.package_managers]: ../../../setup/installation/package-managers
+[docs.operating_systems]: ../../../setup/installation/operating-systems
 [docs.platforms]: ../../../setup/installation/platforms
+[url.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [url.rust]: https://www.rust-lang.org/
-[url.vector_repo]: https://github.com/timberio/vector
