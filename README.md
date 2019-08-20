@@ -111,6 +111,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
+| [**`udp`**][docs.udp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
 [+ request a new source][url.new_source]
@@ -234,6 +235,7 @@ the License.
 [docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
 [docs.topologies]: https://docs.vector.dev/setup/deployment/topologies
 [docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.udp_source]: https://docs.vector.dev/usage/configuration/sources/udp
 [docs.updating]: https://docs.vector.dev/usage/administration/updating
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector

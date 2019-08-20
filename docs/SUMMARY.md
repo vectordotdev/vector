@@ -55,6 +55,7 @@
     * [stdin source](usage/configuration/sources/stdin.md)
     * [syslog source](usage/configuration/sources/syslog.md)
     * [tcp source](usage/configuration/sources/tcp.md)
+    * [udp source](usage/configuration/sources/udp.md)
     * [vector source](usage/configuration/sources/vector.md)
   * [Transforms](usage/configuration/transforms/README.md)
     * [add\_fields transform](usage/configuration/transforms/add_fields.md)

@@ -290,6 +290,41 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+[sources.udp]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "udp"
+  type = "udp"
+
+  # The address to bind the socket to.
+  # 
+  # * required
+  # * no default
+  address = "0.0.0.0:9000"
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_length = 102400
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+
 [sources.vector]
   # The component type
   # 

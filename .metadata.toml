@@ -284,6 +284,41 @@ The timeout before a connection is forcefully closed during shutdown.\
 """
 
 # ------------------------------------------------------------------------------
+# sources.udp
+# ------------------------------------------------------------------------------
+[sources.udp]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "the TCP protocol"
+
+[sources.udp.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = false
+description = "The address to bind the socket to."
+
+[sources.udp.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.udp.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+# ------------------------------------------------------------------------------
 # sources.vector
 # ------------------------------------------------------------------------------
 [sources.vector]
