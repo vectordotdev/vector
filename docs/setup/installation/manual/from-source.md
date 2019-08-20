@@ -4,17 +4,12 @@ description: Install Vector from the Vector source code
 
 # Install From Source
 
-{% hint style="info" %}
-Before proceeding, please make sure Vector does not support your
-[platform][docs.platforms], [package manager][docs.package_managers], or provide a
-[pre-built archive][docs.from_archives]. These are recommended before
-installing from source.
-{% endhint %}
-
-Because Vector is [open source][url.vector_repo] you can download the code and
-compile it from source. Vector is written in [Rust][url.rust], which means it
-compiles to a single static binary. There is no runtime and there are no
-dependencies.
+Installing Vector from source should be a last resort if Vector does not
+support your [platform][docs.platforms],
+[operating system][docs.operating_systems], or provide a pre-built
+[archive][docs.from_archives]. Because Vector is written in [Rust][url.rust]
+it can compile to a single static binary. You can view an example of this
+in the [musl builder Docker image][url.musl_builder_docker_image].
 
 ## Installation
 
@@ -23,11 +18,13 @@ This guide does _not_ cover cross compiling Vector. This guide is intended
 to be followed on your target machine.
 {% endhint %}
 
-Start by installing Rust:
+### 1. Install Rust
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
 ```
+
+### 2. Download Vector's Source
 
 Create a directory to unpack the Vector source into:
 
@@ -38,7 +35,7 @@ mkdir vector
 Download and unarchive the [Vector source](https://github.com/timberio/vector):
 
 {% code-tabs %}
-{% code-tabs-item title="edge" %}
+{% code-tabs-item title="master" %}
 ```bash
 curl -OL https://github.com/timberio/vector/archive/master.tar.gz | tar -xzf - --directory="vector"
 ```
@@ -56,6 +53,8 @@ Change into the `vector` directory:
 cd vector
 ```
 
+### 3. Compile Vector
+
 And build the project via the `build` Make target:
 
 ```bash
@@ -67,19 +66,22 @@ For example, if you are building Vector on your Mac, your target triple
 is `x86_64-apple-darwin`, and the Vector binary will be located at
 `target/x86_64-apple-darwin/release/vector`.
 
+### 4. Start Vector
+
 Finally, go ahead and start vector:
 
 ```bash
 target/<target>/release/vector --config config/vector.toml
 ```
 
-Vector is ready for your system! You'll most likely want to move this
-binary to somewhere in your `$PATH`, such as the `/usr/local/bin` folder.
-Additionally, you'll need to configure the `config/vector.toml` file.
-The [Configuration][docs.configuration] section covers this in
-great detail.
+## Next Steps
 
-## Configuring
+### Adding To Your $PATH
+
+You'll most likely want to move the `vector` binary in your `$PATH`, such as
+the `/usr/local/bin` folder.
+
+### Configuring
 
 The Vector configuration file is located at:
 
@@ -111,11 +113,11 @@ If you plan to run Vector under a separate user, be sure that the directory
 is writable by the `vector` process.
 {% endhint %}
 
-## Service Managers
+### Service Managers
 
 Vector includes service files in case you need them:
 
-### Init.d
+#### Init.d
 
 To install Vector into Init.d run:
 
@@ -123,7 +125,7 @@ To install Vector into Init.d run:
 cp -a distribution/init.d/vector /etc/init.d
 ```
 
-### Systemd
+#### Systemd
 
 To install Vector into Systemd run:
 
@@ -131,7 +133,7 @@ To install Vector into Systemd run:
 cp -a distribution/systemd/vector /etc/systemd/system
 ```
 
-## Updating
+### Updating
 
 Simply follow the same [installation instructions above](#installation).
 
@@ -139,7 +141,7 @@ Simply follow the same [installation instructions above](#installation).
 [docs.configuration]: ../../../usage/configuration
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory
 [docs.from_archives]: ../../../setup/installation/manual/from-archives.md
-[docs.package_managers]: ../../../setup/installation/package-managers
+[docs.operating_systems]: ../../../setup/installation/operating-systems
 [docs.platforms]: ../../../setup/installation/platforms
+[url.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
 [url.rust]: https://www.rust-lang.org/
-[url.vector_repo]: https://github.com/timberio/vector

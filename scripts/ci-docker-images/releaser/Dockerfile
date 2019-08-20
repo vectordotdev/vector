@@ -8,12 +8,12 @@ RUN add-apt-repository ppa:git-core/ppa
 
 RUN apt-get update && \
   apt-get upgrade -y && \
-  apt-get update
-  
-RUN apt-get install -y \
+  apt-get update && \  
+  apt-get install -y \
   build-essential \
   curl \
   git \
+  locales \
   python3-pip \
   rename \
   ruby-full \
@@ -36,3 +36,9 @@ RUN gem install package_cloud
 # Docker is used to upload Vector docker images
 RUN apt-get remove docker docker-engine docker.io
 RUN apt-get install -y docker.io
+
+ENV LANGUAGE en_US.UTF-8
+ENV LANG en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+RUN locale-gen "en_US.UTF-8"
+RUN dpkg-reconfigure locales

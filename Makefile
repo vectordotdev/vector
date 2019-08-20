@@ -1,5 +1,8 @@
 .PHONY: help
 .DEFAULT_GOAL := help
+_latest_version := $(shell scripts/version.sh true)
+_version := $(shell scripts/version.sh)
+
 
 help:
 	@echo "                                      __   __  __"
@@ -35,7 +38,7 @@ check-generate: ## Checks for pending `make generate` changes
 
 generate: ## Generates files across the repo from the /.metadata.toml file
 	@bundle install --gemfile=scripts/generate/Gemfile
-	@scripts/generate.rb --check-urls
+	@export VERSION=$(_latest_version); scripts/generate.rb --check-urls
 
 fmt: ## Format code
 	@cargo fmt
@@ -86,4 +89,4 @@ release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
 version: ## Get the current Vector version
-	@scripts/version.sh
+	@echo $(_version)
