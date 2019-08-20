@@ -4,7 +4,7 @@ FROM ubuntu
 # This is important for determining the current Vector version number.
 RUN apt-get update
 RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:git-core/ppa
+RUN add-apt-repository -y ppa:git-core/ppa
 
 RUN apt-get update && \
   apt-get upgrade -y && \
