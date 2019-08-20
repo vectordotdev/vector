@@ -18,6 +18,7 @@ scopes:
   - stdin source
   - syslog source
   - tcp source
+  - udp source
   - vector source
   # transforms
   - add_fields transform

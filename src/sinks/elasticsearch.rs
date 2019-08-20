@@ -41,6 +41,7 @@ pub struct ElasticSearchConfig {
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 
     pub headers: HashMap<String, String>,
+    pub query: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -65,7 +66,6 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
-    let host = config.host.clone();
     let id_key = config.id_key.clone();
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -101,13 +101,17 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     });
     let headers = config.headers.clone();
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let uri = format!("{}/_bulk", host);
-        let uri: Uri = uri.parse().unwrap();
+    let mut path_query = url::form_urlencoded::Serializer::new(String::from("/_bulk"));
+    for (p, v) in &config.query {
+        path_query.append_pair(&p[..], &v[..]);
+    }
+    let uri = format!("{}{}", config.host, path_query.finish());
+    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
 
+    let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
         builder.method(Method::POST);
-        builder.uri(uri);
+        builder.uri(&uri);
 
         builder.header("Content-Type", "application/x-ndjson");
         if let Some(ref auth) = authorization {

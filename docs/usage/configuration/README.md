@@ -87,6 +87,7 @@ data_dir = "/var/lib/vector"
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
+| [**`udp`**][docs.udp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
 [+ request a new source][url.new_source]
@@ -322,6 +323,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.tcp_source]: ../../usage/configuration/sources/tcp.md
 [docs.tokenizer_transform]: ../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../usage/configuration/transforms
+[docs.udp_source]: ../../usage/configuration/sources/udp.md
 [docs.vector_sink]: ../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../usage/configuration/sources/vector.md
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html

@@ -29,6 +29,7 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
+| [**`udp`**][docs.udp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
 
 [+ request a new source][url.new_source]
@@ -43,6 +44,7 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 [docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
 [docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.udp_source]: ../../../usage/configuration/sources/udp.md
 [docs.vector_source]: ../../../usage/configuration/sources/vector.md
 [images.sources]: ../../../assets/sources.svg
 [url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
