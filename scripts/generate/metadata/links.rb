@@ -340,15 +340,7 @@ class Links
         channel = $1 == "release" ? "latest" : $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
-
-      when /^url\.vector_historical_nightly_(.*)/
-        target = $1
-        "https://packages.timber.io/vector/nightly/vector-2019-08-19-#{target}.tar.gz"
-
-      when /^url\.vector_historical_release_(.*)/
-        target = $1
-        "https://packages.timber.io/vector/0.3.0/vector-0.3.0-#{target}.tar.gz"
-
+        
       when /^url\.(.*)_test$/
         name = $1
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{name}"
