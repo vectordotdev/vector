@@ -181,14 +181,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   group_id = "consumer-group-name"
 
-  # The field name to use for the topic key. If unspecified, the key would not be
-  # added to the events. If the message has null key, then this field would not
-  # be added to the event.
-  # 
-  # * required
-  # * no default
-  key_field = "user_id"
-
   # The Kafka topics names to read events from.
   # 
   # * required
@@ -207,6 +199,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   auto_offset_reset = "latest"
   auto_offset_reset = "end"
   auto_offset_reset = "error"
+
+  # The field name to use for the topic key. If unspecified, the key would not be
+  # added to the events. If the message has null key, then this field would not
+  # be added to the event.
+  # 
+  # * optional
+  # * no default
+  key_field = "user_id"
 
   # The Kafka session timeout in milliseconds.
   # 

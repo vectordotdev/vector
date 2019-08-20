@@ -188,7 +188,7 @@ name = "host_key"
 type = "string"
 category = "Context"
 default = "host"
-null = false
+null = true
 section = "context"
 description = """\
 The key name added to each event representing the current host.\
@@ -197,7 +197,7 @@ The key name added to each event representing the current host.\
 [sources.kafka.options.key_field]
 type = "string"
 examples = ["user_id"]
-null = false
+null = true
 description = """\
 The field name to use for the topic key. If unspecified, the key would not \
 be added to the events. If the message has null key, then this field would \

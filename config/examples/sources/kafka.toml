@@ -14,3 +14,6 @@
   key_field = "partition_key" # no default
   auto_offset_reset = "beginning" # default: "largest"
   session_timeout_ms = 6000 # default: 10000
+
+  # OPTIONAL - Context
+  host_key = "machine_id" # default: "host"
