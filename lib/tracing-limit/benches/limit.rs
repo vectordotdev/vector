@@ -10,7 +10,8 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 use tracing::{field, span, Event, Id, Metadata};
-use tracing_limit::LimitSubscriber;
+use tracing_limit::Limit;
+use tracing_subscriber::layer::SubscriberExt;
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("basline_record", |b| {
@@ -32,7 +33,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("limit_record_5", |b| {
-        let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
+        let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());;
         let n = black_box(5000);
         tracing::subscriber::with_default(sub, || {
             b.iter(|| {
@@ -51,7 +52,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("limit_record_100", |b| {
-        let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
+        let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());;
         let n = black_box(5000);
         tracing::subscriber::with_default(sub, || {
             b.iter(|| {
@@ -70,7 +71,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("limit_record_1000", |b| {
-        let sub = LimitSubscriber::new(VisitingSubscriber(Mutex::new(String::from(""))));
+        let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());;
         let n = black_box(5000);
         tracing::subscriber::with_default(sub, || {
             b.iter(|| {
