@@ -93,14 +93,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   data_dir = "/var/lib/vector"
 
-  # The number of bytes read off the head of the file to generate a unique
-  # fingerprint.
-  # 
-  # * optional
-  # * default: 256
-  # * unit: bytes
-  fingerprint_bytes = 256
-
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
   # 
@@ -115,14 +107,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   # * unit: seconds
   ignore_older = 86400
-
-  # The number of bytes to skipe ahead (or ignore) when generating a unique
-  # fingerprint. This is helpful if all files share a common header.
-  # 
-  # * optional
-  # * default: 0
-  # * unit: bytes
-  ignored_header_bytes = 0
 
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
@@ -154,6 +138,37 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * optional
   # * default: "host"
   host_key = "host"
+
+  #
+  # Fingerprinting
+  #
+
+  [sources.file.fingerprinting]
+    # Whether to use the content of a file to differentiate it (`checksum`) or the
+    # storage device and inode (`device_and_inode`). Depending on your log rotation
+    # strategy, one may be a better fit than the other.
+    # 
+    # * optional
+    # * default: "checksum"
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
+
+    # The number of bytes read off the head of the file to generate a unique
+    # fingerprint.
+    # 
+    # * optional
+    # * default: 256
+    # * unit: bytes
+    fingerprint_bytes = 256
+
+    # The number of bytes to skip ahead (or ignore) when generating a unique
+    # fingerprint. This is helpful if all files share a common header.
+    # 
+    # * optional
+    # * default: 0
+    # * unit: bytes
+    ignored_header_bytes = 0
 
 [sources.journald]
   # The component type
