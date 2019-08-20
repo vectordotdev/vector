@@ -290,7 +290,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 delivery_guarantee = "best_effort"
 guides = []
 resources = []
-through_description = "the TCP protocol"
+through_description = "the UDP protocol"
 
 [sources.udp.options.address]
 type = "string"

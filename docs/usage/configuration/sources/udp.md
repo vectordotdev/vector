@@ -1,5 +1,5 @@
 ---
-description: Ingests data through the TCP protocol and outputs `log` events.
+description: Ingests data through the UDP protocol and outputs `log` events.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Ingests data through the TCP protocol and outputs `log` events.
 ![][images.udp_source]
 
 
-The `udp` source ingests data through the TCP protocol and outputs [`log`][docs.log_event] events.
+The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.log_event] events.
 
 ## Config File
 
