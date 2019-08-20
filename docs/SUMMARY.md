@@ -73,6 +73,7 @@
     * [aws\_kinesis\_streams sink](usage/configuration/sinks/aws_kinesis_streams.md)
     * [aws\_s3 sink](usage/configuration/sinks/aws_s3.md)
     * [blackhole sink](usage/configuration/sinks/blackhole.md)
+    * [clickhouse sink](usage/configuration/sinks/clickhouse.md)
     * [console sink](usage/configuration/sinks/console.md)
     * [elasticsearch sink](usage/configuration/sinks/elasticsearch.md)
     * [http sink](usage/configuration/sinks/http.md)
