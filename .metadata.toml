@@ -284,6 +284,41 @@ The timeout before a connection is forcefully closed during shutdown.\
 """
 
 # ------------------------------------------------------------------------------
+# sources.udp
+# ------------------------------------------------------------------------------
+[sources.udp]
+delivery_guarantee = "best_effort"
+guides = []
+resources = []
+through_description = "the UDP protocol"
+
+[sources.udp.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = false
+description = "The address to bind the socket to."
+
+[sources.udp.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.udp.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+# ------------------------------------------------------------------------------
 # sources.vector
 # ------------------------------------------------------------------------------
 [sources.vector]
@@ -798,8 +833,9 @@ is dynamic based on if the event is structured or not.\
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 examples = [
-  "/var/log/{{ file }}.log",
-  "ec2/{{ instance_id }}"
+  "{{ file }}",
+  "ec2/{{ instance_id }}",
+  "group-name"
 ]
 null = false
 partition_key = true
@@ -816,8 +852,8 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 type = "string"
 examples = [
   "{{ instance_id }}",
-  "stream-name",
-  "%Y-%m-%d"
+  "%Y-%m-%d",
+  "stream-name"
 ]
 null = false
 partition_key = true
@@ -1148,6 +1184,17 @@ examples = [{ name = "X-Powered-By", value = "Vector"}]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
 
+[sinks.elasticsearch.options.query]
+type = "table"
+null = true
+description = "Custom parameters to Elasticsearch query string."
+
+[sinks.elasticsearch.options.query.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom parameter to be added to each Elasticsearch request."
+
 # ------------------------------------------------------------------------------
 # sinks.http
 # ------------------------------------------------------------------------------
@@ -1464,6 +1511,7 @@ config_composition = "/usage/configuration/README.md#composition"
 config_value_types = "/usage/configuration/README.md#value-types"
 data_directory = "/usage/configuration/README.md#data-directory"
 default_schema = "/about/data-model/log.md#default-schema"
+download = "/setup/installation/manual/from-archives#1-download-the-archive"
 event = "/about/data-model/README.md#event"
 event_key_special_characters = "/about/data-model/log.md#special-characters"
 from_source = "/setup/installation/manual/from-source.md"
@@ -1538,6 +1586,7 @@ lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
 metric_event_source = "https://github.com/timberio/vector/blob/master/src/event/metric.rs"
+musl_builder_docker_image = "https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
 new_feature_request = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
@@ -1562,6 +1611,7 @@ rust = "https://www.rust-lang.org/"
 rust_date_time = "https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
+rust_target_triples  = "https://forge.rust-lang.org/platform-support.html"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"

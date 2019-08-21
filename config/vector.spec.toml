@@ -270,6 +270,41 @@
   # * default: "host"
   host_key = "host"
 
+[sources.udp]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "udp"
+  type = "udp"
+
+  # The address to bind the socket to.
+  # 
+  # * required
+  # * no default
+  address = "0.0.0.0:9000"
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_length = 102400
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+
 [sources.vector]
   # The component type
   # 
@@ -782,8 +817,9 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -796,8 +832,8 @@ end
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
@@ -1633,6 +1669,17 @@ end
 
   [sinks.elasticsearch.headers]
     # A custom header to be added to each outgoing Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+
+  #
+  # Query
+  #
+
+  [sinks.elasticsearch.query]
+    # A custom parameter to be added to each Elasticsearch request.
     # 
     # * required
     # * no default

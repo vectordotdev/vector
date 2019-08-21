@@ -611,3 +611,8 @@ workflows:
           <<: *tag-workflow-filters
           requires:
             - release-s3
+experimental:
+  notify:
+    branches:
+      only:
+        - master

@@ -30,6 +30,7 @@ and [source][docs.sources].
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
 | [`syslog` source][docs.syslog_source] | `best_effort` |
 | [`tcp` source][docs.tcp_source] | `best_effort` |
+| [`udp` source][docs.udp_source] | `best_effort` |
 | [`vector` source][docs.vector_source] | `best_effort` |
 | **Sinks** | |
 | [`aws_cloudwatch_logs` sink][docs.aws_cloudwatch_logs_sink] | `at_least_once` |
@@ -127,5 +128,6 @@ keep you in the loop if this ever changes.
 [docs.syslog_source]: ../usage/configuration/sources/syslog.md
 [docs.tcp_sink]: ../usage/configuration/sinks/tcp.md
 [docs.tcp_source]: ../usage/configuration/sources/tcp.md
+[docs.udp_source]: ../usage/configuration/sources/udp.md
 [docs.vector_sink]: ../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../usage/configuration/sources/vector.md

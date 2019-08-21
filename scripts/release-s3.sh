@@ -10,26 +10,42 @@ set -eu
 
 CHANNEL=$(scripts/util/release-channel.sh)
 escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
+today=$(echo date +"%F")
 
 #
-# S3
+# Upload version triple (ex: 0.3.0-121-gdf3df71)
 #
 
 echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
 aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recursive
 
-# Update the "nightly" files
+#
+# Nightly
+#
+
 echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/"
 td=$(mktemp -d)
-
 cp -a "target/artifacts/." "$td"
-rename -v "s/$escaped_version/nightly/" $td/*
-echo "Renamed all builds: via \"s/$escaped_version/nightly/\""
+
+# Add nightly files with today's date for posterity
+rename -v "s/$escaped_version/$today/" $td/*
+echo "Renamed all builds: via \"s/$escaped_version/$today/\""
 ls $td
-aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/"
+aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/" --recursive
+echo "Uploaded archives"
+
+# Add nightly files with "nightly" to represent the latest nightly build
+rename -v "s/$today/nightly/" $td/*
+echo "Renamed all builds: via \"s/$today/nightly/\""
+ls $td
+aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/vector-nightly"
 aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/" --recursive
 rm -rf $td
-echo "Uploaded nightly archives"
+echo "Uploaded archives"
+
+#
+# Latest
+#
 
 if [[ "$CHANNEL" == "latest" ]]; then
   # Update the "latest" files
@@ -42,5 +58,5 @@ if [[ "$CHANNEL" == "latest" ]]; then
   aws s3 rm --recursive "s3://packages.timber.io/vector/latest/"
   aws s3 cp "$td" "s3://packages.timber.io/vector/latest/" --recursive
   rm -rf $td
-  echo "Uploaded latest archives"
+  echo "Uploaded archives"
 fi

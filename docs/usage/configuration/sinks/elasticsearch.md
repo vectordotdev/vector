@@ -67,6 +67,10 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
     X-Powered-By = "Vector"
+  
+  # OPTIONAL - Query
+  [sinks.my_sink_id.query]
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -108,6 +112,10 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 
   # OPTIONAL - Headers
   [sinks.<sink-id>.headers]
+    * = "<string>"
+
+  # OPTIONAL - Query
+  [sinks.<sink-id>.query]
     * = "<string>"
 ```
 {% endcode-tabs-item %}
@@ -285,6 +293,17 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     # * required
     # * no default
     X-Powered-By = "Vector"
+
+  #
+  # Query
+  #
+
+  [sinks.elasticsearch_sink.query]
+    # A custom parameter to be added to each Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -321,6 +340,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Headers | | |
 | `headers.*` | `string` | A custom header to be added to each outgoing Elasticsearch request.<br />`required` `example: (see above)` |
+| **OPTIONAL** - Query | | |
+| `query.*` | `string` | A custom parameter to be added to each Elasticsearch request.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -442,6 +463,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_elasticsearch_sink_id]
   # ...
@@ -449,6 +472,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
   index = "application-{{ application_id }}-%Y-%m-%d"
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].

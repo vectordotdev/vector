@@ -73,7 +73,7 @@ mod test {
     use super::StatsdConfig;
     use crate::{
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{block_on, next_addr, shutdown_on_idle},
+        test_util::{block_on, next_addr, runtime, shutdown_on_idle},
         topology::{self, config},
     };
     use futures::Stream;
@@ -106,7 +106,7 @@ mod test {
             },
         );
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
@@ -116,7 +116,7 @@ mod test {
         for _ in 0..100 {
             socket
                 .send_to(
-                    b"foo:1|c\nbar:42|g\nfoo:1|c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\n",
+                    b"foo:1|c|#a,b:b\nbar:42|g\nfoo:1|c|#a,b:c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\n",
                     &in_addr,
                 )
                 .unwrap();
@@ -138,10 +138,12 @@ mod test {
             .lines()
             .collect::<Vec<_>>();
 
-        let foo = parse_count(&lines, "foo");
+        // note that prometheus client reorders the labels
+        let foo1 = parse_count(&lines, "foo{a=\"true\",b=\"b\"");
+        let foo2 = parse_count(&lines, "foo{a=\"true\",b=\"c\"");
         // packets get lost :(
-        assert!(foo % 2 == 0);
-        assert!(foo > 180);
+        assert!(foo1 > 90);
+        assert!(foo2 > 90);
 
         let bar = parse_count(&lines, "bar");
         assert_eq!(42, bar);
