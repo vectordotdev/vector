@@ -1,5 +1,5 @@
 ---
-description: Ingests data through the TCP protocol and outputs `log` events.
+description: Ingests data through Kafka 0.9 or later and outputs `log` events.
 ---
 
 <!--
@@ -10,12 +10,19 @@ description: Ingests data through the TCP protocol and outputs `log` events.
      scripts/generate/templates/docs/usage/configuration/sources/kafka.md.erb
 -->
 
-# tcp source
+# kafka source
 
-![][images.tcp_source]
+![][images.kafka_source]
 
+{% hint style="warning" %}
+The `kafka` source is in beta. Please see the current
+[enhancements][url.kafka_source_enhancements] and
+[bugs][url.kafka_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][url.new_kafka_source_issue]
+as it will help shape the roadmap of this component.
+{% endhint %}
 
-The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.log_event] events.
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events.
 
 ## Config File
 
@@ -24,12 +31,15 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = "tcp" # must be: "tcp"
-  address = "0.0.0.0:9000"
+  type = "kafka" # must be: "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  group_id = "consumer-group-name"
+  topics = ["topic-1", "topic-2", "topic-3"]
   
   # OPTIONAL - General
-  max_length = 102400 # default, bytes
-  shutdown_timeout_secs = 30 # default, seconds
+  auto_offset_reset = "smallest"
+  key_field = "user_id" # no default
+  session_timeout_ms = 5000 # milliseconds
   
   # OPTIONAL - Context
   host_key = "host" # default
@@ -39,12 +49,15 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```coffeescript
 [sources.<source-id>]
   # REQUIRED - General
-  type = "tcp"
-  address = "<string>"
+  type = "kafka"
+  bootstrap_servers = "<string>"
+  group_id = "<string>"
+  topics = ["<string>", ...]
 
   # OPTIONAL - General
-  max_length = <int>
-  shutdown_timeout_secs = <int>
+  auto_offset_reset = "<string>"
+  key_field = "<string>"
+  session_timeout_ms = <int>
 
   # OPTIONAL - Context
   host_key = "<string>"
@@ -52,7 +65,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[sources.tcp_source]
+[sources.kafka_source]
   #
   # General
   #
@@ -61,28 +74,57 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
   # 
   # * required
   # * no default
-  # * must be: "tcp"
-  type = "tcp"
+  # * must be: "kafka"
+  type = "kafka"
 
-  # The address to bind the socket to.
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself.
   # 
   # * required
   # * no default
-  address = "0.0.0.0:9000"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
-  # The maximum bytes size of incoming messages before they are discarded.
+  # The consumer group name to be used to consume events from Kafka.
+  # 
+  # * required
+  # * no default
+  group_id = "consumer-group-name"
+
+  # The Kafka topics names to read events from.
+  # 
+  # * required
+  # * no default
+  topics = ["topic-1", "topic-2", "topic-3"]
+
+  # If offsets for consumer group do not exist, set them using this strategy.
+  # librdkafka documentation for `auto.offset.reset` option for explanation.
   # 
   # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
+  # * no default
+  auto_offset_reset = "smallest"
+  auto_offset_reset = "earliest"
+  auto_offset_reset = "beginning"
+  auto_offset_reset = "largest"
+  auto_offset_reset = "latest"
+  auto_offset_reset = "end"
+  auto_offset_reset = "error"
 
-  # The timeout before a connection is forcefully closed during shutdown.
+  # The field name to use for the topic key. If unspecified, the key would not be
+  # added to the events. If the message has null key, then this field would not
+  # be added to the event.
   # 
   # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
+  # * no default
+  key_field = "user_id"
+
+  # The Kafka session timeout in milliseconds.
+  # 
+  # * optional
+  # * no default
+  # * unit: milliseconds
+  session_timeout_ms = 5000
+  session_timeout_ms = 10000
 
   #
   # Context
@@ -102,11 +144,14 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
-| `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
+| `type` | `string` | The component type<br />`required` `must be: "kafka"` |
+| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.<br />`required` `example: (see above)` |
+| `group_id` | `string` | The consumer group name to be used to consume events from Kafka.<br />`required` `example: "consumer-group-name"` |
+| `topics` | `[string]` | The Kafka topics names to read events from.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
+| `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
+| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key would not be added to the events. If the message has null key, then this field would not be added to the event.<br />`no default` `example: "user_id"` |
+| `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
 | **OPTIONAL** - Context | | |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
@@ -142,7 +187,7 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Context
 
-By default, the `tcp` source will add context
+By default, the `kafka` source will add context
 keys to your events via the `host_key`
 options.
 
@@ -170,15 +215,15 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `tcp_source` issues][url.tcp_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_tcp_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_tcp_source_enhancement].
+1. Check for any [open `kafka_source` issues][url.kafka_source_issues].
+2. If encountered a bug, please [file a bug report][url.new_kafka_source_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_kafka_source_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.tcp_source_issues] - [enhancements][url.tcp_source_enhancements] - [bugs][url.tcp_source_bugs]
-* [**Source code**][url.tcp_source_source]
+* [**Issues**][url.kafka_source_issues] - [enhancements][url.kafka_source_enhancements] - [bugs][url.kafka_source_bugs]
+* [**Source code**][url.kafka_source_source]
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
@@ -188,11 +233,12 @@ issue, please:
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.tcp_source]: ../../../assets/tcp-source.svg
-[url.new_tcp_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Bug
-[url.new_tcp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Enhancement
-[url.tcp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Bug%22
-[url.tcp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Enhancement%22
-[url.tcp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22
-[url.tcp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/tcp.rs
+[images.kafka_source]: ../../../assets/kafka-source.svg
+[url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22+label%3A%22Type%3A+Bug%22
+[url.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22+label%3A%22Type%3A+Enhancement%22
+[url.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22
+[url.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
+[url.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka&labels=Type%3A+Bug
+[url.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka&labels=Type%3A+Enhancement
+[url.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka
 [url.vector_chat]: https://chat.vector.dev
