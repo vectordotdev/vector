@@ -7,8 +7,12 @@ use lazy_static::lazy_static;
 use quick_js::{Context, JsValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    sync::mpsc,
+    thread,
+};
 
 lazy_static! {
     // although JavaScript identifiers can also contain Unicode characters, we don't allow them
@@ -90,14 +94,93 @@ impl TransformConfig for JavaScriptConfig {
     }
 }
 
+enum ProcessorInput {
+    Event(Event),
+    Stop,
+}
+
+enum ProcessorOutput {
+    Start(Result<(), String>),
+    Events(Vec<Event>),
+}
+
 pub struct JavaScript {
+    input: mpsc::SyncSender<ProcessorInput>,
+    output: mpsc::Receiver<ProcessorOutput>,
+}
+
+impl JavaScript {
+    pub fn new(
+        source: Option<String>,
+        path: Option<String>,
+        handler: Option<String>,
+        memory_limit: Option<usize>,
+    ) -> Result<Self, String> {
+        let (input, thread_input) = mpsc::sync_channel(0);
+        let (thread_output, output) = mpsc::sync_channel(0);
+        thread::spawn(move || {
+            let processor = JavaScriptProcessor::new(source, path, handler, memory_limit);
+            let processor = match processor {
+                Ok(processor) => {
+                    thread_output.send(ProcessorOutput::Start(Ok(()))).unwrap();
+                    processor
+                }
+                Err(e) => {
+                    return thread_output.send(ProcessorOutput::Start(Err(e))).unwrap();
+                }
+            };
+            for event in thread_input {
+                match event {
+                    ProcessorInput::Event(event) => {
+                        let mut output_events = Vec::new();
+                        let result = processor.process(&mut output_events, event);
+                        if let Err(err) = result {
+                            eprintln!("Error in JavaScript transform; discarding event\n{}", err)
+                        }
+                        thread_output
+                            .send(ProcessorOutput::Events(output_events))
+                            .unwrap();
+                    }
+                    ProcessorInput::Stop => break,
+                }
+            }
+        });
+        match output.recv().unwrap() {
+            ProcessorOutput::Start(res) => res.map(|_| JavaScript { input, output }),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Drop for JavaScript {
+    fn drop(&mut self) {
+        self.input.send(ProcessorInput::Stop).unwrap();
+    }
+}
+
+impl Transform for JavaScript {
+    // only used in tests
+    fn transform(&mut self, event: Event) -> Option<Event> {
+        let mut output = Vec::new();
+        self.transform_into(&mut output, event);
+        assert!(output.len() <= 1);
+        output.pop()
+    }
+
+    fn transform_into(&mut self, output_events: &mut Vec<Event>, event: Event) {
+        self.input.send(ProcessorInput::Event(event)).unwrap();
+        match self.output.recv().unwrap() {
+            ProcessorOutput::Events(mut transformed) => output_events.append(&mut transformed),
+            _ => unreachable!(),
+        }
+    }
+}
+
+struct JavaScriptProcessor {
     ctx: Context,
 }
 
-// See https://www.freelists.org/post/quickjs-devel/Usage-of-QuickJS-in-multithreaded-environments,1
-unsafe impl Send for JavaScript {}
-
-impl JavaScript {
+impl JavaScriptProcessor {
     pub fn new(
         source: Option<String>,
         path: Option<String>,
@@ -251,22 +334,6 @@ fn object_to_event(object: HashMap<String, JsValue>) -> Result<Event, String> {
         log.insert_implicit(k.into(), v.into());
     }
     Ok(event)
-}
-
-impl Transform for JavaScript {
-    // only used in tests
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut output = Vec::new();
-        self.transform_into(&mut output, event);
-        assert!(output.len() <= 1);
-        output.pop()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
-        self.process(output, event).unwrap_or_else(|err| {
-            eprintln!("Error in JavaScript transform; discarding event\n{}", err)
-        });
-    }
 }
 
 #[cfg(test)]
