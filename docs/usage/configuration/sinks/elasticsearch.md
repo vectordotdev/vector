@@ -463,6 +463,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_elasticsearch_sink_id]
   # ...
@@ -470,6 +472,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
   index = "application-{{ application_id }}-%Y-%m-%d"
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].
