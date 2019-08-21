@@ -32,6 +32,7 @@ const MIN_FLUSH_PERIOD_MS: u64 = 3; //ms
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
+    pub namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -147,7 +148,8 @@ impl PrometheusSink {
         if let Some(counter) = self.counters.get(&name) {
             f(counter);
         } else {
-            let opts = prometheus::Opts::new(name.clone(), name.clone());
+            let namespace = &self.config.namespace;
+            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::CounterVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
@@ -167,7 +169,8 @@ impl PrometheusSink {
         if let Some(gauge) = self.gauges.get(&name) {
             f(gauge);
         } else {
-            let opts = prometheus::Opts::new(name.clone(), name.clone());
+            let namespace = &self.config.namespace;
+            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let gauge = prometheus::GaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(gauge.clone())) {
@@ -188,7 +191,10 @@ impl PrometheusSink {
             f(hist);
         } else {
             let buckets = self.config.buckets.clone();
-            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone()).buckets(buckets);
+            let namespace = &self.config.namespace;
+            let opts = prometheus::HistogramOpts::new(name.clone(), name.clone())
+                .buckets(buckets)
+                .namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let hist = prometheus::HistogramVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(hist.clone())) {
@@ -209,7 +215,8 @@ impl PrometheusSink {
         if let Some(set) = self.sets.get_mut(&name) {
             f(set);
         } else {
-            let opts = prometheus::Opts::new(name.clone(), name.clone());
+            let namespace = &self.config.namespace;
+            let opts = prometheus::Opts::new(name.clone(), name.clone()).namespace(namespace);
             let keys: Vec<_> = labels.keys().copied().collect();
             let counter = prometheus::IntGaugeVec::new(opts, &keys[..]).unwrap();
             if let Err(e) = self.registry.register(Box::new(counter.clone())) {
