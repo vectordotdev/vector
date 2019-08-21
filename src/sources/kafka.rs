@@ -99,7 +99,9 @@ fn kafka_source(
                             &host_key,
                             &hostname,
                         );
-                        consumer_ref.store_offset(&msg).unwrap();
+                        consumer_ref
+                            .store_offset(&msg)
+                            .map_err(|e| error!("Cannot store offset: {:?}", e))?;
                         Ok(event)
                     }
                 }
