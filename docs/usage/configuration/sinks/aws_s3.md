@@ -555,16 +555,9 @@ and `filename_append_uuid` options.
 ### Partitioning
 
 Partitioning is controlled via the `key_prefix`
-options and allows you to dynamically partition data on the fly. You'll notice
-that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling this partitioning. The interpolated result is effectively the internal
-partition key. Let's look at a few examples:
-
-| Value          | Interpolation          | Desc                                   |
-|:---------------|:-----------------------|:---------------------------------------|
-| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
-| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+options and allows you to dynamically partition data on the fly.
+You'll notice that Vector's [template sytax](#template-syntax) is supported
+for these options, enabling you to use field values as the partition's key.
 
 ### Rate Limits
 
