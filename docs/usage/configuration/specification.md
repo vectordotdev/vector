@@ -837,8 +837,9 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -851,8 +852,8 @@ end
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the

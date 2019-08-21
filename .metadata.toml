@@ -833,8 +833,9 @@ is dynamic based on if the event is structured or not.\
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 examples = [
-  "/var/log/{{ file }}.log",
-  "ec2/{{ instance_id }}"
+  "{{ file }}",
+  "ec2/{{ instance_id }}",
+  "group-name"
 ]
 null = false
 partition_key = true
@@ -851,8 +852,8 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 type = "string"
 examples = [
   "{{ instance_id }}",
-  "stream-name",
-  "%Y-%m-%d"
+  "%Y-%m-%d",
+  "stream-name"
 ]
 null = false
 partition_key = true

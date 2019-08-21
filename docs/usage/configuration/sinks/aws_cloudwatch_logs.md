@@ -33,7 +33,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"]
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   region = "us-east-1"
   stream_name = "{{ instance_id }}"
   
@@ -126,8 +126,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -140,8 +141,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
@@ -286,7 +287,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_logs"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
+| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ file }}"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
 | **OPTIONAL** - General | | |
@@ -351,7 +352,7 @@ Vector checks for AWS credentials in the following order:
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
 3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+4. The [IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -493,8 +494,9 @@ enabling dynamic values derived from the event's data. This syntax accepts
 ```coffeescript
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
   # ...
 ```
 {% endcode-tabs-item %}
