@@ -39,10 +39,16 @@ impl RemoveTags {
 
 impl Transform for RemoveTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        for tag in &self.tags {
-            let tags = event.as_mut_metric().tags_mut();
-            if let Some(tags) = tags {
-                tags.remove(tag.as_ref());
+        let tags = event.as_mut_metric().tags_mut();
+
+        if let Some(map) = tags {
+            for tag in &self.tags {
+                map.remove(tag.as_ref());
+
+                if map.is_empty() {
+                    *tags = None;
+                    break;
+                }
             }
         }
 
@@ -74,10 +80,45 @@ mod tests {
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform.transform(event).unwrap().into_metric();
-
         let tags = metric.tags().as_ref().unwrap();
+
+        assert_eq!(tags.len(), 1);
         assert!(tags.contains_key("env"));
         assert!(!tags.contains_key("region"));
         assert!(!tags.contains_key("host"));
+    }
+
+    #[test]
+    fn remove_all_tags() {
+        let event = Event::Metric(Metric::Counter {
+            name: "foo".into(),
+            val: 10.0,
+            timestamp: None,
+            tags: Some(
+                vec![("env".to_owned(), "production".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+        });
+
+        let mut transform = RemoveTags::new(vec!["env".into()]);
+        let metric = transform.transform(event).unwrap().into_metric();
+
+        assert!(metric.tags().is_none());
+    }
+
+    #[test]
+    fn remove_tags_from_none() {
+        let event = Event::Metric(Metric::Set {
+            name: "foo".into(),
+            val: "bar".into(),
+            timestamp: None,
+            tags: None,
+        });
+
+        let mut transform = RemoveTags::new(vec!["env".into()]);
+        let metric = transform.transform(event).unwrap().into_metric();
+
+        assert!(metric.tags().is_none());
     }
 }
