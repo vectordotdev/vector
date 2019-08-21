@@ -393,7 +393,7 @@ Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
 4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
