@@ -73,19 +73,23 @@ fn kafka_source(
         stream
             .then(move |message| {
                 match message {
-                    Err(e) => Err(error!("Error reading message from Kafka: {:?}", e)),
-                    Ok(Err(e)) => Err(error!("Kafka returned error: {:?}", e)),
+                    Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
+                    Ok(Err(e)) => Err(error!(message = "Kafka returned error", error = ?e)),
                     Ok(Ok(msg)) => {
                         let payload = match msg.payload_view::<[u8]>() {
                             None => return Err(()), // skip messages with empty payload
-                            Some(Err(e)) => return Err(error!("Cannot extract payload: {:?}", e)),
+                            Some(Err(e)) => {
+                                return Err(error!(message = "Cannot extract payload", error = ?e))
+                            }
                             Some(Ok(payload)) => Bytes::from(payload),
                         };
 
                         let message_key = if config.key_field.is_some() {
                             match msg.key_view::<[u8]>() {
                                 None => None,
-                                Some(Err(e)) => return Err(error!("Cannot extract key: {:?}", e)),
+                                Some(Err(e)) => {
+                                    return Err(error!(message = "Cannot extract key", error = ?e))
+                                }
                                 Some(Ok(key)) => Some(Bytes::from(key)),
                             }
                         } else {
@@ -101,12 +105,12 @@ fn kafka_source(
                         );
                         consumer_ref
                             .store_offset(&msg)
-                            .map_err(|e| error!("Cannot store offset: {:?}", e))?;
+                            .map_err(|e| error!(message = "Cannot store offset", error = ?e))?;
                         Ok(event)
                     }
                 }
             })
-            .forward(out.sink_map_err(|e| error!("Error sending to sink: {}", e)))
+            .forward(out.sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)))
             .map(|_| ())
     });
 
