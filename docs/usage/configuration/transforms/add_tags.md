@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to remove one or more event fields.
+description: Accepts `metric` events and allows you to add one or more tags.
 ---
 
 <!--
@@ -7,15 +7,15 @@ description: Accepts `log` events and allows you to remove one or more event fie
 
      To make changes please edit the template located at:
 
-     scripts/generate/templates/docs/usage/configuration/transforms/remove_fields.md.erb
+     scripts/generate/templates/docs/usage/configuration/transforms/add_tags.md.erb
 -->
 
-# remove_fields transform
+# add_tags transform
 
-![][images.remove_fields_transform]
+![][images.add_tags_transform]
 
 
-The `remove_fields` transform accepts [`log`][docs.log_event] events and allows you to remove one or more event fields.
+The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows you to add one or more tags.
 
 ## Config File
 
@@ -23,28 +23,41 @@ The `remove_fields` transform accepts [`log`][docs.log_event] events and allows 
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = "remove_fields" # must be: "remove_fields"
+  # REQUIRED - General
+  type = "add_tags" # must be: "add_tags"
   inputs = ["my-source-id"]
-  fields = ["field1", "field2"]
+  
+  # REQUIRED - Tags
+  [transforms.my_transform_id.tags]
+    my_tag = "my value"
+    my_env_tag = "${ENV_VAR}"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [transforms.<transform-id>]
-  type = "remove_fields"
+  # REQUIRED - General
+  type = "add_tags"
   inputs = ["<string>", ...]
-  fields = ["<string>", ...]
+
+  # REQUIRED - Tags
+  [transforms.<transform-id>.tags]
+    * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[transforms.remove_fields_transform]
+[transforms.add_tags_transform]
+  #
+  # General
+  #
+
   # The component type
   # 
   # * required
   # * no default
-  # * must be: "remove_fields"
-  type = "remove_fields"
+  # * must be: "add_tags"
+  type = "add_tags"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -53,11 +66,17 @@ The `remove_fields` transform accepts [`log`][docs.log_event] events and allows 
   # * no default
   inputs = ["my-source-id"]
 
-  # The field names to drop.
-  # 
-  # * required
-  # * no default
-  fields = ["field1", "field2"]
+  #
+  # Tags
+  #
+
+  [transforms.add_tags_transform.tags]
+    # A key/value pair representing the new tag to be added.
+    # 
+    # * required
+    # * no default
+    my_tag = "my value"
+    my_env_tag = "${ENV_VAR}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -66,10 +85,11 @@ The `remove_fields` transform accepts [`log`][docs.log_event] events and allows 
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "remove_fields"` |
+| **REQUIRED** - General | | |
+| `type` | `string` | The component type<br />`required` `must be: "add_tags"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
+| **REQUIRED** - Tags | | |
+| `tags.*` | `*` | A key/value pair representing the new tag to be added.<br />`required` `example: (see above)` |
 
 ## How It Works
 
@@ -92,9 +112,9 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `remove_fields_transform` issues][url.remove_fields_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_remove_fields_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_remove_fields_transform_enhancement].
+1. Check for any [open `add_tags_transform` issues][url.add_tags_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_add_tags_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_add_tags_transform_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
@@ -103,32 +123,32 @@ issue, please:
 Finally, consider the following alternatives:
 
 * [`add_fields` transform][docs.add_fields_transform]
-* [`add_tags` transform][docs.add_tags_transform]
 * [`lua` transform][docs.lua_transform]
+* [`remove_fields` transform][docs.remove_fields_transform]
 * [`remove_tags` transform][docs.remove_tags_transform]
 
 ## Resources
 
-* [**Issues**][url.remove_fields_transform_issues] - [enhancements][url.remove_fields_transform_enhancements] - [bugs][url.remove_fields_transform_bugs]
-* [**Source code**][url.remove_fields_transform_source]
+* [**Issues**][url.add_tags_transform_issues] - [enhancements][url.add_tags_transform_enhancements] - [bugs][url.add_tags_transform_bugs]
+* [**Source code**][url.add_tags_transform_source]
 
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
-[docs.add_tags_transform]: ../../../usage/configuration/transforms/add_tags.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.remove_fields_transform]: ../../../assets/remove_fields-transform.svg
-[url.new_remove_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+remove_fields&labels=Type%3A+Bug
-[url.new_remove_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+remove_fields&labels=Type%3A+Enhancement
-[url.remove_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Bug%22
-[url.remove_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22+label%3A%22Type%3A+Enhancement%22
-[url.remove_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_fields%22
-[url.remove_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/remove_fields.rs
+[images.add_tags_transform]: ../../../assets/add_tags-transform.svg
+[url.add_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_tags%22+label%3A%22Type%3A+Bug%22
+[url.add_tags_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_tags%22+label%3A%22Type%3A+Enhancement%22
+[url.add_tags_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_tags%22
+[url.add_tags_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_tags.rs
+[url.new_add_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_tags&labels=Type%3A+Bug
+[url.new_add_tags_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_tags&labels=Type%3A+Enhancement
 [url.vector_chat]: https://chat.vector.dev

@@ -392,6 +392,37 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
 
+[transforms.add_tags]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "add_tags"
+  type = "add_tags"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Tags
+  #
+
+  [transforms.add_tags.tags]
+    # A key/value pair representing the new tag to be added.
+    # 
+    # * required
+    # * no default
+    my_tag = "my value"
+    my_env_tag = "${ENV_VAR}"
+
 [transforms.coercer]
   #
   # General
@@ -720,6 +751,27 @@ end
   # * required
   # * no default
   fields = ["field1", "field2"]
+
+[transforms.remove_tags]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "remove_tags"
+  type = "remove_tags"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The tag names to drop.
+  # 
+  # * required
+  # * no default
+  tags = ["tag1", "tag2"]
 
 [transforms.sampler]
   # The component type

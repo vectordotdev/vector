@@ -261,8 +261,10 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`add_tags` transform][docs.add_tags_transform]
 * [`lua` transform][docs.lua_transform]
 * [`remove_fields` transform][docs.remove_fields_transform]
+* [`remove_tags` transform][docs.remove_tags_transform]
 
 ## Resources
 
@@ -270,6 +272,7 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
+[docs.add_tags_transform]: ../../../usage/configuration/transforms/add_tags.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
@@ -280,6 +283,7 @@ Finally, consider the following alternatives:
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
