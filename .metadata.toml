@@ -183,17 +183,6 @@ description = """\
 The consumer group name to be used to consume events from Kafka.
 """
 
-[sources.kafka.options.host_key]
-name = "host_key"
-type = "string"
-category = "Context"
-default = "host"
-null = true
-section = "context"
-description = """\
-The key name added to each event representing the current host.\
-"""
-
 [sources.kafka.options.key_field]
 type = "string"
 examples = ["user_id"]

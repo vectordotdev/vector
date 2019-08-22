@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event},
+    event::Event,
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
@@ -58,8 +58,6 @@ fn kafka_source(
 ) -> Result<super::Source, String> {
     let consumer = Arc::new(create_consumer(config.clone())?);
     let source = future::lazy(move || {
-        let hostname = hostname::get_hostname();
-        let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
         let consumer_ref = Arc::clone(&consumer);
 
         // See https://github.com/fede1024/rust-rdkafka/issues/85#issuecomment-439141656
@@ -83,26 +81,20 @@ fn kafka_source(
                             }
                             Some(Ok(payload)) => Bytes::from(payload),
                         };
+                        let mut event = Event::from(payload);
 
-                        let message_key = if config.key_field.is_some() {
+                        if let Some(key_field) = &config.key_field {
                             match msg.key_view::<[u8]>() {
-                                None => None,
+                                None => (),
                                 Some(Err(e)) => {
                                     return Err(error!(message = "Cannot extract key", error = ?e))
                                 }
-                                Some(Ok(key)) => Some(Bytes::from(key)),
+                                Some(Ok(key)) => event
+                                    .as_mut_log()
+                                    .insert_implicit(key_field.clone().into(), key.into()),
                             }
-                        } else {
-                            None
-                        };
+                        }
 
-                        let event = create_event(
-                            payload,
-                            &config.key_field,
-                            message_key,
-                            &host_key,
-                            &hostname,
-                        );
                         consumer_ref
                             .store_offset(&msg)
                             .map_err(|e| error!(message = "Cannot store offset", error = ?e))?;
@@ -115,32 +107,6 @@ fn kafka_source(
     });
 
     Ok(Box::new(source))
-}
-
-fn create_event(
-    payload: Bytes,
-    key_field: &Option<String>,
-    message_key: Option<Bytes>,
-    host_key: &str,
-    hostname: &Option<String>,
-) -> event::Event {
-    let mut event = Event::from(payload);
-
-    if let Some(key_field) = key_field {
-        if let Some(message_key) = message_key {
-            event
-                .as_mut_log()
-                .insert_implicit(key_field.clone().into(), message_key.into());
-        }
-    }
-
-    if let Some(hostname) = &hostname {
-        event
-            .as_mut_log()
-            .insert_implicit(host_key.clone().into(), hostname.clone().into());
-    }
-
-    event
 }
 
 fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, String> {
@@ -179,10 +145,8 @@ impl Stream for OwnedConsumerStream {
 
 #[cfg(test)]
 mod test {
-    use super::{create_event, kafka_source, KafkaSourceConfig};
-    use crate::event;
+    use super::{kafka_source, KafkaSourceConfig};
     use futures::sync::mpsc;
-    use string_cache::DefaultAtom as Atom;
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -209,62 +173,6 @@ mod test {
             ..make_config()
         };
         assert!(kafka_source(config, mpsc::channel(1).0).is_err());
-    }
-
-    #[test]
-    fn kafka_source_create_event() {
-        let event = create_event(
-            "my message".into(),
-            &Some("message_key".to_string()),
-            Some("my key".into()),
-            &event::HOST.to_string(),
-            &Some("my hostname".to_string()),
-        );
-        assert_eq!(event.as_log()[&event::MESSAGE], "my message".into());
-        assert_eq!(event.as_log()[&event::HOST], "my hostname".into());
-        assert_eq!(event.as_log()[&Atom::from("message_key")], "my key".into());
-    }
-
-    #[test]
-    fn kafka_source_create_event_no_hostname() {
-        let event = create_event(
-            "my message".into(),
-            &Some("message_key".to_string()),
-            Some("my key".into()),
-            &event::HOST.to_string(),
-            &None,
-        );
-        assert_eq!(event.as_log()[&event::MESSAGE], "my message".into());
-        assert_eq!(event.as_log().get(&event::HOST), None);
-        assert_eq!(event.as_log()[&Atom::from("message_key")], "my key".into());
-    }
-
-    #[test]
-    fn kafka_source_create_event_no_key_field() {
-        let event = create_event(
-            "my message".into(),
-            &None,
-            None,
-            &event::HOST.to_string(),
-            &Some("my hostname".to_string()),
-        );
-        assert_eq!(event.as_log()[&event::MESSAGE], "my message".into());
-        assert_eq!(event.as_log()[&event::HOST], "my hostname".into());
-        assert_eq!(event.as_log().get(&Atom::from("message_key")), None);
-    }
-
-    #[test]
-    fn kafka_source_create_event_empty_key() {
-        let event = create_event(
-            "my message".into(),
-            &Some("message_key".to_string()),
-            None,
-            &event::HOST.to_string(),
-            &Some("my hostname".to_string()),
-        );
-        assert_eq!(event.as_log()[&event::MESSAGE], "my message".into());
-        assert_eq!(event.as_log()[&event::HOST], "my hostname".into());
-        assert_eq!(event.as_log().get(&Atom::from("message_key")), None);
     }
 }
 
