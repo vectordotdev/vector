@@ -45,7 +45,7 @@ pub trait SourceConfig: core::fmt::Debug {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String>;
+    ) -> Result<sources::Source, sources::BuildError>;
 
     fn output_type(&self) -> DataType;
 }

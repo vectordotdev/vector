@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -6,6 +7,7 @@ use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
@@ -85,20 +87,19 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, BuildError> {
         let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
         // now before passing on the validated data_dir, we add the source_name as a subdir,
         // so that multiple sources can operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each other
         data_dir.push(name);
-        if let Err(e) = DirBuilder::new().recursive(true).create(&data_dir) {
-            return Err(format!(
-                "could not create subdirectory '{}' inside of data_dir '{}': {}",
-                name,
-                data_dir.parent().unwrap().display(),
-                e
-            ));
-        };
+        DirBuilder::new()
+            .recursive(true)
+            .create(&data_dir)
+            .context(super::MakeSubdirectoryError {
+                data_dir: data_dir.parent().unwrap().to_path_buf(),
+                subdir: name,
+            })?;
         Ok(file_source(self, data_dir, out))
     }
 
@@ -110,25 +111,21 @@ impl SourceConfig for FileConfig {
 fn resolve_and_validate_data_dir(
     config: &FileConfig,
     globals: &GlobalOptions,
-) -> Result<PathBuf, String> {
+) -> Result<PathBuf, BuildError> {
     let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
         Some(v) => v.clone(),
-        None => return Err("data_dir option required, but not given here or globally".into()),
+        None => return Err(BuildError::NoDataDir),
     };
     if !data_dir.exists() {
-        return Err(format!(
-            "data_dir '{}' does not exist",
-            data_dir.to_string_lossy()
-        ));
+        return Err(BuildError::MissingDataDir {
+            data_dir: data_dir.into(),
+        });
     }
     let readonly = std::fs::metadata(&data_dir)
         .map(|meta| meta.permissions().readonly())
         .unwrap_or(true);
     if readonly {
-        return Err(format!(
-            "data_dir '{}' is not writable",
-            data_dir.to_string_lossy()
-        ));
+        return Err(BuildError::DataDirNotWritable { data_dir });
     }
     Ok(data_dir)
 }

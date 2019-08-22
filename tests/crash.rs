@@ -160,7 +160,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String> {
+    ) -> Result<sources::Source, sources::BuildError> {
         Ok(Box::new(future::err(())))
     }
 
@@ -217,7 +217,7 @@ impl config::SourceConfig for PanicSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String> {
+    ) -> Result<sources::Source, sources::BuildError> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

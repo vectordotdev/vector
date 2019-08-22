@@ -8,6 +8,7 @@ use futures::{future, sync::mpsc, Future, Sink};
 use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::collections::HashSet;
 use std::io::Error;
 use std::iter::FromIterator;
@@ -38,10 +39,10 @@ impl SourceConfig for JournaldConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, super::BuildError> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
-        let journal = Journal::open(local_only, runtime_only).map_err(|err| format!("{}", err))?;
+        let journal = Journal::open(local_only, runtime_only).context(super::JournaldError)?;
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.

@@ -12,6 +12,7 @@ use rdkafka::{
     message::{BorrowedMessage, Message},
 };
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -43,7 +44,7 @@ impl SourceConfig for KafkaSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, super::BuildError> {
         kafka_source(self.clone(), out)
     }
 
@@ -55,7 +56,7 @@ impl SourceConfig for KafkaSourceConfig {
 fn kafka_source(
     config: KafkaSourceConfig,
     out: mpsc::Sender<Event>,
-) -> Result<super::Source, String> {
+) -> Result<super::Source, super::BuildError> {
     let consumer = Arc::new(create_consumer(config.clone())?);
     let source = future::lazy(move || {
         let consumer_ref = Arc::clone(&consumer);
@@ -109,7 +110,7 @@ fn kafka_source(
     Ok(Box::new(source))
 }
 
-fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, String> {
+fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, super::BuildError> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", &config.group_id)
         .set("bootstrap.servers", &config.bootstrap_servers)
@@ -119,12 +120,12 @@ fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, String> 
         .set("enable.auto.commit", "false")
         .set("client.id", "vector")
         .create()
-        .map_err(|e| format!("Cannot create Kafka consumer: {:?}", e))?;
+        .context(super::KafkaCreateError)?;
 
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer
         .subscribe(&topics)
-        .map_err(|e| format!("Cannot subscribe to topics: {:?}", e))?;
+        .context(super::KafkaSubscribeError)?;
 
     Ok(consumer)
 }
