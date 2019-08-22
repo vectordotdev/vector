@@ -21,6 +21,17 @@ pub struct DockerConfig {
     exclude_labels: Vec<String>,
 }
 
+impl Default for DockerConfig {
+    fn default() -> Self {
+        DockerConfig {
+            include_containers: Vec::default(),
+            include_labels: Vec::default(),
+            exclude_containers: Vec::default(),
+            exclude_labels: Vec::default(),
+        }
+    }
+}
+
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
     fn build(
@@ -73,46 +84,76 @@ struct ContainerState {
 ///
 #[allow(dead_code)]
 fn docker_source(
-    _: DockerConfig,
+    config: DockerConfig,
     out: mpsc::Sender<Event>,
 ) -> Result<impl Future<Item = (), Error = ()>, String> {
     // TODO: What about currently running containers
-    // TODO: use DockerConfig
+    // TODO: use DockerConfig.exclude
 
     // TODO: async_docker should be replaced with bollard once it supports events
+    // ?NOTE: Requiers sudo privileges, or docker group membership.
+    // Without extra configuration of Docker on user side, there is no way around above.
     let docker_for_events = async_docker::new_docker(None).map_err(|error| {
         error!(message="Error connecting to docker server",%error);
         "Failed to connect to docker server".to_owned()
     })?;
 
+    // ?NOTE: Requiers sudo privileges, or docker group membership.
+    // Without extra configuration of Docker on user side, there is no way around above.
     let docker = Docker::connect_with_local_defaults().map_err(|error| {
         error!(message="Error connecting to docker server",%error);
         "Failed to connect to docker server".to_owned()
     })?;
 
+    // Configure main event stream
+
     // Will log only newly started/restarted containers.
-    // event - emmited on commands
-    // ---------------------------
-    // start - docker start, docker run, restart policy, docker restart
-    // upause - docker unpause
-    // die - docker restart, docker stop, docker kill, process exited, oom
-    // pause - docker pause
-    let events = vec!["start", "upause", "die", "pause"];
-    let options = async_docker::EventsOptionsBuilder::new()
-        .filter(
-            events
-                .into_iter()
-                .map(|s| async_docker::EventFilter::Event(s.into()))
+    let mut options = async_docker::EventsOptionsBuilder::new();
+
+    // event  | emmited on commands
+    // -------+-------------------
+    // start  | docker start, docker run, restart policy, docker restart
+    // upause | docker unpause
+    // die    | docker restart, docker stop, docker kill, process exited, oom
+    // pause  | docker pause
+    options.filter(
+        vec!["start", "upause", "die", "pause"]
+            .into_iter()
+            .map(|s| async_docker::EventFilter::Event(s.into()))
+            .collect(),
+    );
+
+    // ?NOTE: by Docker API using both include results in AND between them
+
+    // Include-name
+    if !config.include_containers.is_empty() {
+        options.filter(
+            config
+                .include_containers
+                .iter()
+                .map(|s| async_docker::EventFilter::Container(s.to_owned()))
                 .collect(),
-        )
-        .build();
-    let mut events = docker_for_events.events(&options);
+        );
+    }
+
+    // Include-label
+    if !config.include_labels.is_empty() {
+        options.filter(
+            config
+                .include_labels
+                .iter()
+                .map(|s| async_docker::EventFilter::Label(s.to_owned()))
+                .collect(),
+        );
+    }
+
+    let mut events = docker_for_events.events(&options.build());
     info!(message = "Listening Docker events");
 
-    let mut containers = HashMap::<String, ContainerState>::new();
     // Channel could be unbounded, since there won't be millions of containers,
     // but bounded should be more performant in most cases.
     let (main_send, mut main_recv) = mpsc::channel::<ContainerLogInfo>(100);
+    let mut containers = HashMap::<String, ContainerState>::new();
 
     // Main
     Ok(poll_fn(move || loop {
@@ -340,4 +381,163 @@ fn process_logoutput(message: LogOutput, info: &mut ContainerLogInfo) -> Option<
     let event = Event::Log(log_event);
     trace!(message = "Received one event", event = field::debug(&event));
     Some(event)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::{collect_n, trace_init};
+    use bollard::container;
+
+    /// None if docker is not present on the system
+    fn source<'a, L: Into<Option<&'a str>>>(
+        name: &str,
+        label: L,
+    ) -> (mpsc::Receiver<Event>, tokio::runtime::Runtime) {
+        trace_init();
+        let (sender, recv) = mpsc::channel(100);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(
+            DockerConfig {
+                include_containers: vec![name.to_owned()],
+                include_labels: label.into().map(|l| vec![l.to_owned()]).unwrap_or_default(),
+                ..DockerConfig::default()
+            }
+            .build("default", &GlobalOptions::default(), sender)
+            .unwrap(),
+        );
+        (recv, rt)
+    }
+
+    fn docker() -> Docker {
+        Docker::connect_with_local_defaults().expect("Docker present on system")
+    }
+
+    fn container<'a, L: Into<Option<&'a str>>>(
+        name: &str,
+        label: L,
+        log: &str,
+        docker: &Docker,
+        rt: &mut tokio::runtime::Runtime,
+    ) -> String {
+        let future = docker.create_container(
+            Some(container::CreateContainerOptions {
+                name: name.to_owned(),
+            }),
+            container::Config {
+                image: Some("busybox".to_owned()),
+                cmd: Some(vec!["echo".to_owned(), log.to_owned()]),
+                labels: label.into().map(|l| {
+                    let mut map = HashMap::new();
+                    map.insert(l.to_owned(), String::new());
+                    map
+                }),
+                ..container::Config::default()
+            },
+        );
+        rt.block_on(future).unwrap().id
+    }
+
+    /// Returns once container is done running
+    fn container_run(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
+        let future = docker.start_container(id, None::<container::StartContainerOptions<String>>);
+        rt.block_on(future).unwrap();
+
+        let future = docker.wait_container(id, None::<container::WaitContainerOptions<String>>);
+        rt.block_on(future.into_future())
+            .map_err(|(e, _)| println!("{}", e))
+            .unwrap();
+    }
+
+    fn container_remove(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
+        let future = docker.remove_container(id, None::<container::RemoveContainerOptions>);
+        rt.block_on(future).unwrap();
+    }
+
+    /// Returns once it's certain that log has been made
+    fn container_log_n<'a, L: Into<Option<&'a str>>>(
+        n: usize,
+        name: &str,
+        label: L,
+        log: &str,
+        docker: &Docker,
+        rt: &mut tokio::runtime::Runtime,
+    ) {
+        let id = container(name, label, log, docker, rt);
+        for _ in 0..n {
+            container_run(&id, docker, rt);
+        }
+        container_remove(&id, docker, rt);
+    }
+
+    #[test]
+    fn newly_started() {
+        let message = "12";
+        let name = "vector_test_newly_started";
+
+        let (out, mut rt) = source(name, None);
+        let docker = docker();
+
+        container_log_n(1, name, None, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
+
+    #[test]
+    fn restart() {
+        let message = "12";
+        let name = "vector_test_restart";
+
+        let (out, mut rt) = source(name, None);
+        let docker = docker();
+
+        container_log_n(2, name, None, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 2)).ok().unwrap();
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into());
+        assert_eq!(events[1].as_log()[&event::MESSAGE], message.into());
+    }
+
+    #[test]
+    fn include_containers() {
+        let message = "12";
+        let name = "vector_test_include_containers";
+
+        let (out, mut rt) = source(name, None);
+        let docker = docker();
+
+        container_log_n(
+            1,
+            "vector_test_include_container",
+            None,
+            "13",
+            &docker,
+            &mut rt,
+        );
+        container_log_n(1, name, None, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
+
+    #[test]
+    fn include_labels() {
+        let message = "12";
+        let name = "vector_test_include_labels";
+        let label = "vector_test_include_label";
+
+        let (out, mut rt) = source(name, label);
+        let docker = docker();
+
+        container_log_n(1, name, None, "13", &docker, &mut rt);
+        container_log_n(1, name, label, message, &docker, &mut rt);
+
+        let events = rt.block_on(collect_n(out, 1)).ok().unwrap();
+
+        assert_eq!(events[0].as_log()[&event::MESSAGE], message.into())
+    }
 }
