@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     event::Event,
+    region::RegionOrEndpoint,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -11,11 +12,15 @@ use crate::{
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{Method, Uri};
+use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
+use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
+use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -29,6 +34,8 @@ pub struct ElasticSearchConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub provider: Option<Provider>,
+    pub region: Option<RegionOrEndpoint>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -51,10 +58,17 @@ pub struct ElasticSearchBasicAuthConfig {
     pub user: String,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Provider {
+    Default,
+    Aws,
+}
+
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = es(self, acker);
+        let sink = es(self, acker)?;
         let healthcheck = healthcheck(&self.host);
 
         Ok((sink, healthcheck))
@@ -65,7 +79,7 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
+fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, String> {
     let id_key = config.id_key.clone();
     let gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -114,24 +128,87 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
     let uri = format!("{}{}", config.host, path_query.finish());
     let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
 
+    let region: Option<Region> = match config.region {
+        Some(ref region) => Some(region.try_into().map_err(|err| format!("{}", err))?),
+        None => None,
+    };
+
+    let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
+        Provider::Default => None,
+        Provider::Aws => {
+            if region.is_none() {
+                return Err("AWS provider requires a configured region".into());
+            }
+            Some(
+                DefaultCredentialsProvider::new()
+                    .map_err(|err| format!("Could not create AWS credentials provider: {}", err))?
+                    .credentials()
+                    .wait()
+                    .map_err(|err| format!("Could not generate AWS credentials: {}", err))?,
+            )
+        }
+    };
+
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
         builder.method(Method::POST);
         builder.uri(&uri);
 
-        builder.header("Content-Type", "application/x-ndjson");
-        if let Some(ref auth) = authorization {
-            builder.header("Authorization", &auth[..]);
-        }
-        for (header, value) in &headers {
-            builder.header(&header[..], &value[..]);
-        }
+        match credentials {
+            None => {
+                builder.header("Content-Type", "application/x-ndjson");
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                for (header, value) in &headers {
+                    builder.header(&header[..], &value[..]);
+                }
 
-        builder.body(body).unwrap()
+                if let Some(ref auth) = authorization {
+                    builder.header("Authorization", &auth[..]);
+                }
+
+                builder.body(body).unwrap()
+            }
+            Some(ref credentials) => {
+                let mut request =
+                    SignedRequest::new("POST", "es", region.as_ref().unwrap(), uri.path());
+                request.set_hostname(uri.host().map(|s| s.into()));
+
+                request.add_header("Content-Type", "application/x-ndjson");
+                if gzip {
+                    request.add_header("Content-Encoding", "gzip");
+                }
+
+                for (header, value) in &headers {
+                    request.add_header(header, value);
+                }
+
+                request.set_payload(Some(body));
+
+                request.sign_with_plus(&credentials, true);
+
+                for (name, values) in request.headers() {
+                    let header_name = name
+                        .parse::<HeaderName>()
+                        .expect("Could not parse header name.");
+                    for value in values {
+                        let header_value =
+                            HeaderValue::from_bytes(value).expect("Could not parse header value.");
+                        builder.header(&header_name, header_value);
+                    }
+                }
+
+                // The SignedRequest ends up owning the body, so we have
+                // to play games here
+                let body = request.payload.take().unwrap();
+                match body {
+                    SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                    _ => unreachable!(),
+                }
+            }
+        }
     });
 
     let service = ServiceBuilder::new()
@@ -149,7 +226,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         )
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
-    Box::new(sink)
+    Ok(Box::new(sink))
 }
 
 fn encode_event(

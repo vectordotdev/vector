@@ -39,6 +39,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   doc_type = "_doc" # default
   healthcheck = true # default
   index = "vector-%Y-%m-%d"
+  provider = "default" # default, enum: "default" or "aws"
+  region = "us-east-1" # no default
   
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
@@ -85,6 +87,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   doc_type = "<string>"
   healthcheck = <bool>
   index = "<string>"
+  provider = {"default" | "aws"}
+  region = "<string>"
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -167,6 +171,21 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   # * no default
   index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
+
+  # The provider of the Elasticsearch service.
+  #
+  # * optional
+  # * default: "default"
+  # * enum: "default" or "aws"
+  provider = "default"
+  provider = "aws"
+
+  # When using the AWS provider, the AWS region of the target Elasticsearch
+  # instance.
+  #
+  # * optional
+  # * no default
+  region = "us-east-1"
 
   #
   # Batching
@@ -320,6 +339,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
+| `provider` | `string` | The provider of the Elasticsearch service.<br />`default: "default"` `enum: "default" or "aws"` |
+| `region` | `string` | When using the AWS provider, the [AWS region][url.aws_cw_logs_regions] of the target Elasticsearch instance.<br />`no default` `example: "us-east-1"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
@@ -523,6 +544,7 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
 [url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
