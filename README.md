@@ -248,7 +248,7 @@ the License.
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
-[url.add_company]: https://github.com/timberio/vector/blob/master/scripts/generate/templates/README.md.erb
+[url.add_company]: https://github.com/timberio/vector/blob/master/.companies.toml
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
