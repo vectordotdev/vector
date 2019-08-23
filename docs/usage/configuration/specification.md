@@ -1998,6 +1998,13 @@ end
   # * no default
   address = "0.0.0.0:9598"
 
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
   # Default buckets to use for histogram metrics.
   # 
   # * optional

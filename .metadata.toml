@@ -1335,6 +1335,15 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = """\
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+"""
+
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -1555,6 +1564,7 @@ prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histog
 prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
 prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
 prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
+prometheus_metric_naming = "https://prometheus.io/docs/practices/naming/#metric-names"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"

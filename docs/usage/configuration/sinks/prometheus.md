@@ -33,6 +33,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
+  namespace = "service"
   
   buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0] # default, seconds
   healthcheck = true # default
@@ -44,6 +45,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   type = "prometheus"
   inputs = ["<string>", ...]
   address = "<string>"
+  namespace = "<string>"
   buckets = [<float>, ...]
   healthcheck = <bool>
 ```
@@ -71,6 +73,13 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
   # * no default
   address = "0.0.0.0:9598"
 
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
   # Default buckets to use for histogram metrics.
   # 
   # * optional
@@ -95,6 +104,8 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 | `type` | `string` | The component type<br />`required` `must be: "prometheus"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `address` | `string` | The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.<br />`required` `example: "0.0.0.0:9598"` |
+| `namespace` | `string` | A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].<br />`required` `example: "service"` |
 | **OPTIONAL** | | |
 | `buckets` | `[float]` | Default buckets to use for [histogram][docs.metric_event.histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.<br />`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `unit: seconds` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
@@ -395,6 +406,7 @@ discussion with your use case if you find this to be a problem.
 [url.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
 [url.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
 [url.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
+[url.prometheus_metric_naming]: https://prometheus.io/docs/practices/naming/#metric-names
 [url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Bug%22
 [url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22+label%3A%22Type%3A+Enhancement%22
 [url.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+prometheus%22
