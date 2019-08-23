@@ -1486,6 +1486,7 @@ pipelines = "/usage/configuration/README.md#composition"
 service_role = "/setup/deployment/roles/service.md"
 
 [links.url]
+add_company = "https://github.com/timberio/vector/blob/master/.companies.toml"
 apt = "https://wiki.debian.org/Apt"
 aws_athena = "https://aws.amazon.com/athena/"
 aws_athena_console = "https://console.aws.amazon.com/athena/home"

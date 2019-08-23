@@ -61,7 +61,7 @@ simple and unified.
 * **Logs, Metrics, or Events** - [Logs][docs.log], [metrics][docs.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
 * **Correlate Logs & Metrics** - [Derive metrics from logs][docs.log_to_metric_transform], add shared context with [transforms][docs.transforms].
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
-* **Easy to Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
 * **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
 
 
@@ -122,6 +122,15 @@ Or view [platform specific installation instructions][docs.installation].
 <%= components_table(metadata.sinks.to_h.values.sort) %>
 
 [+ request a new sink][url.new_sink]
+
+
+## Companies Using Vector In Production
+
+<%- metadata.companies.each do |company| -%>
+* [<%= company.fetch("name") %>](<%= company.fetch("url") %>)
+<%- end -%>
+
+[+ add your company][url.add_company]
 
 
 ## License
