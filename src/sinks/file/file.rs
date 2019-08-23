@@ -81,9 +81,8 @@ impl FileSink {
         let log = event.into_log();
 
         let result = match (encoding, log.is_structured()) {
-            (&Some(Encoding::Json), _) | (_, true) => {
-                serde_json::to_vec(&log.all_fields()).map_err(|e| panic!("Error encoding: {}", e))
-            }
+            (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.unflatten())
+                .map_err(|e| panic!("Error encoding event as json: {}", e)),
 
             (&Some(Encoding::Text), _) | (_, false) => Ok(log
                 .get(&event::MESSAGE)
@@ -142,10 +141,10 @@ impl Sink for FileSink {
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
         match self.poll_complete() {
-            Ok(Async::Ready(())) => match self.state {
+            Ok(Async::Ready(())) => match &mut self.state {
                 FileSinkState::Closed => Ok(Async::Ready(())),
 
-                FileSinkState::FileProvided(ref mut sink) => sink.close(),
+                FileSinkState::FileProvided(sink) => sink.close(),
 
                 //this state is eliminated during poll_complete()
                 FileSinkState::OpeningFile(_) => unreachable!(),
@@ -166,10 +165,11 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        test_util::{lines_from_file, random_lines_with_stream},
+        test_util::{lines_from_file, random_lines_with_stream, random_nested_events_with_stream},
     };
 
     use futures::Stream;
+    use std::collections::HashMap;
     use tempfile::tempdir;
 
     #[test]
@@ -183,14 +183,24 @@ mod tests {
     }
 
     #[test]
-    fn json_output_is_correct() {
-        let (input, events) = random_lines_with_stream(100, 16);
+    fn json_tree_output_is_correct() {
+        let (input, events) = random_nested_events_with_stream(4, 3, 3, 16);
         let output = test_unpartitioned_with_encoding(events, Encoding::Json, None);
 
         for (input, output) in input.into_iter().zip(output) {
-            let output: serde_json::Value = serde_json::from_str(&output[..]).unwrap();
-            let output = output.get("message").and_then(|v| v.as_str()).unwrap();
-            assert_eq!(input, output);
+            let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
+                serde_json::from_str(&output[..]).unwrap();
+
+            let deeper = input.into_log().unflatten().match_against(output).unwrap();
+            for (input, output) in deeper {
+                let deeper = input.match_against_map(output).unwrap();
+                for (input, output) in deeper {
+                    let deeper = input.match_against_map(output).unwrap();
+                    for (input, output) in deeper {
+                        assert!(input.equals(output))
+                    }
+                }
+            }
         }
     }
 

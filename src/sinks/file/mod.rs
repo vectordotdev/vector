@@ -80,7 +80,7 @@ impl PartitionedFileSink {
         }
     }
 
-    fn collect_old_files(&mut self) {
+    fn poll_close_old_files(&mut self) {
         let mut recently_outdated = Vec::new();
         if let Some(timeout) = self.close_timeout_secs {
             self.last_accessed.retain(|path, time| {
@@ -179,7 +179,7 @@ impl Sink for PartitionedFileSink {
                 Err(()) => error!("Error in downstream FileSink with path {:?}", path),
             });
 
-        self.collect_old_files();
+        self.poll_close_old_files();
 
         debug!(message = "keeping opened", files = ?self.opened_files());
 

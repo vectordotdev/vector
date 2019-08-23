@@ -75,7 +75,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 let lines = futures::stream::iter_ok::<_, ()>(lines);
 
                 let pump = lines.forward(input);
-                rt.block_on(pump).unwrap();
+                let (_, _) = rt.block_on(pump).unwrap();
 
                 rt.block_on(topology.stop()).unwrap();
                 rt.shutdown_now().wait().unwrap();
