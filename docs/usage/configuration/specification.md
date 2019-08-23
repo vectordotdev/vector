@@ -597,13 +597,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # * no default
     name = "duration_total"
 
-    [transforms.log_to_metric.metrics.labels]
-      # Key/value pairs representing the metric labels.
+    [transforms.log_to_metric.metrics.tags]
+      # Key/value pairs representing the metric tags.
       # 
       # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
+      status = "{{status}}"
 
 [transforms.lua]
   # The component type
