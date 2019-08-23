@@ -112,7 +112,6 @@ impl ContainerState {
 /// Once a log stream has ended, it sends ContainerLogInfo back to main.
 ///
 /// Future  channel     Future      channel
-///
 ///           |<---- event_stream ---->out
 /// main <----|<---- event_stream ---->out
 ///           | ...                 ...out
