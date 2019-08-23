@@ -159,6 +159,7 @@ kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
+docker-integration-tests = []
 
 [[bench]]
 name = "bench"
