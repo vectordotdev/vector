@@ -60,7 +60,7 @@ simple and unified.
 * **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
 * **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
-* **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
 * **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
 
 
@@ -157,6 +157,13 @@ Or view [platform specific installation instructions][docs.installation].
 [+ request a new sink][url.new_sink]
 
 
+## Companies Using Vector In Production
+
+* [Timber](https://timber.io)
+
+[+ add your company][url.add_company]
+
+
 ## License
 
 Copyright 2019, Vector Authors. All rights reserved.
@@ -241,6 +248,7 @@ the License.
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
+[url.add_company]: https://github.com/timberio/vector/blob/master/scripts/generate/templates/README.md.erb
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
