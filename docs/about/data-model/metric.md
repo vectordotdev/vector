@@ -6,11 +6,6 @@ description: 'A deeper look into Vector''s internal metric event.'
 
 ![][images.data-model-metric]
 
-{% hint style="warning" %}
-The metric data model is in beta and still under development. We are working
-to address core issues such as supporting [labels][url.issue_512].
-{% endhint %}
-
 As mentioned in the [data model page][docs.data-model], Vector's events must
 be one of 2 types: a `log` or a `metric`. This page provides a deeper dive into
 Vector's `metric` event type and how they flow through Vector internally.
@@ -38,6 +33,7 @@ message Counter {
   string name = 1;
   double val = 2;
   google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
 }
 
 message Histogram {
@@ -45,6 +41,7 @@ message Histogram {
   double val = 2;
   uint32 sample_rate = 3;
   google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
 }
 
 message Gauge {
@@ -57,34 +54,69 @@ message Gauge {
   }
   Direction direction = 3;
   google.protobuf.Timestamp timestamp = 4;
+  map<string, string> tags = 5;
 }
 
 message Set {
   string name = 1;
   string val = 2;
   google.protobuf.Timestamp timestamp = 3;
+  map<string, string> tags = 4;
 }
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="counter example" %}
+{% code-tabs-item title="counter.json" %}
 ```javascript
 {
   "counter": {
     "name": "login.count",
     "val": 2.0,
-    "timestamp": "2019-05-02T12:44:21.433184Z" // optional
+    "timestamp": "2019-05-02T12:44:21.433184Z", // optional
+    "tags": {                                   // optional
+      "host": "my.host.com"
+    }
   }
 }
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="histogram example" %}
+{% code-tabs-item title="histogram.json" %}
 ```javascript
 {
   "histogram": {
     "name": "duration_ms",
     "val": 2.0,
     "sample_rate": 1,
-    "timestamp": "2019-05-02T12:44:21.433184Z" // optional
+    "timestamp": "2019-05-02T12:44:21.433184Z", // optional
+    "tags": {                                   // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="gauge.json" %}
+```javascript
+{
+  "gauge": {
+    "name": "memory_rss",
+    "val": 554222.0,
+    "direction": "plus",
+    "tags": {                // optional
+      "host": "my.host.com"
+    }
+  }
+}
+```
+{% endcode-tabs-item %}
+{% code-tabs-item title="set.json" %}
+```javascript
+{
+  "set": {
+    "name": "unique_users",
+    "val": "paul_bunyan",
+    "tags": {                // optional
+      "host": "my.host.com"
+    }
   }
 }
 ```
@@ -159,4 +191,3 @@ that unique value.
 [docs.sinks]: ../../usage/configuration/sinks
 [images.data-model-metric]: ../../assets/data-model-metric.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.issue_512]: https://github.com/timberio/vector/issues/512

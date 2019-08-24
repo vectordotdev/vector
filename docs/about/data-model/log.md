@@ -35,7 +35,7 @@ message Value {
 }
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="example" %}
+{% code-tabs-item title="log.json" %}
 ```javascript
 {
     "timestamp": "2019-05-02T00:23:22Z",
@@ -68,7 +68,7 @@ structure.
 For example, if Vector ingests the following JSON data:
 
 {% code-tabs %}
-{% code-tabs-item title="input" %}
+{% code-tabs-item title="input.json" %}
 ```javascript
 {
     "parent": {
@@ -79,10 +79,10 @@ For example, if Vector ingests the following JSON data:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Vector will represent this data internally as a `LogEvent`:
+Vector will represent this data internally as a flattened map:
 
 {% code-tabs %}
-{% code-tabs-item title="internal log event" %}
+{% code-tabs-item title="internal.json" %}
 ```javascript
 {
     "parent.child": "..."
@@ -91,11 +91,11 @@ Vector will represent this data internally as a `LogEvent`:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-And when this `LogEvent` is emitted from a [sink][docs.sinks], it will be
+And when this internal log is emitted from a [sink][docs.sinks], it will be
 exploded back into it's original structure:
 
 {% code-tabs %}
-{% code-tabs-item title="output" %}
+{% code-tabs-item title="output.json" %}
 ```javascript
 {
     "parent": {
@@ -119,7 +119,7 @@ explode the array back into it's original array structure.
 For example, if Vector ingests the following data:
 
 {% code-tabs %}
-{% code-tabs-item title="input" %}
+{% code-tabs-item title="input.json" %}
 ```javascript
 {
     "array": ["item1", "item2", "item3"]
@@ -131,7 +131,7 @@ For example, if Vector ingests the following data:
 Vector will represent this data internally as a log event:
 
 {% code-tabs %}
-{% code-tabs-item title="internal log event" %}
+{% code-tabs-item title="internal.json" %}
 ```javascript
 {
     "array[0]": "item1",
@@ -146,7 +146,7 @@ And when this event is emitted from a [sink][docs.sinks], it will be exploded
 back into it's original structure:
 
 {% code-tabs %}
-{% code-tabs-item title="output" %}
+{% code-tabs-item title="output.json" %}
 ```javascript
 {
     "array": ["item1", "item2", "item3"]
@@ -163,7 +163,7 @@ If vector receives flattened array items that contain a missing index during the
 unflatten process it will insert `null` values. For example:
 
 {% code-tabs %}
-{% code-tabs-item title="internal log event" %}
+{% code-tabs-item title="internal.json" %}
 ```javascript
 {
     "array[0]": "item1",
@@ -176,7 +176,7 @@ unflatten process it will insert `null` values. For example:
 The output will contain a `null` value for `array[1]` like so:
 
 {% code-tabs %}
-{% code-tabs-item title="output" %}
+{% code-tabs-item title="output.json" %}
 ```javascript
 {
     "array": ["item1", null, "item3"]
@@ -235,11 +235,11 @@ In all cases where a component must operate on a key, the following schema is
 used as the default. Each component will provide configuration options to
 override the keys used, if relevant.
 
-| Name | Type | Description |
-| :--- | :--- | :--- |
-| `timestamp` | [`timestamp`](#timestamp) | A normalized [Rust DateTime struct][url.rust_date_time] in UTC. |
-| `message` | [`string`](#string) | A string representing the log message. This is the key used when ingesting raw string data. |
-| `host` | [`string`](#string) | A string representing the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_field` option for relevant sources. |
+| Name        | Type                      | Description                                                                                                                                                                     |
+|:------------|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp` | [`timestamp`](#timestamp) | A normalized [Rust DateTime struct][url.rust_date_time] in UTC.                                                                                                                 |
+| `message`   | [`string`](#string)       | A string representing the log message. This is the key used when ingesting raw string data.                                                                                     |
+| `host`      | [`string`](#string)       | A string representing the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_field` option for relevant sources. |
 
 ### Deviating from the default schema
 

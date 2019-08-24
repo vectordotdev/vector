@@ -36,6 +36,7 @@ permissions to this dir.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "one or more local files"
 
@@ -237,6 +238,7 @@ description = "UDP socket address to bind to."
 [sources.stdin]
 delivery_guarantee = "at_least_once"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "standard input (STDIN)"
 
@@ -263,6 +265,7 @@ The key name added to each event representing the current host.\
 [sources.syslog]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the Syslog 5424 protocol"
 
@@ -313,6 +316,7 @@ The unix socket path. *This should be absolute path.*
 [sources.tcp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the TCP protocol"
 
@@ -357,8 +361,9 @@ The timeout before a connection is forcefully closed during shutdown.\
 [sources.udp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
-through_description = "the TCP protocol"
+through_description = "the UDP protocol"
 
 [sources.udp.options.address]
 type = "string"
@@ -393,6 +398,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream Vector instance"
 
@@ -646,20 +652,21 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[transforms.log_to_metric.options.metrics.options.labels]
+[transforms.log_to_metric.options.metrics.options.tags]
 type = "table"
 display = "inline"
 null = true
-description = "Key/value pairs representing metric labels."
+description = "Key/value pairs representing metric tags."
 
-[transforms.log_to_metric.options.metrics.options.labels.options."*"]
+[transforms.log_to_metric.options.metrics.options.tags.options."*"]
 type = "string"
 examples = [
   {name = "host", value = "${HOSTNAME}"},
   {name = "region", value = "us-east-1"},
+  {name = "status", value = "{{status}}"},
 ]
 null = false
-description = "Key/value pairs representing the metric labels."
+description = "Key/value pairs representing the metric tags."
 
 # ------------------------------------------------------------------------------
 # transforms.lua
@@ -901,8 +908,9 @@ is dynamic based on if the event is structured or not.\
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 examples = [
-  "/var/log/{{ file }}.log",
-  "ec2/{{ instance_id }}"
+  "{{ file }}",
+  "ec2/{{ instance_id }}",
+  "group-name"
 ]
 null = false
 partition_key = true
@@ -919,8 +927,8 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 type = "string"
 examples = [
   "{{ instance_id }}",
-  "stream-name",
-  "%Y-%m-%d"
+  "%Y-%m-%d",
+  "stream-name"
 ]
 null = false
 partition_key = true
@@ -1402,6 +1410,15 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = """\
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+"""
+
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -1532,6 +1549,7 @@ config_composition = "/usage/configuration/README.md#composition"
 config_value_types = "/usage/configuration/README.md#value-types"
 data_directory = "/usage/configuration/README.md#data-directory"
 default_schema = "/about/data-model/log.md#default-schema"
+download = "/setup/installation/manual/from-archives#1-download-the-archive"
 event = "/about/data-model/README.md#event"
 event_key_special_characters = "/about/data-model/log.md#special-characters"
 from_source = "/setup/installation/manual/from-source.md"
@@ -1543,6 +1561,7 @@ pipelines = "/usage/configuration/README.md#composition"
 service_role = "/setup/deployment/roles/service.md"
 
 [links.url]
+add_company = "https://github.com/timberio/vector/blob/master/.companies.toml"
 apt = "https://wiki.debian.org/Apt"
 aws_athena = "https://aws.amazon.com/athena/"
 aws_athena_console = "https://console.aws.amazon.com/athena/home"
@@ -1606,6 +1625,7 @@ lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
 metric_event_source = "https://github.com/timberio/vector/blob/master/src/event/metric.rs"
+musl_builder_docker_image = "https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
 new_feature_request = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
@@ -1620,6 +1640,7 @@ prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histog
 prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
 prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
 prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
+prometheus_metric_naming = "https://prometheus.io/docs/practices/naming/#metric-names"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
@@ -1630,6 +1651,7 @@ rust = "https://www.rust-lang.org/"
 rust_date_time = "https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
+rust_target_triples  = "https://forge.rust-lang.org/platform-support.html"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"

@@ -648,13 +648,14 @@
     # * no default
     name = "duration_total"
 
-    [transforms.log_to_metric.metrics.labels]
-      # Key/value pairs representing the metric labels.
+    [transforms.log_to_metric.metrics.tags]
+      # Key/value pairs representing the metric tags.
       # 
       # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
+      status = "{{status}}"
 
 [transforms.lua]
   # The component type
@@ -888,8 +889,9 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -902,8 +904,8 @@ end
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
@@ -2047,6 +2049,13 @@ end
   # * required
   # * no default
   address = "0.0.0.0:9598"
+
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
 
   # Default buckets to use for histogram metrics.
   # 

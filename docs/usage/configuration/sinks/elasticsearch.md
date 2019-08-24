@@ -463,6 +463,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_elasticsearch_sink_id]
   # ...
@@ -470,6 +472,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
   index = "application-{{ application_id }}-%Y-%m-%d"
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].
@@ -520,12 +524,12 @@ issue, please:
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22
-[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22
-[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
+[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
+[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
+[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Bug
-[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Enhancement
-[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch
+[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+bug
+[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+enhancement
+[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.vector_chat]: https://chat.vector.dev

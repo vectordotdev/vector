@@ -4,6 +4,7 @@ require_relative "component"
 
 class Source < Component
   attr_reader :delivery_guarantee,
+    :output_types,
     :through_description
 
   def initialize(hash)
@@ -12,6 +13,7 @@ class Source < Component
     # Init
 
     @delivery_guarantee = hash.fetch("delivery_guarantee")
+    @output_types = hash.fetch("output_types")
     @through_description = hash.fetch("through_description")
 
     # delivery_guarantee
@@ -28,9 +30,5 @@ class Source < Component
     if @through_description.strip[-1] == "."
       raise("#{self.class.name}#through_description cannot not end with a period")
     end
-  end
-
-  def output_types
-    ["log"]
   end
 end
