@@ -1,7 +1,7 @@
 # Nightly Rust is used because at the moment only nightly uses recent enough
 # LLVM version that supports libc++ with musl. It can be changed to a stable
 # version after Rust 1.38 release.
-ARG RUST_VERSION=nightly-2019-07-29
+ARG RUST_VERSION=nightly-2019-08-24
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -10,10 +10,10 @@ ARG MUSL_VERSION=1.1.22
 # used by Rust. For each Rust version it can be found here
 # https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
 # submodule "llvm-project".
-ARG LLVM_GIT_COMMIT=9b64ca5b7e1e3583978f9ac8af6d93b220a13d90
+ARG LLVM_GIT_COMMIT=48818e9f5d0f2d5978a9b43ad1a2e8d0b83f6aa0
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.2.2
+ARG LINUX_HEADERS_VERSION=5.2.9
 # LibreSSL uses more modern build system than OpenSSL, which makes it better
 # suited for use with musl.
 ARG LIBRESSL_VERSION=2.9.2
