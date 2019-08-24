@@ -30,46 +30,31 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% code-tabs-item title="vector.toml (example)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
   topics = ["topic-1", "topic-2", "topic-3"]
   
-  # OPTIONAL - General
   auto_offset_reset = "smallest"
   key_field = "user_id" # no default
   session_timeout_ms = 5000 # milliseconds
-  
-  # OPTIONAL - Context
-  host_key = "host" # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
 ```coffeescript
 [sources.<source-id>]
-  # REQUIRED - General
   type = "kafka"
   bootstrap_servers = "<string>"
   group_id = "<string>"
   topics = ["<string>", ...]
-
-  # OPTIONAL - General
   auto_offset_reset = "<string>"
   key_field = "<string>"
   session_timeout_ms = <int>
-
-  # OPTIONAL - Context
-  host_key = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
 [sources.kafka_source]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -125,16 +110,6 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -143,17 +118,15 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
+| **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "kafka"` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.<br />`required` `example: (see above)` |
 | `group_id` | `string` | The consumer group name to be used to consume events from Kafka.<br />`required` `example: "consumer-group-name"` |
 | `topics` | `[string]` | The Kafka topics names to read events from.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
+| **OPTIONAL** | | |
 | `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
 | `key_field` | `string` | The field name to use for the topic key. If unspecified, the key would not be added to the events. If the message has null key, then this field would not be added to the event.<br />`no default` `example: "user_id"` |
 | `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
-| **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 
@@ -184,12 +157,6 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 {% endcode-tabs %}
 
 ## How It Works
-
-### Context
-
-By default, the `kafka` source will add context
-keys to your events via the `host_key`
-options.
 
 ### Delivery Guarantee
 
@@ -234,11 +201,11 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.kafka_source]: ../../../assets/kafka-source.svg
-[url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22+label%3A%22Type%3A+Bug%22
-[url.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22+label%3A%22Type%3A+Enhancement%22
-[url.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+kafka%22
+[url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
+[url.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
+[url.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
 [url.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
-[url.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka&labels=Type%3A+Bug
-[url.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka&labels=Type%3A+Enhancement
-[url.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+kafka
+[url.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
+[url.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
+[url.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka
 [url.vector_chat]: https://chat.vector.dev

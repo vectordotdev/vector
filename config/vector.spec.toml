@@ -136,10 +136,6 @@
   host_key = "host"
 
 [sources.kafka]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -195,16 +191,6 @@
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 
 [sources.statsd]
   # The component type

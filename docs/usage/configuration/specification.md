@@ -156,10 +156,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   host_key = "host"
 
 [sources.kafka]
-  #
-  # General
-  #
-
   # The component type
   # 
   # * required
@@ -215,16 +211,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: milliseconds
   session_timeout_ms = 5000
   session_timeout_ms = 10000
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 
 [sources.statsd]
   # The component type
