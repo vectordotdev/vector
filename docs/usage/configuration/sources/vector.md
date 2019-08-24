@@ -137,11 +137,11 @@ issue, please:
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.vector_source]: ../../../assets/vector-source.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector&labels=Type%3A+Bug
-[url.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector&labels=Type%3A+Enhancement
-[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector
+[url.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+bug
+[url.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+enhancement
+[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector
 [url.vector_chat]: https://chat.vector.dev
-[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22
-[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22
-[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22
+[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+bug%22
+[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+enhancement%22
+[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
 [url.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

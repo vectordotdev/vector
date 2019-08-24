@@ -306,14 +306,14 @@ class Links
       when /^url\.(.*)_(sink|source|transform)_issues$/
         name = $1
         type = $2
-        query = "is:open is:issue label:\"#{type.titleize}: #{name}\""
+        query = "is:open is:issue label:\"#{type}: #{name}\""
         VECTOR_ISSUES_ROOT + "?" + {"q" => query}.to_query
 
       when /^url\.(.*)_(sink|source|transform)_(bugs|enhancements)$/
         name = $1
         type = $2
         issue_type = $3.singularize
-        query = "is:open is:issue label:\"#{type.titleize}: #{name}\" label:\"Type: #{issue_type.titleize}\""
+        query = "is:open is:issue label:\"#{type}: #{name}\" label:\"Type: #{issue_type}\""
         VECTOR_ISSUES_ROOT + "?" + {"q" => query}.to_query
 
       when /^url\.(.*)_(sink|source|transform)_source$/
@@ -329,15 +329,15 @@ class Links
       when /^url\.new_(.*)_(sink|source|transform)_issue$/
         name = $1
         type = $2
-        label = "#{type.titleize}: #{name}"
+        label = "#{type}: #{name}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [label]}.to_query
 
       when /^url\.new_(.*)_(sink|source|transform)_(bug|enhancement)$/
         name = $1
         type = $2
         issue_type = $3.singularize
-        component_label = "#{type.titleize}: #{name}"
-        type_label = "Type: #{issue_type.titleize}"
+        component_label = "#{type}: #{name}"
+        type_label = "Type: #{issue_type}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
 
       when /^url\.vector_latest_(release|nightly)_(.*)/
