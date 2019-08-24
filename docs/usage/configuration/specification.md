@@ -290,6 +290,41 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+[sources.udp]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "udp"
+  type = "udp"
+
+  # The address to bind the socket to.
+  # 
+  # * required
+  # * no default
+  address = "0.0.0.0:9000"
+
+  # The maximum bytes size of incoming messages before they are discarded.
+  # 
+  # * optional
+  # * default: 102400
+  # * unit: bytes
+  max_length = 102400
+
+  #
+  # Context
+  #
+
+  # The key name added to each event representing the current host.
+  # 
+  # * optional
+  # * default: "host"
+  host_key = "host"
+
 [sources.vector]
   # The component type
   # 
@@ -604,13 +639,14 @@ event => ({...event, field: 'value'})
     # * no default
     name = "duration_total"
 
-    [transforms.log_to_metric.metrics.labels]
-      # Key/value pairs representing the metric labels.
+    [transforms.log_to_metric.metrics.tags]
+      # Key/value pairs representing the metric tags.
       # 
       # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
+      status = "{{status}}"
 
 [transforms.lua]
   # The component type
@@ -844,8 +880,9 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -858,8 +895,22 @@ end
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
+
+  # Dynamically create a log group if it does not already exist. This will ignore
+  # `create_missing_stream` directly after creating the group and will create the
+  # first stream.
+  # 
+  # * optional
+  # * default: true
+  create_missing_group = true
+
+  # Dynamically create a log stream if it does not already exist.
+  # 
+  # * optional
+  # * default: true
+  create_missing_stream = true
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -1363,6 +1414,118 @@ end
   # * default: true
   healthcheck = true
 
+[sinks.clickhouse]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "clickhouse"
+  type = "clickhouse"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The host url of the Clickhouse server.
+  # 
+  # * required
+  # * no default
+  host = "http://localhost:8123"
+
+  # The table that data will be inserted into.
+  # 
+  # * required
+  # * no default
+  table = "mytable"
+
+  # The database that contains the stable that data will be inserted into.
+  # 
+  # * optional
+  # * no default
+  database = "mydatabase"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The compression type to use before writing data.
+  # 
+  # * optional
+  # * no default
+  # * must be: "gzip" (if supplied)
+  compression = "gzip"
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  retry_attempts = 9223372036854775807
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 9223372036854775807
+  # * unit: seconds
+  retry_backoff_secs = 9223372036854775807
+
 [sinks.console]
   # The component type
   # 
@@ -1511,6 +1674,23 @@ end
   retry_backoff_secs = 5
 
   #
+  # Basic auth
+  #
+
+  [sinks.elasticsearch.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
   # Buffer
   #
 
@@ -1545,6 +1725,28 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Headers
+  #
+
+  [sinks.elasticsearch.headers]
+    # A custom header to be added to each outgoing Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+
+  #
+  # Query
+  #
+
+  [sinks.elasticsearch.query]
+    # A custom parameter to be added to each Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
 
 [sinks.http]
   #
@@ -1838,6 +2040,13 @@ end
   # * required
   # * no default
   address = "0.0.0.0:9598"
+
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
 
   # Default buckets to use for histogram metrics.
   # 

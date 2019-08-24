@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - file source: `data_dir` now falls back to global `data_dir` option if not specified
 - aws_kinesis_streams: Added configurable partition keys
 - topology: Added ability to disable individual sink healthchecks
+- aws_cloudwatch_logs: Add dynamic group and stream creation
+- elasticsearch sink: Add support for custom headers and query parameters
 
 ### Changed
 
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_s3: Fixed #517 and trailing slash issues with the generated key.
 - aws_cloudwatch_logs: Fixes #586 and now dynamically creates streams if they do not exist.
 - topology: Reloading a configuration which removes both a sink and its source now works (#681). 
+- config: abort reload on unparsable config
 
 ### Removed
 

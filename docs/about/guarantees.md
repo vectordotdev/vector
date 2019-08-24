@@ -30,12 +30,14 @@ and [source][docs.sources].
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
 | [`syslog` source][docs.syslog_source] | `best_effort` |
 | [`tcp` source][docs.tcp_source] | `best_effort` |
+| [`udp` source][docs.udp_source] | `best_effort` |
 | [`vector` source][docs.vector_source] | `best_effort` |
 | **Sinks** | |
 | [`aws_cloudwatch_logs` sink][docs.aws_cloudwatch_logs_sink] | `at_least_once` |
 | [`aws_kinesis_streams` sink][docs.aws_kinesis_streams_sink] | `at_least_once` |
 | [`aws_s3` sink][docs.aws_s3_sink] | `at_least_once` |
 | [`blackhole` sink][docs.blackhole_sink] | `best_effort` |
+| [`clickhouse` sink][docs.clickhouse_sink] | `best_effort` |
 | [`console` sink][docs.console_sink] | `best_effort` |
 | [`elasticsearch` sink][docs.elasticsearch_sink] | `best_effort` |
 | [`http` sink][docs.http_sink] | `at_least_once` |
@@ -110,6 +112,7 @@ keep you in the loop if this ever changes.
 [docs.aws_kinesis_streams_sink]: ../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.aws_s3_sink]: ../usage/configuration/sinks/aws_s3.md
 [docs.blackhole_sink]: ../usage/configuration/sinks/blackhole.md
+[docs.clickhouse_sink]: ../usage/configuration/sinks/clickhouse.md
 [docs.console_sink]: ../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
 [docs.event]: ../about/data-model/README.md#event
@@ -125,5 +128,6 @@ keep you in the loop if this ever changes.
 [docs.syslog_source]: ../usage/configuration/sources/syslog.md
 [docs.tcp_sink]: ../usage/configuration/sinks/tcp.md
 [docs.tcp_source]: ../usage/configuration/sources/tcp.md
+[docs.udp_source]: ../usage/configuration/sources/udp.md
 [docs.vector_sink]: ../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../usage/configuration/sources/vector.md

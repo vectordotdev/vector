@@ -31,7 +31,8 @@ impl TransformConfig for TokenizerConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
+        let types = parse_check_conversion_map(&self.types, &self.field_names)
+            .map_err(|err| format!("{}", err))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);

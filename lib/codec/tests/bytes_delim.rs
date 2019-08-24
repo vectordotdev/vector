@@ -1,7 +1,3 @@
-extern crate bytes;
-extern crate codec;
-extern crate tokio_codec;
-
 use bytes::{BufMut, BytesMut};
 use codec::BytesDelimitedCodec;
 use std::collections::HashMap;

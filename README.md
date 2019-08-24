@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>
+    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install<a/>
   </strong>
 </p>
 
@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [archives][docs.archives], and [more][docs.installation]
+* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [download archives][docs.archives], and [more][docs.installation]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -57,10 +57,11 @@ simple and unified.
 * ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
 * **Correct** - Obsessed with [getting the details right][docs.correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
-* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
-* **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
+* **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
+* **Logs, Metrics, or Events** - [Logs][docs.log], [metrics][docs.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
+* **Correlate Logs & Metrics** - [Derive metrics from logs][docs.log_to_metric_transform], add shared context with [transforms][docs.transforms].
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
-* **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
 * **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
 
 
@@ -107,11 +108,12 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
+| [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
 
 [+ request a new source][url.new_source]
 
@@ -144,6 +146,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.aws_s3_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.blackhole_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
 | [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
@@ -154,6 +157,13 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`vector`**][docs.vector_sink] | [Streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance. |
 
 [+ request a new sink][url.new_sink]
+
+
+## Companies Using Vector In Production
+
+* [Timber](https://timber.io)
+
+[+ add your company][url.add_company]
 
 
 ## License
@@ -188,6 +198,7 @@ the License.
 [docs.aws_kinesis_streams_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.aws_s3_sink]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 [docs.blackhole_sink]: https://docs.vector.dev/usage/configuration/sinks/blackhole
+[docs.clickhouse_sink]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
 [docs.coercer_transform]: https://docs.vector.dev/usage/configuration/transforms/coercer
 [docs.concepts]: https://docs.vector.dev/about/concepts
 [docs.configuration]: https://docs.vector.dev/usage/configuration
@@ -209,9 +220,11 @@ the License.
 [docs.javascript_transform]: https://docs.vector.dev/usage/configuration/transforms/javascript
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
+[docs.log]: https://docs.vector.dev/about/data-model/log
 [docs.log_event]: https://docs.vector.dev/about/data-model/log
 [docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
+[docs.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.metric_event]: https://docs.vector.dev/about/data-model/metric
 [docs.performance]: https://docs.vector.dev/performance
 [docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
@@ -234,14 +247,18 @@ the License.
 [docs.tokenizer_transform]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
 [docs.topologies]: https://docs.vector.dev/setup/deployment/topologies
 [docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.udp_source]: https://docs.vector.dev/usage/configuration/sources/udp
 [docs.updating]: https://docs.vector.dev/usage/administration/updating
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
+[url.add_company]: https://github.com/timberio/vector/blob/master/.companies.toml
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
+[url.clickhouse]: https://clickhouse.yandex/
+[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [url.community]: https://vector.dev/community
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.grok]: http://grokdebug.herokuapp.com/

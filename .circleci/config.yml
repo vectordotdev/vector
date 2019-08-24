@@ -44,7 +44,9 @@ jobs:
           name: Check fmt
           environment:
             RUSTFLAGS: "-D warnings"
-          command: make check-fmt
+          command: |
+            rustup component add rustfmt
+            make check-fmt
 
   check-generate:
     docker:
@@ -68,7 +70,7 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis
+          SERVICES: kinesis,cloudwatch
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
@@ -83,6 +85,7 @@ jobs:
       - image: elasticsearch:6.6.2
         environment:
           - discovery.type=single-node
+      - image: yandex/clickhouse-server:19
     steps:
       - checkout
       - run:
@@ -608,3 +611,8 @@ workflows:
           <<: *tag-workflow-filters
           requires:
             - release-s3
+experimental:
+  notify:
+    branches:
+      only:
+        - master

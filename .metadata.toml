@@ -36,6 +36,7 @@ permissions to this dir.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "one or more local files"
 
@@ -169,6 +170,7 @@ description = "UDP socket address to bind to."
 [sources.stdin]
 delivery_guarantee = "at_least_once"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "standard input (STDIN)"
 
@@ -195,6 +197,7 @@ The key name added to each event representing the current host.\
 [sources.syslog]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the Syslog 5424 protocol"
 
@@ -245,6 +248,7 @@ The unix socket path. *This should be absolute path.*
 [sources.tcp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the TCP protocol"
 
@@ -284,12 +288,49 @@ The timeout before a connection is forcefully closed during shutdown.\
 """
 
 # ------------------------------------------------------------------------------
+# sources.udp
+# ------------------------------------------------------------------------------
+[sources.udp]
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "the UDP protocol"
+
+[sources.udp.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = false
+description = "The address to bind the socket to."
+
+[sources.udp.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.udp.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+# ------------------------------------------------------------------------------
 # sources.vector
 # ------------------------------------------------------------------------------
 [sources.vector]
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream Vector instance"
 
@@ -543,20 +584,21 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[transforms.log_to_metric.options.metrics.options.labels]
+[transforms.log_to_metric.options.metrics.options.tags]
 type = "table"
 display = "inline"
 null = true
-description = "Key/value pairs representing metric labels."
+description = "Key/value pairs representing metric tags."
 
-[transforms.log_to_metric.options.metrics.options.labels.options."*"]
+[transforms.log_to_metric.options.metrics.options.tags.options."*"]
 type = "string"
 examples = [
   {name = "host", value = "${HOSTNAME}"},
   {name = "region", value = "us-east-1"},
+  {name = "status", value = "{{status}}"},
 ]
 null = false
-description = "Key/value pairs representing the metric labels."
+description = "Key/value pairs representing the metric tags."
 
 # ------------------------------------------------------------------------------
 # transforms.lua
@@ -839,8 +881,9 @@ is dynamic based on if the event is structured or not.\
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"
 examples = [
-  "/var/log/{{ file }}.log",
-  "ec2/{{ instance_id }}"
+  "{{ file }}",
+  "ec2/{{ instance_id }}",
+  "group-name"
 ]
 null = false
 partition_key = true
@@ -857,13 +900,28 @@ description = "The [AWS region][url.aws_cw_logs_regions] of the target CloudWatc
 type = "string"
 examples = [
   "{{ instance_id }}",
-  "stream-name",
-  "%Y-%m-%d"
+  "%Y-%m-%d",
+  "stream-name"
 ]
 null = false
 partition_key = true
 templateable = true
 description = "The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream."
+
+[sinks.aws_cloudwatch_logs.options.create_missing_group]
+type = "bool"
+default = true
+null = true
+description = """\
+Dynamically create a [log group][url.aws_cw_logs_group_name] if it does not already exist. This will ignore \
+`create_missing_stream` directly after creating the group and will create the first stream. \
+"""
+
+[sinks.aws_cloudwatch_logs.options.create_missing_stream]
+type = "bool"
+default = true
+null = true
+description = "Dynamically create a [log stream][url.aws_cw_logs_stream_name] if it does not already exist."
 
 # ------------------------------------------------------------------------------
 # sinks.aws_kinesis_streams
@@ -1032,6 +1090,52 @@ description = "The number of events that must be received in order to print a su
 # ------------------------------------------------------------------------------
 # sinks.console
 # ------------------------------------------------------------------------------
+
+[sinks.clickhouse]
+batch_size = 1049000
+batch_timeout = 1
+beta = true
+buffer = false
+delivery_guarantee = "best_effort"
+healthcheck = true
+egress_method = "batching"
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 9223372036854775807
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+write_to_description = "[Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]"
+
+[sinks.clickhouse.options.compression]
+type = "string"
+category = "Requests"
+enum = ["gzip"]
+null = true
+description = "The compression type to use before writing data."
+
+[sinks.clickhouse.options.host]
+type = "string"
+examples = ["http://localhost:8123"]
+null = false
+description = "The host url of the [Clickhouse][url.clickhouse] server."
+
+[sinks.clickhouse.options.table]
+type = "string"
+examples = ["mytable"]
+null = false
+description = "The table that data will be inserted into."
+
+[sinks.clickhouse.options.database]
+type = "string"
+examples = ["mydatabase"]
+null = true
+description = "The database that contains the stable that data will be inserted into."
+
+# ------------------------------------------------------------------------------
+# sinks.console
+# ------------------------------------------------------------------------------
 [sinks.console]
 buffer = false
 delivery_guarantee = "best_effort"
@@ -1099,6 +1203,45 @@ examples = [
 null = false
 templateable = true
 description = "Index name to write events to."
+
+[sinks.elasticsearch.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.elasticsearch.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.elasticsearch.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
+[sinks.elasticsearch.options.headers]
+type = "table"
+null = true
+description = "Options for custom headers."
+
+[sinks.elasticsearch.options.headers.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom header to be added to each outgoing Elasticsearch request."
+
+[sinks.elasticsearch.options.query]
+type = "table"
+null = true
+description = "Custom parameters to Elasticsearch query string."
+
+[sinks.elasticsearch.options.query.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom parameter to be added to each Elasticsearch request."
 
 # ------------------------------------------------------------------------------
 # sinks.http
@@ -1240,6 +1383,15 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = """\
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+"""
+
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -1370,6 +1522,7 @@ config_composition = "/usage/configuration/README.md#composition"
 config_value_types = "/usage/configuration/README.md#value-types"
 data_directory = "/usage/configuration/README.md#data-directory"
 default_schema = "/about/data-model/log.md#default-schema"
+download = "/setup/installation/manual/from-archives#1-download-the-archive"
 event = "/about/data-model/README.md#event"
 event_key_special_characters = "/about/data-model/log.md#special-characters"
 from_source = "/setup/installation/manual/from-source.md"
@@ -1381,6 +1534,7 @@ pipelines = "/usage/configuration/README.md#composition"
 service_role = "/setup/deployment/roles/service.md"
 
 [links.url]
+add_company = "https://github.com/timberio/vector/blob/master/.companies.toml"
 apt = "https://wiki.debian.org/Apt"
 aws_athena = "https://aws.amazon.com/athena/"
 aws_athena_console = "https://console.aws.amazon.com/athena/home"
@@ -1404,6 +1558,8 @@ aws_s3_service_limits = "https://docs.aws.amazon.com/streams/latest/dev/service-
 basic_auth = "https://en.wikipedia.org/wiki/Basic_access_authentication"
 big_query_streaming = "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
 cgroups_limit_resources = "https://the.binbashtheory.com/control-resources-cgroups/"
+clickhouse = "https://clickhouse.yandex/"
+clickhouse_http = "https://clickhouse.yandex/docs/en/interfaces/http/"
 community = "https://vector.dev/community"
 configuration = "https://docs.vector.dev/usage/configuration"
 crc = "https://en.wikipedia.org/wiki/Cyclic_redundancy_check"
@@ -1442,6 +1598,7 @@ lua_table = "https://www.lua.org/manual/2.2/section3_3.html"
 lua_types = "https://www.lua.org/manual/2.2/section3_3.html"
 mailing_list = "https://vector.dev/mailing_list/"
 metric_event_source = "https://github.com/timberio/vector/blob/master/src/event/metric.rs"
+musl_builder_docker_image = "https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 new_bug_report = "https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug"
 new_feature_request = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
 new_sink = "https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature"
@@ -1456,6 +1613,7 @@ prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histog
 prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
 prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
 prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
+prometheus_metric_naming = "https://prometheus.io/docs/practices/naming/#metric-names"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"
@@ -1466,6 +1624,7 @@ rust = "https://www.rust-lang.org/"
 rust_date_time = "https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html"
 rust_grok_library = "https://github.com/daschl/grok"
 rust_regex_syntax = "https://docs.rs/regex/1.1.7/regex/#syntax"
+rust_target_triples  = "https://forge.rust-lang.org/platform-support.html"
 splunk_hec = "http://dev.splunk.com/view/event-collector/SP-CAAAE6M"
 splunk_hec_setup = "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
 standard_streams = "https://en.wikipedia.org/wiki/Standard_streams"

@@ -58,7 +58,7 @@ pub struct SinkOuter {
     pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Box<SinkConfig>,
+    pub inner: Box<dyn SinkConfig>,
 }
 
 #[typetag::serde(tag = "type")]
@@ -75,7 +75,7 @@ pub trait SinkConfig: core::fmt::Debug {
 pub struct TransformOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
-    pub inner: Box<TransformConfig>,
+    pub inner: Box<dyn TransformConfig>,
 }
 
 #[typetag::serde(tag = "type")]

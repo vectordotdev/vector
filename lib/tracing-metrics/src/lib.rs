@@ -28,10 +28,6 @@
 //! })
 //! ```
 
-#[warn(missing_debug_implementations, missing_docs)]
-extern crate hotmic;
-extern crate tracing_core;
-
 use hotmic::Sink;
 use std::{
     collections::{HashMap, HashSet},
@@ -85,11 +81,11 @@ impl<S> MetricsSubscriber<S> {
 }
 
 impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         self.inner.enabled(metadata)
     }
 
-    fn new_span(&self, span: &Attributes) -> Id {
+    fn new_span(&self, span: &Attributes<'_>) -> Id {
         let metadata = span.metadata();
 
         let id = self.inner.new_span(span);
@@ -105,7 +101,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
         id
     }
 
-    fn record(&self, span: &Id, values: &Record) {
+    fn record(&self, span: &Id, values: &Record<'_>) {
         self.inner.record(span, values);
     }
 
@@ -113,7 +109,7 @@ impl<S: Subscriber> Subscriber for MetricsSubscriber<S> {
         self.inner.record_follows_from(span, follows);
     }
 
-    fn event(&self, event: &Event) {
+    fn event(&self, event: &Event<'_>) {
         let mut recorder = MetricVisitor::new(self.collector.clone());
         event.record(&mut recorder);
 
@@ -229,7 +225,7 @@ impl MetricVisitor {
 impl Visit for MetricVisitor {
     fn record_str(&mut self, _field: &Field, _value: &str) {}
 
-    fn record_debug(&mut self, _field: &Field, _value: &fmt::Debug) {}
+    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
 
     fn record_u64(&mut self, field: &Field, value: u64) {
         if field.name().ends_with("_counter") {

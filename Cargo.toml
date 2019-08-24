@@ -64,6 +64,7 @@ hotmic = "0.8"
 rusoto_core = "0.37.0"
 rusoto_s3 = "0.37.0"
 rusoto_logs = "0.37.0"
+rusoto_cloudwatch = "0.37.0"
 rusoto_kinesis = "0.37.0"
 rusoto_credential = "0.16.0"
 
@@ -117,6 +118,9 @@ grok = "1.0.0"
 nom = "5.0.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 exitcode = "1.1.2"
+snafu = "0.4.3"
+url = "1.7"
+base64 = "0.10.1"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -140,14 +144,16 @@ tower-test = "0.1"
 [features]
 default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
-  "cloudwatch-integration-tests",
+  "cloudwatch-logs-integration-tests",
+  "cloudwatch-metrics-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
   "splunk-integration-tests",
 ]
-cloudwatch-integration-tests = []
+cloudwatch-logs-integration-tests = []
+cloudwatch-metrics-integration-tests = []
 es-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []

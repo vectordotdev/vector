@@ -34,7 +34,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     name = "duration_total"
     
     increment_by_value = false # default, relevant when type = "counter"
-    labels = {host = "${HOSTNAME}", region = "us-east-1"}
+    tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -50,7 +50,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     field = "<string>"
     name = "<string>"
     increment_by_value = <bool>
-    labels = {* = "<string>"}
+    tags = {* = "<string>"}
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -109,13 +109,14 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
     # * no default
     name = "duration_total"
 
-    [transforms.log_to_metric_transform.metrics.labels]
-      # Key/value pairs representing the metric labels.
+    [transforms.log_to_metric_transform.metrics.tags]
+      # Key/value pairs representing the metric tags.
       # 
       # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
+      status = "{{status}}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -132,7 +133,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 | `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
 | `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`required` `example: "duration_total"` |
 | `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"<br />`default: false` |
-| `metrics.labels.*` | `string` | Key/value pairs representing the metric labels.<br />`required` `example: (see above)` |
+| `metrics.tags.*` | `string` | Key/value pairs representing the metric tags.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -165,8 +166,8 @@ You can convert the `time` field into a `histogram` metric:
     type = "histogram"
     field = "time"
     name = "time_ms" # optional
-    labels.status = "${event.status}" # optional
-    labels.host = "${event.host}" # optional
+    tags.status = "{{status}}" # optional
+    tags.host = "{{host}}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -180,7 +181,7 @@ structure:
     "name": "time_ms",
     "val": 52.2,
     "smaple_rate": 1,
-    "labels": {
+    "tags": {
       "status": "200",
       "host": "10.22.11.222"
     }
@@ -222,8 +223,8 @@ You can count the number of responses by status code:
     type = "counter"
     field = "status"
     name = "response_total" # optional
-    labels.status = "${event.status}" 
-    labels.host = "${event.host}"
+    tags.status = "{{status}}"
+    tags.host = "{{host}}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -236,7 +237,7 @@ structure:
   "counter": {
     "name": "response_total",
     "val": 1.0,
-    "labels": {
+    "tags": {
       "status": "200",
       "host": "10.22.11.222"
     }
@@ -280,7 +281,7 @@ field's value:
     field = "total"
     name = "order_total" # optional
     increment_by_value = true # optional
-    labels.host = "${event.host}" # optional
+    tags.host = "{{host}}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -293,7 +294,7 @@ structure:
   "counter": {
     "name": "order_total",
     "val": 122.20,
-    "labels": {
+    "tags": {
       "host": "10.22.11.222"
     }
   }
@@ -335,17 +336,17 @@ You can reduce this logs into multiple `gauge` metrics:
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "1m_load_avg"
-    labels.host = "${event.host}" # optional
+    tags.host = "{{host}}" # optional
 
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "5m_load_avg"
-    labels.host = "${event.host}" # optional
+    tags.host = "{{host}}" # optional
 
   [[transforms.log_to_metric.metrics]]
     type = "gauge"
     field = "15m_load_avg"
-    labels.host = "${event.host}" # optional
+    tags.host = "{{host}}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -359,7 +360,7 @@ structure:
     "gauge": {
       "name": "1m_load_avg",
       "val": 78.2,
-      "labels": {
+      "tags": {
         "host": "10.22.11.222"
       }
     }
@@ -368,7 +369,7 @@ structure:
     "gauge": {
       "name": "5m_load_avg",
       "val": 56.2,
-      "labels": {
+      "tags": {
         "host": "10.22.11.222"
       }
     }
@@ -377,7 +378,7 @@ structure:
     "gauge": {
       "name": "15m_load_avg",
       "val": 48.7,
-      "labels": {
+      "tags": {
         "host": "10.22.11.222"
       }
     }
@@ -420,7 +421,7 @@ You can count the number of unique `remote_addr` values by using a set:
   [[transforms.log_to_metric.metrics]]
     type = "set"
     field = "remote_addr"
-    labels.host = "${event.host}" # optional
+    tags.host = "{{host}}" # optional
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -433,7 +434,7 @@ structure:
   "set": {
     "name": "remote_addr",
     "val": "233.221.232.22",
-    "labels": {
+    "tags": {
       "host": "10.22.11.222"
     }
   }
@@ -510,10 +511,10 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
-[url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Bug%22
-[url.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22+label%3A%22Type%3A+Enhancement%22
-[url.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+log_to_metric%22
+[url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
+[url.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22
+[url.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
 [url.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
-[url.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+log_to_metric&labels=Type%3A+Bug
-[url.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+log_to_metric&labels=Type%3A+Enhancement
+[url.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+bug
+[url.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+enhancement
 [url.vector_chat]: https://chat.vector.dev

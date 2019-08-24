@@ -137,7 +137,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 }
 
 impl fmt::Debug for KinesisService {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("KinesisService")
             .field("config", &self.config)
             .finish()

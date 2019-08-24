@@ -275,10 +275,10 @@ issue, please:
 [images.kafka_sink]: ../../../assets/kafka-sink.svg
 [url.kafka]: https://kafka.apache.org/
 [url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Bug%22
-[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22+label%3A%22Type%3A+Enhancement%22
-[url.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+kafka%22
+[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+bug%22
+[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+enhancement%22
+[url.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
 [url.kafka_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
-[url.new_kafka_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+kafka&labels=Type%3A+Bug
-[url.new_kafka_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+kafka&labels=Type%3A+Enhancement
+[url.new_kafka_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+bug
+[url.new_kafka_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+enhancement
 [url.vector_chat]: https://chat.vector.dev

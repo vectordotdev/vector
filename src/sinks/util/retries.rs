@@ -60,6 +60,11 @@ where
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => {
+                if self.remaining_attempts == 0 {
+                    error!("retries exhausted");
+                    return None;
+                }
+
                 if self.logic.should_retry_response(response) {
                     warn!(message = "retrying after response.");
                     Some(self.build_retry())
@@ -200,7 +205,7 @@ mod tests {
     struct Error(bool);
 
     impl fmt::Display for Error {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "error")
         }
     }

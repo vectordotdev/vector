@@ -11,9 +11,10 @@
 
 set -e
 
-git_tag=$(git describe --exact-match --tags HEAD 2> /dev/null || echo "")
+on_git_tag=$(git describe --exact-match --tags HEAD 2> /dev/null || echo "")
+latest_version=$1
 
-if [ -z "${git_tag}" ]
+if [ -z "${on_git_tag}" ] && [ "$latest_version" != "true" ]
 then
   git describe --tags | sed 's/^v//g'
 else

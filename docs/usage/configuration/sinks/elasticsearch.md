@@ -52,12 +52,25 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   retry_attempts = 5 # default
   retry_backoff_secs = 5 # default, seconds
   
+  # OPTIONAL - Basic auth
+  [sinks.my_sink_id.basic_auth]
+    password = "password"
+    user = "username"
+  
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
     type = "memory" # default, enum: "memory" or "disk"
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
+  
+  # OPTIONAL - Headers
+  [sinks.my_sink_id.headers]
+    X-Powered-By = "Vector"
+  
+  # OPTIONAL - Query
+  [sinks.my_sink_id.query]
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -85,12 +98,25 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   retry_attempts = <int>
   retry_backoff_secs = <int>
 
+  # OPTIONAL - Basic auth
+  [sinks.<sink-id>.basic_auth]
+    password = "<string>"
+    user = "<string>"
+
   # OPTIONAL - Buffer
   [sinks.<sink-id>.buffer]
     type = {"memory" | "disk"}
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
+
+  # OPTIONAL - Headers
+  [sinks.<sink-id>.headers]
+    * = "<string>"
+
+  # OPTIONAL - Query
+  [sinks.<sink-id>.query]
+    * = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -205,6 +231,23 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   retry_backoff_secs = 5
 
   #
+  # Basic auth
+  #
+
+  [sinks.elasticsearch_sink.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
+  #
   # Buffer
   #
 
@@ -239,6 +282,28 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Headers
+  #
+
+  [sinks.elasticsearch_sink.headers]
+    # A custom header to be added to each outgoing Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
+
+  #
+  # Query
+  #
+
+  [sinks.elasticsearch_sink.query]
+    # A custom parameter to be added to each Elasticsearch request.
+    # 
+    # * required
+    # * no default
+    X-Powered-By = "Vector"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -265,11 +330,18 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 | `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
 | `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
 | `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
+| **OPTIONAL** - Basic auth | | |
+| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
+| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
 | **OPTIONAL** - Buffer | | |
 | `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| **OPTIONAL** - Headers | | |
+| `headers.*` | `string` | A custom header to be added to each outgoing Elasticsearch request.<br />`required` `example: (see above)` |
+| **OPTIONAL** - Query | | |
+| `query.*` | `string` | A custom parameter to be added to each Elasticsearch request.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -391,6 +463,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_elasticsearch_sink_id]
   # ...
@@ -398,6 +472,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
   index = "application-{{ application_id }}-%Y-%m-%d"
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].
@@ -448,12 +524,12 @@ issue, please:
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Bug%22
-[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22+label%3A%22Type%3A+Enhancement%22
-[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+elasticsearch%22
+[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
+[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
+[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
 [url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Bug
-[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch&labels=Type%3A+Enhancement
-[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+elasticsearch
+[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+bug
+[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+enhancement
+[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.vector_chat]: https://chat.vector.dev

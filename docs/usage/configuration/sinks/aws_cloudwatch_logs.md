@@ -33,11 +33,13 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"]
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   region = "us-east-1"
   stream_name = "{{ instance_id }}"
   
   # OPTIONAL - General
+  create_missing_group = true # default
+  create_missing_stream = true # default
   healthcheck = true # default
   hostname = "127.0.0.0:5000"
   
@@ -73,6 +75,8 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   stream_name = "<string>"
 
   # OPTIONAL - General
+  create_missing_group = <bool>
+  create_missing_stream = <bool>
   healthcheck = <bool>
   hostname = "<string>"
 
@@ -122,8 +126,9 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -136,8 +141,22 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
+
+  # Dynamically create a log group if it does not already exist. This will ignore
+  # `create_missing_stream` directly after creating the group and will create the
+  # first stream.
+  # 
+  # * optional
+  # * default: true
+  create_missing_group = true
+
+  # Dynamically create a log stream if it does not already exist.
+  # 
+  # * optional
+  # * default: true
+  create_missing_stream = true
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -268,10 +287,12 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_logs"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "/var/log/{{ file }}.log"` |
+| `group_name` | `string` | The [group name][url.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ file }}"` |
 | `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.<br />`required` `example: "us-east-1"` |
 | `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.<br />`required` `example: "{{ instance_id }}"` |
 | **OPTIONAL** - General | | |
+| `create_missing_group` | `bool` | Dynamically create a [log group][url.aws_cw_logs_group_name] if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream.<br />`default: true` |
+| `create_missing_stream` | `bool` | Dynamically create a [log stream][url.aws_cw_logs_stream_name] if it does not already exist.<br />`default: true` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
 | **OPTIONAL** - Batching | | |
@@ -329,9 +350,9 @@ X-Amz-Target: Logs_20140328.PutLogEvents
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -437,16 +458,9 @@ you can set the `healthcheck` option to `false`.
 ### Partitioning
 
 Partitioning is controlled via the `group_name` and `stream_name`
-options and allows you to dynamically partition data on the fly. You'll notice
-that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling this partitioning. The interpolated result is effectively the internal
-partition key. Let's look at a few examples:
-
-| Value          | Interpolation          | Desc                                   |
-|:---------------|:-----------------------|:---------------------------------------|
-| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
-| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+options and allows you to dynamically partition data on the fly.
+You'll notice that Vector's [template sytax](#template-syntax) is supported
+for these options, enabling you to use field values as the partition's key.
 
 ### Rate Limits
 
@@ -475,13 +489,18 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_aws_cloudwatch_logs_sink_id]
   # ...
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].
@@ -533,9 +552,9 @@ issue, please:
 [images.aws_cloudwatch_logs_sink]: ../../../assets/aws_cloudwatch_logs-sink.svg
 [images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[url.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Bug%22
-[url.aws_cloudwatch_logs_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+Enhancement%22
-[url.aws_cloudwatch_logs_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+aws_cloudwatch_logs%22
+[url.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+bug%22
+[url.aws_cloudwatch_logs_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+enhancement%22
+[url.aws_cloudwatch_logs_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22
 [url.aws_cloudwatch_logs_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/mod.rs
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
@@ -545,8 +564,8 @@ issue, please:
 [url.aws_cw_logs_service_limits]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html
 [url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_cloudwatch_logs_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs&labels=Type%3A+Bug
-[url.new_aws_cloudwatch_logs_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs&labels=Type%3A+Enhancement
-[url.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+aws_cloudwatch_logs
+[url.new_aws_cloudwatch_logs_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs&labels=Type%3A+bug
+[url.new_aws_cloudwatch_logs_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs&labels=Type%3A+enhancement
+[url.new_aws_cloudwatch_logs_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.vector_chat]: https://chat.vector.dev

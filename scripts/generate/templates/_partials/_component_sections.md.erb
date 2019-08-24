@@ -4,9 +4,9 @@
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-​2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-​3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The ​[IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
 error will be [logged][docs.monitoring_logs].
@@ -170,16 +170,11 @@ you can set the `healthcheck` option to `false`.
 ### Partitioning
 
 Partitioning is controlled via the <%= option_names(component.partition_options).to_sentence %>
-options and allows you to dynamically partition data on the fly. You'll notice
-that [`strftime` specifiers][url.strftime_specifiers] are allowed in the values,
-enabling this partitioning. The interpolated result is effectively the internal
-partition key. Let's look at a few examples:
-
-| Value          | Interpolation          | Desc                                   |
-|:---------------|:-----------------------|:---------------------------------------|
-| `date=%F`      | `date=2019-05-02`      | Partitions data by the event's day.    |
-| `date=%Y`      | `date=2019`            | Partitions data by the event's year.   |
-| `timestamp=%s` | `timestamp=1562450045` | Partitions data by the unix timestamp. |
+options and allows you to dynamically partition data on the fly.
+<%- if component.partition_options.any?(&:templateable?) -%>
+You'll notice that Vector's [template sytax](#template-syntax) is supported
+for these options, enabling you to use field values as the partition's key.
+<%- end -%>
 <%- end -%>
 <%- if component.options.rate_limit_duration -%>
 
@@ -221,6 +216,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
 [strftime specifiers][url.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
 ```toml
 [<%= component.type.pluralize %>.my_<%= component.id %>_id]
   # ...
@@ -230,6 +227,8 @@ enabling dynamic values derived from the event's data. This syntax accepts
   <%- end -%>
   # ...
 ```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 You can read more about the complete syntax in the
 [template syntax section][docs.configuration.template-syntax].

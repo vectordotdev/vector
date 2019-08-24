@@ -83,11 +83,12 @@ data_dir = "/var/lib/vector"
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
+| [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
 
 [+ request a new source][url.new_source]
 
@@ -118,6 +119,7 @@ data_dir = "/var/lib/vector"
 | [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.aws_s3_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.blackhole_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
 | [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
 | [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
@@ -267,7 +269,6 @@ application_id=1/date=2019-05-02
 
 This effectively enables application specific time partitioning.
 
-
 ### Value Types
 
 All TOML values types are supported. For convenience this includes:
@@ -289,6 +290,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.aws_kinesis_streams_sink]: ../../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.aws_s3_sink]: ../../usage/configuration/sinks/aws_s3.md
 [docs.blackhole_sink]: ../../usage/configuration/sinks/blackhole.md
+[docs.clickhouse_sink]: ../../usage/configuration/sinks/clickhouse.md
 [docs.coercer_transform]: ../../usage/configuration/transforms/coercer.md
 [docs.console_sink]: ../../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../../usage/configuration/sinks/elasticsearch.md
@@ -322,11 +324,14 @@ All TOML values types are supported. For convenience this includes:
 [docs.tcp_source]: ../../usage/configuration/sources/tcp.md
 [docs.tokenizer_transform]: ../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../usage/configuration/transforms
+[docs.udp_source]: ../../usage/configuration/sources/udp.md
 [docs.vector_sink]: ../../usage/configuration/sinks/vector.md
 [docs.vector_source]: ../../usage/configuration/sources/vector.md
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
+[url.clickhouse]: https://clickhouse.yandex/
+[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.grok]: http://grokdebug.herokuapp.com/
 [url.kafka]: https://kafka.apache.org/

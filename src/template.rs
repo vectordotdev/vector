@@ -17,7 +17,7 @@ lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Template {
     src: String,
     src_bytes: Bytes,
@@ -33,6 +33,12 @@ impl From<&str> for Template {
             has_ts: StrftimeItems::new(src).count() > 0,
             has_fields: RE.is_match(src),
         }
+    }
+}
+
+impl From<String> for Template {
+    fn from(s: String) -> Self {
+        Template::from(s.as_str())
     }
 }
 
@@ -53,12 +59,20 @@ impl Template {
         self.render(event)
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
     }
+
+    pub fn is_dynamic(&self) -> bool {
+        !(self.has_fields && self.has_ts)
+    }
+
+    pub fn get_ref(&self) -> &Bytes {
+        &self.src_bytes
+    }
 }
 
 fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
     let mut missing_fields = Vec::new();
     let out = RE
-        .replace_all(src, |caps: &Captures| {
+        .replace_all(src, |caps: &Captures<'_>| {
             let key = caps
                 .get(1)
                 .map(|s| Atom::from(s.as_str().trim()))
@@ -104,7 +118,7 @@ struct TemplateVisitor;
 impl<'de> Visitor<'de> for TemplateVisitor {
     type Value = Template;
 
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "a string")
     }
 
