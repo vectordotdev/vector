@@ -36,6 +36,7 @@ permissions to this dir.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "one or more local files"
 
@@ -169,6 +170,7 @@ description = "UDP socket address to bind to."
 [sources.stdin]
 delivery_guarantee = "at_least_once"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "standard input (STDIN)"
 
@@ -195,6 +197,7 @@ The key name added to each event representing the current host.\
 [sources.syslog]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the Syslog 5424 protocol"
 
@@ -245,6 +248,7 @@ The unix socket path. *This should be absolute path.*
 [sources.tcp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the TCP protocol"
 
@@ -289,6 +293,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 [sources.udp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the UDP protocol"
 
@@ -325,6 +330,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream Vector instance"
 

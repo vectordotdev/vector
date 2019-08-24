@@ -1,5 +1,5 @@
 ---
-description: Ingests data through another upstream Vector instance and outputs `log` events.
+description: Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
 ---
 
 <!--
@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_vector_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events.
+The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events.
 
 ## Config File
 
@@ -132,6 +132,7 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.vector_source]: ../../../assets/vector-source.svg

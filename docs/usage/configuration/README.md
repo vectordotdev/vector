@@ -83,12 +83,12 @@ data_dir = "/var/lib/vector"
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
 
 [+ request a new source][url.new_source]
 
