@@ -274,6 +274,10 @@ class Links
             collect { |_| ".." }.
             join("/")
 
+        if relative_root == ""
+          relative_root = "."
+        end
+
         "#{relative_root}#{path}"
       else
         path = path.gsub(/^docs\//, "/").gsub(".md", "").gsub("/README.md", "")

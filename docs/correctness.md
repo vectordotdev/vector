@@ -22,7 +22,7 @@ harness README.
 ⚠️ = unknown, please click into the test for an explanation
 
 
-[docs.performance]: /performance.md
+[docs.performance]: ./performance.md
 [url.disk_buffer_persistence_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness
 [url.file_rotate_create_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness
 [url.file_rotate_truncate_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness

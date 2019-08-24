@@ -33,7 +33,7 @@ definition][url.event_proto]. You'll notice that each event must be one of
 
 ## FAQ
 
-### Isn't eveything just an events?
+### Why not _just_ "event"?
 
 1. We like the "everything is an event" philosophy a lot.
 2. We recognize that there's a large gap between that idea and a lot of
