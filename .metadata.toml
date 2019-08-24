@@ -584,20 +584,21 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[transforms.log_to_metric.options.metrics.options.labels]
+[transforms.log_to_metric.options.metrics.options.tags]
 type = "table"
 display = "inline"
 null = true
-description = "Key/value pairs representing metric labels."
+description = "Key/value pairs representing metric tags."
 
-[transforms.log_to_metric.options.metrics.options.labels.options."*"]
+[transforms.log_to_metric.options.metrics.options.tags.options."*"]
 type = "string"
 examples = [
   {name = "host", value = "${HOSTNAME}"},
   {name = "region", value = "us-east-1"},
+  {name = "status", value = "{{status}}"},
 ]
 null = false
-description = "Key/value pairs representing the metric labels."
+description = "Key/value pairs representing the metric tags."
 
 # ------------------------------------------------------------------------------
 # transforms.lua
