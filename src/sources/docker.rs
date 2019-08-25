@@ -13,7 +13,7 @@ use futures::{
     Async, Future, Sink, Stream,
 };
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap};
+use std::{cmp::Ordering, collections::HashMap, env};
 use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -219,27 +219,66 @@ fn docker_source(
         let main_send = main_send.clone();
         let out = out.clone();
 
+        // Find out it's own container id, if it's inside a docker container.
+        // Since docker doesn't readily provide such information,
+        // various approches need to be made. As such the solution is not
+        // exact, but probable.
+        // This is to be used only if source is in state of catching everything.
+        // Or in other words, if includes are used then this is not necessary.
+        let exclude_self = config.include_containers.is_empty() && config.include_labels.is_empty();
+
+        // HOSTNAME hint
+        // It may contain shortened container id.
+        let hostname = env::var("HOSTNAME").ok();
+
+        // IMAGE hint
+        // If image name starts with timberio/vector.
+        let image = "timberio/vector";
+
         // Future
         docker.list_containers(Some(options)).map(move |list| {
             let mut containers = HashMap::<String, ContainerState>::new();
+            let mut ignore_container_id = Vec::new();
             for container in list {
                 trace!(
                     message = "Found already running container",
                     id = field::display(&container.id)
                 );
+
+                if exclude_self {
+                    let hostname_hint = hostname
+                        .as_ref()
+                        .map(|maybe_short_id| container.id.starts_with(maybe_short_id))
+                        .unwrap_or(false);
+                    let image_hint = container.image.starts_with(image);
+                    if hostname_hint || image_hint {
+                        // This container is probably itself.
+                        // So ignore it.
+                        info!(
+                            message = "Detected self container",
+                            id = field::display(&container.id)
+                        );
+                        ignore_container_id.push(container.id);
+                        continue;
+                    }
+                }
+
                 let mut state = ContainerState::new(container.id.clone(), now_timestamp);
                 state.run_event_stream(&out, &main_send, &docker);
                 containers.insert(container.id, state);
             }
-            containers
+            (containers, ignore_container_id)
         })
     };
 
     // Main docker source future
     let main = now_running.then(move |result| {
-        let mut containers = result
+        let (mut containers, mut ignore_container_id) = result
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
             .unwrap_or_default();
+
+        // Sort for efficient lookup
+        ignore_container_id.sort();
 
         poll_fn(move || loop {
             match main_recv.poll() {
@@ -283,7 +322,8 @@ fn docker_source(
                                                 state.generation += 1;
 
                                                 state.run_event_stream(&out, &main_send, &docker);
-                                            } else {
+                                            } else if ignore_container_id.binary_search(id).is_err()
+                                            {
                                                 let mut state = ContainerState::new(
                                                     id.clone(),
                                                     // logs can actually come with timestamps before timestamp of this event, so no now_timestamp.max(event.time as i64),
@@ -291,6 +331,8 @@ fn docker_source(
                                                 );
                                                 state.run_event_stream(&out, &main_send, &docker);
                                                 containers.insert(id.clone(), state);
+                                            } else {
+                                                // Ignore
                                             }
                                         }
                                         // Ignore
