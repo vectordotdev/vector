@@ -420,12 +420,12 @@ fn run_event_stream(
 fn log_to_event(message: LogOutput, info: &mut ContainerLogInfo) -> Option<Event> {
     let mut log_event = Event::new_empty_log().into_log();
 
-    // TODO: Source could be supplied to log_event, but should it, and how to name it?
-    let (message, _) = match message {
+    let (message, stream) = match message {
         LogOutput::StdErr { message } => (message, "stderr"),
         LogOutput::StdOut { message } => (message, "stdout"),
         _ => return None,
     };
+    log_event.insert_implicit(event::STREAM.clone(), stream.into());
 
     let mut splitter = message.splitn(2, char::is_whitespace);
     let timestamp_str = splitter.next()?;
