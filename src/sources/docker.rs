@@ -481,9 +481,8 @@ fn log_to_event(message: LogOutput, info: &mut ContainerLogInfo) -> Option<Event
     // Supply message
     log_event.insert_explicit(event::MESSAGE.clone(), log.into());
 
-    // Supply host
-    // TODO: use event::HOST or create new naming, or don't supply at all?
-    //log_event.insert_implicit(event::HOST.clone(), info.id.as_str().into());
+    // Supply container
+    log_event.insert_implicit(event::CONTAINER.clone(), info.id.as_str().into());
 
     let event = Event::Log(log_event);
     trace!(message = "Received one event", event = field::debug(&event));
