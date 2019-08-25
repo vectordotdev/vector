@@ -21,9 +21,6 @@ use tracing::field;
 pub struct DockerConfig {
     include_containers: Vec<String>,
     include_labels: Vec<String>,
-    // TODO: add them, or not?
-    // ignore_containers: Vec<String>,
-    // ignore_labels: Vec<String>,
 }
 
 impl Default for DockerConfig {
@@ -31,8 +28,6 @@ impl Default for DockerConfig {
         DockerConfig {
             include_containers: Vec::default(),
             include_labels: Vec::default(),
-            // ignore_containers: Vec::default(),
-            // ignore_labels: Vec::default(),
         }
     }
 }
