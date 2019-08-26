@@ -243,7 +243,10 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
+        let field_names = fields
+            .split_whitespace()
+            .map(|s| s.into())
+            .collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
         let mut parser = TokenizerConfig {
             field_names,
