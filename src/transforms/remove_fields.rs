@@ -1,4 +1,4 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
@@ -18,7 +18,7 @@ pub struct RemoveFields {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 

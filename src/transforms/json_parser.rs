@@ -1,4 +1,4 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, TransformConfig},
@@ -19,7 +19,7 @@ pub struct JsonParserConfig {
 
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         Ok(Box::new(JsonParser::from(self.clone())))
     }
 

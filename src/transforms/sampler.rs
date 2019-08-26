@@ -1,10 +1,11 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     event::{self, Event},
     topology::config::{DataType, TransformConfig},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -16,10 +17,10 @@ pub struct SamplerConfig {
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         RegexSet::new(&self.pass_list)
-            .map_err(|err| err.to_string())
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
+            .context(super::InvalidRegex)
     }
 
     fn input_type(&self) -> DataType {

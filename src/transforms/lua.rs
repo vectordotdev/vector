@@ -1,9 +1,10 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     event::Event,
     topology::config::{DataType, TransformConfig},
 };
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -15,7 +16,7 @@ pub struct LuaConfig {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -36,7 +37,7 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, String> {
+    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, BuildError> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs
@@ -59,7 +60,7 @@ impl Lua {
             ctx.set_named_registry_value("vector_func", func)?;
             Ok(())
         })
-        .map_err(|err| format_error(&err))?;
+        .context(super::InvalidLua)?;
 
         Ok(Self { lua })
     }
@@ -308,7 +309,8 @@ mod tests {
             vec![],
         )
         .map(|_| ())
-        .unwrap_err();
+        .unwrap_err()
+        .to_string();
 
         assert!(err.contains("syntax error:"), err);
     }

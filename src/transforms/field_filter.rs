@@ -1,4 +1,4 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
@@ -15,7 +15,7 @@ pub struct FieldFilterConfig {
 
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),

@@ -80,7 +80,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
+    fn build(&self) -> Result<Box<dyn transforms::Transform>, transforms::BuildError>;
 
     fn input_type(&self) -> DataType;
 

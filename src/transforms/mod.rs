@@ -1,4 +1,5 @@
 use crate::Event;
+use snafu::Snafu;
 
 pub mod add_fields;
 pub mod coercer;
@@ -20,4 +21,18 @@ pub trait Transform: Send {
             output.push(transformed);
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("Invalid type name: {}", source))]
+    TypesConversionError {
+        source: crate::types::ConversionError,
+    },
+    #[snafu(display("Invalid regular expression: {}", source))]
+    InvalidRegex { source: regex::Error },
+    #[snafu(display("Invalid grok pattern: {}", source))]
+    InvalidGrok { source: grok::Error },
+    #[snafu(display("Lua error: {}", source))]
+    InvalidLua { source: rlua::Error },
 }

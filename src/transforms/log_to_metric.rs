@@ -1,4 +1,4 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
     event::metric::Metric,
     event::{self, ValueKind},
@@ -70,7 +70,7 @@ pub struct LogToMetric {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 

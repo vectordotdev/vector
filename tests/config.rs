@@ -151,7 +151,8 @@ fn bad_regex() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"sampler\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 
     let err = load(
         r#"
@@ -172,7 +173,8 @@ fn bad_regex() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"parser\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 }
 
 #[test]
