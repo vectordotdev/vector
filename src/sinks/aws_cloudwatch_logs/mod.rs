@@ -266,13 +266,13 @@ impl CloudwatchLogsSvc {
         };
 
         match (&self.encoding, log.is_structured()) {
-            (&Some(Encoding::Json), _) | (_, true) => {
+            (&Some(Encoding::Json), _) | (None, true) => {
                 let bytes = serde_json::to_vec(&log.unflatten()).unwrap();
                 let message = String::from_utf8(bytes).unwrap();
 
                 InputLogEvent { message, timestamp }
             }
-            (&Some(Encoding::Text), _) | (_, false) => {
+            (&Some(Encoding::Text), _) | (None, false) => {
                 let message = log
                     .get(&event::MESSAGE)
                     .map(|v| v.to_string_lossy())
@@ -706,6 +706,31 @@ mod tests {
         let encoded = svc(Default::default()).encode_log(event.clone());
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
         assert!(map.get(&event::TIMESTAMP).is_none());
+    }
+
+    #[test]
+    fn cloudwatch_encode_log_as_json() {
+        let config = CloudwatchLogsSinkConfig {
+            encoding: Some(Encoding::Json),
+            ..Default::default()
+        };
+        let mut event = Event::from("hello world").into_log();
+        event.insert_implicit("key".into(), "value".into());
+        let encoded = svc(config).encode_log(event.clone());
+        let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
+        assert!(map.get(&event::TIMESTAMP).is_none());
+    }
+
+    #[test]
+    fn cloudwatch_encode_log_as_text() {
+        let config = CloudwatchLogsSinkConfig {
+            encoding: Some(Encoding::Text),
+            ..Default::default()
+        };
+        let mut event = Event::from("hello world").into_log();
+        event.insert_explicit("key".into(), "value".into());
+        let encoded = svc(config).encode_log(event.clone());
+        assert_eq!(encoded.message, "hello world");
     }
 }
 
