@@ -25,6 +25,7 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
+| [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
 | [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
@@ -38,6 +39,7 @@ that receive data over the network, like the [`vector`][docs.vector_source],
 [docs.agent_role]: ../../../setup/deployment/roles/agent.md
 [docs.event]: ../../../about/data-model/README.md#event
 [docs.file_source]: ../../../usage/configuration/sources/file.md
+[docs.kafka_source]: ../../../usage/configuration/sources/kafka.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.service_role]: ../../../setup/deployment/roles/service.md
