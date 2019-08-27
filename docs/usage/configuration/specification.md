@@ -155,6 +155,34 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+[sources.journald]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "journald"
+  type = "journald"
+
+  # Include only entries from the current runtime (boot)
+  # 
+  # * optional
+  # * default: true
+  current_runtime_only = true
+
+  # Include only entries from the local system
+  # 
+  # * optional
+  # * default: true
+  local_only = true
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  # 
+  # * optional
+  # * no default
+  units = ["ntpd", "sysinit.target"]
+
 [sources.kafka]
   # The component type
   # 

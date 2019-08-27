@@ -108,6 +108,7 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
+| [**`journald`**][docs.journald_source] | Ingests data through log records from journald and outputs [`log`][docs.log_event] events. |
 | [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
 | [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
@@ -217,6 +218,7 @@ the License.
 [docs.homebrew]: https://docs.vector.dev/setup/installation/package-managers/homebrew
 [docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
 [docs.installation]: https://docs.vector.dev/setup/installation
+[docs.journald_source]: https://docs.vector.dev/usage/configuration/sources/journald
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.kafka_source]: https://docs.vector.dev/usage/configuration/sources/kafka
