@@ -120,6 +120,7 @@ exitcode = "1.1.2"
 snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
+owning_ref = "0.4.0"
 
 [build-dependencies]
 prost-build = "0.4.0"

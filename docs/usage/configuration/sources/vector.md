@@ -1,5 +1,5 @@
 ---
-description: Ingests data through another upstream Vector instance and outputs `log` events.
+description: Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
 ---
 
 <!--
@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_vector_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events.
+The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events.
 
 ## Config File
 
@@ -132,15 +132,16 @@ issue, please:
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
+[docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.vector_source]: ../../../assets/vector-source.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector&labels=Type%3A+Bug
-[url.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector&labels=Type%3A+Enhancement
-[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+vector
+[url.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+bug
+[url.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+enhancement
+[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector
 [url.vector_chat]: https://chat.vector.dev
-[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Bug%22
-[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22+label%3A%22Type%3A+Enhancement%22
-[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+vector%22
+[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+bug%22
+[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+enhancement%22
+[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
 [url.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

@@ -13,11 +13,13 @@ class Metadata
   class << self
     def load()
       metadata_toml = TomlRB.load_file("#{DOCS_ROOT}/../.metadata.toml")
-      new(metadata_toml)
+      companies_toml = TomlRB.load_file("#{DOCS_ROOT}/../.companies.toml")
+      new(metadata_toml.merge(companies_toml))
     end
   end
 
-  attr_reader :enums,
+  attr_reader :companies,
+    :enums,
     :links,
     :options,
     :sinks,
@@ -25,6 +27,7 @@ class Metadata
     :transforms
 
   def initialize(hash)
+    @companies = hash.fetch("companies")
     @enums = OpenStruct.new(hash.fetch("enums"))
     @options = OpenStruct.new()
     @sinks = OpenStruct.new()

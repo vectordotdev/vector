@@ -193,10 +193,10 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tcp_source]: ../../../assets/tcp-source.svg
-[url.new_tcp_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Bug
-[url.new_tcp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+tcp&labels=Type%3A+Enhancement
-[url.tcp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Bug%22
-[url.tcp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22+label%3A%22Type%3A+Enhancement%22
-[url.tcp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+tcp%22
+[url.new_tcp_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+tcp&labels=Type%3A+bug
+[url.new_tcp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+tcp&labels=Type%3A+enhancement
+[url.tcp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+tcp%22+label%3A%22Type%3A+bug%22
+[url.tcp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+tcp%22+label%3A%22Type%3A+enhancement%22
+[url.tcp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+tcp%22
 [url.tcp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/tcp.rs
 [url.vector_chat]: https://chat.vector.dev

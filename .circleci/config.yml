@@ -190,7 +190,6 @@ jobs:
           command: |
             export VERSION=$(make version)
             export RUST_LTO="lto"
-            export FEATURES="default rdkafka/cmake_build"
             export TARGET="x86_64-unknown-linux-musl"
             make build-archive
       - persist_to_workspace:

@@ -99,7 +99,7 @@ type = "<type>"
 
 ### Document
 
-* Lines should not exceed 80 characters in width.
+* Lines should not exceed 80 characters in width unless formatting prohibits it.
 * All documents should have an H1 heading.
 
 ### Headings
@@ -134,60 +134,17 @@ into a link. For example:
 
 When displaying options, a table must adhere to the following format:
 
-<table>
-  <thead>
-    <tr>
-      <th style="text-align:left">Name</th>
-      <th style="text-align:left">Type</th>
-      <th style="text-align:left">Description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align:left"><b>Required</b>
-      </td>
-      <td style="text-align:left"></td>
-      <td style="text-align:left"></td>
-    </tr>
-    <tr>
-      <td style="text-align:left"><code>name</code>
-      </td>
-      <td style="text-align:left"><code>type</code>
-      </td>
-      <td style="text-align:left">
-        <p>Description. See <a href="conventions.md#displaying-options">Section</a> for
-          more info.</p>
-        <p><code>default: &quot;value&quot;</code>
-        </p>
-      </td>
-    </tr>
-    <tr>
-      <td style="text-align:left"><b>Optional</b>
-      </td>
-      <td style="text-align:left"></td>
-      <td style="text-align:left"></td>
-    </tr>
-    <tr>
-      <td style="text-align:left"><code>name</code>
-      </td>
-      <td style="text-align:left"><code>type</code>
-      </td>
-      <td style="text-align:left">
-        <p>Description. See <a href="conventions.md#displaying-options">Section</a> for
-          more info.</p>
-        <p><code>no default</code>
-        </p>
-      </td>
-    </tr>
-  </tbody>
-</table>Where:
+| Key                                        |   Type   | Description            |    |
+|:-------------------------------------------|:--------:|:-----------------------|:---|
+| **\<REQUIRED or OPTIONAL\>** - \<section\> |          |                        |    |
+| `<name>`                                   | `<type>` | <description\> [`<tag>`] |    |
 
-* `name` is the name of the option.
-* `type` is one of the supported types, typically a [TOML type](https://github.com/toml-lang/toml#table-of-contents).
-* The description _succinctly_ describes what the variable does.
-* A more in-depth description should be moved to a separate section and linked.
-* Default should be specified on a new line if relevant.
-* `no default` should be used if it is not already obviously implied.
+Where:
+
+* `<name>` is the name of the option.
+* `<type>` is one of the supported types, typically a [TOML type](https://github.com/toml-lang/toml#table-of-contents).
+* `<description>` _succinctly_ describes what the variable does. A more in-depth description should be moved to a separate section and linked.
+* `<tag>` is one or more short descriptive tags, such as `required`, `default: 123`, etc.
 
 ### Sources, Transforms, & Sinks
 
@@ -203,19 +160,13 @@ Source, transform, and sink pages must be structured to include the following
 section hierarchy. The root level represents an `h1`, children are `h2`, and
 so on:
 
-* **Configuration File** - A configuration example that includes all options, [formatted
-  appropriately](conventions.md#configuration-examples).
-* **Options** - A table representing the available options, [formatted
-  appropriately](conventions.md#options).
-* **Examples** - The data type accepted as input, must link to the appropriate type
-  in the [Data Model document](../about/data-model.md).
+* **Configuration File** - A configuration example that includes all options, [formatted appropriately](conventions.md#configuration-examples).
+* **Options** - A table representing the available options, [formatted appropriately](conventions.md#options).
+* **Examples** - The data type accepted as input, must link to the appropriate type in the [Data Model document](../about/data-model.md).
 * **How It Works**
-  * **Context** - Any keys added to the event that represent context \(such as
-    `"host"`\).
-  * **Guarantees** - The [guarantee](../about/guarantees.md) a source or sink
-    can achieve.
-* **Resources** - A list of linked resources, such as source code, issues, and
-  so on.
+  * **Context** - Any keys added to the event that represent context \(such as `"host"`\).
+  * **Guarantees** - The [guarantee](../about/guarantees.md) a source or sink can achieve.
+* **Resources** - A list of linked resources, such as source code, issues, and so on.
 
 ## Organization
 
@@ -242,8 +193,7 @@ clear, concise, and confident manner.
 
 Avoid using vague language such as “it seems” or “probably.” Instead of:
 
-> It seems like every SSL reseller packs their certs in a slightly different
-way with slightly different filenames.
+> It seems like every SSL reseller packs their certs in a slightly different way with slightly different filenames.
 
 Use:
 
@@ -291,10 +241,8 @@ Use:
 
 ### Link
 
-* Link to other internal documents when possible. You can do this by
-  highlighting the word and using `ctrl+k` to search for and link to a document.
-* If in the same section you only need to link the first occurrence of the word,
-  do not link every single occurrence.
+* Link to other internal documents when possible. You can do this by highlighting the word and using `ctrl+k` to search for and link to a document.
+* If in the same section you only need to link the first occurrence of the word, do not link every single occurrence.
 * When linking to documents, try to link to the specific section.
 
 ### Shallow Scope
@@ -309,18 +257,8 @@ the document with that, and link to the document covering that topic.
 
 Here a few examples to help illustrate this point:
 
-* Every [source](../usage/configuration/sources/),
-  [transform](../usage/configuration/transforms/), and
-  [sink](../usage/configuration/sinks/) includes _all_ options, even if they are
-  foundational options that are shared and repeated across all components. This
-  avoids the need for a user to have to jump around to separate pages to get the
-  full scope of options available to them.
-* All of the `aws_*` sources and sinks include an "Authentication" section that
-  repeats the same language. This is easier for the user since it is contained
-  in the relevant integration page. The user should not have to jump to a
-  separate "AWS Authentication" page unless this subject deserves it's own
-  entire document. Even then, each `aws_*` source and sink should include a link
-  to that document.
+* Every [source](../usage/configuration/sources/), [transform](../usage/configuration/transforms/), and [sink](../usage/configuration/sinks/) includes _all_ options, even if they are foundational options that are shared and repeated across all components. This avoids the need for a user to have to jump around to separate pages to get the full scope of options available to them.
+* All of the `aws_*` sources and sinks include an "Authentication" section that repeats the same language. This is easier for the user since it is contained in the relevant integration page. The user should not have to jump to a separate "AWS Authentication" page unless this subject deserves it's own entire document. Even then, each `aws_*` source and sink should include a link to that document.
 
 
 [docs.administration]: ../usage/administration

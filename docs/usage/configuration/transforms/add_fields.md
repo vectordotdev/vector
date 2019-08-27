@@ -284,12 +284,12 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.add_fields_transform]: ../../../assets/add_fields-transform.svg
-[url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Bug%22
-[url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22+label%3A%22Type%3A+Enhancement%22
-[url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+add_fields%22
+[url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
+[url.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+enhancement%22
+[url.add_fields_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22
 [url.add_fields_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/add_fields.rs
-[url.new_add_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Bug
-[url.new_add_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+add_fields&labels=Type%3A+Enhancement
+[url.new_add_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+add_fields&labels=Type%3A+bug
+[url.new_add_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+add_fields&labels=Type%3A+enhancement
 [url.toml_array]: https://github.com/toml-lang/toml#array
 [url.toml_table]: https://github.com/toml-lang/toml#table
 [url.vector_chat]: https://chat.vector.dev
