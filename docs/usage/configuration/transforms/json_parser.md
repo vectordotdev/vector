@@ -252,11 +252,11 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.json_parser_transform]: ../../../assets/json_parser-transform.svg
-[url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Bug%22
-[url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22+label%3A%22Type%3A+Enhancement%22
-[url.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+json_parser%22
+[url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22
+[url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+enhancement%22
+[url.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
 [url.json_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
-[url.new_json_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+json_parser&labels=Type%3A+Bug
-[url.new_json_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+json_parser&labels=Type%3A+Enhancement
+[url.new_json_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+bug
+[url.new_json_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+enhancement
 [url.vector_chat]: https://chat.vector.dev
 [url.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

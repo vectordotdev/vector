@@ -139,11 +139,11 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sampler_transform]: ../../../assets/sampler-transform.svg
-[url.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler&labels=Type%3A+Bug
-[url.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler&labels=Type%3A+Enhancement
-[url.new_sampler_transform_issue]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+sampler
-[url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Bug%22
-[url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22+label%3A%22Type%3A+Enhancement%22
-[url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+sampler%22
+[url.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+bug
+[url.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+enhancement
+[url.new_sampler_transform_issue]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler
+[url.sampler_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22+label%3A%22Type%3A+bug%22
+[url.sampler_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22+label%3A%22Type%3A+enhancement%22
+[url.sampler_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+sampler%22
 [url.sampler_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/sampler.rs
 [url.vector_chat]: https://chat.vector.dev

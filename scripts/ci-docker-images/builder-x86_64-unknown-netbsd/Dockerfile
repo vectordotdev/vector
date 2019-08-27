@@ -16,7 +16,7 @@ RUN apt-get install -y --no-install-recommends \
   software-properties-common
 
 RUN curl -L https://packages.confluent.io/deb/5.2/archive.key | apt-key add -
-RUN add-apt-repository "deb [arch=amd64] https://packages.confluent.io/deb/5.2 stable main"
+RUN add-apt-repository -y "deb [arch=amd64] https://packages.confluent.io/deb/5.2 stable main"
 RUN apt-get update
 RUN apt-get install -y librdkafka-dev
 ENV CARGO_FEATURE_DYNAMIC_LINKING=true

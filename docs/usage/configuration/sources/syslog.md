@@ -233,11 +233,11 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.syslog_source]: ../../../assets/syslog-source.svg
-[url.new_syslog_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+syslog&labels=Type%3A+Bug
-[url.new_syslog_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+syslog&labels=Type%3A+Enhancement
+[url.new_syslog_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+bug
+[url.new_syslog_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+enhancement
 [url.syslog_5424]: https://tools.ietf.org/html/rfc5424
-[url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Bug%22
-[url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22+label%3A%22Type%3A+Enhancement%22
-[url.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+syslog%22
+[url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+bug%22
+[url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+enhancement%22
+[url.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
 [url.syslog_source_source]: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
 [url.vector_chat]: https://chat.vector.dev

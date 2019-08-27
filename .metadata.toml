@@ -36,6 +36,7 @@ permissions to this dir.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "one or more local files"
 
@@ -147,6 +148,74 @@ When `true` Vector will read from the beginning of new files, when \
 """
 
 # ------------------------------------------------------------------------------
+# sources.kafka
+# ------------------------------------------------------------------------------
+[sources.kafka]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "Kafka 0.9 or later"
+
+[sources.kafka.options.bootstrap_servers]
+type = "string"
+examples = ["10.14.22.123:9092,10.14.23.332:9092"]
+null = false
+description = """\
+A comma-separated list of host and port pairs that are the addresses of the \
+Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
+to initially to bootstrap itself.\
+"""
+
+[sources.kafka.options.topics]
+type = "[string]"
+examples = [["topic-1", "topic-2", "topic-3"]]
+null = false
+description = """\
+The Kafka topics names to read events from.
+"""
+
+[sources.kafka.options.group_id]
+type = "string"
+examples = ["consumer-group-name"]
+null = false
+description = """\
+The consumer group name to be used to consume events from Kafka.
+"""
+
+[sources.kafka.options.key_field]
+type = "string"
+examples = ["user_id"]
+null = true
+description = """\
+The field name to use for the topic key. If unspecified, the key would not \
+be added to the events. If the message has null key, then this field would \
+not be added to the event.\
+"""
+
+[sources.kafka.options.auto_offset_reset]
+type = "string"
+examples = ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
+null = true
+default = "largest"
+description = """\
+If offsets for consumer group do not exist, set them using this strategy. \
+[librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) \
+for `auto.offset.reset` option for explanation.\
+"""
+
+[sources.kafka.options.session_timeout_ms]
+type = "int"
+examples = [5000, 10000]
+null = true
+default = 10000
+unit = "milliseconds"
+description = """\
+The Kafka session timeout in milliseconds.
+"""
+
+# ------------------------------------------------------------------------------
 # sources.statsd
 # ------------------------------------------------------------------------------
 [sources.statsd]
@@ -169,6 +238,7 @@ description = "UDP socket address to bind to."
 [sources.stdin]
 delivery_guarantee = "at_least_once"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "standard input (STDIN)"
 
@@ -195,6 +265,7 @@ The key name added to each event representing the current host.\
 [sources.syslog]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the Syslog 5424 protocol"
 
@@ -245,6 +316,7 @@ The unix socket path. *This should be absolute path.*
 [sources.tcp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the TCP protocol"
 
@@ -289,6 +361,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 [sources.udp]
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log"]
 resources = []
 through_description = "the UDP protocol"
 
@@ -325,6 +398,7 @@ The maximum bytes size of incoming messages before they are discarded.\
 beta = true
 delivery_guarantee = "best_effort"
 guides = []
+output_types = ["log", "metric"]
 resources = []
 through_description = "another upstream Vector instance"
 
@@ -578,20 +652,21 @@ The name of the metric. Defaults to `<field>_total` for `counter` and \
 `<field>` for `gauge`.\
 """
 
-[transforms.log_to_metric.options.metrics.options.labels]
+[transforms.log_to_metric.options.metrics.options.tags]
 type = "table"
 display = "inline"
 null = true
-description = "Key/value pairs representing metric labels."
+description = "Key/value pairs representing metric tags."
 
-[transforms.log_to_metric.options.metrics.options.labels.options."*"]
+[transforms.log_to_metric.options.metrics.options.tags.options."*"]
 type = "string"
 examples = [
   {name = "host", value = "${HOSTNAME}"},
   {name = "region", value = "us-east-1"},
+  {name = "status", value = "{{status}}"},
 ]
 null = false
-description = "Key/value pairs representing the metric labels."
+description = "Key/value pairs representing the metric tags."
 
 # ------------------------------------------------------------------------------
 # transforms.lua
@@ -1335,6 +1410,15 @@ examples = ["0.0.0.0:9598"]
 null = false
 description = "The address to expose for scraping."
 
+[sinks.prometheus.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = """\
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+"""
+
 [sinks.prometheus.options.buckets]
 type = "[float]"
 default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -1523,6 +1607,7 @@ pipelines = "/usage/configuration/README.md#composition"
 service_role = "/setup/deployment/roles/service.md"
 
 [links.url]
+add_company = "https://github.com/timberio/vector/blob/master/.companies.toml"
 apt = "https://wiki.debian.org/Apt"
 aws_athena = "https://aws.amazon.com/athena/"
 aws_athena_console = "https://console.aws.amazon.com/athena/home"
@@ -1601,6 +1686,7 @@ prometheus_histogram = "https://prometheus.io/docs/concepts/metric_types/#histog
 prometheus_histograms_guide = "https://prometheus.io/docs/practices/histograms/"
 prometheus_summary = "https://prometheus.io/docs/concepts/metric_types/#summary"
 prometheus_text_based_exposition_format = "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
+prometheus_metric_naming = "https://prometheus.io/docs/practices/naming/#metric-names"
 rdkafka = "https://github.com/edenhill/librdkafka"
 regex = "https://en.wikipedia.org/wiki/Regular_expression"
 regex_grouping_and_flags = "https://docs.rs/regex/1.1.7/regex/#grouping-and-flags"

@@ -101,6 +101,7 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
+                namespace: "vector".into(),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period: Duration::from_millis(100),
             },
@@ -139,34 +140,34 @@ mod test {
             .collect::<Vec<_>>();
 
         // note that prometheus client reorders the labels
-        let foo1 = parse_count(&lines, "foo{a=\"true\",b=\"b\"");
-        let foo2 = parse_count(&lines, "foo{a=\"true\",b=\"c\"");
+        let foo1 = parse_count(&lines, "vector_foo{a=\"true\",b=\"b\"");
+        let foo2 = parse_count(&lines, "vector_foo{a=\"true\",b=\"c\"");
         // packets get lost :(
         assert!(foo1 > 90);
         assert!(foo2 > 90);
 
-        let bar = parse_count(&lines, "bar");
+        let bar = parse_count(&lines, "vector_bar");
         assert_eq!(42, bar);
 
-        assert_eq!(parse_count(&lines, "glork_bucket{le=\"1\"}"), 0);
-        assert_eq!(parse_count(&lines, "glork_bucket{le=\"2\"}"), 0);
-        assert!(parse_count(&lines, "glork_bucket{le=\"4\"}") > 0);
-        assert!(parse_count(&lines, "glork_bucket{le=\"+Inf\"}") > 0);
-        let glork_sum = parse_count(&lines, "glork_sum");
-        let glork_count = parse_count(&lines, "glork_count");
+        assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"1\"}"), 0);
+        assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"2\"}"), 0);
+        assert!(parse_count(&lines, "vector_glork_bucket{le=\"4\"}") > 0);
+        assert!(parse_count(&lines, "vector_glork_bucket{le=\"+Inf\"}") > 0);
+        let glork_sum = parse_count(&lines, "vector_glork_sum");
+        let glork_count = parse_count(&lines, "vector_glork_count");
         assert_eq!(glork_count * 3, glork_sum);
 
-        assert_eq!(parse_count(&lines, "milliglork_bucket{le=\"1\"}"), 0);
-        assert_eq!(parse_count(&lines, "milliglork_bucket{le=\"2\"}"), 0);
-        assert!(parse_count(&lines, "milliglork_bucket{le=\"4\"}") > 0);
-        assert!(parse_count(&lines, "milliglork_bucket{le=\"+Inf\"}") > 0);
-        let milliglork_sum = parse_count(&lines, "milliglork_sum");
-        let milliglork_count = parse_count(&lines, "milliglork_count");
+        assert_eq!(parse_count(&lines, "vector_milliglork_bucket{le=\"1\"}"), 0);
+        assert_eq!(parse_count(&lines, "vector_milliglork_bucket{le=\"2\"}"), 0);
+        assert!(parse_count(&lines, "vector_milliglork_bucket{le=\"4\"}") > 0);
+        assert!(parse_count(&lines, "vector_milliglork_bucket{le=\"+Inf\"}") > 0);
+        let milliglork_sum = parse_count(&lines, "vector_milliglork_sum");
+        let milliglork_count = parse_count(&lines, "vector_milliglork_count");
         assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Set test
         // Flush could have occured
-        assert!(parse_count(&lines, "set") <= 2);
+        assert!(parse_count(&lines, "vector_set") <= 2);
 
         // Flush test
         {
@@ -185,7 +186,7 @@ mod test {
                 .collect::<Vec<_>>();
 
             // Check rested
-            assert_eq!(parse_count(&lines, "set"), 0);
+            assert_eq!(parse_count(&lines, "vector_set"), 0);
 
             // Recheck that set is also reseted------------
 
@@ -207,7 +208,7 @@ mod test {
                 .collect::<Vec<_>>();
 
             // Set test
-            assert_eq!(parse_count(&lines, "set"), 2);
+            assert_eq!(parse_count(&lines, "vector_set"), 2);
         }
 
         // Shut down server

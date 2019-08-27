@@ -57,10 +57,11 @@ simple and unified.
 * ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
 * **Correct** - Obsessed with [getting the details right][docs.correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
-* **Agent Or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
-* **Logs, Metrics, or Events** - Logs, metrics, and events. Collect, unify, and ship all observability data.
+* **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
+* **Logs, Metrics, or Events** - [Logs][docs.log], [metrics][docs.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
+* **Correlate Logs & Metrics** - [Derive metrics from logs][docs.log_to_metric_transform], add shared context with [transforms][docs.transforms].
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
-* **Easy To Deploy** - Cross-compiles to a single static binary with no runtime.
+* **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
 * **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
 
 
@@ -107,12 +108,13 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`log`][docs.log_event] events. |
+| [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
+| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
 | [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
 | [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
 | [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
 | [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] events. |
+| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
 
 [+ request a new source][url.new_source]
 
@@ -155,6 +157,13 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`vector`**][docs.vector_sink] | [Streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance. |
 
 [+ request a new sink][url.new_sink]
+
+
+## Companies Using Vector In Production
+
+* [Timber](https://timber.io)
+
+[+ add your company][url.add_company]
 
 
 ## License
@@ -210,9 +219,12 @@ the License.
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
+[docs.kafka_source]: https://docs.vector.dev/usage/configuration/sources/kafka
+[docs.log]: https://docs.vector.dev/about/data-model/log
 [docs.log_event]: https://docs.vector.dev/about/data-model/log
 [docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
+[docs.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.metric_event]: https://docs.vector.dev/about/data-model/metric
 [docs.performance]: https://docs.vector.dev/performance
 [docs.prometheus_sink]: https://docs.vector.dev/usage/configuration/sinks/prometheus
@@ -241,6 +253,7 @@ the License.
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
+[url.add_company]: https://github.com/timberio/vector/blob/master/.companies.toml
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/
