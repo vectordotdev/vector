@@ -101,7 +101,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let sink = vector(addr, Acker::Null);
+        let sink = vector("NONE".into(), addr, Acker::Null);
         let events = vec![
             Event::from("test"),
             Event::from("events"),

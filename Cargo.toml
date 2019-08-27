@@ -49,6 +49,7 @@ tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experi
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
+tokio-tls = "0.2.1"
 
 # Tracing
 tracing = "0.1.2"
@@ -92,6 +93,8 @@ stream-cancel = "0.4.3"
 prometheus = "0.4.2"
 hyper = "0.12.18"
 hyper-tls = "0.3.1"
+native-tls = "0.2.3"
+openssl = "0.10.23"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
 structopt = "0.2.16"
