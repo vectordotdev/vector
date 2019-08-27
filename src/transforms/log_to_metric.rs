@@ -6,7 +6,9 @@ use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
 };
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -22,6 +24,7 @@ pub struct CounterConfig {
     name: Option<Atom>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+    tags: Option<IndexMap<Atom, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -29,6 +32,7 @@ pub struct CounterConfig {
 pub struct GaugeConfig {
     field: Atom,
     name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -36,6 +40,7 @@ pub struct GaugeConfig {
 pub struct SetConfig {
     field: Atom,
     name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -43,6 +48,7 @@ pub struct SetConfig {
 pub struct HistogramConfig {
     field: Atom,
     name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -100,6 +106,28 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     Ok(String::from_utf8_lossy(&name.to_vec()).to_string())
 }
 
+fn render_tags(
+    tags: &Option<IndexMap<Atom, String>>,
+    event: &Event,
+) -> Option<HashMap<String, String>> {
+    match tags {
+        None => None,
+        Some(tags) => {
+            let mut map = HashMap::new();
+            for (name, value) in tags {
+                if let Ok(tag) = render_template(value, event) {
+                    map.insert(name.to_string(), tag);
+                }
+            }
+            if !map.is_empty() {
+                Some(map)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
@@ -107,9 +135,6 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .get(&event::TIMESTAMP)
         .and_then(ValueKind::as_timestamp)
         .cloned();
-
-    // https://github.com/timberio/vector/issues/684
-    let tags = None;
 
     match config {
         MetricConfig::Counter(counter) => {
@@ -127,6 +152,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
+            let tags = render_tags(&counter.tags, &event);
+
             Ok(Metric::Counter {
                 name,
                 val,
@@ -143,6 +170,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let name = hist.name.as_ref().unwrap_or(&hist.field);
             let name = render_template(&name, &event)?;
+
+            let tags = render_tags(&hist.tags, &event);
 
             Ok(Metric::Histogram {
                 name,
@@ -162,6 +191,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
             let name = render_template(&name, &event)?;
 
+            let tags = render_tags(&gauge.tags, &event);
+
             Ok(Metric::Gauge {
                 name,
                 val,
@@ -176,6 +207,8 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
+
+            let tags = render_tags(&set.tags, &event);
 
             Ok(Metric::Set {
                 name,
@@ -260,6 +293,48 @@ mod tests {
                 val: 1.0,
                 timestamp: Some(ts()),
                 tags: None,
+            }
+        );
+    }
+
+    #[test]
+    fn count_http_requests_with_tags() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "message"
+            name = "http_requests_total"
+            tags = {method = "{{method}}", code = "{{code}}", missing_tag = "{{unknown}}", host = "localhost"}
+            "#,
+        );
+
+        let mut event = create_event("message", "i am log");
+        event
+            .as_mut_log()
+            .insert_explicit("method".into(), "post".into());
+        event
+            .as_mut_log()
+            .insert_explicit("code".into(), "200".into());
+
+        let mut transform = LogToMetric::new(config);
+        let metric = transform.transform(event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::Counter {
+                name: "http_requests_total".into(),
+                val: 1.0,
+                timestamp: Some(ts()),
+                tags: Some(
+                    vec![
+                        ("method".to_owned(), "post".to_owned()),
+                        ("code".to_owned(), "200".to_owned()),
+                        ("host".to_owned(), "localhost".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
             }
         );
     }

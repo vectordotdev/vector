@@ -1,4 +1,4 @@
-<% component = metadata.sources.udp %>
+<% component = metadata.sources.kafka %>
 
 <%= component_header(component) %>
 
@@ -12,7 +12,7 @@
 
 ## Examples
 
-Given the following input line:
+Given the following message in a Kafka topic:
 
 {% code-tabs %}
 {% code-tabs-item title="stdin" %}
@@ -34,17 +34,13 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
-
-### Line Delimiters
-
-Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ## Troubleshooting
 

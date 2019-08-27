@@ -190,7 +190,6 @@ jobs:
           command: |
             export VERSION=$(make version)
             export RUST_LTO="lto"
-            export FEATURES="default rdkafka/cmake_build"
             export TARGET="x86_64-unknown-linux-musl"
             make build-archive
       - persist_to_workspace:
@@ -502,6 +501,12 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+      - build-x86_64-unknown-linux-gnu-archive:
+          <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-musl-archive:
+          <<: *require-checks-and-tests
+      - build-x86_64-apple-darwin-archive:
+          <<: *require-checks-and-tests
 
   nightly:
     triggers:
@@ -611,3 +616,8 @@ workflows:
           <<: *tag-workflow-filters
           requires:
             - release-s3
+experimental:
+  notify:
+    branches:
+      only:
+        - master

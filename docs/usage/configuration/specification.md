@@ -155,6 +155,63 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+[sources.kafka]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "kafka"
+  type = "kafka"
+
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself.
+  # 
+  # * required
+  # * no default
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+
+  # The consumer group name to be used to consume events from Kafka.
+  # 
+  # * required
+  # * no default
+  group_id = "consumer-group-name"
+
+  # The Kafka topics names to read events from.
+  # 
+  # * required
+  # * no default
+  topics = ["topic-1", "topic-2", "topic-3"]
+
+  # If offsets for consumer group do not exist, set them using this strategy.
+  # librdkafka documentation for `auto.offset.reset` option for explanation.
+  # 
+  # * optional
+  # * no default
+  auto_offset_reset = "smallest"
+  auto_offset_reset = "earliest"
+  auto_offset_reset = "beginning"
+  auto_offset_reset = "largest"
+  auto_offset_reset = "latest"
+  auto_offset_reset = "end"
+  auto_offset_reset = "error"
+
+  # The field name to use for the topic key. If unspecified, the key would not be
+  # added to the events. If the message has null key, then this field would not
+  # be added to the event.
+  # 
+  # * optional
+  # * no default
+  key_field = "user_id"
+
+  # The Kafka session timeout in milliseconds.
+  # 
+  # * optional
+  # * no default
+  # * unit: milliseconds
+  session_timeout_ms = 5000
+  session_timeout_ms = 10000
+
 [sources.statsd]
   # The component type
   # 
@@ -597,13 +654,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # * no default
     name = "duration_total"
 
-    [transforms.log_to_metric.metrics.labels]
-      # Key/value pairs representing the metric labels.
+    [transforms.log_to_metric.metrics.tags]
+      # Key/value pairs representing the metric tags.
       # 
       # * required
       # * no default
       host = "${HOSTNAME}"
       region = "us-east-1"
+      status = "{{status}}"
 
 [transforms.lua]
   # The component type
@@ -837,8 +895,9 @@ end
   # 
   # * required
   # * no default
-  group_name = "/var/log/{{ file }}.log"
+  group_name = "{{ file }}"
   group_name = "ec2/{{ instance_id }}"
+  group_name = "group-name"
 
   # The AWS region of the target CloudWatch Logs stream resides.
   # 
@@ -851,8 +910,8 @@ end
   # * required
   # * no default
   stream_name = "{{ instance_id }}"
-  stream_name = "stream-name"
   stream_name = "%Y-%m-%d"
+  stream_name = "stream-name"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
@@ -1996,6 +2055,13 @@ end
   # * required
   # * no default
   address = "0.0.0.0:9598"
+
+  # A prefix that will be added to all metric names.
+  # It should follow Prometheus naming conventions.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
 
   # Default buckets to use for histogram metrics.
   # 
