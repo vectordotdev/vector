@@ -2339,9 +2339,8 @@ end
     # * default: false
     enabled = false
 
-    # If `true`, Vector will force certificate validation.
-    # Do NOT set this to `false` unless you know the risks of not verifying
-    # the remote certificate.
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
     # 
     # * optional
     # * default: true
@@ -2353,22 +2352,22 @@ end
     # * no default
     ca_file = "/path/to/certificate_authority.crt"
 
-    # Absolute path to certificate file used to identify this
-    # connection, in PEM format. If this is set, `key_file` must also be set.
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_file` must also be set.
     # 
     # * optional
     # * no default
     crt_file = "/path/to/host_certificate.crt"
 
-    # Absolute path to key file used to identify this
-    # connection, in PEM format. If this is set, `crt_file` must also be set.
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_file` must also be set.
     # 
     # * optional
     # * no default
     key_file = "/path/to/host_certificate.key"
 
-    # Pass phrase to unlock the encrypted key file.
-    # This has no effect unless `key_file` above is set.
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
     # 
     # * optional
     # * no default

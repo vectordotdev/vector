@@ -175,9 +175,8 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # * default: false
     enabled = false
 
-    # If `true`, Vector will force certificate validation.
-    # Do NOT set this to `false` unless you know the risks of not verifying
-    # the remote certificate.
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
     # 
     # * optional
     # * default: true
@@ -189,22 +188,22 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # * no default
     ca_file = "/path/to/certificate_authority.crt"
 
-    # Absolute path to certificate file used to identify this
-    # connection, in PEM format. If this is set, `key_file` must also be set.
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_file` must also be set.
     # 
     # * optional
     # * no default
     crt_file = "/path/to/host_certificate.crt"
 
-    # Absolute path to key file used to identify this
-    # connection, in PEM format. If this is set, `crt_file` must also be set.
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_file` must also be set.
     # 
     # * optional
     # * no default
     key_file = "/path/to/host_certificate.key"
 
-    # Pass phrase to unlock the encrypted key file.
-    # This has no effect unless `key_file` above is set.
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
     # 
     # * optional
     # * no default
@@ -232,16 +231,11 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 | **OPTIONAL** - Tls | | |
 | `tls.enabled` | `bool` | Enable TLS during connections to the remote.<br />`default: false` |
-| `tls.verify` | `bool` | If `true`, Vector will force certificate validation.
-Do NOT set this to `false` unless you know the risks of not verifying
-the remote certificate.<br />`default: true` |
+| `tls.verify` | `bool` | If `true`, Vector will force certificate validation. Do NOT set this to `false` unless you know the risks of not verifying the remote certificate.<br />`default: true` |
 | `tls.ca_file` | `string` | Absolute path to additional CA certificate file, in PEM format.<br />`no default` `example: (see above)` |
-| `tls.crt_file` | `string` | Absolute path to certificate file used to identify this
-connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
-| `tls.key_file` | `string` | Absolute path to key file used to identify this
-connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
-| `tls.key_phrase` | `string` | Pass phrase to unlock the encrypted key file.
-This has no effect unless `key_file` above is set.<br />`no default` `example: "PassWord1"` |
+| `tls.crt_file` | `string` | Absolute path to certificate file used to identify this connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_file` | `string` | Absolute path to key file used to identify this connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_phrase` | `string` | Pass phrase to unlock the encrypted key file. This has no effect unless `key_file` above is set.<br />`no default` `example: "PassWord1"` |
 
 ## How It Works
 
