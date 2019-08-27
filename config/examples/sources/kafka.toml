@@ -1,0 +1,16 @@
+# `kafka` Source Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `kafka` source
+# Docs: https://docs.vector.dev/usage/configuration/sources/kafka
+
+[sources.my_kafka_source]
+  # REQUIRED - General
+  type = "kafka" # must be: kafka
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  topics = ["topic-1234", "topic-5678"]
+  group_id = "my-consumer-group"
+
+  # OPTIONAL - General
+  key_field = "partition_key" # no default
+  auto_offset_reset = "beginning" # default: "largest"
+  session_timeout_ms = 6000 # default: 10000
