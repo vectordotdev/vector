@@ -9,27 +9,21 @@ use bollard::{
 use chrono::{DateTime, FixedOffset};
 use futures::{
     future::poll_fn,
-    sync::mpsc::{self, Sender},
+    sync::mpsc::{self, Sender, UnboundedSender},
     Async, Future, Sink, Stream,
 };
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashMap, env};
 use tracing::field;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// The begining of image names of vector docker images packaged by vector.
+const VECTOR_IMAGE_NAME: &'static str = "timberio/vector";
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DockerConfig {
     include_containers: Vec<String>,
     include_labels: Vec<String>,
-}
-
-impl Default for DockerConfig {
-    fn default() -> Self {
-        DockerConfig {
-            include_containers: Vec::default(),
-            include_labels: Vec::default(),
-        }
-    }
 }
 
 #[typetag::serde(name = "docker")]
@@ -91,7 +85,7 @@ impl ContainerState {
     fn run_event_stream(
         &mut self,
         out: &Sender<Event>,
-        main: &Sender<ContainerLogInfo>,
+        main: &UnboundedSender<ContainerLogInfo>,
         docker: &Docker,
     ) {
         if let Some(info) = self.info.take() {
@@ -111,19 +105,10 @@ impl ContainerState {
 /// main <----|<---- event_stream ---->out
 ///           | ...                 ...out
 ///
-#[allow(dead_code)]
 fn docker_source(
     config: DockerConfig,
     out: Sender<Event>,
 ) -> Result<impl Future<Item = (), Error = ()>, String> {
-    // TODO: async_docker should be replaced with bollard once it supports events
-    // ?NOTE: Requiers sudo privileges, or docker group membership.
-    // Without extra configuration of docker on user side, there is no way around above.
-    let docker_for_events = async_docker::new_docker(None).map_err(|error| {
-        error!(message="Error connecting to docker server",%error);
-        "Failed to connect to docker server".to_owned()
-    })?;
-
     // ?NOTE: Requiers sudo privileges, or docker group membership.
     // Without extra configuration of docker on user side, there is no way around above.
     let docker = Docker::connect_with_local_defaults().map_err(|error| {
@@ -131,53 +116,11 @@ fn docker_source(
         "Failed to connect to docker server".to_owned()
     })?;
 
-    // Channel could be unbounded, since there won't be millions of containers,
-    // but bounded should be more performant in most cases.
-    let (main_send, mut main_recv) = mpsc::channel::<ContainerLogInfo>(100);
+    // Channel of communication between main future and event_stream futures
+    let (main_send, mut main_recv) = mpsc::unbounded::<ContainerLogInfo>();
 
     // main event stream, with whom only newly started/restarted containers will be loged.
-    let mut events = {
-        let mut options = async_docker::EventsOptionsBuilder::new();
-
-        // event  | emmited on commands
-        // -------+-------------------
-        // start  | docker start, docker run, restart policy, docker restart
-        // upause | docker unpause
-        // die    | docker restart, docker stop, docker kill, process exited, oom
-        // pause  | docker pause
-        options.filter(
-            vec!["start", "upause", "die", "pause"]
-                .into_iter()
-                .map(|s| async_docker::EventFilter::Event(s.into()))
-                .collect(),
-        );
-
-        // ?NOTE: by docker API, using both type of include results in AND between them
-
-        // Include-name
-        if !config.include_containers.is_empty() {
-            options.filter(
-                config
-                    .include_containers
-                    .iter()
-                    .map(|s| async_docker::EventFilter::Container(s.to_owned()))
-                    .collect(),
-            );
-        }
-
-        // Include-label
-        if !config.include_labels.is_empty() {
-            options.filter(
-                config
-                    .include_labels
-                    .iter()
-                    .map(|s| async_docker::EventFilter::Label(s.to_owned()))
-                    .collect(),
-            );
-        }
-
-        docker_for_events.events(&options.build())
-    };
+    let mut events = docker_event_stream(&config)?;
     info!(message = "Listening docker events");
 
     // Starting with logs from now.
@@ -196,86 +139,17 @@ fn docker_source(
     );
 
     // Future that captures currently running containers, and starts event streams for them.
-    let now_running = {
-        let mut options = ListContainersOptions::default();
-
-        // ?NOTE: by docker API, using both type of include results in AND between them
-
-        // Include-name
-        if !config.include_containers.is_empty() {
-            options
-                .filters
-                .insert("name".to_owned(), config.include_containers.clone());
-        }
-
-        // Include-label
-        if !config.include_labels.is_empty() {
-            options
-                .filters
-                .insert("label".to_owned(), config.include_labels.clone());
-        }
-
-        let docker = docker.clone();
-        let main_send = main_send.clone();
-        let out = out.clone();
-
-        // Find out it's own container id, if it's inside a docker container.
-        // Since docker doesn't readily provide such information,
-        // various approches need to be made. As such the solution is not
-        // exact, but probable.
-        // This is to be used only if source is in state of catching everything.
-        // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = config.include_containers.is_empty() && config.include_labels.is_empty();
-
-        // HOSTNAME hint
-        // It may contain shortened container id.
-        let hostname = env::var("HOSTNAME").ok();
-
-        // IMAGE hint
-        // If image name starts with timberio/vector.
-        let image = "timberio/vector";
-
-        // Future
-        docker.list_containers(Some(options)).map(move |list| {
-            let mut containers = HashMap::<String, ContainerState>::new();
-            let mut ignore_container_id = Vec::new();
-            for container in list {
-                trace!(
-                    message = "Found already running container",
-                    id = field::display(&container.id)
-                );
-
-                if exclude_self {
-                    let hostname_hint = hostname
-                        .as_ref()
-                        .map(|maybe_short_id| container.id.starts_with(maybe_short_id))
-                        .unwrap_or(false);
-                    let image_hint = container.image.starts_with(image);
-                    if hostname_hint || image_hint {
-                        // This container is probably itself.
-                        // So ignore it.
-                        info!(
-                            message = "Detected self container",
-                            id = field::display(&container.id)
-                        );
-                        ignore_container_id.push(container.id);
-                        continue;
-                    }
-                }
-
-                let mut state = ContainerState::new(container.id.clone(), now_timestamp);
-                state.run_event_stream(&out, &main_send, &docker);
-                containers.insert(container.id, state);
-            }
-            (containers, ignore_container_id)
-        })
-    };
+    let now_running = running_containers(
+        &config,
+        now_timestamp,
+        out.clone(),
+        main_send.clone(),
+        docker.clone(),
+    );
 
     // Main docker source future
     let main = now_running.then(move |result| {
-        let (mut containers, mut ignore_container_id) = result
-            .map_err(|error| error!(message="Listing currently running containers, failed",%error))
-            .unwrap_or_default();
+        let (mut containers, mut ignore_container_id) = result.unwrap_or_default();
 
         // Sort for efficient lookup
         ignore_container_id.sort();
@@ -373,11 +247,149 @@ fn docker_source(
     Ok(main)
 }
 
+fn docker_event_stream(
+    config: &DockerConfig,
+) -> Result<
+    impl Stream<Item = async_docker::Result<async_docker::Event>, Error = async_docker::Error>,
+    String,
+> {
+    // TODO: async_docker should be replaced with bollard once it supports events
+    // ?NOTE: Requiers sudo privileges, or docker group membership.
+    // Without extra configuration of docker on user side, there is no way around above.
+    let docker_for_events = async_docker::new_docker(None).map_err(|error| {
+        error!(message="Error connecting to docker server",%error);
+        "Failed to connect to docker server".to_owned()
+    })?;
+
+    let mut options = async_docker::EventsOptionsBuilder::new();
+
+    // event  | emmited on commands
+    // -------+-------------------
+    // start  | docker start, docker run, restart policy, docker restart
+    // upause | docker unpause
+    // die    | docker restart, docker stop, docker kill, process exited, oom
+    // pause  | docker pause
+    options.filter(
+        vec!["start", "upause", "die", "pause"]
+            .into_iter()
+            .map(|s| async_docker::EventFilter::Event(s.into()))
+            .collect(),
+    );
+
+    // by docker API, using both type of include results in AND between them
+
+    // Include-name
+    if !config.include_containers.is_empty() {
+        options.filter(
+            config
+                .include_containers
+                .iter()
+                .map(|s| async_docker::EventFilter::Container(s.to_owned()))
+                .collect(),
+        );
+    }
+
+    // Include-label
+    if !config.include_labels.is_empty() {
+        options.filter(
+            config
+                .include_labels
+                .iter()
+                .map(|s| async_docker::EventFilter::Label(s.to_owned()))
+                .collect(),
+        );
+    }
+
+    Ok(docker_for_events.events(&options.build()))
+}
+
+/// Future that captures currently running containers, and starts event streams for them.
+fn running_containers(
+    config: &DockerConfig,
+    now_timestamp: i64,
+    out: Sender<Event>,
+    main: UnboundedSender<ContainerLogInfo>,
+    docker: Docker,
+) -> impl Future<Item = (HashMap<String, ContainerState>, Vec<String>), Error = ()> {
+    let mut options = ListContainersOptions::default();
+
+    // by docker API, using both type of include results in AND between them
+
+    // Include-name
+    if !config.include_containers.is_empty() {
+        options
+            .filters
+            .insert("name".to_owned(), config.include_containers.clone());
+    }
+
+    // Include-label
+    if !config.include_labels.is_empty() {
+        options
+            .filters
+            .insert("label".to_owned(), config.include_labels.clone());
+    }
+
+    // Find out it's own container id, if it's inside a docker container.
+    // Since docker doesn't readily provide such information,
+    // various approches need to be made. As such the solution is not
+    // exact, but probable.
+    // This is to be used only if source is in state of catching everything.
+    // Or in other words, if includes are used then this is not necessary.
+    let exclude_self = config.include_containers.is_empty() && config.include_labels.is_empty();
+
+    // HOSTNAME hint
+    // It may contain shortened container id.
+    let hostname = env::var("HOSTNAME").ok();
+
+    // IMAGE hint
+    // If image name starts with this.
+    let image = VECTOR_IMAGE_NAME;
+
+    // Future
+    docker
+        .list_containers(Some(options))
+        .map(move |list| {
+            let mut containers = HashMap::<String, ContainerState>::new();
+            let mut ignore_container_id = Vec::new();
+            for container in list {
+                trace!(
+                    message = "Found already running container",
+                    id = field::display(&container.id)
+                );
+
+                if exclude_self {
+                    let hostname_hint = hostname
+                        .as_ref()
+                        .map(|maybe_short_id| container.id.starts_with(maybe_short_id))
+                        .unwrap_or(false);
+                    let image_hint = container.image.starts_with(image);
+                    if hostname_hint || image_hint {
+                        // This container is probably itself.
+                        // So ignore it.
+                        info!(
+                            message = "Detected self container",
+                            id = field::display(&container.id)
+                        );
+                        ignore_container_id.push(container.id);
+                        continue;
+                    }
+                }
+
+                let mut state = ContainerState::new(container.id.clone(), now_timestamp);
+                state.run_event_stream(&out, &main, &docker);
+                containers.insert(container.id, state);
+            }
+            (containers, ignore_container_id)
+        })
+        .map_err(|error| error!(message="Listing currently running containers, failed",%error))
+}
+
+/// Event stream coming from docker
 fn run_event_stream(
     container: &ContainerState,
     mut info: ContainerLogInfo,
     out: Sender<Event>,
-    main: Sender<ContainerLogInfo>,
+    main: UnboundedSender<ContainerLogInfo>,
     docker: &Docker,
 ) {
     // Update info
