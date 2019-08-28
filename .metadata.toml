@@ -77,16 +77,6 @@ description = """\
 The key name added to each event with the full path of the file.\
 """
 
-[sources.file.options.fingerprint_bytes]
-type = "int"
-default = 256
-null = false
-unit = "bytes"
-description = """\
-The number of bytes read off the head of the file to generate a unique \
-fingerprint.\
-"""
-
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
@@ -117,16 +107,6 @@ description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
 
-[sources.file.options.ignored_header_bytes]
-type = "int"
-default = 0
-null = false
-unit = "bytes"
-description = """\
-The number of bytes to skipe ahead (or ignore) when generating a unique \
-fingerprint. This is helpful if all files share a common header.\
-"""
-
 [sources.file.options.max_line_bytes]
 type = "int"
 unit = "bytes"
@@ -145,6 +125,46 @@ default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
 `false` Vector will only read new data added to the file.\
+"""
+
+[sources.file.options.fingerprinting]
+type = "table"
+null = true
+description = """\
+Configuration for how the file source should identify files.\
+"""
+
+[sources.file.options.fingerprinting.options.strategy]
+type = "string"
+enum = ["checksum", "device_and_inode"]
+default = "checksum"
+null = true
+description = """\
+Whether to use the content of a file to differentiate it (`checksum`) or the \
+storage device and inode (`device_and_inode`). Depending on your log rotation \
+strategy, one may be a better fit than the other.\
+"""
+
+[sources.file.options.fingerprinting.options.fingerprint_bytes]
+type = "int"
+default = 256
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes read off the head of the file to generate a unique \
+fingerprint.\
+"""
+
+[sources.file.options.fingerprinting.options.ignored_header_bytes]
+type = "int"
+default = 0
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes to skip ahead (or ignore) when generating a unique \
+fingerprint. This is helpful if all files share a common header.\
 """
 
 # ------------------------------------------------------------------------------

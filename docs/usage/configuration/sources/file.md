@@ -37,16 +37,20 @@ The `file` source ingests data through one or more local files and outputs [`log
   
   # OPTIONAL - General
   data_dir = "/var/lib/vector" # no default
-  fingerprint_bytes = 256 # default, bytes
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
-  ignored_header_bytes = 0 # default, bytes
   max_line_bytes = 102400 # default, bytes
   start_at_beginning = false # default
   
   # OPTIONAL - Context
   file_key = "file" # default
   host_key = "host" # default
+  
+  # OPTIONAL - Fingerprinting
+  [sources.my_source_id.fingerprinting]
+    strategy = "checksum" # default, enum: "checksum" or "device_and_inode"
+    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
+    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -59,16 +63,20 @@ The `file` source ingests data through one or more local files and outputs [`log
 
   # OPTIONAL - General
   data_dir = "<string>"
-  fingerprint_bytes = <int>
   glob_minimum_cooldown = <int>
   ignore_older = <int>
-  ignored_header_bytes = <int>
   max_line_bytes = <int>
   start_at_beginning = <bool>
 
   # OPTIONAL - Context
   file_key = "<string>"
   host_key = "<string>"
+
+  # OPTIONAL - Fingerprinting
+  [sources.<source-id>.fingerprinting]
+    strategy = {"checksum" | "device_and_inode"}
+    fingerprint_bytes = <int>
+    ignored_header_bytes = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -106,14 +114,6 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * no default
   data_dir = "/var/lib/vector"
 
-  # The number of bytes read off the head of the file to generate a unique
-  # fingerprint.
-  # 
-  # * optional
-  # * default: 256
-  # * unit: bytes
-  fingerprint_bytes = 256
-
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
   # 
@@ -128,14 +128,6 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * no default
   # * unit: seconds
   ignore_older = 86400
-
-  # The number of bytes to skipe ahead (or ignore) when generating a unique
-  # fingerprint. This is helpful if all files share a common header.
-  # 
-  # * optional
-  # * default: 0
-  # * unit: bytes
-  ignored_header_bytes = 0
 
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
@@ -167,6 +159,37 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * optional
   # * default: "host"
   host_key = "host"
+
+  #
+  # Fingerprinting
+  #
+
+  [sources.file_source.fingerprinting]
+    # Whether to use the content of a file to differentiate it (`checksum`) or the
+    # storage device and inode (`device_and_inode`). Depending on your log rotation
+    # strategy, one may be a better fit than the other.
+    # 
+    # * optional
+    # * default: "checksum"
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
+
+    # The number of bytes read off the head of the file to generate a unique
+    # fingerprint.
+    # 
+    # * optional
+    # * default: 256
+    # * unit: bytes
+    fingerprint_bytes = 256
+
+    # The number of bytes to skip ahead (or ignore) when generating a unique
+    # fingerprint. This is helpful if all files share a common header.
+    # 
+    # * optional
+    # * default: 0
+    # * unit: bytes
+    ignored_header_bytes = 0
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -181,15 +204,17 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported.<br />`required` `example: ["/var/log/nginx/*.log"]` |
 | **OPTIONAL** - General | | |
 | `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.<br />`no default` `example: "/var/lib/vector"` |
-| `fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
 | `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [File Rotation](#file-rotation) for more info.<br />`no default` `example: 86400` `unit: seconds` |
-| `ignored_header_bytes` | `int` | The number of bytes to skipe ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
 | `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
 | **OPTIONAL** - Context | | |
 | `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
 | `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
+| **OPTIONAL** - Fingerprinting | | |
+| `fingerprinting.strategy` | `string` | Whether to use the content of a file to differentiate it (`checksum`) or the storage device and inode (`device_and_inode`). Depending on your log rotation strategy, one may be a better fit than the other.<br />`default: "checksum"` `enum: "checksum" or "device_and_inode"` |
+| `fingerprinting.fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
+| `fingerprinting.ignored_header_bytes` | `int` | The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 
 ## Examples
 
