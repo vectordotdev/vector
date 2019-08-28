@@ -48,6 +48,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 # Tokio / Futures
 futures = "0.1.25"
 tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experimental-tracing"], default-features = false }
+tokio-udp = { git = "https://github.com/tokio-rs/tokio.git",rev="11a1ce27219da01f8773001810b58e96f486225c"}
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
