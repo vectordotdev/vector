@@ -4,14 +4,14 @@ extern crate tracing;
 pub mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform};
-use futures::{future, future::Future, sink::Sink, stream::iter_ok, stream::Stream};
+use futures::{future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::oneshot};
 use std::iter;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
 use vector::event::{Event, MESSAGE};
-use vector::test_util::{runtime, shutdown_on_idle};
+use vector::test_util::{runtime, shutdown_on_idle, trace_init};
 use vector::topology;
 use vector::topology::config::Config;
 
@@ -46,9 +46,11 @@ fn topology_source_and_sink() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(out1.collect()).unwrap();
+    let res = rt.block_on(h_out1).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec![event], res);
 }
@@ -69,10 +71,13 @@ fn topology_multiple_sources() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    rt.block_on(in1.send(event1.clone())).unwrap();
-    rt.block_on(in2.send(event2.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
+    let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
+    rt.block_on(h_in2).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(out1.collect()).unwrap();
+    let res = rt.block_on(h_out1).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec![event1, event2], res);
 }
@@ -92,10 +97,13 @@ fn topology_multiple_sinks() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_out2 = oneshot::spawn(out2.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res1 = rt.block_on(out1.collect()).unwrap();
-    let res2 = rt.block_on(out2.collect()).unwrap();
+    let res1 = rt.block_on(h_out1).unwrap();
+    let res2 = rt.block_on(h_out2).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
@@ -118,9 +126,11 @@ fn topology_transform_chain() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.map(into_message).collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(out1.map(into_message).collect()).unwrap();
+    let res = rt.block_on(h_out1).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec!["this first second"], res);
 }
@@ -149,10 +159,13 @@ fn topology_remove_one_source() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    rt.block_on(in1.send(event1.clone())).unwrap();
-    rt.block_on(in2.send(event2.clone())).unwrap_err();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
+    let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
+    rt.block_on(h_in2).unwrap_err();
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(out1.collect()).unwrap();
+    let res = rt.block_on(h_out1).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec![event1], res);
 }
@@ -178,10 +191,13 @@ fn topology_remove_one_sink() {
     assert!(topology.reload_config_and_respawn(config, &mut rt, false));
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_out2 = oneshot::spawn(out2.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res1 = rt.block_on(out1.collect()).unwrap();
-    let res2 = rt.block_on(out2.collect()).unwrap();
+    let res1 = rt.block_on(h_out1).unwrap();
+    let res2 = rt.block_on(h_out2).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -213,9 +229,11 @@ fn topology_remove_one_transform() {
     assert!(topology.reload_config_and_respawn(config, &mut rt, false));
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.map(into_message).collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(out1.map(into_message).collect()).unwrap();
+    let res = rt.block_on(h_out1).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(vec!["this transformed"], res);
 }
@@ -243,11 +261,15 @@ fn topology_swap_source() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    rt.block_on(in1.send(event1.clone())).unwrap_err();
-    rt.block_on(in2.send(event2.clone())).unwrap();
+    let h_out1v1 = oneshot::spawn(out1v1.collect(), &rt.executor());
+    let h_out1v2 = oneshot::spawn(out1v2.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
+    let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap_err();
+    rt.block_on(h_in2).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res1v1 = rt.block_on(out1v1.collect()).unwrap();
-    let res1v2 = rt.block_on(out1v2.collect()).unwrap();
+    let res1v1 = rt.block_on(h_out1v1).unwrap();
+    let res1v2 = rt.block_on(h_out1v2).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(Vec::<Event>::new(), res1v1);
     assert_eq!(vec![event2], res1v2);
@@ -255,6 +277,7 @@ fn topology_swap_source() {
 
 #[test]
 fn topology_swap_sink() {
+    trace_init();
     let mut rt = runtime();
     let (in1, source1) = source();
     let (out1, sink1) = sink();
@@ -274,10 +297,13 @@ fn topology_swap_sink() {
     assert!(topology.reload_config_and_respawn(config, &mut rt, false));
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
+    let h_out2 = oneshot::spawn(out2.collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res1 = rt.block_on(out1.collect()).unwrap();
-    let res2 = rt.block_on(out2.collect()).unwrap();
+    let res1 = rt.block_on(h_out1).unwrap();
+    let res2 = rt.block_on(h_out2).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(Vec::<Event>::new(), res1);
     assert_eq!(vec![event], res2);
@@ -308,10 +334,13 @@ fn topology_swap_transform() {
     assert!(topology.reload_config_and_respawn(config, &mut rt, false));
 
     let event = Event::from("this");
-    rt.block_on(in1.send(event.clone())).unwrap();
+    let h_out1v1 = oneshot::spawn(out1v1.map(into_message).collect(), &rt.executor());
+    let h_out1v2 = oneshot::spawn(out1v2.map(into_message).collect(), &rt.executor());
+    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
+    rt.block_on(h_in1).unwrap();
     rt.block_on(topology.stop()).unwrap();
-    let res1v1 = rt.block_on(out1v1.map(into_message).collect()).unwrap();
-    let res1v2 = rt.block_on(out1v2.map(into_message).collect()).unwrap();
+    let res1v1 = rt.block_on(h_out1v1).unwrap();
+    let res1v2 = rt.block_on(h_out1v2).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(Vec::<String>::new(), res1v1);
     assert_eq!(vec!["this replaced"], res1v2);
@@ -340,16 +369,15 @@ fn topology_swap_transform_is_atomic() {
         false => None,
     };
     let input = iter_ok::<_, ()>(iter::from_fn(events));
+    let input = input
+        .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
+        .map(|_| ());
     let output = out1.map_err(|_| ()).for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
         future::ok(())
     });
-    rt.spawn(
-        input
-            .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
-            .map(|_| ()),
-    );
-    rt.spawn(output);
+    let h_out = oneshot::spawn(output, &rt.executor());
+    let h_in = oneshot::spawn(input, &rt.executor());
 
     let mut config = Config::empty();
     config.add_source("in1", source1);
@@ -370,7 +398,9 @@ fn topology_swap_transform_is_atomic() {
     std::thread::sleep(std::time::Duration::from_millis(10));
 
     run_control.store(false, Ordering::Release);
+    rt.block_on(h_in).unwrap();
     rt.block_on(topology.stop()).unwrap();
+    rt.block_on(h_out).unwrap();
     shutdown_on_idle(rt);
     assert_eq!(
         send_total.load(Ordering::Acquire),

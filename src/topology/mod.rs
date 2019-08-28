@@ -392,6 +392,7 @@ impl RunningTopology {
                     output
                         .unbounded_send(fanout::ControlMessage::Remove(name.clone()))
                         .unwrap();
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             }
         }
