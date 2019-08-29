@@ -285,7 +285,6 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                 Ok(Async::Ready(None)) => {
                     // start flushing all existing data, stop polling inner
                     self.draining = Some(self.buffers.drain().map(|(k, v)| (v, k)).collect());
-                    continue;
                 }
                 Ok(Async::NotReady) => {
                     // check for keys that have hit their timeout
