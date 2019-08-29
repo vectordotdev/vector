@@ -262,7 +262,7 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                     continue;
                 }
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => panic!(e),
+                Err(()) => return Err(()),
             };
 
             if let Some(buffered) = self.buffers.remove(&src) {
