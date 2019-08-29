@@ -29,7 +29,7 @@ pub struct FileConfig {
     pub glob_minimum_cooldown: u64, // millis
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
-    pub multi_line_timeout: Option<u64>, // millis? TODO: decide
+    pub multi_line_timeout: u64, // millis
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -79,7 +79,7 @@ impl Default for FileConfig {
             data_dir: None,
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
-            multi_line_timeout: None, // millis
+            multi_line_timeout: 1000, // millis
         }
     }
 }
@@ -170,7 +170,7 @@ pub fn file_source(
     let include = config.include.clone();
     let exclude = config.exclude.clone();
     let message_start_indicator = config.message_start_indicator.clone();
-    let multi_line_timeout = config.multi_line_timeout.unwrap_or(1000); // TODO: 1s default?
+    let multi_line_timeout = config.multi_line_timeout;
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
@@ -1106,7 +1106,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             message_start_indicator: Some("INFO".into()),
-            multi_line_timeout: Some(25), // less than 50 in sleep()
+            multi_line_timeout: 25, // less than 50 in sleep()
             ..test_default_file_config(&dir)
         };
 
