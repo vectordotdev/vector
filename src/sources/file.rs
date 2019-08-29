@@ -173,26 +173,22 @@ pub fn file_source(
         // TODO: channel sizing?
         let (tx, rx) = futures::sync::mpsc::channel(100); // create channel to send down, wrap agg around rx, forward to out
 
-        if let Some(msi) = message_start_indicator {
-            tokio::spawn(
-                LineAgg::new(rx, msi)
-                    .map(move |(line, file): (Bytes, String)| {
-                        trace!(message = "Received one event.", file = file.as_str());
-                        create_event(line, file, &host_key, &hostname, &file_key)
-                    })
-                    .forward(out.sink_map_err(|e| error!(%e)))
-                    .map(|_| ()),
-            )
-        } else {
-            tokio::spawn(
-                rx.map(move |(line, file): (Bytes, String)| {
+        let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
+            if let Some(msi) = message_start_indicator {
+                Box::new(LineAgg::new(rx, msi))
+            } else {
+                Box::new(rx)
+            };
+
+        tokio::spawn(
+            messages
+                .map(move |(msg, file): (Bytes, String)| {
                     trace!(message = "Received one event.", file = file.as_str());
-                    create_event(line, file, &host_key, &hostname, &file_key)
+                    create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
                 .map(|_| ()),
-            )
-        };
+        );
 
         let span = info_span!("file-server");
         let dispatcher = dispatcher::get_default(|d| d.clone());
