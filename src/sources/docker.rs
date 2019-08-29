@@ -2,16 +2,18 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bollard::{
-    container::{ListContainersOptions, LogOutput, LogsOptions},
-    Docker,
-};
 use chrono::{DateTime, FixedOffset};
 use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
 use serde::{Deserialize, Serialize};
+use shiplift::{
+    builder::{ContainerFilter, EventFilter, LogsOptions},
+    tty::{Chunk, StreamType},
+    Docker,
+};
+use std::ops::Deref;
 use std::{collections::HashMap, env};
 use tracing::field;
 
@@ -33,11 +35,90 @@ impl SourceConfig for DockerConfig {
         _globals: &GlobalOptions,
         out: Sender<Event>,
     ) -> Result<super::Source, String> {
-        DockerSource::new(self.clone(), out).map(|f| Box::new(f) as Box<_>)
+        Ok(Box::new(DockerSource::new(self.clone(), out)) as Box<_>)
     }
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+}
+
+struct DockerSourceCore {
+    config: DockerConfig,
+    docker: Docker,
+    /// Only logs created at, or after this moment are logged. UNIX timestamp
+    now_timestamp: i64,
+}
+
+impl DockerSourceCore {
+    /// Only logs created at, or after this moment are logged.
+    fn new(config: DockerConfig) -> Self {
+        // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
+        // ?      Otherwise connects to unix socket which requiers sudo privileges, or docker group membership.
+        let docker = Docker::new();
+
+        // Only logs created at, or after this moment are logged.
+        let now = chrono::Local::now();
+        let now_timestamp = now.timestamp();
+        info!(
+            message = "Capturing logs from now on",
+            now = field::display(now.to_rfc3339())
+        );
+        DockerSourceCore {
+            config,
+            docker,
+            now_timestamp,
+        }
+    }
+
+    /// Returns event stream coming from docker.
+    fn docker_event_stream(
+        &self,
+    ) -> impl Stream<Item = shiplift::rep::Event, Error = shiplift::Error> + Send {
+        let mut options = shiplift::builder::EventsOptions::builder();
+
+        // Limit events to those after core creation
+        options.since(&(self.now_timestamp as u64));
+
+        // event  | emmited on commands
+        // -------+-------------------
+        // start  | docker start, docker run, restart policy, docker restart
+        // upause | docker unpause
+        // die    | docker restart, docker stop, docker kill, process exited, oom
+        // pause  | docker pause
+        options.filter(
+            vec!["start", "upause", "die", "pause"]
+                .into_iter()
+                .map(|s| EventFilter::Event(s.into()))
+                .collect(),
+        );
+
+        // by docker API, using both type of include results in AND between them
+
+        // Include-name
+        let include_name = self
+            .config
+            .include_containers
+            .iter()
+            .map(|s| EventFilter::Container(s.to_owned()));
+
+        // Include-label
+        let include_label = self
+            .config
+            .include_labels
+            .iter()
+            .map(|s| EventFilter::Label(s.to_owned()));
+
+        options.filter(include_name.chain(include_label).collect());
+
+        self.docker.events(&options.build())
+    }
+}
+
+impl Deref for DockerSourceCore {
+    type Target = DockerConfig;
+    fn deref(&self) -> &DockerConfig {
+        &self.config
     }
 }
 
@@ -53,16 +134,9 @@ impl SourceConfig for DockerConfig {
 ///           | ...                 ...out
 ///
 struct DockerSource {
-    config: DockerConfig,
-    docker: Docker,
     esb: EventStreamBuilder,
     /// event stream from docker
-    events: Box<
-        dyn Stream<
-                Item = Result<async_docker::Event, async_docker::Error>,
-                Error = async_docker::Error,
-            > + Send,
-    >,
+    events: Box<dyn Stream<Item = shiplift::rep::Event, Error = shiplift::Error> + Send>,
     ///  mappings of seen container_id to their data
     containers: HashMap<String, ContainerState>,
     /// collection of container_id not to be listened
@@ -72,23 +146,16 @@ struct DockerSource {
 }
 
 impl DockerSource {
-    fn new(
-        config: DockerConfig,
-        out: Sender<Event>,
-    ) -> Result<impl Future<Item = (), Error = ()>, String> {
-        // ?NOTE: Requiers sudo privileges, or docker group membership.
-        // Without extra configuration of docker on user side, there is no way around above.
-        let docker = Docker::connect_with_local_defaults().map_err(|error| {
-            error!(message="Error connecting to docker server",%error);
-            "Failed to connect to docker server".to_owned()
-        })?;
+    fn new(config: DockerConfig, out: Sender<Event>) -> impl Future<Item = (), Error = ()> {
+        // Only logs created at, or after this moment are logged.
+        let core = DockerSourceCore::new(config);
+
+        // main event stream, with whom only newly started/restarted containers will be loged.
+        let events = core.docker_event_stream();
+        info!(message = "Listening docker events");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) = mpsc::unbounded::<ContainerLogInfo>();
-
-        // main event stream, with whom only newly started/restarted containers will be loged.
-        let events = DockerSource::docker_event_stream(&config)?;
-        info!(message = "Listening docker events");
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -98,102 +165,35 @@ impl DockerSource {
         // t2 -- outside: container stoped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
-        let esb = EventStreamBuilder::new(docker.clone(), out, main_send);
+        let esb = EventStreamBuilder::new(core, out, main_send);
 
         // Construct, capture currently running containers, and do main future(self)
-        Ok(DockerSource {
-            config,
-            docker,
+        DockerSource {
             esb,
-            events,
+            events: Box::new(events) as Box<_>,
             containers: HashMap::new(),
             ignore_container_id: Vec::new(),
             main_recv,
         }
         .running_containers()
-        .and_then(|source| source))
+        .and_then(|source| source)
     }
 
-    /// Returns event stream coming from docker.
-    fn docker_event_stream(
-        config: &DockerConfig,
-    ) -> Result<
-        Box<
-            dyn Stream<
-                    Item = Result<async_docker::Event, async_docker::Error>,
-                    Error = async_docker::Error,
-                > + Send,
-        >,
-        String,
-    > {
-        // TODO: async_docker should be replaced with bollard once it supports events
-        // ?NOTE: Requiers sudo privileges, or docker group membership.
-        // Without extra configuration of docker on user side, there is no way around above.
-        let docker_for_events = async_docker::new_docker(None).map_err(|error| {
-            error!(message="Error connecting to docker server",%error);
-            "Failed to connect to docker server".to_owned()
-        })?;
-
-        let mut options = async_docker::EventsOptionsBuilder::new();
-
-        // event  | emmited on commands
-        // -------+-------------------
-        // start  | docker start, docker run, restart policy, docker restart
-        // upause | docker unpause
-        // die    | docker restart, docker stop, docker kill, process exited, oom
-        // pause  | docker pause
-        options.filter(
-            vec!["start", "upause", "die", "pause"]
-                .into_iter()
-                .map(|s| async_docker::EventFilter::Event(s.into()))
-                .collect(),
-        );
-
-        // by docker API, using both type of include results in AND between them
-
-        // Include-name
-        if !config.include_containers.is_empty() {
-            options.filter(
-                config
-                    .include_containers
-                    .iter()
-                    .map(|s| async_docker::EventFilter::Container(s.to_owned()))
-                    .collect(),
-            );
-        }
-
-        // Include-label
-        if !config.include_labels.is_empty() {
-            options.filter(
-                config
-                    .include_labels
-                    .iter()
-                    .map(|s| async_docker::EventFilter::Label(s.to_owned()))
-                    .collect(),
-            );
-        }
-
-        Ok(docker_for_events.events(&options.build()))
-    }
     /// Future that captures currently running containers, and starts event streams for them.
     fn running_containers(mut self) -> impl Future<Item = Self, Error = ()> {
-        let mut options = ListContainersOptions::default();
+        let mut options = shiplift::ContainerListOptions::builder();
 
         // by docker API, using both type of include results in AND between them
-
-        // Include-name
-        if !self.config.include_containers.is_empty() {
-            options
-                .filters
-                .insert("name".to_owned(), self.config.include_containers.clone());
-        }
-
+        // TODO: missing feature in shiplift to include ContainerFilter::Name
         // Include-label
-        if !self.config.include_labels.is_empty() {
-            options
-                .filters
-                .insert("label".to_owned(), self.config.include_labels.clone());
-        }
+        options.filter(
+            self.esb
+                .core
+                .include_labels
+                .iter()
+                .map(|s| ContainerFilter::LabelName(s.clone()))
+                .collect(),
+        );
 
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
@@ -201,8 +201,8 @@ impl DockerSource {
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
-        let exclude_self =
-            self.config.include_containers.is_empty() && self.config.include_labels.is_empty();
+        let exclude_self = self.esb.core.config.include_containers.is_empty()
+            && self.esb.core.config.include_labels.is_empty();
 
         // HOSTNAME hint
         // It may contain shortened container id.
@@ -213,8 +213,11 @@ impl DockerSource {
         let image = VECTOR_IMAGE_NAME;
 
         // Future
-        self.docker
-            .list_containers(Some(options))
+        self.esb
+            .core
+            .docker
+            .containers()
+            .list(&options.build())
             .map(move |list| {
                 for container in list {
                     trace!(
@@ -236,6 +239,18 @@ impl DockerSource {
                                 id = field::display(&container.id)
                             );
                             self.ignore_container_id.push(container.id);
+                            continue;
+                        }
+                    }
+
+                    // This block is necessary since shiplift doesn't have way to include
+                    // names into request to docker.
+                    if !self.esb.core.include_labels.is_empty() {
+                        if !self.esb.core.include_labels.iter().any(|include| {
+                            container.id.starts_with(include)
+                                || container.names.iter().any(|name| name.starts_with(include))
+                        }) {
+                            // This container isn't included
                             continue;
                         }
                     }
@@ -276,7 +291,7 @@ impl Future for DockerSource {
                     match self.events.poll() {
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         // Process event from docker
-                        Ok(Async::Ready(Some(Ok(mut event)))) => {
+                        Ok(Async::Ready(Some(mut event))) => {
                             match (event.id.take(), event.status.take()) {
                                 (Some(id), Some(status)) => {
                                     trace!(
@@ -315,9 +330,6 @@ impl Future for DockerSource {
                                 _ => (),
                             }
                         }
-                        Ok(Async::Ready(Some(Err(error)))) => {
-                            error!(message = "Error in docker event stream",%error)
-                        }
                         Err(error) => error!(source="docker events",%error),
                         // Stream has ended
                         Ok(Async::Ready(None)) => {
@@ -344,11 +356,8 @@ impl Future for DockerSource {
 }
 
 /// Used to construct and start event stream futures
-#[derive(Clone)]
 struct EventStreamBuilder {
-    docker: Docker,
-    /// Only logs created at, or after this moment are logged. UNIX timestamp
-    now_timestamp: i64,
+    core: DockerSourceCore,
     /// Event stream futures send events through this
     out: Sender<Event>,
     /// End through which event stream futures send ContainerLogInfo to main future
@@ -356,21 +365,13 @@ struct EventStreamBuilder {
 }
 
 impl EventStreamBuilder {
-    /// Only logs created at, or after this moment are logged.
     fn new(
-        docker: Docker,
+        core: DockerSourceCore,
         out: Sender<Event>,
         main_send: UnboundedSender<ContainerLogInfo>,
     ) -> Self {
-        let now = chrono::Local::now();
-        let now_timestamp = now.timestamp();
-        info!(
-            message = "Capturing logs from now on",
-            now = field::display(now.to_rfc3339())
-        );
         EventStreamBuilder {
-            docker,
-            now_timestamp,
+            core,
             out,
             main_send,
         }
@@ -378,7 +379,7 @@ impl EventStreamBuilder {
 
     /// Constructs and runs event stream
     fn start(&self, id: String) -> ContainerState {
-        let mut state = ContainerState::new(id, self.now_timestamp);
+        let mut state = ContainerState::new(id, self.core.now_timestamp);
         self.restart(&mut state);
         state
     }
@@ -392,15 +393,20 @@ impl EventStreamBuilder {
 
     fn start_event_stream(&self, info: ContainerLogInfo) {
         // Establish connection
-        let options = LogsOptions {
-            follow: true,
-            stdout: true,
-            stderr: true,
-            since: info.log_since(),
-            timestamps: true,
-            ..Default::default()
-        };
-        let mut stream = self.docker.logs(&info.id, Some(options));
+        let mut options = LogsOptions::builder();
+        options
+            .follow(true)
+            .stdout(true)
+            .stderr(true)
+            // TODO: missing feature in shiplift to use .since(info.log_since())
+            .timestamps(true);
+
+        let mut stream = self
+            .core
+            .docker
+            .containers()
+            .get(&info.id)
+            .logs(&options.build());
         info!(
             message = "Started listening logs on docker container",
             id = field::display(&info.id)
@@ -526,6 +532,7 @@ struct ContainerLogInfo {
 
 impl ContainerLogInfo {
     /// Only logs after or equal to this point need to be fetched
+    #[allow(dead_code)]
     fn log_since(&self) -> i64 {
         self.last_log
             .as_ref()
@@ -536,19 +543,23 @@ impl ContainerLogInfo {
 
     /// Expects timestamp at the begining of message
     /// Expects messages to be ordered by timestamps
-    fn new_event(&mut self, message: LogOutput) -> Option<Event> {
+    fn new_event(&mut self, message: Chunk) -> Option<Event> {
         let mut log_event = Event::new_empty_log().into_log();
 
-        let (message, stream) = match message {
-            LogOutput::StdErr { message } => (message, "stderr"),
-            LogOutput::StdOut { message } => (message, "stdout"),
+        let stream = match message.stream_type {
+            StreamType::StdErr => "stderr",
+            StreamType::StdOut => "stdout",
             _ => return None,
         };
         log_event.insert_implicit(event::STREAM.clone(), stream.into());
 
+        let mut message = String::from_utf8(message.data)
+            .map_err(|error| error!(message="Recieved corrupted message",%error))
+            .ok()?;
+
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
-        let log = match DateTime::parse_from_rfc3339(timestamp_str) {
+        match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
@@ -575,18 +586,27 @@ impl ContainerLogInfo {
                 );
 
                 self.last_log = Some((timestamp, self.generation));
-                splitter.next()?
+
+                let log = splitter.next()?;
+                let remove_len = message.len() - log.len();
+                message.drain(..remove_len);
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
                 error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
                 // So log whole message
-                message.as_str()
             }
-        };
+        }
+
+        // Message is actually one line from stderr or stdout, and they are delimited with newline
+        // so that newline needs to be removed.
+        message.pop().filter(|&c| c != '\n').map(|c| {
+            // For some reason last character isn't a newline, so return it
+            message.push(c);
+        });
 
         // Supply message
-        log_event.insert_explicit(event::MESSAGE.clone(), log.into());
+        log_event.insert_explicit(event::MESSAGE.clone(), message.into());
 
         // Supply container
         log_event.insert_implicit(event::CONTAINER.clone(), self.id.as_str().into());
@@ -601,7 +621,6 @@ impl ContainerLogInfo {
 mod tests {
     use super::*;
     use crate::test_util::{collect_n, trace_init};
-    use bollard::container;
 
     /// None if docker is not present on the system
     fn source<'a, L: Into<Option<&'a str>>>(
@@ -634,7 +653,7 @@ mod tests {
     }
 
     fn docker() -> Docker {
-        Docker::connect_with_local_defaults().expect("docker present on system")
+        Docker::new()
     }
 
     /// Users should ensure to remove container before exiting.
@@ -705,21 +724,17 @@ mod tests {
         docker: &Docker,
         rt: &mut tokio::runtime::Runtime,
     ) -> Option<String> {
-        let future = docker.create_container(
-            Some(container::CreateContainerOptions {
-                name: name.to_owned(),
-            }),
-            container::Config {
-                image: Some("busybox".to_owned()),
-                cmd: Some(cmd),
-                labels: label.into().map(|l| {
-                    let mut map = HashMap::new();
-                    map.insert(l.to_owned(), String::new());
-                    map
-                }),
-                ..container::Config::default()
-            },
-        );
+        let mut options = shiplift::builder::ContainerOptions::builder("busybox");
+        options
+            .name(name)
+            .cmd(cmd.iter().map(|s| s.as_str()).collect());
+        label.into().map(|l| {
+            let mut map = HashMap::new();
+            map.insert(l, "");
+            options.labels(&map);
+        });
+
+        let future = docker.containers().create(&options.build());
         rt.block_on(future)
             .map_err(|e| error!(%e))
             .ok()
@@ -729,18 +744,15 @@ mod tests {
     /// Returns once container has started
     #[must_use]
     fn container_start(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) -> Option<()> {
-        let future = docker.start_container(id, None::<container::StartContainerOptions<String>>);
+        let future = docker.containers().get(id).start();
         rt.block_on(future).ok()
     }
 
     /// Returns once container is done running
     #[must_use]
     fn container_wait(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) -> Option<()> {
-        let future = docker.wait_container(id, None::<container::WaitContainerOptions<String>>);
-        rt.block_on(future.into_future())
-            .map_err(|(e, _)| error!(%e))
-            .map(|_| ())
-            .ok()
+        let future = docker.containers().get(id).wait();
+        rt.block_on(future).map_err(|e| error!(%e)).map(|_| ()).ok()
     }
 
     /// Returns once container is done running
@@ -751,7 +763,10 @@ mod tests {
     }
 
     fn container_remove(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
-        let future = docker.remove_container(id, None::<container::RemoveContainerOptions>);
+        let future = docker
+            .containers()
+            .get(id)
+            .remove(shiplift::builder::RmContainerOptions::builder().build());
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = rt.block_on(future).map_err(|e| error!(%e));
     }
