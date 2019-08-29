@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
+use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time;
@@ -30,18 +31,20 @@ pub struct JournaldConfig {
     pub current_runtime_only: Option<bool>,
     pub local_only: Option<bool>,
     pub units: Vec<String>,
+    pub data_dir: Option<PathBuf>,
 }
 
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     fn build(
         &self,
-        _name: &str,
-        _globals: &GlobalOptions,
+        name: &str,
+        globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
+        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let journal = Journal::open(local_only, runtime_only).map_err(|err| format!("{}", err))?;
 
         // Map the given unit names into valid systemd units by
@@ -58,7 +61,10 @@ impl SourceConfig for JournaldConfig {
             })
             .collect::<HashSet<String>>();
 
-        Ok(journald_source(journal, out, units))
+        let checkpointer = Checkpointer::new(data_dir)
+            .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
+
+        Ok(journald_source(journal, out, checkpointer, units))
     }
 
     fn output_type(&self) -> DataType {
@@ -66,9 +72,14 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-fn journald_source<J>(journal: J, out: mpsc::Sender<Event>, units: HashSet<String>) -> super::Source
+fn journald_source<J>(
+    journal: J,
+    out: mpsc::Sender<Event>,
+    checkpointer: Checkpointer,
+    units: HashSet<String>,
+) -> super::Source
 where
-    J: 'static + Iterator<Item = Result<Record, Error>> + Send,
+    J: 'static + Iterator<Item = Result<Record, Error>> + JournalCursor + Send,
 {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
@@ -84,6 +95,7 @@ where
             units,
             channel: out,
             shutdown: shutdown_rx,
+            checkpointer,
         };
         let span = info_span!("journald-server");
         let dispatcher = dispatcher::get_default(|d| d.clone());
@@ -125,21 +137,54 @@ fn create_event(record: Record) -> Event {
     log.into()
 }
 
+trait JournalCursor {
+    fn cursor(&self) -> Result<String, Error>;
+    fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error>;
+}
+
+impl JournalCursor for Journal {
+    fn cursor(&self) -> Result<String, Error> {
+        Journal::cursor(self)
+    }
+    fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error> {
+        Journal::seek_cursor(self, cursor)
+    }
+}
+
 struct JournaldServer<J, T> {
     journal: J,
     units: HashSet<String>,
     channel: T,
     shutdown: std::sync::mpsc::Receiver<()>,
+    checkpointer: Checkpointer,
 }
 
 impl<J, T> JournaldServer<J, T>
 where
-    J: Iterator<Item = Result<Record, Error>>,
+    J: Iterator<Item = Result<Record, Error>> + JournalCursor,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
         let timeout = time::Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
+
+        // Retrieve the saved checkpoint, and seek forward in the journald log
+        match self.checkpointer.get() {
+            Ok(Some(cursor)) => {
+                if let Err(err) = self.journal.seek_cursor(&cursor) {
+                    error!(
+                        message = "Could not seek journald to stored cursor",
+                        error = field::display(&err)
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(err) => error!(
+                message = "Could not retrieve journald checkpoint",
+                error = field::display(&err)
+            ),
+        }
+
         loop {
             loop {
                 let record = match self.journal.next() {
@@ -168,7 +213,20 @@ where
                     Err(()) => error!(message = "Could not send journald log"),
                 }
             }
-            // FIXME: Checkpoint here
+            match self.journal.cursor() {
+                Ok(cursor) => {
+                    if let Err(err) = self.checkpointer.set(&cursor) {
+                        error!(
+                            message = "Could not set journald checkpoint.",
+                            error = field::display(&err)
+                        );
+                    }
+                }
+                Err(err) => error!(
+                    message = "Could not retrieve journald checkpoint.",
+                    error = field::display(&err)
+                ),
+            }
             match self.shutdown.recv_timeout(timeout) {
                 Ok(()) => unreachable!(), // The sender should never actually send
                 Err(RecvTimeoutError::Timeout) => {}
@@ -270,11 +328,13 @@ mod tests {
     use std::iter::FromIterator;
     use std::time::{Duration, SystemTime};
     use stream_cancel::Tripwire;
+    use tempfile::tempdir;
     use tokio::util::FutureExt;
 
     #[derive(Default)]
     struct FakeJournal {
         records: Vec<Record>,
+        cursor: usize,
     }
 
     impl FakeJournal {
@@ -296,7 +356,22 @@ mod tests {
     impl Iterator for FakeJournal {
         type Item = Result<Record, Error>;
         fn next(&mut self) -> Option<Self::Item> {
+            self.cursor += 1;
             self.records.pop().map(|item| Ok(item))
+        }
+    }
+
+    impl JournalCursor for FakeJournal {
+        // The fake journal cursor is just a line number
+        fn cursor(&self) -> Result<String, Error> {
+            Ok(format!("{}", self.cursor))
+        }
+        fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error> {
+            let cursor = cursor.parse::<usize>().expect("Invalid cursor");
+            for _ in 0..cursor {
+                self.records.pop();
+            }
+            Ok(())
         }
     }
 
@@ -307,16 +382,20 @@ mod tests {
         journal
     }
 
-    fn run_journal(units: &[&str]) -> Vec<Event> {
+    fn run_journal(units: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let (tx, rx) = futures::sync::mpsc::channel(10);
         let (trigger, tripwire) = Tripwire::new();
+        let tempdir = tempdir().unwrap();
+        let mut checkpointer =
+            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let units = HashSet::<String>::from_iter(units.into_iter().map(|&s| s.into()));
+
+        if let Some(cursor) = cursor {
+            checkpointer.set(cursor).expect("Could not set checkpoint");
+        }
 
         let journal = fake_journal();
-        let source = journald_source(
-            journal,
-            tx,
-            HashSet::from_iter(units.into_iter().map(|&s| s.into())),
-        );
+        let source = journald_source(journal, tx, checkpointer, units);
         let mut rt = runtime();
         rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
 
@@ -329,7 +408,7 @@ mod tests {
 
     #[test]
     fn journald_source_works() {
-        let received = run_journal(&[]);
+        let received = run_journal(&[], None);
         assert_eq!(received.len(), 2);
         assert_eq!(
             received[0].as_log()[&event::MESSAGE],
@@ -343,7 +422,17 @@ mod tests {
 
     #[test]
     fn journald_source_filters_units() {
-        let received = run_journal(&["unit.service"]);
+        let received = run_journal(&["unit.service"], None);
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()[&event::MESSAGE],
+            ValueKind::Bytes("unit message".into())
+        );
+    }
+
+    #[test]
+    fn journald_source_handles_checkpoint() {
+        let received = run_journal(&[], Some("1"));
         assert_eq!(received.len(), 1);
         assert_eq!(
             received[0].as_log()[&event::MESSAGE],

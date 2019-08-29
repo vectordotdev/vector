@@ -33,6 +33,7 @@ The `journald` source ingests data through log records from journald and outputs
   type = "journald" # must be: "journald"
   
   current_runtime_only = true # default
+  data_dir = "/var/lib/vector" # no default
   local_only = true # default
   units = ["ntpd", "sysinit.target"]
 ```
@@ -42,6 +43,7 @@ The `journald` source ingests data through log records from journald and outputs
 [sources.<source-id>]
   type = "journald"
   current_runtime_only = <bool>
+  data_dir = "<string>"
   local_only = <bool>
   units = ["<string>", ...]
 ```
@@ -61,6 +63,14 @@ The `journald` source ingests data through log records from journald and outputs
   # * optional
   # * default: true
   current_runtime_only = true
+
+  # The directory used to persist the journal checkpoint position. By default,
+  # the global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
 
   # Include only entries from the local system
   # 
@@ -87,6 +97,7 @@ The `journald` source ingests data through log records from journald and outputs
 | `type` | `string` | The component type<br />`required` `must be: "journald"` |
 | **OPTIONAL** | | |
 | `current_runtime_only` | `bool` | Include only entries from the current runtime (boot)<br />`default: true` |
+| `data_dir` | `string` | The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir.<br />`no default` `example: "/var/lib/vector"` |
 | `local_only` | `bool` | Include only entries from the local system<br />`default: true` |
 | `units` | `[string]` | The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.<br />`default: []` |
 
