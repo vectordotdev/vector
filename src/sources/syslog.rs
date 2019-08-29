@@ -247,6 +247,7 @@ fn event_from_str(host_key: &String, host: Option<Bytes>, raw: impl AsRef<str>) 
 
             event
         })
+        .map_err(|_| warn!("Problem parsing incoming message, check syslog format"))
         .ok()
 }
 
