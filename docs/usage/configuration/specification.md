@@ -116,6 +116,24 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: bytes
   max_line_bytes = 102400
 
+  # When present, Vector will aggregate multiple lines into a single event, using
+  # this pattern as the indicator that the previous lines should be flushed and a
+  # new event started. The pattern will be matched against entire lines as a
+  # regular expression, so remember to anchor as appropriate.
+  # 
+  # * optional
+  # * no default
+  message_start_indicator = "^(INFO|ERROR)"
+
+  # When `message_start_indicator` is present, this sets the amount of time
+  # Vector will buffer lines into a single event before flushing, regardless of
+  # whether or not it has seen a line indicating the start of a new message.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  multi_line_timeout = 1000
+
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
   # 

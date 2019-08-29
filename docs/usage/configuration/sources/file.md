@@ -40,6 +40,8 @@ The `file` source ingests data through one or more local files and outputs [`log
   glob_minimum_cooldown = 1000 # default, milliseconds
   ignore_older = 86400 # no default, seconds
   max_line_bytes = 102400 # default, bytes
+  message_start_indicator = "^(INFO|ERROR)" # no default
+  multi_line_timeout = 1000 # default, milliseconds
   start_at_beginning = false # default
   
   # OPTIONAL - Context
@@ -66,6 +68,8 @@ The `file` source ingests data through one or more local files and outputs [`log
   glob_minimum_cooldown = <int>
   ignore_older = <int>
   max_line_bytes = <int>
+  message_start_indicator = "<string>"
+  multi_line_timeout = <int>
   start_at_beginning = <bool>
 
   # OPTIONAL - Context
@@ -137,6 +141,24 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * unit: bytes
   max_line_bytes = 102400
 
+  # When present, Vector will aggregate multiple lines into a single event, using
+  # this pattern as the indicator that the previous lines should be flushed and a
+  # new event started. The pattern will be matched against entire lines as a
+  # regular expression, so remember to anchor as appropriate.
+  # 
+  # * optional
+  # * no default
+  message_start_indicator = "^(INFO|ERROR)"
+
+  # When `message_start_indicator` is present, this sets the amount of time
+  # Vector will buffer lines into a single event before flushing, regardless of
+  # whether or not it has seen a line indicating the start of a new message.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  multi_line_timeout = 1000
+
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
   # 
@@ -207,6 +229,8 @@ The `file` source ingests data through one or more local files and outputs [`log
 | `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
 | `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age. See [File Rotation](#file-rotation) for more info.<br />`no default` `example: 86400` `unit: seconds` |
 | `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
+| `message_start_indicator` | `string` | When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.<br />`no default` `example: "^(INFO|ERROR)"` |
+| `multi_line_timeout` | `int` | When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.<br />`default: 1000` `unit: milliseconds` |
 | `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
 | **OPTIONAL** - Context | | |
 | `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
