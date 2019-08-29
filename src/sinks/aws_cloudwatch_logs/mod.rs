@@ -237,7 +237,11 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 
 impl CloudwatchLogsSvc {
     pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> Result<Self, String> {
-        let region = config.region.clone().try_into()?;
+        let region = config
+            .region
+            .clone()
+            .try_into()
+            .map_err(|err| format!("{}", err))?;
         let client = create_client(region)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
@@ -389,7 +393,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 
     let region = config.region.clone();
 
-    let client = create_client(region.try_into()?)?;
+    let client = create_client(region.try_into().map_err(|err| format!("{}", err))?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),

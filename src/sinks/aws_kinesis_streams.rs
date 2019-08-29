@@ -73,7 +73,13 @@ impl KinesisService {
         config: KinesisSinkConfig,
         acker: Acker,
     ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
-        let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
+        let client = Arc::new(KinesisClient::new(
+            config
+                .region
+                .clone()
+                .try_into()
+                .map_err(|err| format!("{}", err))?,
+        ));
 
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
@@ -162,7 +168,7 @@ impl RetryLogic for KinesisRetryLogic {
 }
 
 fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> {
-    let client = KinesisClient::new(config.region.try_into()?);
+    let client = KinesisClient::new(config.region.try_into().map_err(|err| format!("{}", err))?);
     let stream_name = config.stream_name;
 
     let fut = client

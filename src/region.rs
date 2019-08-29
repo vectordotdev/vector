@@ -1,6 +1,7 @@
 use http::Uri;
 use rusoto_core::Region;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -26,21 +27,35 @@ impl RegionOrEndpoint {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum ParseError {
+    #[snafu(display("Failed to parse custom endpoint as URI: {}", source))]
+    EndpointParseError { source: http::uri::InvalidUri },
+    #[snafu(display("{}", source))]
+    RegionParseError {
+        source: rusoto_core::region::ParseRegionError,
+    },
+    #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
+    BothRegionAndEndpoint,
+    #[snafu(display("Must set either 'region' or 'endpoint'"))]
+    NeitherRegionNorEndpoint,
+}
+
 impl TryFrom<RegionOrEndpoint> for Region {
-    type Error = String;
+    type Error = ParseError;
 
     fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
         match (r.region, r.endpoint) {
-            (Some(region), None) => region.parse().map_err(|e| format!("{}", e)),
+            (Some(region), None) => region.parse().context(RegionParseError),
             (None, Some(endpoint)) => endpoint
                 .parse::<Uri>()
                 .map(|_| Region::Custom {
                     name: "custom".into(),
                     endpoint,
                 })
-                .map_err(|e| format!("Failed to parse custom endpoint as URI: {}", e)),
-            (Some(_), Some(_)) => Err("Only one of 'region' or 'endpoint' can be specified".into()),
-            (None, None) => Err("Must set 'region' or 'endpoint'".into()),
+                .context(EndpointParseError),
+            (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
+            (None, None) => Err(ParseError::NeitherRegionNorEndpoint),
         }
     }
 }
@@ -106,7 +121,7 @@ mod tests {
         )
         .unwrap();
 
-        let region: Result<Region, String> = config.inner.region.try_into();
+        let region: Result<Region, super::ParseError> = config.inner.region.try_into();
         assert!(region.is_err());
     }
 }

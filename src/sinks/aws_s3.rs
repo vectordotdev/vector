@@ -126,7 +126,7 @@ impl S3Sink {
 
         let region = config.region.clone();
         let s3 = S3Sink {
-            client: Self::create_client(region.try_into()?),
+            client: Self::create_client(region.try_into().map_err(|err| format!("{}", err))?),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -154,7 +154,7 @@ impl S3Sink {
 
     pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
         let region = config.region.clone();
-        let client = Self::create_client(region.try_into()?);
+        let client = Self::create_client(region.try_into().map_err(|err| format!("{}", err))?);
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
