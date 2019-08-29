@@ -247,41 +247,46 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                 }
             }
 
-            if let Ok(Async::Ready(Some(expired))) = self.timeouts.poll() {
-                let key = expired.into_inner();
-                if let Some(buffered) = self.buffers.remove(&key) {
-                    return Ok(Async::Ready(Some((buffered, key))));
+            match self.inner.poll() {
+                Ok(Async::Ready(Some((line, src)))) => {
+                    // look for buffered content from same source
+                    if let Some(buffered) = self.buffers.remove(&src) {
+                        if line.starts_with(self.marker.as_bytes()) {
+                            // buffer the incoming line and flush the existing data
+                            self.buffers.insert(src.clone(), line);
+                            return Ok(Async::Ready(Some((buffered, src))));
+                        } else {
+                            // append new line to the buffered data
+                            let mut more = buffered.to_vec();
+                            more.push(b'\n');
+                            more.extend_from_slice(&line);
+                            self.buffers.insert(src, Bytes::from(more));
+                        }
+                    } else {
+                        // no existing data for this source so buffer it with timeout
+                        self.timeouts
+                            .insert(src.clone(), Duration::from_millis(self.timeout));
+                        self.buffers.insert(src, line);
+                    }
                 }
-            }
-
-            let (chunk, src) = match self.inner.poll() {
-                Ok(Async::Ready(Some(x))) => x,
                 Ok(Async::Ready(None)) => {
-                    // fuse inner, flush everything
+                    // start flushing all existing data, stop polling inner
                     self.draining = Some(self.buffers.drain().map(|(k, v)| (v, k)).collect());
                     continue;
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
+                Ok(Async::NotReady) => {
+                    // check for keys that have hit their timeout
+                    if let Ok(Async::Ready(Some(expired))) = self.timeouts.poll() {
+                        let key = expired.into_inner();
+                        if let Some(buffered) = self.buffers.remove(&key) {
+                            return Ok(Async::Ready(Some((buffered, key))));
+                        }
+                    }
+
+                    return Ok(Async::NotReady);
+                }
                 Err(()) => return Err(()),
             };
-
-            if let Some(buffered) = self.buffers.remove(&src) {
-                if chunk.starts_with(self.marker.as_bytes()) {
-                    self.buffers.insert(src.clone(), chunk);
-                    // flush buffered
-                    return Ok(Async::Ready(Some((buffered, src))));
-                } else {
-                    // append chunk to buffered
-                    let mut more = buffered.to_vec();
-                    more.push(b'\n');
-                    more.extend_from_slice(&chunk);
-                    self.buffers.insert(src, Bytes::from(more));
-                }
-            } else {
-                self.timeouts
-                    .insert(src.clone(), Duration::from_millis(self.timeout));
-                self.buffers.insert(src, chunk);
-            }
         }
     }
 }
