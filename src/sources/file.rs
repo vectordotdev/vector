@@ -4,8 +4,9 @@ use crate::{
 };
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
-use futures::{future, sync::mpsc, Future, Sink};
+use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
@@ -26,6 +27,7 @@ pub struct FileConfig {
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
     pub fingerprinting: FingerprintingConfig,
+    pub message_start_indicator: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -74,6 +76,7 @@ impl Default for FileConfig {
             host_key: None,
             data_dir: None,
             glob_minimum_cooldown: 1000, // millis
+            message_start_indicator: None,
         }
     }
 }
@@ -161,20 +164,35 @@ pub fn file_source(
     let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
     let hostname = hostname::get_hostname();
 
-    let out = out
-        .sink_map_err(|_| ())
-        .with(move |(line, file): (Bytes, String)| {
-            trace!(message = "Received one event.", file = file.as_str());
-
-            let event = create_event(line, file, &host_key, &hostname, &file_key);
-
-            future::ok(event)
-        });
-
     let include = config.include.clone();
     let exclude = config.exclude.clone();
+    let message_start_indicator = config.message_start_indicator.clone();
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
+
+        // TODO: channel sizing?
+        let (tx, rx) = futures::sync::mpsc::channel(100); // create channel to send down, wrap agg around rx, forward to out
+
+        if let Some(msi) = message_start_indicator {
+            tokio::spawn(
+                LineAgg::new(rx, msi)
+                    .map(move |(line, file): (Bytes, String)| {
+                        trace!(message = "Received one event.", file = file.as_str());
+                        create_event(line, file, &host_key, &hostname, &file_key)
+                    })
+                    .forward(out.sink_map_err(|e| error!(%e)))
+                    .map(|_| ()),
+            )
+        } else {
+            tokio::spawn(
+                rx.map(move |(line, file): (Bytes, String)| {
+                    trace!(message = "Received one event.", file = file.as_str());
+                    create_event(line, file, &host_key, &hostname, &file_key)
+                })
+                .forward(out.sink_map_err(|e| error!(%e)))
+                .map(|_| ()),
+            )
+        };
 
         let span = info_span!("file-server");
         let dispatcher = dispatcher::get_default(|d| d.clone());
@@ -182,7 +200,7 @@ pub fn file_source(
             let dispatcher = dispatcher;
             dispatcher::with_default(&dispatcher, || {
                 span.in_scope(|| {
-                    file_server.run(out, shutdown_rx);
+                    file_server.run(tx.sink_map_err(|_| ()), shutdown_rx);
                 })
             });
         });
@@ -191,6 +209,69 @@ pub fn file_source(
         // so it needs to be held onto until the future we return is dropped.
         future::empty().inspect(|_| drop(shutdown_tx))
     }))
+}
+
+struct LineAgg<T> {
+    inner: T,
+    marker: String,
+    buffers: HashMap<String, Bytes>,
+    draining: Option<Vec<(Bytes, String)>>,
+    // TODO: add timeouts
+}
+
+impl<T> LineAgg<T> {
+    fn new(inner: T, marker: String) -> Self {
+        Self {
+            inner,
+            marker,
+            draining: None,
+            buffers: HashMap::new(),
+        }
+    }
+}
+
+impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
+    type Item = (Bytes, String);
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        loop {
+            if let Some(to_drain) = &mut self.draining {
+                if let Some((data, key)) = to_drain.pop() {
+                    return Ok(Async::Ready(Some((data, key))));
+                } else {
+                    return Ok(Async::Ready(None));
+                }
+            }
+
+            let (chunk, src) = match self.inner.poll() {
+                Ok(Async::Ready(Some(x))) => x,
+                Ok(Async::Ready(None)) => {
+                    // fuse inner, flush everything
+                    self.draining = Some(self.buffers.drain().map(|(k, v)| (v, k)).collect());
+                    continue;
+                }
+                Ok(Async::NotReady) => return Ok(Async::NotReady),
+                Err(e) => panic!(e),
+            };
+
+            if let Some(buffered) = self.buffers.remove(&src) {
+                if chunk.starts_with(self.marker.as_bytes()) {
+                    self.buffers.insert(src.clone(), chunk);
+                    // flush buffered
+                    return Ok(Async::Ready(Some((buffered, src))));
+                } else {
+                    // append chunk to buffered
+                    let mut more = buffered.to_vec();
+                    more.push(b'\n');
+                    more.extend_from_slice(&chunk);
+                    self.buffers.insert(src, Bytes::from(more));
+                }
+            } else {
+                self.buffers.insert(src, chunk);
+            }
+        }
+    }
 }
 
 fn create_event(
@@ -256,6 +337,10 @@ mod tests {
             "Unclosed channel: may indicate file-server could not shutdown gracefully."
         );
         result.unwrap()
+    }
+
+    fn sleep() {
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     #[test]
@@ -1000,8 +1085,57 @@ mod tests {
         );
     }
 
-    fn sleep() {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    #[test]
+    fn test_multi_line_aggregation() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
 
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            message_start_indicator: Some("INFO".into()),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep(); // The files must be observed at their original lengths before writing to them
+
+        writeln!(&mut file, "leftover foo").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+        writeln!(&mut file, "INFO goodbye").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "part of goodbye").unwrap();
+        writeln!(&mut file, "INFO hi again").unwrap();
+        writeln!(&mut file, "and some more").unwrap();
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "leftover foo".into(),
+                "INFO hello".into(),
+                "INFO goodbye\npart of goodbye".into(),
+                "INFO hi again\nand some more".into()
+            ]
+        );
+    }
 }
