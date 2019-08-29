@@ -11,6 +11,7 @@ use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
+use tokio::timer::DelayQueue;
 use tracing::dispatcher;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -28,6 +29,7 @@ pub struct FileConfig {
     pub glob_minimum_cooldown: u64, // millis
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
+    pub multi_line_timeout: Option<u64>, // millis? TODO: decide
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -77,6 +79,7 @@ impl Default for FileConfig {
             data_dir: None,
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
+            multi_line_timeout: None, // millis
         }
     }
 }
@@ -167,6 +170,7 @@ pub fn file_source(
     let include = config.include.clone();
     let exclude = config.exclude.clone();
     let message_start_indicator = config.message_start_indicator.clone();
+    let multi_line_timeout = config.multi_line_timeout.unwrap_or(1000); // TODO: 1s default?
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
@@ -175,7 +179,7 @@ pub fn file_source(
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(msi) = message_start_indicator {
-                Box::new(LineAgg::new(rx, msi))
+                Box::new(LineAgg::new(rx, msi, multi_line_timeout))
             } else {
                 Box::new(rx)
             };
@@ -210,18 +214,21 @@ pub fn file_source(
 struct LineAgg<T> {
     inner: T,
     marker: String,
+    timeout: u64,
     buffers: HashMap<String, Bytes>,
     draining: Option<Vec<(Bytes, String)>>,
-    // TODO: add timeouts
+    timeouts: DelayQueue<String>,
 }
 
 impl<T> LineAgg<T> {
-    fn new(inner: T, marker: String) -> Self {
+    fn new(inner: T, marker: String, timeout: u64) -> Self {
         Self {
             inner,
             marker,
+            timeout,
             draining: None,
             buffers: HashMap::new(),
+            timeouts: DelayQueue::new(),
         }
     }
 }
@@ -237,6 +244,13 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                     return Ok(Async::Ready(Some((data, key))));
                 } else {
                     return Ok(Async::Ready(None));
+                }
+            }
+
+            if let Ok(Async::Ready(Some(expired))) = self.timeouts.poll() {
+                let key = expired.into_inner();
+                if let Some(buffered) = self.buffers.remove(&key) {
+                    return Ok(Async::Ready(Some((buffered, key))));
                 }
             }
 
@@ -264,6 +278,8 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                     self.buffers.insert(src, Bytes::from(more));
                 }
             } else {
+                self.timeouts
+                    .insert(src.clone(), Duration::from_millis(self.timeout));
                 self.buffers.insert(src, chunk);
             }
         }
@@ -1090,6 +1106,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             message_start_indicator: Some("INFO".into()),
+            multi_line_timeout: Some(25), // less than 50 in sleep()
             ..test_default_file_config(&dir)
         };
 
@@ -1107,12 +1124,17 @@ mod tests {
         writeln!(&mut file, "leftover foo").unwrap();
         writeln!(&mut file, "INFO hello").unwrap();
         writeln!(&mut file, "INFO goodbye").unwrap();
+        writeln!(&mut file, "part of goodbye").unwrap();
 
         sleep();
 
-        writeln!(&mut file, "part of goodbye").unwrap();
         writeln!(&mut file, "INFO hi again").unwrap();
         writeln!(&mut file, "and some more").unwrap();
+        writeln!(&mut file, "INFO hello").unwrap();
+
+        sleep();
+
+        writeln!(&mut file, "too slow").unwrap();
 
         sleep();
 
@@ -1130,7 +1152,9 @@ mod tests {
                 "leftover foo".into(),
                 "INFO hello".into(),
                 "INFO goodbye\npart of goodbye".into(),
-                "INFO hi again\nand some more".into()
+                "INFO hi again\nand some more".into(),
+                "INFO hello".into(),
+                "too slow".into(),
             ]
         );
     }
