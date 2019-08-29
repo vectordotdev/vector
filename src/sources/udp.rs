@@ -87,6 +87,13 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
     )
 }
 
+/// Since messages in udp packet strech until end of the packet, it is necessary to decode last message
+/// when eof is reached. The problem is in UdpFramed calling BytesDelimitedCodec::decode for decoding
+/// messages which decodes only messages delimted with delimeter, in this case a newline. To fix this,
+/// this wrapper is used to make BytesDelimitedEofCodec::decode call BytesDelimitedCodec::decode_eof
+///
+/// which will decode last message properly.
+/// For more info see issue https://github.com/timberio/vector/issues/777.
 struct BytesDelimitedEofCodec(BytesDelimitedCodec);
 
 impl Decoder for BytesDelimitedEofCodec {
