@@ -64,7 +64,7 @@ lazy_static! {
     .collect();
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct JavaScriptConfig {
     source: Option<String>,
@@ -76,13 +76,7 @@ pub struct JavaScriptConfig {
 #[typetag::serde(name = "javascript")]
 impl TransformConfig for JavaScriptConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
-        JavaScript::new(
-            self.source.clone(),
-            self.path.clone(),
-            self.handler.clone(),
-            self.memory_limit.clone(),
-        )
-        .map(|js| -> Box<dyn Transform> { Box::new(js) })
+        JavaScript::new(self.clone()).map(|js| -> Box<dyn Transform> { Box::new(js) })
     }
 
     fn input_type(&self) -> DataType {
@@ -110,16 +104,11 @@ pub struct JavaScript {
 }
 
 impl JavaScript {
-    pub fn new(
-        source: Option<String>,
-        path: Option<String>,
-        handler: Option<String>,
-        memory_limit: Option<usize>,
-    ) -> Result<Self, String> {
+    pub fn new(config: JavaScriptConfig) -> Result<Self, String> {
         let (input, thread_input) = mpsc::sync_channel(0);
         let (thread_output, output) = mpsc::sync_channel(0);
         thread::spawn(move || {
-            let processor = JavaScriptProcessor::new(source, path, handler, memory_limit);
+            let processor = JavaScriptProcessor::new(config);
             let processor = match processor {
                 Ok(processor) => {
                     thread_output.send(ProcessorOutput::Start(Ok(()))).unwrap();
@@ -181,14 +170,9 @@ struct JavaScriptProcessor {
 }
 
 impl JavaScriptProcessor {
-    pub fn new(
-        source: Option<String>,
-        path: Option<String>,
-        handler: Option<String>,
-        memory_limit: Option<usize>,
-    ) -> Result<Self, String> {
+    pub fn new(config: JavaScriptConfig) -> Result<Self, String> {
         // validate and load source
-        let source = match (source, path) {
+        let source = match (config.source, config.path) {
             (Some(source), None) => source,
             (None, Some(path)) => fs::read_to_string(&path).map_err(|err| {
                 format!("Cannot load JavaScript source from \"{}\": {}", path, err)
@@ -202,7 +186,7 @@ impl JavaScriptProcessor {
         };
 
         // validate handler parameter if present
-        if let Some(ref handler) = handler {
+        if let Some(ref handler) = config.handler {
             if !JS_VALID_IDENTIFIER.is_match(&handler) {
                 return Err(format!(
                     "Handler name \"{}\" is not a valid JavaScript identifier",
@@ -219,7 +203,7 @@ impl JavaScriptProcessor {
 
         // init QuickJS context
         let mut builder = Context::builder();
-        if let Some(memory_limit) = memory_limit {
+        if let Some(memory_limit) = config.memory_limit {
             builder = builder.memory_limit(memory_limit);
         }
         let ctx = builder
@@ -227,7 +211,7 @@ impl JavaScriptProcessor {
             .map_err(|err| format!("Cannot create JavaScript runtime: {}", err))?;
 
         // inject handler source
-        let source = if let Some(handler) = handler {
+        let source = if let Some(handler) = config.handler {
             format!("{}; __vector_handler = {}", source, handler)
         } else {
             format!(r"__vector_handler = ({})", source)
@@ -338,7 +322,7 @@ fn object_to_event(object: HashMap<String, JsValue>) -> Result<Event, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::JavaScript;
+    use super::{JavaScript, JavaScriptConfig};
     use crate::{
         event::{Event, ValueKind, TIMESTAMP},
         transforms::Transform,
@@ -349,7 +333,10 @@ mod tests {
 
     #[test]
     fn javascript_new() {
-        let res = JavaScript::new(Some(r"event => event".to_string()), None, None, None);
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"event => event".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
@@ -358,7 +345,10 @@ mod tests {
         let path = Temp::new_path();
         let path_str = path.to_str().unwrap();
         fs::write(path_str, r"event => event").unwrap();
-        let res = JavaScript::new(None, Some(path_str.to_string()), None, None);
+        let res = JavaScript::new(JavaScriptConfig {
+            path: Some(path_str.to_string()),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
@@ -369,37 +359,42 @@ mod tests {
         let path = Temp::new_path();
         let path_str = path.to_str().unwrap();
         fs::write(path_str, source).unwrap();
-        let res = JavaScript::new(
-            Some(source.to_string()),
-            Some(path_str.to_string()),
-            None,
-            None,
-        );
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(source.to_string()),
+            path: Some(path_str.to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_without_source_and_path() {
-        let res = JavaScript::new(None, None, None, None);
+        let res = JavaScript::new(Default::default());
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_syntax_error() {
-        let res = JavaScript::new(Some(r"...".to_string()), None, None, None);
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"...".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_not_a_function() {
-        let res = JavaScript::new(Some(r"123".to_string()), None, None, None);
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"123".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_with_handler_function() {
-        let res = JavaScript::new(
-            Some(
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(
                 r#"
                 function handler(event) {
                     return event
@@ -407,111 +402,111 @@ mod tests {
                 "#
                 .to_string(),
             ),
-            None,
-            Some("handler".to_string()),
-            None,
-        );
+            handler: Some("handler".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
     #[test]
     fn javascript_new_with_handler_const() {
-        let res = JavaScript::new(
-            Some(
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(
                 r#"
                 const handler = event => event
                 "#
                 .to_string(),
             ),
-            None,
-            Some("handler".to_string()),
-            None,
-        );
+            handler: Some("handler".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
     #[test]
     fn javascript_new_with_handler_global_object_property() {
-        let res = JavaScript::new(
-            Some(
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(
                 r#"
                 handler = event => event
                 "#
                 .to_string(),
             ),
-            None,
-            Some("handler".to_string()),
-            None,
-        );
+            handler: Some("handler".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
     #[test]
     fn javascript_new_with_handler_missing() {
-        let res = JavaScript::new(
-            Some(
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(
                 r#"
                 const handler1 = event => event
                 "#
                 .to_string(),
             ),
-            None,
-            Some("handler2".to_string()),
-            None,
-        );
+            handler: Some("handler2".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_with_handler_not_a_valid_identifier() {
-        let res = JavaScript::new(
-            Some(r"event => event".to_string()),
-            None,
-            Some("!@#$".to_string()),
-            None,
-        );
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"event => event".to_string()),
+            handler: Some("!@#$".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_with_handler_reserved_keyword() {
-        let res = JavaScript::new(
-            Some(r"event => event".to_string()),
-            None,
-            Some("new".to_string()),
-            None,
-        );
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"event => event".to_string()),
+            handler: Some("new".to_string()),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn javascript_new_with_memory_limit_success() {
-        let res = JavaScript::new(
-            Some(r"event => event".to_string()),
-            None,
-            None,
-            Some(10_000_000),
-        );
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"event => event".to_string()),
+            memory_limit: Some(10_000_000),
+            ..Default::default()
+        });
         assert!(res.is_ok());
     }
 
     #[test]
     fn javascript_new_with_memory_limit_failure_oom() {
-        let res = JavaScript::new(Some(r"event => event".to_string()), None, None, Some(10));
+        let res = JavaScript::new(JavaScriptConfig {
+            source: Some(r"event => event".to_string()),
+            memory_limit: Some(10),
+            ..Default::default()
+        });
         assert!(res.is_err());
     }
 
     fn make_js(source: &str) -> JavaScript {
-        JavaScript::new(Some(source.to_string()), None, None, None).unwrap()
+        JavaScript::new(JavaScriptConfig {
+            source: Some(source.to_string()),
+            ..Default::default()
+        })
+        .unwrap()
     }
 
     fn make_js_with_handler(source: &str, handler: &str) -> JavaScript {
-        JavaScript::new(
-            Some(source.to_string()),
-            None,
-            Some(handler.to_string()),
-            None,
-        )
+        JavaScript::new(JavaScriptConfig {
+            source: Some(source.to_string()),
+            handler: Some(handler.to_string()),
+            ..Default::default()
+        })
         .unwrap()
     }
 
