@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Event, Metric},
@@ -15,6 +16,7 @@ use rusoto_cloudwatch::{
 };
 use rusoto_core::{Region, RusotoFuture};
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::collections::HashMap;
 use std::{convert::TryInto, time::Duration};
 use tower::{Service, ServiceBuilder};
@@ -51,7 +53,7 @@ pub struct CloudWatchMetricsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let sink = CloudWatchMetricsSvc::new(self.clone(), acker)?;
         let healthcheck = CloudWatchMetricsSvc::healthcheck(self)?;
         Ok((sink, healthcheck))
@@ -66,13 +68,13 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         acker: Acker,
-    ) -> Result<super::RouterSink, String> {
+    ) -> Result<super::RouterSink, BuildError> {
         let client = Self::create_client(
             config
                 .region
                 .clone()
                 .try_into()
-                .map_err(|err| format!("{}", err))?,
+                .context(super::RegionParseError)?,
         )?;
 
         let batch_size = config.batch_size.unwrap_or(20);
@@ -115,13 +117,13 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> Result<super::Healthcheck, String> {
+    fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> Result<super::Healthcheck, BuildError> {
         let client = Self::create_client(
             config
                 .region
                 .clone()
                 .try_into()
-                .map_err(|err| format!("{}", err))?,
+                .context(super::RegionParseError)?,
         )?;
 
         let datum = MetricDatum {
@@ -140,7 +142,7 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(healthcheck))
     }
 
-    fn create_client(region: Region) -> Result<CloudWatchClient, String> {
+    fn create_client(region: Region) -> Result<CloudWatchClient, BuildError> {
         #[cfg(test)]
         {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name

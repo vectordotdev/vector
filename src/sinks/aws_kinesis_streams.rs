@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -16,6 +17,7 @@ use rusoto_kinesis::{
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
@@ -56,7 +58,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let config = self.clone();
         let sink = KinesisService::new(config, acker)?;
         let healthcheck = healthcheck(self.clone())?;
@@ -72,13 +74,13 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
+    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, BuildError> {
         let client = Arc::new(KinesisClient::new(
             config
                 .region
                 .clone()
                 .try_into()
-                .map_err(|err| format!("{}", err))?,
+                .context(super::RegionParseError)?,
         ));
 
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
@@ -167,8 +169,8 @@ impl RetryLogic for KinesisRetryLogic {
     }
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> {
-    let client = KinesisClient::new(config.region.try_into().map_err(|err| format!("{}", err))?);
+fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, BuildError> {
+    let client = KinesisClient::new(config.region.try_into().context(super::RegionParseError)?);
     let stream_name = config.stream_name;
 
     let fut = client

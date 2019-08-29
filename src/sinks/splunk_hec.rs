@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event, ValueKind},
@@ -15,6 +16,7 @@ use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snafu::ResultExt;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
@@ -53,7 +55,7 @@ fn default_host_field() -> Atom {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
@@ -66,7 +68,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, BuildError> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -94,7 +96,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
-        .map_err(|e| format!("{}", e))?;
+        .context(super::UriParseError)?;
     let token = Bytes::from(format!("Splunk {}", token));
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
@@ -131,10 +133,10 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     Ok(Box::new(sink))
 }
 
-pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, String> {
+pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, BuildError> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
-        .map_err(|e| format!("{}", e))?;
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
@@ -157,11 +159,11 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, St
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> Result<(), String> {
-    let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
+pub fn validate_host(host: &String) -> Result<(), BuildError> {
+    let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     if let None = uri.scheme_part() {
-        Err("Host must include a scheme (https or http)".into())
+        Err(BuildError::UriMissingScheme)
     } else {
         Ok(())
     }
@@ -244,7 +246,7 @@ mod tests {
         let invalid_scheme = "localhost:8888".to_string();
         let invalid_uri = "iminvalidohnoes".to_string();
 
-        assert_eq!(validate_host(&valid), Ok(()));
+        assert!(validate_host(&valid).is_ok());
         assert!(validate_host(&invalid_scheme).is_err());
         assert!(validate_host(&invalid_uri).is_err());
     }

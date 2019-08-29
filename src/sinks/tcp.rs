@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -13,7 +14,7 @@ use openssl::{
     x509::X509,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error;
+use snafu::ResultExt;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
@@ -67,19 +68,19 @@ impl TcpSinkConfig {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let addr = self
             .address
             .to_socket_addrs()
-            .map_err(|e| format!("IO Error: {}", e))?
+            .context(super::SocketAddressError)?
             .next()
-            .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+            .ok_or(BuildError::DNSFailure)?;
 
         let tls = match self.tls {
             Some(ref tls) => {
                 if tls.enabled.unwrap_or(false) {
                     if tls.key_file.is_some() != tls.crt_file.is_some() {
-                        return Err("Must specify both tls key_file and crt_file".into());
+                        return Err(BuildError::MissingCrtKeyFile);
                     }
                     let add_ca = match &tls.ca_file {
                         None => None,
@@ -91,11 +92,11 @@ impl SinkConfig for TcpSinkConfig {
                             // This unwrap is safe because of the crt/key check above
                             let key = load_key(tls.key_file.as_ref().unwrap(), &tls.key_phrase)?;
                             let crt = load_x509(filename)?;
-                            Some(Pkcs12::builder().build("", filename, &key, &crt).map_err(
-                                |err| {
-                                    format!("Could not build PKCS#12 archive for identity: {}", err)
-                                },
-                            )?)
+                            Some(
+                                Pkcs12::builder()
+                                    .build("", filename, &key, &crt)
+                                    .context(super::Pkcs12Error)?,
+                            )
                         }
                     };
                     Some(TcpSinkTls {
@@ -127,39 +128,44 @@ impl SinkConfig for TcpSinkConfig {
     }
 }
 
-fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, String> {
-    open_read_parse(filename, "certificate authority", Certificate::from_pem)
+fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, BuildError> {
+    let filename = filename.as_ref();
+    let data = open_read(filename, "certificate authority")?;
+    Certificate::from_pem(&data).context(super::CertificateParseError { filename })
 }
 
 fn load_key<T: AsRef<Path> + Debug>(
     filename: T,
     pass_phrase: &Option<String>,
-) -> Result<PKey<Private>, String> {
+) -> Result<PKey<Private>, BuildError> {
+    let filename = filename.as_ref();
+    let data = open_read(filename, "key")?;
     match pass_phrase {
-        None => open_read_parse(filename, "key", PKey::private_key_from_pem),
-        Some(phrase) => open_read_parse(filename, "key", |data| {
-            PKey::private_key_from_pem_passphrase(data, phrase.as_bytes())
-        }),
+        None => PKey::private_key_from_pem(&data).context(super::PrivateKeyParseError { filename }),
+        Some(phrase) => PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
+            .context(super::PrivateKeyParseError { filename }),
     }
 }
 
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, String> {
-    open_read_parse(filename, "certificate", X509::from_pem)
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, BuildError> {
+    let filename = filename.as_ref();
+    let data = open_read(filename, "certificate")?;
+    X509::from_pem(&data).context(super::X509ParseError { filename })
 }
 
-fn open_read_parse<F: AsRef<Path> + Debug, O, E: Error, P: Fn(&[u8]) -> Result<O, E>>(
+fn open_read<F: AsRef<Path> + Debug>(
     filename: F,
-    note: &str,
-    parser: P,
-) -> Result<O, String> {
+    note: &'static str,
+) -> Result<Vec<u8>, BuildError> {
     let mut text = Vec::<u8>::new();
+    let filename = filename.as_ref();
 
-    File::open(filename.as_ref())
-        .map_err(|err| format!("Could not open {} file {:?}: {}", note, filename, err))?
+    File::open(filename)
+        .context(super::FileOpenFailed { note, filename })?
         .read_to_end(&mut text)
-        .map_err(|err| format!("Could not read {} file {:?}: {}", note, filename, err))?;
+        .context(super::FileReadFailed { note, filename })?;
 
-    parser(&text).map_err(|err| format!("Could not parse {} file {:?}: {}", note, filename, err))
+    Ok(text)
 }
 
 pub struct TcpSink {
@@ -191,25 +197,21 @@ pub struct TcpSinkTls {
 }
 
 impl TcpSinkTls {
-    fn make_connector(&self) -> Result<TlsConnector, String> {
+    fn make_connector(&self) -> Result<TlsConnector, BuildError> {
         let mut connector = native_tls::TlsConnector::builder();
         connector.danger_accept_invalid_certs(!self.verify);
         if let Some(ref certificate) = self.add_ca {
             connector.add_root_certificate(certificate.clone());
         }
         if let Some(ref identity) = self.identity {
-            let identity = Identity::from_pkcs12(
-                &identity
-                    .to_der()
-                    .map_err(|err| format!("Could not export identity to DER: {}", err))?,
-                "",
-            )
-            .map_err(|err| format!("Could not set TCP TLS identity: {}", err))?;
+            let identity =
+                Identity::from_pkcs12(&identity.to_der().context(super::DerExportError)?, "")
+                    .context(super::TlsIdentityError)?;
             connector.identity(identity);
         }
-        Ok(TlsConnector::from(connector.build().map_err(|err| {
-            format!("Could not build TLS connector: {}", err)
-        })?))
+        Ok(TlsConnector::from(
+            connector.build().context(super::TlsBuildError)?,
+        ))
     }
 }
 

@@ -66,7 +66,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(
         &self,
         acker: crate::buffers::Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), sinks::BuildError>;
 
     fn input_type(&self) -> DataType;
 }

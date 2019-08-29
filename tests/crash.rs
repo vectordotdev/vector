@@ -18,7 +18,10 @@ struct PanicSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for PanicSink {
-    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(
+        &self,
+        _acker: Acker,
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::sinks::BuildError> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
 
@@ -87,7 +90,10 @@ struct ErrorSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for ErrorSink {
-    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(
+        &self,
+        _acker: Acker,
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::sinks::BuildError> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
 

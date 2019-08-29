@@ -53,7 +53,10 @@ pub struct ElasticSearchBasicAuthConfig {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), super::BuildError> {
         let sink = es(self, acker);
         let healthcheck = healthcheck(&self.host);
 

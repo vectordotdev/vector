@@ -10,6 +10,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use futures::{future, Future, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::net::TcpStream;
 
@@ -27,13 +28,16 @@ impl VectorSinkConfig {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), super::BuildError> {
         let addr = self
             .address
             .to_socket_addrs()
-            .map_err(|e| format!("IO Error: {}", e))?
+            .context(super::SocketAddressError)?
             .next()
-            .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+            .ok_or(super::BuildError::DNSFailure)?;
 
         let sink = vector(self.address.clone(), addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);

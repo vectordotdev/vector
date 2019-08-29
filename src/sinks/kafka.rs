@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -14,6 +15,7 @@ use rdkafka::{
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
 };
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::collections::HashSet;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
@@ -48,7 +50,7 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -69,11 +71,11 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, String> {
+    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, BuildError> {
         config
             .to_rdkafka()
             .create()
-            .map_err(|e| format!("error creating kafka producer: {}", e))
+            .context(super::KafkaCreateError)
             .map(|producer| KafkaSink {
                 producer,
                 topic: config.topic,

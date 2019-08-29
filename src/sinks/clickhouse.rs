@@ -1,3 +1,4 @@
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::Event,
@@ -14,6 +15,7 @@ use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -38,7 +40,7 @@ pub struct ClickhouseConfig {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let sink = clickhouse(self.clone(), acker)?;
         let healtcheck = healthcheck(self.host.clone());
 
@@ -50,7 +52,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, String> {
+fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, BuildError> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -138,7 +140,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
+fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, BuildError> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
@@ -157,8 +159,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
         format!("{}/?{}", host, query)
     };
 
-    url.parse::<Uri>()
-        .map_err(|e| format!("Unable to parse host as URI: {}", e))
+    url.parse::<Uri>().context(super::UriParseError)
 }
 
 #[derive(Clone)]

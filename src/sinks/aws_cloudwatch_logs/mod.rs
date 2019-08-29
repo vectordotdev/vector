@@ -1,5 +1,6 @@
 mod request;
 
+use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event, LogEvent, ValueKind},
@@ -23,6 +24,7 @@ use rusoto_logs::{
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use tower::{
     buffer::Buffer,
@@ -115,7 +117,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
@@ -150,7 +152,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, BuildError> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
@@ -236,12 +238,12 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> Result<Self, String> {
+    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> Result<Self, BuildError> {
         let region = config
             .region
             .clone()
             .try_into()
-            .map_err(|err| format!("{}", err))?;
+            .context(super::RegionParseError)?;
         let client = create_client(region)?;
 
         let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
@@ -383,7 +385,7 @@ fn partition(
     Some(PartitionInnerBuffer::new(event, key))
 }
 
-fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, BuildError> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(Box::new(future::ok(())));
@@ -391,9 +393,13 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let region = config.region.clone();
-
-    let client = create_client(region.try_into().map_err(|err| format!("{}", err))?)?;
+    let client = create_client(
+        config
+            .region
+            .clone()
+            .try_into()
+            .context(super::RegionParseError)?,
+    )?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -435,9 +441,9 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region) -> Result<CloudWatchLogsClient, String> {
-    let http = HttpClient::new().map_err(|e| format!("{}", e))?;
-    let creds = DefaultCredentialsProvider::new().map_err(|e| format!("{}", e))?;
+fn create_client(region: Region) -> Result<CloudWatchLogsClient, BuildError> {
+    let http = HttpClient::new().context(super::HttpClientError)?;
+    let creds = DefaultCredentialsProvider::new().context(super::InvalidCloudwatchCredentials)?;
 
     Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
