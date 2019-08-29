@@ -183,8 +183,8 @@ pub fn file_source(
     Box::new(future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
-        // TODO: channel sizing?
-        let (tx, rx) = futures::sync::mpsc::channel(100); // create channel to send down, wrap agg around rx, forward to out
+        // sizing here is just a guess
+        let (tx, rx) = futures::sync::mpsc::channel(100);
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(msi) = message_start_indicator {
