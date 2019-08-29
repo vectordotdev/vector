@@ -1,5 +1,6 @@
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
+use transforms::javascript::{JavaScript, JavaScriptConfig};
 use vector::{
     topology::config::TransformConfig,
     transforms::{self, Transform},
@@ -40,8 +41,11 @@ fn add_fields(c: &mut Criterion) {
         .with_function("javascript_with_copying", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = format!("event => ({{...event, ['{}']: '{}'}})", key, value);
-                    transforms::javascript::JavaScript::new(Some(source), None, None, None).unwrap()
+                    let config = JavaScriptConfig {
+                        source: Some(format!("event => ({{...event, ['{}']: '{}'}})", key, value)),
+                        ..Default::default()
+                    };
+                    JavaScript::new(config).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
@@ -55,11 +59,14 @@ fn add_fields(c: &mut Criterion) {
         .with_function("javascript_without_copying", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = format!(
-                        "event => {{ event['{}'] = '{}'; return event }}",
-                        key, value
-                    );
-                    transforms::javascript::JavaScript::new(Some(source), None, None, None).unwrap()
+                    let config = JavaScriptConfig {
+                        source: Some(format!(
+                            "event => {{ event['{}'] = '{}'; return event }}",
+                            key, value
+                        )),
+                        ..Default::default()
+                    };
+                    JavaScript::new(config).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
@@ -107,8 +114,13 @@ fn field_filter(c: &mut Criterion) {
         .with_function("javascript", move |b| {
             b.iter_with_setup(
                 || {
-                    let source = r"event => (event.the_field !== '0') ? null : event".to_string();
-                    transforms::javascript::JavaScript::new(Some(source), None, None, None).unwrap()
+                    let config = JavaScriptConfig {
+                        source: Some(
+                            r"event => (event.the_field !== '0') ? null : event".to_string(),
+                        ),
+                        ..Default::default()
+                    };
+                    JavaScript::new(config).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)

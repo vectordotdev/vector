@@ -64,13 +64,13 @@ lazy_static! {
     .collect();
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct JavaScriptConfig {
-    source: Option<String>,
-    path: Option<String>,
-    handler: Option<String>,
-    memory_limit: Option<usize>,
+    pub source: Option<String>,
+    pub path: Option<String>,
+    pub handler: Option<String>,
+    pub memory_limit: Option<usize>,
 }
 
 #[typetag::serde(name = "javascript")]
