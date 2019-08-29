@@ -2,11 +2,12 @@
 extern crate dlopen_derive;
 
 use dlopen::wrapper::{Container, WrapperApi};
-use libc::size_t;
+use libc::{free, size_t, strlen};
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::io::{Error as IOError, Result as IOResult};
 use std::iter;
-use std::os::raw::c_int;
+use std::os::raw::{c_char, c_int, c_void};
 use std::ptr::null_mut;
 
 const SD_JOURNAL_LOCAL_ONLY: c_int = 1;
@@ -24,6 +25,9 @@ struct LibSystemd {
     sd_journal_restart_data: extern "C" fn(j: *mut sd_journal),
     sd_journal_enumerate_data:
         extern "C" fn(j: *mut sd_journal, data: *const *mut u8, l: *mut size_t) -> c_int,
+    sd_journal_seek_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
+    sd_journal_get_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const *mut c_char) -> c_int,
+    sd_journal_test_cursor: extern "C" fn(j: *mut sd_journal, cursor: *const c_char) -> c_int,
 }
 
 fn load_lib() -> Result<Container<LibSystemd>, dlopen::Error> {
@@ -107,6 +111,21 @@ impl Journal {
         })
         .collect::<IOResult<Record>>()
     }
+
+    pub fn cursor(&self) -> IOResult<String> {
+        let mut cursor: *mut c_char = null_mut();
+        sd_result(self.lib.sd_journal_get_cursor(self.journal, &mut cursor))?;
+        Ok(into_string(cursor).unwrap())
+    }
+
+    pub fn seek_cursor(&self, cursor: &str) -> IOResult<()> {
+        let cursor = CString::new(cursor)?;
+        sd_result(
+            self.lib
+                .sd_journal_seek_cursor(self.journal, cursor.as_ptr()),
+        )?;
+        Ok(())
+    }
 }
 
 impl Iterator for Journal {
@@ -125,6 +144,21 @@ fn sd_result(code: c_int) -> IOResult<c_int> {
     match code {
         _ if code < 0 => Err(IOError::from_raw_os_error(-code)),
         _ => Ok(code),
+    }
+}
+
+/// Turn a C `char*` into a String, and free the source
+fn into_string(ptr: *mut c_char) -> Option<String> {
+    if ptr.is_null() {
+        None
+    } else {
+        Some(unsafe {
+            let result =
+                String::from_utf8_lossy(&std::slice::from_raw_parts(ptr as *mut u8, strlen(ptr)))
+                    .into_owned();
+            free(ptr as *mut c_void);
+            result
+        })
     }
 }
 
