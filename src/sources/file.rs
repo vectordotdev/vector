@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::Regex;
@@ -228,7 +228,7 @@ struct LineAgg<T> {
     inner: T,
     marker: Regex,
     timeout: u64,
-    buffers: HashMap<String, Bytes>,
+    buffers: HashMap<String, BytesMut>,
     draining: Option<Vec<(Bytes, String)>>,
     timeouts: DelayQueue<String>,
 }
@@ -263,35 +263,35 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
             match self.inner.poll() {
                 Ok(Async::Ready(Some((line, src)))) => {
                     // look for buffered content from same source
-                    if let Some(buffered) = self.buffers.remove(&src) {
+                    if let Some(mut buffered) = self.buffers.remove(&src) {
                         if self.marker.is_match(line.as_ref()) {
                             // buffer the incoming line and flush the existing data
-                            self.buffers.insert(src.clone(), line);
-                            return Ok(Async::Ready(Some((buffered, src))));
+                            self.buffers.insert(src.clone(), line.into());
+                            return Ok(Async::Ready(Some((buffered.freeze(), src))));
                         } else {
                             // append new line to the buffered data
-                            let mut more = buffered.to_vec();
-                            more.push(b'\n');
-                            more.extend_from_slice(&line);
-                            self.buffers.insert(src, Bytes::from(more));
+                            buffered.extend_from_slice(b"\n");
+                            buffered.extend_from_slice(&line);
+                            self.buffers.insert(src, buffered);
                         }
                     } else {
                         // no existing data for this source so buffer it with timeout
                         self.timeouts
                             .insert(src.clone(), Duration::from_millis(self.timeout));
-                        self.buffers.insert(src, line);
+                        self.buffers.insert(src, line.into());
                     }
                 }
                 Ok(Async::Ready(None)) => {
                     // start flushing all existing data, stop polling inner
-                    self.draining = Some(self.buffers.drain().map(|(k, v)| (v, k)).collect());
+                    self.draining =
+                        Some(self.buffers.drain().map(|(k, v)| (v.into(), k)).collect());
                 }
                 Ok(Async::NotReady) => {
                     // check for keys that have hit their timeout
                     if let Ok(Async::Ready(Some(expired))) = self.timeouts.poll() {
                         let key = expired.into_inner();
                         if let Some(buffered) = self.buffers.remove(&key) {
-                            return Ok(Async::Ready(Some((buffered, key))));
+                            return Ok(Async::Ready(Some((buffered.freeze(), key))));
                         }
                     }
 
