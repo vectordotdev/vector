@@ -113,8 +113,8 @@ fn topology_multiple_sinks() {
 fn topology_transform_chain() {
     let mut rt = runtime();
     let (in1, source1) = source();
-    let transform1 = transform(" first");
-    let transform2 = transform(" second");
+    let transform1 = transform(" first", 0.0);
+    let transform2 = transform(" second", 0.0);
     let (out1, sink1) = sink();
 
     let mut config = Config::empty();
@@ -207,8 +207,8 @@ fn topology_remove_one_sink() {
 fn topology_remove_one_transform() {
     let mut rt = runtime();
     let (in1, source1) = source();
-    let transform1 = transform(" transformed");
-    let transform2 = transform(" transformed");
+    let transform1 = transform(" transformed", 0.0);
+    let transform2 = transform(" transformed", 0.0);
     let (out1, sink1) = sink();
 
     let mut config = Config::empty();
@@ -219,7 +219,7 @@ fn topology_remove_one_transform() {
 
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
-    let transform2 = transform(" transformed");
+    let transform2 = transform(" transformed", 0.0);
 
     let mut config = Config::empty();
     config.add_source("in1", source().1);
@@ -313,7 +313,7 @@ fn topology_swap_sink() {
 fn topology_swap_transform() {
     let mut rt = runtime();
     let (in1, source1) = source();
-    let transform1 = transform(" transformed");
+    let transform1 = transform(" transformed", 0.0);
     let (out1v1, sink1v1) = sink();
 
     let mut config = Config::empty();
@@ -323,7 +323,7 @@ fn topology_swap_transform() {
 
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
-    let transform2 = transform(" replaced");
+    let transform2 = transform(" replaced", 0.0);
     let (out1v2, sink1v2) = sink();
 
     let mut config = Config::empty();
@@ -350,7 +350,7 @@ fn topology_swap_transform() {
 fn topology_swap_transform_is_atomic() {
     let mut rt = runtime();
     let (in1, source1) = source();
-    let transform1v1 = transform(" transformed");
+    let transform1v1 = transform(" transformed", 0.0);
     let (out1, sink1) = sink();
 
     let running = Arc::new(AtomicBool::new(true));
@@ -387,7 +387,7 @@ fn topology_swap_transform_is_atomic() {
     let (mut topology, _crash) = topology::start(config, &mut rt, false).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(10));
 
-    let transform1v2 = transform(" replaced");
+    let transform1v2 = transform(" replaced", 0.0);
 
     let mut config = Config::empty();
     config.add_source("in1", source().1);

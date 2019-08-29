@@ -7,7 +7,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use vector::buffers::Acker;
-use vector::event::{Event, ValueKind, MESSAGE};
+use vector::event::{Event, Metric, ValueKind, MESSAGE};
 use vector::sinks::{util::SinkExt, Healthcheck, RouterSink};
 use vector::sources::Source;
 use vector::topology::config::{
@@ -51,7 +51,7 @@ impl SourceConfig for MockSourceConfig {
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 }
 
@@ -63,6 +63,7 @@ pub fn source() -> (Sender<Event>, MockSourceConfig) {
 
 pub struct MockTransform {
     suffix: String,
+    increase: f64,
 }
 
 impl Transform for MockTransform {
@@ -73,8 +74,39 @@ impl Transform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert_explicit(MESSAGE.clone(), ValueKind::from(v));
             }
-            Event::Metric(_) => {
-                panic!("not yet supported");
+            Event::Metric(Metric::Counter {
+                name: _,
+                val,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *val += self.increase;
+            }
+            Event::Metric(Metric::Histogram {
+                name: _,
+                val,
+                sample_rate: _,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *val += self.increase;
+            }
+            Event::Metric(Metric::Gauge {
+                name: _,
+                val,
+                direction: _,
+                timestamp: _,
+                tags: _,
+            }) => {
+                *val += self.increase;
+            }
+            Event::Metric(Metric::Set {
+                name: _,
+                val,
+                timestamp: _,
+                tags: _,
+            }) => {
+                val.push_str(&self.suffix);
             }
         };
         Some(event)
@@ -84,11 +116,12 @@ impl Transform for MockTransform {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockTransformConfig {
     suffix: String,
+    increase: f64,
 }
 
 impl MockTransformConfig {
-    pub fn new(suffix: String) -> Self {
-        Self { suffix }
+    pub fn new(suffix: String, increase: f64) -> Self {
+        Self { suffix, increase }
     }
 }
 
@@ -97,20 +130,21 @@ impl TransformConfig for MockTransformConfig {
     fn build(&self) -> Result<Box<dyn Transform>, String> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
+            increase: self.increase,
         }))
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 }
 
-pub fn transform(suffix: &str) -> MockTransformConfig {
-    MockTransformConfig::new(suffix.to_owned())
+pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
+    MockTransformConfig::new(suffix.to_owned(), increase)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -147,7 +181,7 @@ impl SinkConfig for MockSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 }
 
