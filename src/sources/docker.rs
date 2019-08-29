@@ -12,7 +12,7 @@ use futures::{
     Async, Future, Sink, Stream,
 };
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashMap, env};
+use std::{collections::HashMap, env};
 use tracing::field;
 
 /// The begining of image names of vector docker images packaged by vector.
@@ -435,7 +435,6 @@ impl EventStreamBuilder {
                                     .map_err(|e| error!(message="Unable to return ContainerLogInfo to main",%e))
                                     .map(|_| ()),
                             );
-                            
                             Ok(Async::Ready(None))
                         }
                         Ok(Async::NotReady) => Ok(Async::NotReady),
@@ -553,33 +552,21 @@ impl ContainerLogInfo {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
-                    // Recieved log has already been processed
-                    Some(&(ref last, gen)) => match last.cmp(&timestamp) {
-                        Ordering::Greater => {
-                            trace!(
-                                message = "Recieved older log",
-                                timestamp = field::display(timestamp_str)
-                            );
-                            return None;
-                        }
-                        Ordering::Equal if gen < self.generation => {
-                            trace!(
-                                message = "Recieved log from previous container run",
-                                timestamp = field::display(timestamp_str)
-                            );
-                            return None;
-                        }
-                        _ => (),
-                    },
-                    // Recieved log is from before of creation
-                    None if self.created > timestamp.timestamp() => {
+                    // Recieved log has not already been processed
+                    Some(&(ref last, gen))
+                        if *last < timestamp || (*last == timestamp && gen == self.generation) =>
+                    {
+                        ()
+                    }
+                    // Recieved log is not from before of creation
+                    None if self.created <= timestamp.timestamp() => (),
+                    _ => {
                         trace!(
-                            message = "Recieved backlog",
+                            message = "Recieved older log",
                             timestamp = field::display(timestamp_str)
                         );
                         return None;
                     }
-                    _ => (),
                 }
                 // Supply timestamp
                 log_event.insert_explicit(
