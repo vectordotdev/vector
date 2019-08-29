@@ -5,6 +5,7 @@ use crate::{
 use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
+use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::DirBuilder;
@@ -105,6 +106,14 @@ impl SourceConfig for FileConfig {
                 e
             ));
         };
+
+        if let Some(Err(err)) = self.message_start_indicator.as_ref().map(|s| Regex::new(s)) {
+            return Err(format!(
+                "message_start_indicator is not a valid regex: {}",
+                err
+            ));
+        }
+
         Ok(file_source(self, data_dir, out))
     }
 
@@ -179,7 +188,11 @@ pub fn file_source(
 
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(msi) = message_start_indicator {
-                Box::new(LineAgg::new(rx, msi, multi_line_timeout))
+                Box::new(LineAgg::new(
+                    rx,
+                    Regex::new(&msi).unwrap(), // validated in build
+                    multi_line_timeout,
+                ))
             } else {
                 Box::new(rx)
             };
@@ -213,7 +226,7 @@ pub fn file_source(
 
 struct LineAgg<T> {
     inner: T,
-    marker: String,
+    marker: Regex,
     timeout: u64,
     buffers: HashMap<String, Bytes>,
     draining: Option<Vec<(Bytes, String)>>,
@@ -221,7 +234,7 @@ struct LineAgg<T> {
 }
 
 impl<T> LineAgg<T> {
-    fn new(inner: T, marker: String, timeout: u64) -> Self {
+    fn new(inner: T, marker: Regex, timeout: u64) -> Self {
         Self {
             inner,
             marker,
@@ -251,7 +264,7 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                 Ok(Async::Ready(Some((line, src)))) => {
                     // look for buffered content from same source
                     if let Some(buffered) = self.buffers.remove(&src) {
-                        if line.starts_with(self.marker.as_bytes()) {
+                        if self.marker.is_match(line.as_ref()) {
                             // buffer the incoming line and flush the existing data
                             self.buffers.insert(src.clone(), line);
                             return Ok(Async::Ready(Some((buffered, src))));
@@ -1140,6 +1153,9 @@ mod tests {
         sleep();
 
         writeln!(&mut file, "too slow").unwrap();
+        writeln!(&mut file, "INFO doesn't have").unwrap();
+        writeln!(&mut file, "to be INFO in").unwrap();
+        writeln!(&mut file, "the middle").unwrap();
 
         sleep();
 
@@ -1160,6 +1176,8 @@ mod tests {
                 "INFO hi again\nand some more".into(),
                 "INFO hello".into(),
                 "too slow".into(),
+                "INFO doesn't have".into(),
+                "to be INFO in\nthe middle".into(),
             ]
         );
     }
