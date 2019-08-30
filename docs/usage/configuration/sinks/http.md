@@ -33,6 +33,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   compression = "gzip" # no default, must be: "gzip" (if supplied)
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
+  verify_certificate = true # default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
@@ -76,6 +77,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   compression = "gzip"
   healthcheck = <bool>
   healthcheck_uri = "<string>"
+  verify_certificate = <bool>
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -161,6 +163,15 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # * optional
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  # When making a connection to a HTTPS server, this controls if the TLS
+  # certificate presented by the server will be verified. Do not set this unless
+  # you know what you are doing. Turning this off introduces significant
+  # vulnerabilities.
+  # 
+  # * optional
+  # * default: true
+  verify_certificate = true
 
   #
   # Batching
@@ -304,6 +315,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
+| `verify_certificate` | `bool` | When making a connection to a HTTPS server, this controls if the TLS certificate presented by the server will be verified. Do not set this unless you know what you are doing. Turning this off introduces significant vulnerabilities.<br />`default: true` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 5` `unit: seconds` |

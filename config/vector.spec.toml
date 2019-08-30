@@ -1840,6 +1840,15 @@ end
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
 
+  # When making a connection to a HTTPS server, this controls if the TLS
+  # certificate presented by the server will be verified. Do not set this unless
+  # you know what you are doing. Turning this off introduces significant
+  # vulnerabilities.
+  # 
+  # * optional
+  # * default: true
+  verify_certificate = true
+
   #
   # Batching
   #
