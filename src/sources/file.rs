@@ -6,7 +6,6 @@ use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
-use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -86,19 +85,11 @@ impl SourceConfig for FileConfig {
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        let mut data_dir = globals.resolve_and_validate_data_dir(self.data_dir.as_ref())?;
-        // now before passing on the validated data_dir, we add the source_name as a subdir,
-        // so that multiple sources can operate within the same given data_dir (e.g. the global one)
-        // without the file servers' checkpointers interfering with each other
-        data_dir.push(name);
-        if let Err(e) = DirBuilder::new().recursive(true).create(&data_dir) {
-            return Err(format!(
-                "could not create subdirectory '{}' inside of data_dir '{}': {}",
-                name,
-                data_dir.parent().unwrap().display(),
-                e
-            ));
-        };
+        // add the source name as a subdir, so that multiple sources can
+        // operate within the same given data_dir (e.g. the global one)
+        // without the file servers' checkpointers interfering with each
+        // other
+        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         Ok(file_source(self, data_dir, out))
     }
 

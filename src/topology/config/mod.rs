@@ -2,6 +2,7 @@ use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
 mod validation;
@@ -58,6 +59,33 @@ impl GlobalOptions {
             ));
         }
         Ok(data_dir)
+    }
+
+    /// Resolve the `data_dir` option using
+    /// `resolve_and_validate_data_dir` and then ensure a named
+    /// subdirectory exists.
+    pub fn resolve_and_make_data_subdir(
+        &self,
+        local: Option<&PathBuf>,
+        subdir: &str,
+    ) -> Result<PathBuf, String> {
+        let data_dir = self.resolve_and_validate_data_dir(local)?;
+
+        let mut data_subdir = data_dir.clone();
+        data_subdir.push(subdir);
+
+        DirBuilder::new()
+            .recursive(true)
+            .create(&data_subdir)
+            .map_err(|err| {
+                format!(
+                    "could not create subdirectory '{}' inside of data_dir '{}': {}",
+                    subdir,
+                    data_dir.display(),
+                    err
+                )
+            })?;
+        Ok(data_subdir)
     }
 }
 
