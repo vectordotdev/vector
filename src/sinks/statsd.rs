@@ -211,9 +211,9 @@ mod test {
 
     fn tags() -> HashMap<String, String> {
         vec![
-            ("z".to_owned(), "value".to_owned()),
-            ("t".to_owned(), "true".to_owned()),
-            ("a".to_owned(), "".to_owned()),
+            ("normal_tag".to_owned(), "value".to_owned()),
+            ("true_tag".to_owned(), "true".to_owned()),
+            ("empty_tag".to_owned(), "".to_owned()),
         ]
         .into_iter()
         .collect()
@@ -221,7 +221,10 @@ mod test {
 
     #[test]
     fn test_encode_tags() {
-        assert!(true);
+        assert_eq!(
+            &encode_tags(&tags()),
+            "empty_tag:,normal_tag:value,true_tag"
+        );
     }
 
     #[test]
@@ -333,7 +336,7 @@ mod test {
         let messages = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#a:,t,z:value\nvector.histogram:2|h|@0.01")
+            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01")
         );
     }
 }
