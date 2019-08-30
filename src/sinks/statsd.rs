@@ -1,10 +1,10 @@
 use crate::{
     buffers::Acker,
     event::{metric::Direction, Event, Metric},
-    sinks::util::{BatchServiceSink, SinkExt},
+    sinks::util::{BatchServiceSink, Buffer, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
-use futures::{future, Future, Poll};
+use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -13,7 +13,6 @@ use tower::{Service, ServiceBuilder};
 
 pub struct StatsdSvc {
     client: Client,
-    config: StatsdSinkConfig,
 }
 
 pub struct Client {
@@ -65,19 +64,26 @@ impl SinkConfig for StatsdSinkConfig {
 
 impl StatsdSvc {
     pub fn new(config: StatsdSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
-        let batch_size = config.batch_size.unwrap_or(20);
+        // 1432 bytes is a safe default to fit into MTU
+        // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
+        // also one might keep an eye on server side limitations, like
+        // https://github.com/DataDog/dd-agent/issues/2638
+        let batch_size = config.batch_size.unwrap_or(1432);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
+        let namespace = config.namespace.clone();
 
         let client = Client::new(config.address);
-        let service = StatsdSvc { client, config };
+        let service = StatsdSvc { client };
 
         let svc = ServiceBuilder::new().service(service);
 
-        let sink = BatchServiceSink::new(svc, acker).batched_with_min(
-            Vec::new(),
-            batch_size,
-            Duration::from_secs(batch_timeout),
-        );
+        let sink = BatchServiceSink::new(svc, acker)
+            .batched_with_min(
+                Buffer::new(false),
+                batch_size,
+                Duration::from_secs(batch_timeout),
+            )
+            .with(move |event| encode_event(event, &namespace));
 
         Ok(Box::new(sink))
     }
@@ -102,7 +108,7 @@ fn encode_tags(tags: &HashMap<String, String>) -> String {
     parts.join(",")
 }
 
-fn encode_event(event: &Event) -> String {
+fn encode_event(event: Event, namespace: &str) -> Result<Vec<u8>, ()> {
     let mut buf = Vec::new();
 
     match event.as_metric() {
@@ -160,10 +166,18 @@ fn encode_event(event: &Event) -> String {
         }
     };
 
-    buf.join("|")
+    let mut message: String = buf.join("|");
+    if !namespace.is_empty() {
+        message = format!("{}.{}", namespace, message);
+    };
+
+    let mut body: Vec<u8> = message.into_bytes();
+    body.push(b'\n');
+
+    Ok(body)
 }
 
-impl Service<Vec<Event>> for StatsdSvc {
+impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
     type Error = tokio::io::Error;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
@@ -172,22 +186,12 @@ impl Service<Vec<Event>> for StatsdSvc {
         Ok(().into())
     }
 
-    fn call(&mut self, items: Vec<Event>) -> Self::Future {
-        let messages: Vec<_> = items
-            .iter()
-            .map(encode_event)
-            .map(|message| {
-                if self.config.namespace.is_empty() {
-                    message
-                } else {
-                    format!("{}.{}", self.config.namespace, message)
-                }
-            })
-            .collect();
-        let frame = messages.join("\n");
-
+    fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
+        // remove trailing delimiter
+        if let Some(b'\n') = frame.last() {
+            frame.pop();
+        };
         self.client.send(frame.as_ref());
-
         Box::new(future::ok(()))
     }
 }
@@ -203,6 +207,7 @@ mod test {
     };
     use bytes::Bytes;
     use futures::{stream, stream::Stream, sync::mpsc, Sink};
+    use std::str::from_utf8;
     use tokio::{
         self,
         codec::BytesCodec,
@@ -235,8 +240,9 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
         };
-        let event1 = Event::Metric(metric1.clone());
-        let metric2 = parse(&encode_event(&event1)).unwrap();
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
 
@@ -249,8 +255,9 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
         };
-        let event1 = Event::Metric(metric1.clone());
-        let metric2 = parse(&encode_event(&event1)).unwrap();
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
 
@@ -263,8 +270,9 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
         };
-        let event1 = Event::Metric(metric1.clone());
-        let metric2 = parse(&encode_event(&event1)).unwrap();
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
 
@@ -276,8 +284,9 @@ mod test {
             timestamp: None,
             tags: Some(tags()),
         };
-        let event1 = Event::Metric(metric1.clone());
-        let metric2 = parse(&encode_event(&event1)).unwrap();
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
 
@@ -286,7 +295,7 @@ mod test {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
-            batch_size: Some(2),
+            batch_size: Some(512),
             batch_timeout: Some(1),
         };
 
