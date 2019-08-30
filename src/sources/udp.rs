@@ -2,16 +2,14 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{future, sync::mpsc, Async, Future, Sink, Stream};
+use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
-use tokio::{
-    codec::{BytesCodec, Decoder},
-    net::{UdpFramed, UdpSocket},
-    prelude::stream::poll_fn,
-};
+use tokio::codec::Decoder;
+use tokio_udp::{UdpFramed, UdpSocket};
 use tracing::field;
 
 /// UDP processes messages per packet, where messages are separated by newline.
@@ -61,49 +59,54 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
         })
         .and_then(move |socket| {
             let host_key = host_key.clone();
-            let mut new_line_decoder = BytesDelimitedCodec::new(b'\n');
-            UdpFramed::new(socket, BytesCodec::new())
-                .map(move |(mut bytes, addr)| {
-                    // A packet has come.
-                    // UDP processes messages per packet, where messages are separated by newline.
-                    let host_key = host_key.clone();
-                    poll_fn(move || {
-                        let maybe_event = match new_line_decoder.decode_eof(&mut bytes) {
-                            Ok(Some(line)) => {
-                                // One message
-                                let mut event = Event::from(line);
+            // UDP processes messages per packet, where messages are separated by newline.
+            // And stretch to end of packet.
+            UdpFramed::new(
+                socket,
+                BytesDelimitedEofCodec(BytesDelimitedCodec::new(b'\n')),
+            )
+            .map(move |(line, addr): (Bytes, _)| {
+                let mut event = Event::from(line);
 
-                                event.as_mut_log().insert_implicit(
-                                    host_key.clone().into(),
-                                    addr.to_string().into(),
-                                );
+                event
+                    .as_mut_log()
+                    .insert_implicit(host_key.clone().into(), addr.to_string().into());
 
-                                trace!(
-                                    message = "Received one event.",
-                                    event = field::debug(&event)
-                                );
-                                Some(event)
-                            }
-                            Ok(None) => None,
-                            Err(error) => {
-                                // Even if an Error occures, it should not be propagated further as it
-                                // only affects this datagram.
-                                error!(message = "error decoding datagram.", %error);
-                                None
-                            }
-                        };
-                        Ok(Async::Ready(maybe_event))
-                    })
-                })
-                // Flatten messages from single packet
-                .flatten()
-                // Error from UdpSocket
-                .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
-                .forward(out)
-                // Done with listening and sending
-                .map(|_| ())
+                trace!(
+                    message = "Received one event.",
+                    event = field::debug(&event)
+                );
+                event
+            })
+            // Error from Decoder or UdpSocket
+            .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
+            .forward(out)
+            // Done with listening and sending
+            .map(|_| ())
         }),
     )
+}
+
+/// Since messages in udp packet strech until end of the packet, it is necessary to decode last message
+/// when eof is reached. The problem is in UdpFramed calling BytesDelimitedCodec::decode for decoding
+/// messages which decodes only messages delimted with delimeter, in this case a newline. To fix this,
+/// this wrapper is used to make BytesDelimitedEofCodec::decode call BytesDelimitedCodec::decode_eof
+///
+/// which will decode last message properly.
+/// For more info see issue https://github.com/timberio/vector/issues/777.
+struct BytesDelimitedEofCodec(BytesDelimitedCodec);
+
+impl Decoder for BytesDelimitedEofCodec {
+    type Item = Bytes;
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, io::Error> {
+        self.0.decode_eof(buf)
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Bytes>, io::Error> {
+        self.0.decode_eof(buf)
+    }
 }
 
 #[cfg(test)]

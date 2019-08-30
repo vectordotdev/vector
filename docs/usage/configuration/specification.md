@@ -93,14 +93,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   data_dir = "/var/lib/vector"
 
-  # The number of bytes read off the head of the file to generate a unique
-  # fingerprint.
-  # 
-  # * optional
-  # * default: 256
-  # * unit: bytes
-  fingerprint_bytes = 256
-
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
   # 
@@ -115,14 +107,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   # * unit: seconds
   ignore_older = 86400
-
-  # The number of bytes to skipe ahead (or ignore) when generating a unique
-  # fingerprint. This is helpful if all files share a common header.
-  # 
-  # * optional
-  # * default: 0
-  # * unit: bytes
-  ignored_header_bytes = 0
 
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
@@ -154,6 +138,65 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * optional
   # * default: "host"
   host_key = "host"
+
+  #
+  # Fingerprinting
+  #
+
+  [sources.file.fingerprinting]
+    # Whether to use the content of a file to differentiate it (`checksum`) or the
+    # storage device and inode (`device_and_inode`). Depending on your log rotation
+    # strategy, one may be a better fit than the other.
+    # 
+    # * optional
+    # * default: "checksum"
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
+
+    # The number of bytes read off the head of the file to generate a unique
+    # fingerprint.
+    # 
+    # * optional
+    # * default: 256
+    # * unit: bytes
+    fingerprint_bytes = 256
+
+    # The number of bytes to skip ahead (or ignore) when generating a unique
+    # fingerprint. This is helpful if all files share a common header.
+    # 
+    # * optional
+    # * default: 0
+    # * unit: bytes
+    ignored_header_bytes = 0
+
+[sources.journald]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "journald"
+  type = "journald"
+
+  # Include only entries from the current runtime (boot)
+  # 
+  # * optional
+  # * default: true
+  current_runtime_only = true
+
+  # Include only entries from the local system
+  # 
+  # * optional
+  # * default: true
+  local_only = true
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  # 
+  # * optional
+  # * no default
+  units = ["ntpd", "sysinit.target"]
 
 [sources.kafka]
   # The component type
@@ -2341,6 +2384,51 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Tls
+  #
+
+  [sinks.tcp.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify = true
+
+    # Absolute path to additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_file = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
 
 [sinks.vector]
   #

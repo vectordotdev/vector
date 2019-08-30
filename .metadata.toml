@@ -77,16 +77,6 @@ description = """\
 The key name added to each event with the full path of the file.\
 """
 
-[sources.file.options.fingerprint_bytes]
-type = "int"
-default = 256
-null = false
-unit = "bytes"
-description = """\
-The number of bytes read off the head of the file to generate a unique \
-fingerprint.\
-"""
-
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
@@ -117,16 +107,6 @@ description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
 
-[sources.file.options.ignored_header_bytes]
-type = "int"
-default = 0
-null = false
-unit = "bytes"
-description = """\
-The number of bytes to skipe ahead (or ignore) when generating a unique \
-fingerprint. This is helpful if all files share a common header.\
-"""
-
 [sources.file.options.max_line_bytes]
 type = "int"
 unit = "bytes"
@@ -145,6 +125,80 @@ default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
 `false` Vector will only read new data added to the file.\
+"""
+
+[sources.file.options.fingerprinting]
+type = "table"
+null = true
+description = """\
+Configuration for how the file source should identify files.\
+"""
+
+[sources.file.options.fingerprinting.options.strategy]
+type = "string"
+enum = ["checksum", "device_and_inode"]
+default = "checksum"
+null = true
+description = """\
+Whether to use the content of a file to differentiate it (`checksum`) or the \
+storage device and inode (`device_and_inode`). Depending on your log rotation \
+strategy, one may be a better fit than the other.\
+"""
+
+[sources.file.options.fingerprinting.options.fingerprint_bytes]
+type = "int"
+default = 256
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes read off the head of the file to generate a unique \
+fingerprint.\
+"""
+
+[sources.file.options.fingerprinting.options.ignored_header_bytes]
+type = "int"
+default = 0
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes to skip ahead (or ignore) when generating a unique \
+fingerprint. This is helpful if all files share a common header.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.journald
+# ------------------------------------------------------------------------------
+[sources.journald]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "log records from journald"
+
+[sources.journald.options.current_runtime_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the current runtime (boot)"
+
+[sources.journald.options.local_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the local system"
+
+[sources.journald.options.units]
+type = "[string]"
+null = true
+default = []
+examples = [["ntpd", "sysinit.target"]]
+description = """\
+The list of units names to monitor. \
+If empty or not present, all units are accepted. \
+Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
 """
 
 # ------------------------------------------------------------------------------
@@ -1537,6 +1591,52 @@ description = """\
 The encoding format used to serialize the events before flushing. The default \
 is dynamic based on if the event is structured or not.\
 """
+
+[sinks.tcp.options.tls]
+type = "table"
+null = true
+description = "Options for TLS support"
+
+[sinks.tcp.options.tls.options.enabled]
+type = "bool"
+null = true
+default = false
+description = "Enable TLS during connections to the remote."
+
+[sinks.tcp.options.tls.options.verify]
+type = "bool"
+null = true
+default = true
+description = """If `true`, Vector will force certificate validation. \
+Do NOT set this to `false` unless you know the risks of not verifying \
+the remote certificate."""
+
+[sinks.tcp.options.tls.options.ca_file]
+type = "string"
+null = true
+description = "Absolute path to additional CA certificate file, in PEM format."
+examples = ["/path/to/certificate_authority.crt"]
+
+[sinks.tcp.options.tls.options.crt_file]
+type = "string"
+null = true
+description = """Absolute path to certificate file used to identify this \
+connection, in PEM format. If this is set, `key_file` must also be set."""
+examples = ["/path/to/host_certificate.crt"]
+
+[sinks.tcp.options.tls.options.key_file]
+type = "string"
+null = true
+description = """Absolute path to key file used to identify this \
+connection, in PEM format. If this is set, `crt_file` must also be set."""
+examples = ["/path/to/host_certificate.key"]
+
+[sinks.tcp.options.tls.options.key_phrase]
+type = "string"
+null = true
+description = """Pass phrase to unlock the encrypted key file. \
+This has no effect unless `key_file` above is set."""
+examples = ["PassWord1"]
 
 # ------------------------------------------------------------------------------
 # sinks.vector

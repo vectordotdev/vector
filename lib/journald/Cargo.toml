@@ -1,0 +1,11 @@
+[package]
+name = "journald"
+version = "0.1.0"
+authors = ["Bruce Guenter <bruce@untroubled.org>"]
+edition = "2018"
+
+[dependencies]
+dlopen = "0.1"
+dlopen_derive = "0.1"
+lazy_static = "1.3"
+libc = "0.2"

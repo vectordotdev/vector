@@ -4,6 +4,7 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use serde::{Serialize, Serializer};
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use string_cache::DefaultAtom as Atom;
 
 pub mod metric;
@@ -147,6 +148,26 @@ impl std::ops::Index<&Atom> for LogEvent {
 
     fn index(&self, key: &Atom) -> &ValueKind {
         &self.structured[key].value
+    }
+}
+
+// Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
+impl<K: Into<Atom>, V: Into<ValueKind>> FromIterator<(K, V)> for LogEvent {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        Self {
+            structured: iter
+                .into_iter()
+                .map(|(key, value)| {
+                    (
+                        key.into(),
+                        Value {
+                            value: value.into(),
+                            explicit: true,
+                        },
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -605,6 +626,18 @@ impl From<&str> for Event {
 impl From<String> for Event {
     fn from(line: String) -> Self {
         Bytes::from(line).into()
+    }
+}
+
+impl From<LogEvent> for Event {
+    fn from(log: LogEvent) -> Self {
+        Event::Log(log)
+    }
+}
+
+impl From<Metric> for Event {
+    fn from(metric: Metric) -> Self {
+        Event::Metric(metric)
     }
 }
 
