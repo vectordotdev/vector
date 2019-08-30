@@ -36,11 +36,15 @@ impl HttpService {
 /// A builder for `HttpService`s
 pub struct HttpServiceBuilder {
     threads: usize,
+    verify_certificate: bool,
 }
 
 impl HttpServiceBuilder {
     fn new() -> Self {
-        Self { threads: 4 }
+        Self {
+            threads: 4,
+            verify_certificate: true,
+        }
     }
 
     pub fn build<F>(&self, request_builder: F) -> HttpService
@@ -55,6 +59,12 @@ impl HttpServiceBuilder {
         self.threads = threads;
         self
     }
+
+    /// Verify the remote server's certificate
+    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
+        self.verify_certificate = verify;
+        self
+    }
 }
 
 impl<F> From<(&HttpServiceBuilder, F)> for HttpService
@@ -62,7 +72,13 @@ where
     F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
 {
     fn from((builder, request_builder): (&HttpServiceBuilder, F)) -> Self {
-        let https = HttpsConnector::new(builder.threads).expect("TLS initialization failed");
+        let mut http = HttpConnector::new(builder.threads);
+        http.enforce_http(false);
+        let tls = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(!builder.verify_certificate)
+            .build()
+            .expect("TLS initialization failed");
+        let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
