@@ -301,6 +301,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.grok_parser_transform]: ../../usage/configuration/transforms/grok_parser.md
 [docs.http_sink]: ../../usage/configuration/sinks/http.md
 [docs.javascript_transform]: ../../usage/configuration/transforms/javascript.md
+[docs.journald_source]: ../../usage/configuration/sources/journald.md
 [docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
 [docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
 [docs.kafka_source]: ../../usage/configuration/sources/kafka.md

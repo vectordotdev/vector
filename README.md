@@ -220,6 +220,7 @@ the License.
 [docs.http_sink]: https://docs.vector.dev/usage/configuration/sinks/http
 [docs.installation]: https://docs.vector.dev/setup/installation
 [docs.javascript_transform]: https://docs.vector.dev/usage/configuration/transforms/javascript
+[docs.journald_source]: https://docs.vector.dev/usage/configuration/sources/journald
 [docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.kafka_source]: https://docs.vector.dev/usage/configuration/sources/kafka
