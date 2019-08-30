@@ -21,11 +21,48 @@ pub struct HttpService {
 }
 
 impl HttpService {
+    pub fn builder() -> HttpServiceBuilder {
+        HttpServiceBuilder::new()
+    }
+
     pub fn new<F>(request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        Self::builder().build(request_builder)
+    }
+}
+
+/// A builder for `HttpService`s
+pub struct HttpServiceBuilder {
+    threads: usize,
+}
+
+impl HttpServiceBuilder {
+    fn new() -> Self {
+        Self { threads: 4 }
+    }
+
+    pub fn build<F>(&self, request_builder: F) -> HttpService
+    where
+        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    {
+        HttpService::from((self, request_builder))
+    }
+
+    /// Set the number of threads used by the `HttpService`
+    pub fn threads(&mut self, threads: usize) -> &mut Self {
+        self.threads = threads;
+        self
+    }
+}
+
+impl<F> From<(&HttpServiceBuilder, F)> for HttpService
+where
+    F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+{
+    fn from((builder, request_builder): (&HttpServiceBuilder, F)) -> Self {
+        let https = HttpsConnector::new(builder.threads).expect("TLS initialization failed");
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
