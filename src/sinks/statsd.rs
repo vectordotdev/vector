@@ -7,8 +7,7 @@ use crate::{
 use futures::{future, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 
@@ -174,7 +173,17 @@ impl Service<Vec<Event>> for StatsdSvc {
     }
 
     fn call(&mut self, items: Vec<Event>) -> Self::Future {
-        let messages: Vec<_> = items.iter().map(encode_event).collect();
+        let messages: Vec<_> = items
+            .iter()
+            .map(encode_event)
+            .map(|message| {
+                if self.config.namespace.is_empty() {
+                    message
+                } else {
+                    format!("{}.{}", self.config.namespace, message)
+                }
+            })
+            .collect();
         let frame = messages.join("\n");
 
         self.client.send(frame.as_ref());
@@ -186,23 +195,91 @@ impl Service<Vec<Event>> for StatsdSvc {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::buffers::Acker;
     use crate::{
+        buffers::Acker,
+        sources::statsd::parser::parse,
         test_util::{collect_n, runtime},
         Event,
     };
     use bytes::Bytes;
-    use futures::stream::Stream;
-    use futures::sync::mpsc;
-    use futures::{stream, Sink};
+    use futures::{stream, stream::Stream, sync::mpsc, Sink};
     use tokio::{
         self,
         codec::BytesCodec,
         net::{UdpFramed, UdpSocket},
     };
 
+    fn tags() -> HashMap<String, String> {
+        vec![
+            ("z".to_owned(), "value".to_owned()),
+            ("t".to_owned(), "true".to_owned()),
+            ("a".to_owned(), "".to_owned()),
+        ]
+        .into_iter()
+        .collect()
+    }
+
     #[test]
-    fn test_statsd() {
+    fn test_encode_tags() {
+        assert!(true);
+    }
+
+    #[test]
+    fn test_encode_counter() {
+        let metric1 = Metric::Counter {
+            name: "counter".to_owned(),
+            val: 1.5,
+            timestamp: None,
+            tags: Some(tags()),
+        };
+        let event1 = Event::Metric(metric1.clone());
+        let metric2 = parse(&encode_event(&event1)).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[test]
+    fn test_encode_gauge() {
+        let metric1 = Metric::Gauge {
+            name: "gauge".to_owned(),
+            val: 1.5,
+            direction: Some(Direction::Minus),
+            timestamp: None,
+            tags: Some(tags()),
+        };
+        let event1 = Event::Metric(metric1.clone());
+        let metric2 = parse(&encode_event(&event1)).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[test]
+    fn test_encode_histogram() {
+        let metric1 = Metric::Histogram {
+            name: "histogram".to_owned(),
+            val: 1.5,
+            sample_rate: 1,
+            timestamp: None,
+            tags: Some(tags()),
+        };
+        let event1 = Event::Metric(metric1.clone());
+        let metric2 = parse(&encode_event(&event1)).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[test]
+    fn test_encode_set() {
+        let metric1 = Metric::Set {
+            name: "set".to_owned(),
+            val: "abc".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+        };
+        let event1 = Event::Metric(metric1.clone());
+        let metric2 = parse(&encode_event(&event1)).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[test]
+    fn test_send_to_statsd() {
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
             address: default_address(),
@@ -218,15 +295,7 @@ mod test {
             name: "counter".to_owned(),
             val: 1.5,
             timestamp: None,
-            tags: Some(
-                vec![
-                    ("z".to_owned(), "value".to_owned()),
-                    ("t".to_owned(), "true".to_owned()),
-                    ("a".to_owned(), "".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ),
+            tags: Some(tags()),
         });
         events.push(event);
 
@@ -245,11 +314,11 @@ mod test {
         let (tx, rx) = mpsc::channel(1);
 
         let receiver = Box::new(
-            future::lazy(move || {
+            future::lazy(|| {
                 let socket = UdpSocket::bind(&default_address()).unwrap();
                 future::ok(socket)
             })
-            .and_then(move |socket| {
+            .and_then(|socket| {
                 UdpFramed::new(socket, BytesCodec::new())
                     .map_err(|e| error!("error reading line: {:?}", e))
                     .map(|(bytes, _addr)| bytes)
@@ -264,7 +333,7 @@ mod test {
         let messages = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(
             messages[0],
-            Bytes::from("counter:1.5|c|#a:,t,z:value\nhistogram:2|h|@0.01")
+            Bytes::from("vector.counter:1.5|c|#a:,t,z:value\nvector.histogram:2|h|@0.01")
         );
     }
 }
