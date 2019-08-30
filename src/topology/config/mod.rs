@@ -29,6 +29,36 @@ impl GlobalOptions {
             data_dir: config.data_dir.clone(),
         }
     }
+
+    /// Resolve the `data_dir` option in either the global or local
+    /// config, and validate that it exists and is writable.
+    pub fn resolve_and_validate_data_dir(
+        &self,
+        local_data_dir: Option<&PathBuf>,
+    ) -> Result<PathBuf, String> {
+        let data_dir = local_data_dir
+            .or(self.data_dir.as_ref())
+            .ok_or_else(|| {
+                String::from("data_dir option required, but not given here or globally")
+            })?
+            .to_path_buf();
+        if !data_dir.exists() {
+            return Err(format!(
+                "data_dir '{}' does not exist",
+                data_dir.to_string_lossy()
+            ));
+        }
+        let readonly = std::fs::metadata(&data_dir)
+            .map(|meta| meta.permissions().readonly())
+            .unwrap_or(true);
+        if readonly {
+            return Err(format!(
+                "data_dir '{}' is not writable",
+                data_dir.to_string_lossy()
+            ));
+        }
+        Ok(data_dir)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
