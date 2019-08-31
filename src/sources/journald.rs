@@ -9,7 +9,8 @@ use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::io::Error;
+use std::fs::{File, OpenOptions};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
@@ -174,6 +175,89 @@ where
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }
+    }
+}
+
+const CHECKPOINT_FILENAME: &'static str = "checkpoint.txt";
+
+struct Checkpointer {
+    file: File,
+}
+
+impl Checkpointer {
+    fn new(mut filename: PathBuf) -> Result<Self, Error> {
+        filename.push(CHECKPOINT_FILENAME);
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(filename)?;
+        Ok(Checkpointer { file })
+    }
+
+    fn set(&mut self, token: &str) -> Result<(), Error> {
+        self.file.seek(SeekFrom::Start(0))?;
+        self.file.write(format!("{}\n", token).as_bytes())?;
+        Ok(())
+    }
+
+    fn get(&mut self) -> Result<Option<String>, Error> {
+        let mut buf = Vec::<u8>::new();
+        self.file.seek(SeekFrom::Start(0))?;
+        self.file.read_to_end(&mut buf)?;
+        match buf.len() {
+            0 => Ok(None),
+            _ => {
+                let text = String::from_utf8_lossy(&buf);
+                match text.find('\n') {
+                    Some(nl) => Ok(Some(String::from(&text[..nl]))),
+                    None => Ok(None), // Maybe return an error?
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod checkpointer_tests {
+    use super::*;
+    use core::fmt::Debug;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::Path;
+    use tempfile::tempdir;
+
+    fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
+        let mut file = File::open(&path).expect(&format!("Could not open {:?}", path));
+        let mut buf = Vec::<u8>::new();
+        file.read_to_end(&mut buf)
+            .expect(&format!("Could not read {:?}", path));
+        buf
+    }
+
+    #[test]
+    fn journald_checkpointer_works() {
+        let tempdir = tempdir().unwrap();
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer =
+            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+
+        assert!(checkpointer.get().unwrap().is_none());
+
+        checkpointer
+            .set("first test")
+            .expect("Setting checkpoint failed");
+        assert_eq!(checkpointer.get().unwrap().unwrap(), "first test");
+        let contents = open_read_close(&filename);
+        assert!(String::from_utf8_lossy(&contents).starts_with("first test\n"));
+
+        checkpointer
+            .set("second")
+            .expect("Setting checkpoint failed");
+        assert_eq!(checkpointer.get().unwrap().unwrap(), "second");
+        let contents = open_read_close(&filename);
+        assert!(String::from_utf8_lossy(&contents).starts_with("second\n"));
     }
 }
 
