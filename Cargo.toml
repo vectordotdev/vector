@@ -151,6 +151,7 @@ default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
+  "clickhouse-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
@@ -159,6 +160,7 @@ docker = [
 ]
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
+clickhouse-integration-tests = []
 es-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []
