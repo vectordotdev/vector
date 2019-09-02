@@ -111,11 +111,15 @@ impl JavaScript {
             let processor = JavaScriptProcessor::new(config);
             let processor = match processor {
                 Ok(processor) => {
-                    thread_output.send(ProcessorOutput::Start(Ok(()))).unwrap();
+                    thread_output
+                        .send(ProcessorOutput::Start(Ok(())))
+                        .expect("Unable to send data from JavaScript thread");
                     processor
                 }
                 Err(e) => {
-                    return thread_output.send(ProcessorOutput::Start(Err(e))).unwrap();
+                    return thread_output
+                        .send(ProcessorOutput::Start(Err(e)))
+                        .expect("Unable to send data from JavaScript thread");
                 }
             };
             for event in thread_input {
@@ -128,13 +132,16 @@ impl JavaScript {
                         }
                         thread_output
                             .send(ProcessorOutput::Events(output_events))
-                            .unwrap();
+                            .expect("Unable to send data from JavaScript thread");
                     }
                     ProcessorInput::Stop => break,
                 }
             }
         });
-        match output.recv().unwrap() {
+        match output
+            .recv()
+            .expect("Unable to receive data from JavaScript thread")
+        {
             ProcessorOutput::Start(res) => res.map(|_| JavaScript { input, output }),
             _ => unreachable!(),
         }
@@ -143,7 +150,9 @@ impl JavaScript {
 
 impl Drop for JavaScript {
     fn drop(&mut self) {
-        self.input.send(ProcessorInput::Stop).unwrap();
+        self.input
+            .send(ProcessorInput::Stop)
+            .expect("Unable to send data to JavaScript thread")
     }
 }
 
@@ -157,8 +166,14 @@ impl Transform for JavaScript {
     }
 
     fn transform_into(&mut self, output_events: &mut Vec<Event>, event: Event) {
-        self.input.send(ProcessorInput::Event(event)).unwrap();
-        match self.output.recv().unwrap() {
+        self.input
+            .send(ProcessorInput::Event(event))
+            .expect("Unable to send data to JavaScript thread");
+        match self
+            .output
+            .recv()
+            .expect("Unable to receive message from a JavaScriptProcessor thread")
+        {
             ProcessorOutput::Events(mut transformed) => output_events.append(&mut transformed),
             _ => unreachable!(),
         }
