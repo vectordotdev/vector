@@ -6,6 +6,9 @@ extern crate tracing;
 extern crate prost_derive;
 #[macro_use]
 extern crate derivative;
+#[cfg(test)]
+#[macro_use]
+extern crate toml;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
