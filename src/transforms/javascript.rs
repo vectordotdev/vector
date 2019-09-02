@@ -263,9 +263,7 @@ fn encode(event: Event) -> Result<JsValue, String> {
             (
                 key.to_string(),
                 match value {
-                    ValueKind::Bytes(v) => {
-                        JsValue::String(std::str::from_utf8(v).unwrap().to_string())
-                    }
+                    ValueKind::Bytes(v) => JsValue::String(String::from_utf8_lossy(v).to_string()),
                     ValueKind::Integer(v) => JsValue::Float(*v as f64), // JS `Number`s are floats
                     ValueKind::Float(v) => JsValue::Float(*v),
                     ValueKind::Boolean(v) => JsValue::Bool(*v),
