@@ -26,22 +26,29 @@ impl RegionOrEndpoint {
     }
 }
 
-impl TryFrom<RegionOrEndpoint> for Region {
+impl TryFrom<&RegionOrEndpoint> for Region {
     type Error = String;
 
-    fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
-        match (r.region, r.endpoint) {
+    fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
+        match (&r.region, &r.endpoint) {
             (Some(region), None) => region.parse().map_err(|e| format!("{}", e)),
             (None, Some(endpoint)) => endpoint
                 .parse::<Uri>()
                 .map(|_| Region::Custom {
                     name: "custom".into(),
-                    endpoint,
+                    endpoint: endpoint.into(),
                 })
                 .map_err(|e| format!("Failed to parse custom endpoint as URI: {}", e)),
             (Some(_), Some(_)) => Err("Only one of 'region' or 'endpoint' can be specified".into()),
             (None, None) => Err("Must set 'region' or 'endpoint'".into()),
         }
+    }
+}
+
+impl TryFrom<RegionOrEndpoint> for Region {
+    type Error = String;
+    fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
+        Region::try_from(&r)
     }
 }
 
