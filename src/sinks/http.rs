@@ -120,7 +120,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
 
     if !verify {
         warn!(
-            message = "Turning off verify_certificate in http sink can introduce security vulnerabilities"
+            message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
         );
     }
 
