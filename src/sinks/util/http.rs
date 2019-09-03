@@ -47,11 +47,26 @@ impl HttpServiceBuilder {
         }
     }
 
+    /// Build the configured `HttpService`
     pub fn build<F>(&self, request_builder: F) -> HttpService
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        HttpService::from((self, request_builder))
+        let mut http = HttpConnector::new(self.threads);
+        http.enforce_http(false);
+        let tls = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(!self.verify_certificate)
+            .build()
+            .expect("TLS initialization failed");
+        let https = HttpsConnector::from((http, tls));
+        let client = hyper::Client::builder()
+            .executor(DefaultExecutor::current())
+            .build(https);
+        let inner = InstrumentedHttpService::new(Client::with_client(client));
+        HttpService {
+            inner,
+            request_builder: Arc::new(Box::new(request_builder)),
+        }
     }
 
     /// Set the number of threads used by the `HttpService`
@@ -64,29 +79,6 @@ impl HttpServiceBuilder {
     pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
         self.verify_certificate = verify;
         self
-    }
-}
-
-impl<F> From<(&HttpServiceBuilder, F)> for HttpService
-where
-    F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
-{
-    fn from((builder, request_builder): (&HttpServiceBuilder, F)) -> Self {
-        let mut http = HttpConnector::new(builder.threads);
-        http.enforce_http(false);
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(!builder.verify_certificate)
-            .build()
-            .expect("TLS initialization failed");
-        let https = HttpsConnector::from((http, tls));
-        let client = hyper::Client::builder()
-            .executor(DefaultExecutor::current())
-            .build(https);
-        let inner = InstrumentedHttpService::new(Client::with_client(client));
-        Self {
-            inner,
-            request_builder: Arc::new(Box::new(request_builder)),
-        }
     }
 }
 
