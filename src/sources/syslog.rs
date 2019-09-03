@@ -8,6 +8,7 @@ use chrono::{TimeZone, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::{
     self,
@@ -58,7 +59,7 @@ impl SourceConfig for SyslogConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, super::BuildError> {
+    ) -> Result<super::Source, Box<dyn Error + 'static>> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
         match self.mode.clone() {

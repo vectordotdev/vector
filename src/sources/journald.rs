@@ -8,9 +8,10 @@ use futures::{future, sync::mpsc, Future, Sink};
 use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
-use std::io::Error;
+use std::error::Error;
+use std::io;
 use std::iter::FromIterator;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
@@ -22,6 +23,12 @@ lazy_static! {
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
+}
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("journald error: {}", source))]
+    JournaldError { source: ::journald::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -39,10 +46,10 @@ impl SourceConfig for JournaldConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, super::BuildError> {
+    ) -> Result<super::Source, Box<dyn Error + 'static>> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
-        let journal = Journal::open(local_only, runtime_only).context(super::JournaldError)?;
+        let journal = Journal::open(local_only, runtime_only).context(JournaldError)?;
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.
@@ -68,7 +75,7 @@ impl SourceConfig for JournaldConfig {
 
 fn journald_source<J>(journal: J, out: mpsc::Sender<Event>, units: HashSet<String>) -> super::Source
 where
-    J: 'static + Iterator<Item = Result<Record, Error>> + Send,
+    J: 'static + Iterator<Item = Result<Record, io::Error>> + Send,
 {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
@@ -134,7 +141,7 @@ struct JournaldServer<J, T> {
 
 impl<J, T> JournaldServer<J, T>
 where
-    J: Iterator<Item = Result<Record, Error>>,
+    J: Iterator<Item = Result<Record, io::Error>>,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {

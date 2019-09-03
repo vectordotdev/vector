@@ -2,6 +2,7 @@ use crate::{topology::config::GlobalOptions, Event};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use parser::parse;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::net::SocketAddr;
 use tokio::{
     self,
@@ -24,7 +25,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, super::BuildError> {
+    ) -> Result<super::Source, Box<dyn Error + 'static>> {
         Ok(statsd(self.address, out))
     }
 

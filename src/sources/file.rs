@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -7,12 +6,33 @@ use bytes::Bytes;
 use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Future, Sink};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tracing::dispatcher;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("data_dir option required, but not given here or globally"))]
+    NoDataDir,
+    #[snafu(display(
+        "could not create subdirectory {:?} inside of data_dir {:?}",
+        subdir,
+        data_dir
+    ))]
+    MakeSubdirectoryError {
+        subdir: PathBuf,
+        data_dir: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("data_dir {:?} does not exist", data_dir))]
+    MissingDataDir { data_dir: PathBuf },
+    #[snafu(display("data_dir {:?} is not writable", data_dir))]
+    DataDirNotWritable { data_dir: PathBuf },
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields, default)]
@@ -87,7 +107,7 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, BuildError> {
+    ) -> Result<super::Source, Box<dyn Error + 'static>> {
         let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
         // now before passing on the validated data_dir, we add the source_name as a subdir,
         // so that multiple sources can operate within the same given data_dir (e.g. the global one)
@@ -96,7 +116,7 @@ impl SourceConfig for FileConfig {
         DirBuilder::new()
             .recursive(true)
             .create(&data_dir)
-            .context(super::MakeSubdirectoryError {
+            .context(MakeSubdirectoryError {
                 data_dir: data_dir.parent().unwrap().to_path_buf(),
                 subdir: name,
             })?;
@@ -111,21 +131,21 @@ impl SourceConfig for FileConfig {
 fn resolve_and_validate_data_dir(
     config: &FileConfig,
     globals: &GlobalOptions,
-) -> Result<PathBuf, BuildError> {
+) -> Result<PathBuf, Box<dyn Error + 'static>> {
     let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
         Some(v) => v.clone(),
-        None => return Err(BuildError::NoDataDir),
+        None => return Err(Box::new(BuildError::NoDataDir)),
     };
     if !data_dir.exists() {
-        return Err(BuildError::MissingDataDir {
+        return Err(Box::new(BuildError::MissingDataDir {
             data_dir: data_dir.into(),
-        });
+        }));
     }
     let readonly = std::fs::metadata(&data_dir)
         .map(|meta| meta.permissions().readonly())
         .unwrap_or(true);
     if readonly {
-        return Err(BuildError::DataDirNotWritable { data_dir });
+        return Err(Box::new(BuildError::DataDirNotWritable { data_dir }));
     }
     Ok(data_dir)
 }

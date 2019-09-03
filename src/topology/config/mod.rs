@@ -46,7 +46,7 @@ pub trait SourceConfig: core::fmt::Debug {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, sources::BuildError>;
+    ) -> Result<sources::Source, Box<dyn Error + 'static>>;
 
     fn output_type(&self) -> DataType;
 }

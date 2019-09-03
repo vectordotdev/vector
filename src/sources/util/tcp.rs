@@ -1,6 +1,7 @@
 use crate::Event;
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
+use std::error::Error;
 use std::{
     io,
     net::SocketAddr,
@@ -31,7 +32,7 @@ pub trait TcpSource: Clone + Send + 'static {
         addr: SocketAddr,
         shutdown_timeout_secs: u64,
         out: mpsc::Sender<Event>,
-    ) -> Result<crate::sources::Source, crate::sources::BuildError> {
+    ) -> Result<crate::sources::Source, Box<dyn Error + 'static>> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
         let source = future::lazy(move || {

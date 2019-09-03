@@ -6,6 +6,7 @@ use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use tokio::{
     codec::FramedRead,
     io::{stdin, AsyncRead},
@@ -39,7 +40,7 @@ impl SourceConfig for StdinConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, super::BuildError> {
+    ) -> Result<super::Source, Box<dyn Error + 'static>> {
         Ok(stdin_source(stdin(), self.clone(), out))
     }
 
