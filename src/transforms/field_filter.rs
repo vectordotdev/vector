@@ -1,9 +1,10 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
 };
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -15,7 +16,7 @@ pub struct FieldFilterConfig {
 
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),

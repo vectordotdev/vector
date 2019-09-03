@@ -24,15 +24,7 @@ pub trait Transform: Send {
 }
 
 #[derive(Debug, Snafu)]
-pub enum BuildError {
-    #[snafu(display("Invalid type name: {}", source))]
-    TypesConversionError {
-        source: crate::types::ConversionError,
-    },
+enum BuildError {
     #[snafu(display("Invalid regular expression: {}", source))]
     InvalidRegex { source: regex::Error },
-    #[snafu(display("Invalid grok pattern: {}", source))]
-    InvalidGrok { source: grok::Error },
-    #[snafu(display("Lua error: {}", source))]
-    InvalidLua { source: rlua::Error },
 }

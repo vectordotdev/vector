@@ -1,10 +1,10 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::event::Event;
 use crate::topology::config::DataType;
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 use std::collections::HashMap;
+use std::error::Error;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -17,8 +17,8 @@ pub struct CoercerConfig {
 
 #[typetag::serde(name = "coercer")]
 impl crate::topology::config::TransformConfig for CoercerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
-        let types = parse_conversion_map(&self.types).context(super::TypesConversionError)?;
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+        let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
     }
 

@@ -1,4 +1,4 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::{self, Event},
     topology::config::{DataType, TransformConfig},
@@ -13,8 +13,8 @@ use nom::{
     sequence::{delimited, terminated},
 };
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 use std::collections::HashMap;
+use std::error::Error;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -29,11 +29,10 @@ pub struct TokenizerConfig {
 
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)
-            .context(super::TypesConversionError)?;
+        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);

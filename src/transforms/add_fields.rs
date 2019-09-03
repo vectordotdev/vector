@@ -1,4 +1,4 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::{Event, ValueKind},
     topology::config::{DataType, TransformConfig},
@@ -6,6 +6,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 use toml::value::Value;
 
@@ -21,7 +22,7 @@ pub struct AddFields {
 
 #[typetag::serde(name = "augmenter")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 

@@ -1,4 +1,4 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::metric::Metric,
     event::{self, ValueKind},
@@ -9,6 +9,7 @@ use crate::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -70,7 +71,7 @@ pub struct LogToMetric {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 

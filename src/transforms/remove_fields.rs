@@ -1,9 +1,10 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     topology::config::{DataType, TransformConfig},
     Event,
 };
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -18,7 +19,7 @@ pub struct RemoveFields {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 

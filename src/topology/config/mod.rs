@@ -2,6 +2,7 @@ use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::{collections::HashMap, path::PathBuf};
 
 mod validation;
@@ -80,7 +81,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> Result<Box<dyn transforms::Transform>, transforms::BuildError>;
+    fn build(&self) -> Result<Box<dyn transforms::Transform>, Box<dyn Error + 'static>>;
 
     fn input_type(&self) -> DataType;
 

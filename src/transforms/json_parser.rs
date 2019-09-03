@@ -1,10 +1,11 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, TransformConfig},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -19,7 +20,7 @@ pub struct JsonParserConfig {
 
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Ok(Box::new(JsonParser::from(self.clone())))
     }
 

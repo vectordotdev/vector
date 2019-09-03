@@ -1,10 +1,17 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::Event,
     topology::config::{DataType, TransformConfig},
 };
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Lua error: {}", source))]
+    InvalidLua { source: rlua::Error },
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -16,7 +23,7 @@ pub struct LuaConfig {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -37,7 +44,7 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, BuildError> {
+    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, Box<dyn Error + 'static>> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs
@@ -60,7 +67,7 @@ impl Lua {
             ctx.set_named_registry_value("vector_func", func)?;
             Ok(())
         })
-        .context(super::InvalidLua)?;
+        .context(InvalidLua)?;
 
         Ok(Self { lua })
     }

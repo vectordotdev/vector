@@ -1,4 +1,4 @@
-use super::{BuildError, Transform};
+use super::Transform;
 use crate::{
     event::{self, Event, ValueKind},
     topology::config::{DataType, TransformConfig},
@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::error::Error;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -24,7 +25,7 @@ pub struct RegexParserConfig {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, BuildError> {
+    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
@@ -35,8 +36,7 @@ impl TransformConfig for RegexParserConfig {
                 .capture_names()
                 .filter_map(|s| s.map(|s| s.into()))
                 .collect(),
-        )
-        .context(super::TypesConversionError)?;
+        )?;
 
         Ok(Box::new(RegexParser::new(
             regex,
