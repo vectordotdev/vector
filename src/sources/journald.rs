@@ -213,6 +213,7 @@ where
                     Err(()) => error!(message = "Could not send journald log"),
                 }
             }
+
             match self.journal.cursor() {
                 Ok(cursor) => {
                     if let Err(err) = self.checkpointer.set(&cursor) {
@@ -227,6 +228,7 @@ where
                     error = field::display(&err)
                 ),
             }
+
             match self.shutdown.recv_timeout(timeout) {
                 Ok(()) => unreachable!(), // The sender should never actually send
                 Err(RecvTimeoutError::Timeout) => {}
