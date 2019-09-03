@@ -79,7 +79,7 @@ fn journald_source<J>(
     units: HashSet<String>,
 ) -> super::Source
 where
-    J: 'static + Iterator<Item = Result<Record, Error>> + JournalCursor + Send,
+    J: Iterator<Item = Result<Record, Error>> + JournalCursor + Send + 'static,
 {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
