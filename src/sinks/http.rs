@@ -118,6 +118,12 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         HttpRetryLogic,
     );
 
+    if !verify {
+        warn!(
+            message = "Turning off verify_certificate in http sink can introduce security vulnerabilities"
+        );
+    }
+
     let http_service =
         HttpService::builder()
             .verify_certificate(verify)
