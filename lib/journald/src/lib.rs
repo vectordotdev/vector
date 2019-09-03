@@ -5,7 +5,7 @@ use dlopen::wrapper::{Container, WrapperApi};
 use libc::{free, size_t, strlen};
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::io::{Error as IOError, Result as IOResult};
+use std::io;
 use std::iter;
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr::null_mut;
@@ -87,7 +87,7 @@ impl Journal {
     /// records in two steps -- first advance to the next record and
     /// then fetch the fields of the current record. This accomplishes
     /// the second part of that process.
-    pub fn current_record(&mut self) -> IOResult<Record> {
+    pub fn current_record(&mut self) -> io::Result<Record> {
         self.lib.sd_journal_restart_data(self.journal);
 
         iter::from_fn(|| {
@@ -109,16 +109,16 @@ impl Journal {
                 }
             }
         })
-        .collect::<IOResult<Record>>()
+        .collect::<io::Result<Record>>()
     }
 
-    pub fn cursor(&self) -> IOResult<String> {
+    pub fn cursor(&self) -> io::Result<String> {
         let mut cursor: *mut c_char = null_mut();
         sd_result(self.lib.sd_journal_get_cursor(self.journal, &mut cursor))?;
         Ok(into_string(cursor).unwrap())
     }
 
-    pub fn seek_cursor(&self, cursor: &str) -> IOResult<()> {
+    pub fn seek_cursor(&self, cursor: &str) -> io::Result<()> {
         let cursor = CString::new(cursor)?;
         sd_result(
             self.lib
@@ -129,7 +129,7 @@ impl Journal {
 }
 
 impl Iterator for Journal {
-    type Item = IOResult<Record>;
+    type Item = io::Result<Record>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match sd_result(self.lib.sd_journal_next(self.journal)) {
@@ -140,9 +140,9 @@ impl Iterator for Journal {
     }
 }
 
-fn sd_result(code: c_int) -> IOResult<c_int> {
+fn sd_result(code: c_int) -> io::Result<c_int> {
     match code {
-        _ if code < 0 => Err(IOError::from_raw_os_error(-code)),
+        _ if code < 0 => Err(io::Error::from_raw_os_error(-code)),
         _ => Ok(code),
     }
 }
@@ -166,7 +166,7 @@ fn into_string(ptr: *mut c_char) -> Option<String> {
 /// `std::io::Error`.
 #[derive(Debug)]
 pub enum Error {
-    IOError(IOError),
+    IOError(io::Error),
     DLOpenError(dlopen::Error),
 }
 
@@ -176,8 +176,8 @@ impl From<dlopen::Error> for Error {
     }
 }
 
-impl From<IOError> for Error {
-    fn from(err: IOError) -> Error {
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
         Error::IOError(err)
     }
 }
