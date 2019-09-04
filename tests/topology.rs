@@ -33,6 +33,13 @@ fn into_message(event: Event) -> String {
     event.as_log().get(&MESSAGE).unwrap().to_string_lossy()
 }
 
+fn sleep_ms(dur: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(dur));
+}
+
+// The duration at which we let the runtime spawn its extra tasks.
+const RUNTIME_SLEEP_DURATION: u64 = 50;
+
 #[test]
 fn topology_source_and_sink() {
     let mut rt = runtime();
@@ -46,11 +53,14 @@ fn topology_source_and_sink() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
-    rt.block_on(h_in1).unwrap();
+    in1.send(event.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(h_out1).unwrap();
+
+    let res = out1.collect().wait().unwrap();
+
     shutdown_on_idle(rt);
     assert_eq!(vec![event], res);
 }
@@ -71,13 +81,19 @@ fn topology_multiple_sources() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());
-    let h_in2 = oneshot::spawn(in2.send(event2.clone()), &rt.executor());
-    rt.block_on(h_in1).unwrap();
-    rt.block_on(h_in2).unwrap();
+
+    in1.send(event1.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
+    in2.send(event2.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(h_out1).unwrap();
+
+    let res = out1.collect().wait().unwrap();
+
     shutdown_on_idle(rt);
     assert_eq!(vec![event1, event2], res);
 }
@@ -97,13 +113,16 @@ fn topology_multiple_sinks() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
-    let h_out2 = oneshot::spawn(out2.collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
-    rt.block_on(h_in1).unwrap();
+
+    in1.send(event.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
     rt.block_on(topology.stop()).unwrap();
-    let res1 = rt.block_on(h_out1).unwrap();
-    let res2 = rt.block_on(h_out2).unwrap();
+
+    let res1 = out1.collect().wait().unwrap();
+    let res2 = out2.collect().wait().unwrap();
+
     shutdown_on_idle(rt);
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
@@ -126,11 +145,15 @@ fn topology_transform_chain() {
     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
 
     let event = Event::from("this");
-    let h_out1 = oneshot::spawn(out1.map(into_message).collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
-    rt.block_on(h_in1).unwrap();
+
+    in1.send(event.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
     rt.block_on(topology.stop()).unwrap();
-    let res = rt.block_on(h_out1).unwrap();
+
+    let res = out1.map(into_message).collect().wait().unwrap();
+
     shutdown_on_idle(rt);
     assert_eq!(vec!["this first second"], res);
 }
@@ -191,13 +214,16 @@ fn topology_remove_one_sink() {
     assert!(topology.reload_config_and_respawn(config, &mut rt, false));
 
     let event = Event::from("this");
-    let h_out1 = oneshot::spawn(out1.collect(), &rt.executor());
-    let h_out2 = oneshot::spawn(out2.collect(), &rt.executor());
-    let h_in1 = oneshot::spawn(in1.send(event.clone()), &rt.executor());
-    rt.block_on(h_in1).unwrap();
+
+    in1.send(event.clone()).wait().unwrap();
+
+    sleep_ms(RUNTIME_SLEEP_DURATION);
+
     rt.block_on(topology.stop()).unwrap();
-    let res1 = rt.block_on(h_out1).unwrap();
-    let res2 = rt.block_on(h_out2).unwrap();
+
+    let res1 = out1.collect().wait().unwrap();
+    let res2 = out2.collect().wait().unwrap();
+
     shutdown_on_idle(rt);
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -261,6 +287,7 @@ fn topology_swap_source() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
+
     let h_out1v1 = oneshot::spawn(out1v1.collect(), &rt.executor());
     let h_out1v2 = oneshot::spawn(out1v2.collect(), &rt.executor());
     let h_in1 = oneshot::spawn(in1.send(event1.clone()), &rt.executor());

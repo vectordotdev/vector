@@ -15,6 +15,28 @@ use vector::topology::config::{
 };
 use vector::transforms::Transform;
 
+pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let sink = MockSinkConfig::new(tx, true);
+    (rx, sink)
+}
+
+pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let sink = MockSinkConfig::new(tx, false);
+    (rx, sink)
+}
+
+pub fn source() -> (Sender<Event>, MockSourceConfig) {
+    let (tx, rx) = futures::sync::mpsc::channel(10);
+    let source = MockSourceConfig::new(rx);
+    (tx, source)
+}
+
+pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
+    MockTransformConfig::new(suffix.to_owned(), increase)
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSourceConfig {
     #[serde(skip)]
@@ -53,12 +75,6 @@ impl SourceConfig for MockSourceConfig {
     fn output_type(&self) -> DataType {
         DataType::Any
     }
-}
-
-pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
-    let source = MockSourceConfig::new(rx);
-    (tx, source)
 }
 
 pub struct MockTransform {
@@ -143,10 +159,6 @@ impl TransformConfig for MockTransformConfig {
     }
 }
 
-pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
-    MockTransformConfig::new(suffix.to_owned(), increase)
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSinkConfig {
     #[serde(skip)]
@@ -183,16 +195,4 @@ impl SinkConfig for MockSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Any
     }
-}
-
-pub fn sink() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
-    let sink = MockSinkConfig::new(tx, true);
-    (rx, sink)
-}
-
-pub fn sink_failing_healthcheck() -> (Receiver<Event>, MockSinkConfig) {
-    let (tx, rx) = futures::sync::mpsc::channel(10);
-    let sink = MockSinkConfig::new(tx, false);
-    (rx, sink)
 }
