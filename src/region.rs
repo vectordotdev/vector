@@ -38,7 +38,7 @@ pub enum ParseError {
     #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
     BothRegionAndEndpoint,
     #[snafu(display("Must set either 'region' or 'endpoint'"))]
-    NeitherRegionNorEndpoint,
+    MissingRegionAndEndpoint,
 }
 
 impl TryFrom<RegionOrEndpoint> for Region {
@@ -55,7 +55,7 @@ impl TryFrom<RegionOrEndpoint> for Region {
                 })
                 .context(EndpointParseError),
             (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
-            (None, None) => Err(ParseError::NeitherRegionNorEndpoint),
+            (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
     }
 }
