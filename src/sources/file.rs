@@ -263,16 +263,22 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
             match self.inner.poll() {
                 Ok(Async::Ready(Some((line, src)))) => {
                     // look for buffered content from same source
-                    if let Some(mut buffered) = self.buffers.remove(&src) {
+                    if self.buffers.contains_key(&src) {
                         if self.marker.is_match(line.as_ref()) {
                             // buffer the incoming line and flush the existing data
-                            self.buffers.insert(src.clone(), line.into());
+                            let buffered = self
+                                .buffers
+                                .insert(src.clone(), line.into())
+                                .expect("already asserted key is present");
                             return Ok(Async::Ready(Some((buffered.freeze(), src))));
                         } else {
                             // append new line to the buffered data
+                            let buffered = self
+                                .buffers
+                                .get_mut(&src)
+                                .expect("already asserted key is present");
                             buffered.extend_from_slice(b"\n");
                             buffered.extend_from_slice(&line);
-                            self.buffers.insert(src, buffered);
                         }
                     } else {
                         // no existing data for this source so buffer it with timeout
