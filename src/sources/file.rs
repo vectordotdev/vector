@@ -7,7 +7,7 @@ use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
@@ -231,6 +231,7 @@ struct LineAgg<T> {
     buffers: HashMap<String, BytesMut>,
     draining: Option<Vec<(Bytes, String)>>,
     timeouts: DelayQueue<String>,
+    expired: VecDeque<String>,
 }
 
 impl<T> LineAgg<T> {
@@ -242,6 +243,7 @@ impl<T> LineAgg<T> {
             draining: None,
             buffers: HashMap::new(),
             timeouts: DelayQueue::new(),
+            expired: VecDeque::new(),
         }
     }
 }
@@ -258,6 +260,11 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                 } else {
                     return Ok(Async::Ready(None));
                 }
+            }
+
+            // check for keys that have hit their timeout
+            while let Ok(Async::Ready(Some(expired_key))) = self.timeouts.poll() {
+                self.expired.push_back(expired_key.into_inner());
             }
 
             match self.inner.poll() {
@@ -293,9 +300,7 @@ impl<T: Stream<Item = (Bytes, String), Error = ()>> Stream for LineAgg<T> {
                         Some(self.buffers.drain().map(|(k, v)| (v.into(), k)).collect());
                 }
                 Ok(Async::NotReady) => {
-                    // check for keys that have hit their timeout
-                    if let Ok(Async::Ready(Some(expired))) = self.timeouts.poll() {
-                        let key = expired.into_inner();
+                    if let Some(key) = self.expired.pop_front() {
                         if let Some(buffered) = self.buffers.remove(&key) {
                             return Ok(Async::Ready(Some((buffered.freeze(), key))));
                         }
