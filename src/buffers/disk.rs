@@ -292,7 +292,7 @@ pub fn open(
     let mut options = Options::new();
     options.create_if_missing = true;
 
-    let db: Database<Key> = Database::open(&path, options).context(DataDirOpenError {
+    let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
         data_dir: data_dir.to_path_buf(),
     })?;
     let db = Arc::new(db);
