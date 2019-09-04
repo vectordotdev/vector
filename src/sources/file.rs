@@ -213,7 +213,7 @@ pub fn file_source(
             let dispatcher = dispatcher;
             dispatcher::with_default(&dispatcher, || {
                 span.in_scope(|| {
-                    file_server.run(tx.sink_map_err(|_| ()), shutdown_rx);
+                    file_server.run(tx.sink_map_err(drop), shutdown_rx);
                 })
             });
         });
