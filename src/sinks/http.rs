@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -19,9 +18,24 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
 use std::time::Duration;
 use tower::ServiceBuilder;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("{}: {}", source, name))]
+    InvalidHeaderName {
+        name: String,
+        source: ::http::header::InvalidHeaderName,
+    },
+    #[snafu(display("{}: {}", source, value))]
+    InvalidHeaderValue {
+        value: String,
+        source: ::http::header::InvalidHeaderValue,
+    },
+}
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -73,7 +87,10 @@ pub struct BasicAuth {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         validate_headers(&self.headers)?;
         let sink = http(self.clone(), acker)?;
 
@@ -90,7 +107,10 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, BuildError> {
+fn http(
+    config: HttpSinkConfig,
+    acker: Acker,
+) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -172,7 +192,10 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Build
     Ok(Box::new(sink))
 }
 
-fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, BuildError> {
+fn healthcheck(
+    uri: String,
+    auth: Option<BasicAuth>,
+) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -205,19 +228,20 @@ impl BasicAuth {
     }
 }
 
-fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), BuildError> {
+fn validate_headers(
+    headers: &Option<IndexMap<String, String>>,
+) -> Result<(), Box<dyn Error + 'static>> {
     if let Some(map) = headers {
         for (name, value) in map {
-            HeaderName::from_bytes(name.as_bytes())
-                .with_context(|| super::InvalidHeaderName { name })?;
+            HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
             HeaderValue::from_bytes(value.as_bytes())
-                .with_context(|| super::InvalidHeaderValue { value })?;
+                .with_context(|| InvalidHeaderValue { value })?;
         }
     }
     Ok(())
 }
 
-fn build_uri(raw: &str) -> Result<Uri, BuildError> {
+fn build_uri(raw: &str) -> Result<Uri, Box<dyn Error + 'static>> {
     let base: Uri = raw.parse().context(super::UriParseError)?;
     Ok(Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))

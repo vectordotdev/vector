@@ -67,7 +67,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(
         &self,
         acker: crate::buffers::Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), sinks::BuildError>;
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>>;
 
     fn input_type(&self) -> DataType;
 }

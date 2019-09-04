@@ -22,7 +22,7 @@ impl config::SinkConfig for PanicSink {
     fn build(
         &self,
         _acker: Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::sinks::BuildError> {
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
 
@@ -94,7 +94,7 @@ impl config::SinkConfig for ErrorSink {
     fn build(
         &self,
         _acker: Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::sinks::BuildError> {
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
 

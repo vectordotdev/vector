@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -15,10 +14,17 @@ use rdkafka::{
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
 };
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
+use std::error::Error;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Error creating kafka producer: {}", source))]
+    KafkaCreateError { source: rdkafka::error::KafkaError },
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KafkaSinkConfig {
@@ -50,7 +56,10 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -71,22 +80,19 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, BuildError> {
-        config
-            .to_rdkafka()
-            .create()
-            .context(super::KafkaCreateError)
-            .map(|producer| KafkaSink {
-                producer,
-                topic: config.topic,
-                key_field: config.key_field,
-                encoding: config.encoding,
-                in_flight: FuturesUnordered::new(),
-                acker,
-                seq_head: 0,
-                seq_tail: 0,
-                pending_acks: HashSet::new(),
-            })
+    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, Box<dyn Error + 'static>> {
+        let producer = config.to_rdkafka().create().context(KafkaCreateError)?;
+        Ok(KafkaSink {
+            producer,
+            topic: config.topic,
+            key_field: config.key_field,
+            encoding: config.encoding,
+            in_flight: FuturesUnordered::new(),
+            acker,
+            seq_head: 0,
+            seq_tail: 0,
+            pending_acks: HashSet::new(),
+        })
     }
 }
 

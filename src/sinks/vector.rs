@@ -10,9 +10,16 @@ use bytes::{BufMut, Bytes, BytesMut};
 use futures::{future, Future, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::net::TcpStream;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Unable to resolve DNS for provided address"))]
+    DNSFailure,
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -31,13 +38,13 @@ impl SinkConfig for VectorSinkConfig {
     fn build(
         &self,
         acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), super::BuildError> {
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         let addr = self
             .address
             .to_socket_addrs()
             .context(super::SocketAddressError)?
             .next()
-            .ok_or(super::BuildError::DNSFailure)?;
+            .ok_or(Box::new(BuildError::DNSFailure))?;
 
         let sink = vector(self.address.clone(), addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);

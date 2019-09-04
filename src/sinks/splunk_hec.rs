@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event, ValueKind},
@@ -16,10 +15,17 @@ use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
+
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("Host must include a scheme (https or http)"))]
+    UriMissingScheme,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -55,7 +61,10 @@ fn default_host_field() -> Atom {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
@@ -68,7 +77,10 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, BuildError> {
+pub fn hec(
+    config: HecSinkConfig,
+    acker: Acker,
+) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -133,7 +145,10 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Bui
     Ok(Box::new(sink))
 }
 
-pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, BuildError> {
+pub fn healthcheck(
+    token: String,
+    host: String,
+) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
@@ -159,13 +174,12 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, Bu
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> Result<(), BuildError> {
+pub fn validate_host(host: &String) -> Result<(), Box<dyn Error + 'static>> {
     let uri = Uri::try_from(host).context(super::UriParseError)?;
 
-    if let None = uri.scheme_part() {
-        Err(BuildError::UriMissingScheme)
-    } else {
-        Ok(())
+    match uri.scheme_part() {
+        Some(_) => Ok(()),
+        None => Err(Box::new(BuildError::UriMissingScheme)),
     }
 }
 

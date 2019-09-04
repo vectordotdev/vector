@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -14,12 +13,14 @@ use openssl::{
     x509::X509,
 };
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+use std::error::Error;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
@@ -29,6 +30,49 @@ use tokio::{
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_tls::{Connect as TlsConnect, TlsConnector, TlsStream};
 use tracing::field;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Unable to resolve DNS for provided address"))]
+    DNSFailure,
+    #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
+    FileOpenFailed {
+        note: &'static str,
+        filename: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("Could not read {} file {:?}: {}", note, filename, source))]
+    FileReadFailed {
+        note: &'static str,
+        filename: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("Must specify both TLS key_file and crt_file"))]
+    MissingCrtKeyFile,
+    #[snafu(display("Could not build TLS connector: {}", source))]
+    TlsBuildError { source: native_tls::Error },
+    #[snafu(display("Could not set TCP TLS identity: {}", source))]
+    TlsIdentityError { source: native_tls::Error },
+    #[snafu(display("Could not export identity to DER: {}", source))]
+    DerExportError { source: openssl::error::ErrorStack },
+    #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
+    CertificateParseError {
+        filename: PathBuf,
+        source: native_tls::Error,
+    },
+    #[snafu(display("Could not parse X509 certificate in {:?}: {}", filename, source))]
+    X509ParseError {
+        filename: PathBuf,
+        source: openssl::error::ErrorStack,
+    },
+    #[snafu(display("Could not parse private key in {:?}: {}", filename, source))]
+    PrivateKeyParseError {
+        filename: PathBuf,
+        source: openssl::error::ErrorStack,
+    },
+    #[snafu(display("Could not build PKCS#12 archive for identity: {}", source))]
+    Pkcs12Error { source: openssl::error::ErrorStack },
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -68,19 +112,22 @@ impl TcpSinkConfig {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         let addr = self
             .address
             .to_socket_addrs()
             .context(super::SocketAddressError)?
             .next()
-            .ok_or(BuildError::DNSFailure)?;
+            .ok_or(Box::new(BuildError::DNSFailure))?;
 
         let tls = match self.tls {
             Some(ref tls) => {
                 if tls.enabled.unwrap_or(false) {
                     if tls.key_file.is_some() != tls.crt_file.is_some() {
-                        return Err(BuildError::MissingCrtKeyFile);
+                        return Err(Box::new(BuildError::MissingCrtKeyFile));
                     }
                     let add_ca = match &tls.ca_file {
                         None => None,
@@ -95,7 +142,7 @@ impl SinkConfig for TcpSinkConfig {
                             Some(
                                 Pkcs12::builder()
                                     .build("", filename, &key, &crt)
-                                    .context(super::Pkcs12Error)?,
+                                    .context(Pkcs12Error)?,
                             )
                         }
                     };
@@ -128,42 +175,49 @@ impl SinkConfig for TcpSinkConfig {
     }
 }
 
-fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, BuildError> {
+fn load_certificate<T: AsRef<Path> + Debug>(
+    filename: T,
+) -> Result<Certificate, Box<dyn Error + 'static>> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate authority")?;
-    Certificate::from_pem(&data).context(super::CertificateParseError { filename })
+    Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
 }
 
 fn load_key<T: AsRef<Path> + Debug>(
     filename: T,
     pass_phrase: &Option<String>,
-) -> Result<PKey<Private>, BuildError> {
+) -> Result<PKey<Private>, Box<dyn Error + 'static>> {
     let filename = filename.as_ref();
     let data = open_read(filename, "key")?;
     match pass_phrase {
-        None => PKey::private_key_from_pem(&data).context(super::PrivateKeyParseError { filename }),
-        Some(phrase) => PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
-            .context(super::PrivateKeyParseError { filename }),
+        None => {
+            Ok(PKey::private_key_from_pem(&data)
+                .with_context(|| PrivateKeyParseError { filename })?)
+        }
+        Some(phrase) => Ok(
+            PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
+                .with_context(|| PrivateKeyParseError { filename })?,
+        ),
     }
 }
 
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, BuildError> {
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, Box<dyn Error + 'static>> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate")?;
-    X509::from_pem(&data).context(super::X509ParseError { filename })
+    Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
 }
 
 fn open_read<F: AsRef<Path> + Debug>(
     filename: F,
     note: &'static str,
-) -> Result<Vec<u8>, BuildError> {
+) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
     let mut text = Vec::<u8>::new();
     let filename = filename.as_ref();
 
     File::open(filename)
-        .context(super::FileOpenFailed { note, filename })?
+        .with_context(|| FileOpenFailed { note, filename })?
         .read_to_end(&mut text)
-        .context(super::FileReadFailed { note, filename })?;
+        .with_context(|| FileReadFailed { note, filename })?;
 
     Ok(text)
 }
@@ -197,20 +251,19 @@ pub struct TcpSinkTls {
 }
 
 impl TcpSinkTls {
-    fn make_connector(&self) -> Result<TlsConnector, BuildError> {
+    fn make_connector(&self) -> Result<TlsConnector, Box<dyn Error + 'static>> {
         let mut connector = native_tls::TlsConnector::builder();
         connector.danger_accept_invalid_certs(!self.verify);
         if let Some(ref certificate) = self.add_ca {
             connector.add_root_certificate(certificate.clone());
         }
         if let Some(ref identity) = self.identity {
-            let identity =
-                Identity::from_pkcs12(&identity.to_der().context(super::DerExportError)?, "")
-                    .context(super::TlsIdentityError)?;
+            let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
+                .context(TlsIdentityError)?;
             connector.identity(identity);
         }
         Ok(TlsConnector::from(
-            connector.build().context(super::TlsBuildError)?,
+            connector.build().context(TlsBuildError)?,
         ))
     }
 }

@@ -1,4 +1,3 @@
-use super::BuildError;
 use crate::{
     buffers::Acker,
     event::{self, Event},
@@ -19,8 +18,8 @@ use rusoto_s3::{
     S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 use std::convert::TryInto;
+use std::error::Error;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -83,7 +82,10 @@ impl Default for Compression {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), BuildError> {
+    fn build(
+        &self,
+        acker: Acker,
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
@@ -96,7 +98,10 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3Sink {
-    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, BuildError> {
+    pub fn new(
+        config: &S3SinkConfig,
+        acker: Acker,
+    ) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -127,13 +132,7 @@ impl S3Sink {
         };
 
         let s3 = S3Sink {
-            client: Self::create_client(
-                config
-                    .region
-                    .clone()
-                    .try_into()
-                    .context(super::RegionParseError)?,
-            ),
+            client: Self::create_client(config.region.clone().try_into()?),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -159,14 +158,10 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, BuildError> {
-        let client = Self::create_client(
-            config
-                .region
-                .clone()
-                .try_into()
-                .context(super::RegionParseError)?,
-        );
+    pub fn healthcheck(
+        config: &S3SinkConfig,
+    ) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+        let client = Self::create_client(config.region.clone().try_into()?);
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),

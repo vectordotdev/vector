@@ -6,6 +6,7 @@ use crate::{
 };
 use futures::{future, Sink};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use tokio::{
     codec::{FramedWrite, LinesCodec},
     io,
@@ -44,7 +45,7 @@ impl SinkConfig for ConsoleSinkConfig {
     fn build(
         &self,
         acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), super::BuildError> {
+    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {
