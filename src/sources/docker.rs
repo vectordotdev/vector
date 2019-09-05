@@ -85,7 +85,7 @@ impl DockerSourceCore {
     /// Only logs created at, or after this moment are logged.
     fn new(config: DockerConfig) -> Self {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
-        // ?      Otherwise connects to unix socket which requiers sudo privileges, or docker group membership.
+        // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = Docker::new();
 
         // Only logs created at, or after this moment are logged.
