@@ -688,7 +688,7 @@ impl ContainerLogInfo {
         log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
 
         let event = Event::Log(log_event);
-        trace!(message = "Received one event", event = field::debug(&event));
+        trace!(message = "Received one event.", ?event);
         Some(event)
     }
 }
