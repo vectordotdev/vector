@@ -652,14 +652,14 @@ impl ContainerLogInfo {
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
-    use crate::test_util::{collect_n, trace_init};
+    use crate::test_util::{self,collect_n, trace_init};
 
     /// None if docker is not present on the system
     fn source<'a, L: Into<Option<&'a str>>>(
         name: &str,
         label: L,
     ) -> (mpsc::Receiver<Event>, tokio::runtime::Runtime) {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = test_util::runtime();
         let source = source_with(name, label, &mut rt);
         (source, rt)
     }
@@ -900,7 +900,7 @@ mod tests {
         let name = "vector_test_currently_running";
         let delay = 3; // sec
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = test_util::runtime();
         let docker = docker();
 
         let id = delayed_container(name, None, message, delay, &docker, &mut rt);
