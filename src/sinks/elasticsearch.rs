@@ -40,8 +40,8 @@ pub struct ElasticSearchConfig {
 
     pub basic_auth: Option<ElasticSearchBasicAuthConfig>,
 
-    pub headers: HashMap<String, String>,
-    pub query: HashMap<String, String>,
+    pub headers: Option<HashMap<String, String>>,
+    pub query: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -99,11 +99,17 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         let token = format!("{}:{}", auth.user, auth.password);
         format!("Basic {}", base64::encode(token.as_bytes()))
     });
-    let headers = config.headers.clone();
+    let headers = config
+        .headers
+        .as_ref()
+        .unwrap_or(&HashMap::default())
+        .clone();
 
     let mut path_query = url::form_urlencoded::Serializer::new(String::from("/_bulk"));
-    for (p, v) in &config.query {
-        path_query.append_pair(&p[..], &v[..]);
+    if let Some(ref query) = config.query {
+        for (p, v) in query {
+            path_query.append_pair(&p[..], &v[..]);
+        }
     }
     let uri = format!("{}{}", config.host, path_query.finish());
     let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");

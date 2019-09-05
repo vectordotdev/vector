@@ -21,19 +21,64 @@ pub struct HttpService {
 }
 
 impl HttpService {
+    pub fn builder() -> HttpServiceBuilder {
+        HttpServiceBuilder::new()
+    }
+
     pub fn new<F>(request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        Self::builder().build(request_builder)
+    }
+}
+
+/// A builder for `HttpService`s
+pub struct HttpServiceBuilder {
+    threads: usize,
+    verify_certificate: bool,
+}
+
+impl HttpServiceBuilder {
+    fn new() -> Self {
+        Self {
+            threads: 4,
+            verify_certificate: true,
+        }
+    }
+
+    /// Build the configured `HttpService`
+    pub fn build<F>(&self, request_builder: F) -> HttpService
+    where
+        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    {
+        let mut http = HttpConnector::new(self.threads);
+        http.enforce_http(false);
+        let tls = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(!self.verify_certificate)
+            .build()
+            .expect("TLS initialization failed");
+        let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        Self {
+        HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
+    }
+
+    /// Set the number of threads used by the `HttpService`
+    pub fn threads(&mut self, threads: usize) -> &mut Self {
+        self.threads = threads;
+        self
+    }
+
+    /// Verify the remote server's certificate
+    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
+        self.verify_certificate = verify;
+        self
     }
 }
 
