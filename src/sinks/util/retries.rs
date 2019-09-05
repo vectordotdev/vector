@@ -52,6 +52,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
 
 impl<Req, Res, L> Policy<Req, Res, Error> for FixedRetryPolicy<L>
 where
+    Res: std::fmt::Debug,
     Req: Clone,
     L: RetryLogic<Response = Res>,
 {
@@ -66,7 +67,10 @@ where
                 }
 
                 if self.logic.should_retry_response(response) {
-                    warn!(message = "retrying after response.");
+                    warn!(
+                        message = "retrying after response.",
+                        reason = tracing::field::debug(response),
+                    );
                     Some(self.build_retry())
                 } else {
                     None
