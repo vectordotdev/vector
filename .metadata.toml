@@ -189,6 +189,28 @@ will buffer lines into a single event before flushing, regardless of whether \
 or not it has seen a line indicating the start of a new message.\
 """
 
+[sources.file.options.max_read_bytes]
+type = "int"
+default = 2048
+null = true
+unit = "bytes"
+description = """\
+An approximate limit on the amount of data read from a single file at a given \
+time.\
+"""
+
+[sources.file.options.oldest_first]
+type = "bool"
+default = false
+null = true
+description = """\
+By default, the file source will try to share read capacity fairly between all \
+the files that it is currently tailing. Depending on your file rotation \
+strategy, log file organization, and throughput patterns, it could be better \
+for the file source to focus on draining the oldest files it's aware of before \
+moving on to read data from younger files. This flag enables that behavior.\
+"""
+
 # ------------------------------------------------------------------------------
 # sources.journald
 # ------------------------------------------------------------------------------

@@ -116,6 +116,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: bytes
   max_line_bytes = 102400
 
+  # An approximate limit on the amount of data read from a single file at a given
+  # time.
+  # 
+  # * optional
+  # * default: 2048
+  # * unit: bytes
+  max_read_bytes = 2048
+
   # When present, Vector will aggregate multiple lines into a single event, using
   # this pattern as the indicator that the previous lines should be flushed and a
   # new event started. The pattern will be matched against entire lines as a
@@ -133,6 +141,17 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: 1000
   # * unit: milliseconds
   multi_line_timeout = 1000
+
+  # By default, the file source will try to share read capacity fairly between
+  # all the files that it is currently tailing. Depending on your file rotation
+  # strategy, log file organization, and throughput patterns, it could be better
+  # for the file source to focus on draining the oldest files it's aware of
+  # before moving on to read data from younger files. This flag enables that
+  # behavior.
+  # 
+  # * optional
+  # * default: false
+  oldest_first = false
 
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
