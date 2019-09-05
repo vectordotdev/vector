@@ -12,6 +12,7 @@ futures = "0.1.25"
 glob = "0.2.11"
 scan_fmt = "0.2.3"
 tracing = "0.1.2"
+indexmap = {version = "1.0.2", features = ["serde-1"]}
 
 [dev-dependencies]
 quickcheck = "0.6"

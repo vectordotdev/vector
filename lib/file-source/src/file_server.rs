@@ -2,6 +2,7 @@ use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition};
 use bytes::Bytes;
 use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Seek, Write};
@@ -55,7 +56,7 @@ impl FileServer {
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
-        let mut fp_map: HashMap<FileFingerprint, FileWatcher> = Default::default();
+        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
