@@ -232,7 +232,8 @@ impl DockerSource {
                 for container in list {
                     trace!(
                         message = "Found already running container",
-                        id = field::display(&container.id)
+                        id = field::display(&container.id),
+                        names = field::debug(&container.names)
                     );
 
                     if exclude_self {
@@ -256,14 +257,23 @@ impl DockerSource {
 
                     // This block is necessary since shiplift doesn't have way to include
                     // names into request to docker.
-                    if !self.esb.core.include_labels.is_empty() {
-                        if !self.esb.core.include_labels.iter().any(|include| {
-                            container.id.starts_with(include)
-                                || container.names.iter().any(|name| name.starts_with(include))
-                        }) {
-                            // This container isn't included
-                            continue;
-                        }
+                    if !self.name_included(
+                        container.id.as_str(),
+                        container.names.iter().map(|s| {
+                            // In this case shiplift gives names with starting '/' so it needs to be removed.
+                            let s = s.as_str();
+                            if s.starts_with('/') {
+                                s.split_at('/'.len_utf8()).1
+                            } else {
+                                s
+                            }
+                        }),
+                    ) {
+                        trace!(
+                            message = "Container excluded",
+                            id = field::display(&container.id)
+                        );
+                        continue;
                     }
 
                     let id = ContainerId::new(container.id);
@@ -276,6 +286,25 @@ impl DockerSource {
                 self
             })
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
+    }
+
+    fn name_included<'a, I: IntoIterator<Item = &'a str>>(&self, id: &str, names: I) -> bool {
+        let include_empty = self.esb.core.include_containers.is_empty();
+        let id_flag = self
+            .esb
+            .core
+            .include_containers
+            .iter()
+            .any(|include| id.starts_with(include));
+        let name_flag = names.into_iter().any(|name| {
+            self.esb
+                .core
+                .include_containers
+                .iter()
+                .any(|include| name.starts_with(include))
+        });
+
+        include_empty || id_flag || name_flag
     }
 }
 
@@ -311,6 +340,7 @@ impl Future for DockerSource {
                                         id = field::display(&id),
                                         status = field::display(&status),
                                         timestamp = field::display(event.time),
+                                        attributes = field::debug(&event.actor.attributes),
                                     );
                                     let id = ContainerId::new(id);
 
@@ -325,15 +355,29 @@ impl Future for DockerSource {
                                             if let Some(state) = self.containers.get_mut(&id) {
                                                 state.running();
                                                 self.esb.restart(state);
-                                            } else if self
-                                                .ignore_container_id
-                                                .binary_search(&id)
-                                                .is_err()
-                                            {
-                                                self.containers
-                                                    .insert(id.clone(), self.esb.start(id));
                                             } else {
-                                                // Ignore
+                                                let ignore_flag = self
+                                                    .ignore_container_id
+                                                    .binary_search_by(|a| {
+                                                        a.as_str().cmp(id.as_str())
+                                                    })
+                                                    .is_ok();
+
+                                                let include_name = self.name_included(
+                                                    id.as_str(),
+                                                    event
+                                                        .actor
+                                                        .attributes
+                                                        .get("name")
+                                                        .map(|s| s.as_str()),
+                                                );
+
+                                                if !ignore_flag && include_name {
+                                                    self.containers
+                                                        .insert(id.clone(), self.esb.start(id));
+                                                } else {
+                                                    // Ignore
+                                                }
                                             }
                                         }
                                         // Ignore
@@ -652,7 +696,7 @@ impl ContainerLogInfo {
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
-    use crate::test_util::{self,collect_n, trace_init};
+    use crate::test_util::{self, collect_n, trace_init};
 
     /// None if docker is not present on the system
     fn source<'a, L: Into<Option<&'a str>>>(
