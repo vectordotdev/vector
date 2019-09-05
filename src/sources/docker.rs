@@ -1,24 +1,34 @@
 use crate::{
-    event::{self, Event},
+    event::{self, Event, ValueKind},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
+use bytes::Bytes;
 use chrono::{DateTime, FixedOffset};
 use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     Async, Future, Sink, Stream,
 };
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use shiplift::{
     builder::{ContainerFilter, EventFilter, LogsOptions},
     tty::{Chunk, StreamType},
     Docker,
 };
+use std::borrow::Borrow;
 use std::ops::Deref;
 use std::{collections::HashMap, env};
 use tracing::field;
 
 /// The begining of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &'static str = "timberio/vector";
+
+lazy_static! {
+    static ref STDERR: Bytes = "stderr".into();
+    static ref STDOUT: Bytes = "stdout".into();
+}
+
+type DockerEvent = shiplift::rep::Event;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +84,7 @@ impl DockerSourceCore {
     /// Returns event stream coming from docker.
     fn docker_event_stream(
         &self,
-    ) -> impl Stream<Item = shiplift::rep::Event, Error = shiplift::Error> + Send {
+    ) -> impl Stream<Item = DockerEvent, Error = shiplift::Error> + Send {
         let mut options = shiplift::builder::EventsOptions::builder();
 
         // Limit events to those after core creation
@@ -136,11 +146,11 @@ impl Deref for DockerSourceCore {
 struct DockerSource {
     esb: EventStreamBuilder,
     /// event stream from docker
-    events: Box<dyn Stream<Item = shiplift::rep::Event, Error = shiplift::Error> + Send>,
+    events: Box<dyn Stream<Item = DockerEvent, Error = shiplift::Error> + Send>,
     ///  mappings of seen container_id to their data
-    containers: HashMap<String, ContainerState>,
+    containers: HashMap<ContainerId, ContainerState>,
     /// collection of container_id not to be listened
-    ignore_container_id: Vec<String>,
+    ignore_container_id: Vec<ContainerId>,
     ///receives ContainerLogInfo comming from event stream futures
     main_recv: UnboundedReceiver<ContainerLogInfo>,
 }
@@ -238,7 +248,8 @@ impl DockerSource {
                                 message = "Detected self container",
                                 id = field::display(&container.id)
                             );
-                            self.ignore_container_id.push(container.id);
+                            self.ignore_container_id
+                                .push(ContainerId::new(container.id));
                             continue;
                         }
                     }
@@ -255,8 +266,9 @@ impl DockerSource {
                         }
                     }
 
-                    self.containers
-                        .insert(container.id.clone(), self.esb.start(container.id));
+                    let id = ContainerId::new(container.id);
+
+                    self.containers.insert(id.clone(), self.esb.start(id));
                 }
 
                 // Sort for efficient lookup
@@ -300,6 +312,8 @@ impl Future for DockerSource {
                                         status = field::display(&status),
                                         timestamp = field::display(event.time),
                                     );
+                                    let id = ContainerId::new(id);
+
                                     // Update container status
                                     match status.as_str() {
                                         "die" | "pause" => {
@@ -378,7 +392,7 @@ impl EventStreamBuilder {
     }
 
     /// Constructs and runs event stream
-    fn start(&self, id: String) -> ContainerState {
+    fn start(&self, id: ContainerId) -> ContainerState {
         let mut state = ContainerState::new(id, self.core.now_timestamp);
         self.restart(&mut state);
         state
@@ -405,11 +419,11 @@ impl EventStreamBuilder {
             .core
             .docker
             .containers()
-            .get(&info.id)
+            .get(info.id.as_str())
             .logs(&options.build());
         info!(
             message = "Started listening logs on docker container",
-            id = field::display(&info.id)
+            id = field::display(info.id.as_str())
         );
 
         // Create event streamer
@@ -433,7 +447,7 @@ impl EventStreamBuilder {
                             // End of stream
                             info!(
                                 message = "Stoped listening logs on docker container",
-                                id = field::display(&info.id)
+                                id = field::display(info.id.as_str())
                             );
                             // TODO: I am not sure that it's necessary to drive this future to completition
                             tokio::spawn(
@@ -462,6 +476,21 @@ impl EventStreamBuilder {
     }
 }
 
+/// Container ID as assigned by Docker.
+/// Is actually a string.
+#[derive(Hash, Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct ContainerId(Bytes);
+
+impl ContainerId {
+    fn new(id: String) -> Self {
+        ContainerId(id.into())
+    }
+
+    fn as_str(&self) -> &str {
+        std::str::from_utf8(self.0.borrow()).expect("Bytes should be a still valid String")
+    }
+}
+
 /// Kept by main to keep track of container state
 struct ContainerState {
     /// None if there is a event_stream of this container.
@@ -475,7 +504,7 @@ struct ContainerState {
 impl ContainerState {
     /// Container docker ID
     /// Unix timestamp of event which created this struct
-    fn new(id: String, created: i64) -> Self {
+    fn new(id: ContainerId, created: i64) -> Self {
         let info = ContainerLogInfo {
             id: id,
             created,
@@ -521,7 +550,7 @@ impl ContainerState {
 /// Exchanged between main future and event_stream futures
 struct ContainerLogInfo {
     /// Container docker ID
-    id: String,
+    id: ContainerId,
     /// Unix timestamp of event which created this struct
     created: i64,
     /// Timestamp of last log message with it's generation
@@ -547,8 +576,8 @@ impl ContainerLogInfo {
         let mut log_event = Event::new_empty_log().into_log();
 
         let stream = match message.stream_type {
-            StreamType::StdErr => "stderr",
-            StreamType::StdOut => "stdout",
+            StreamType::StdErr => STDERR.clone(),
+            StreamType::StdOut => STDOUT.clone(),
             _ => return None,
         };
         log_event.insert_implicit(event::STREAM.clone(), stream.into());
@@ -609,7 +638,7 @@ impl ContainerLogInfo {
         log_event.insert_explicit(event::MESSAGE.clone(), message.into());
 
         // Supply container
-        log_event.insert_implicit(event::CONTAINER.clone(), self.id.as_str().into());
+        log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
 
         let event = Event::Log(log_event);
         trace!(message = "Received one event", event = field::debug(&event));
