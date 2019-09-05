@@ -62,7 +62,7 @@ impl DockerSourceCore {
         let now_timestamp = now.timestamp();
         info!(
             message = "Capturing logs from now on",
-            now = field::display(now.to_rfc3339())
+            now = %now.to_rfc3339()
         );
         DockerSourceCore {
             config,
