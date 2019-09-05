@@ -37,6 +37,27 @@ pub struct DockerConfig {
     include_labels: Vec<String>,
 }
 
+impl DockerConfig {
+    fn container_name_included<'a, I: IntoIterator<Item = &'a str>>(
+        &self,
+        id: &str,
+        names: I,
+    ) -> bool {
+        let include_empty = self.include_containers.is_empty();
+        let id_flag = self
+            .include_containers
+            .iter()
+            .any(|include| id.starts_with(include));
+        let name_flag = names.into_iter().any(|name| {
+            self.include_containers
+                .iter()
+                .any(|include| name.starts_with(include))
+        });
+
+        include_empty || id_flag || name_flag
+    }
+}
+
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
     fn build(
@@ -125,13 +146,6 @@ impl DockerSourceCore {
     }
 }
 
-impl Deref for DockerSourceCore {
-    type Target = DockerConfig;
-    fn deref(&self) -> &DockerConfig {
-        &self.config
-    }
-}
-
 /// Main future which listens for events coming from docker, and maintains
 /// a fan of event_stream futures.
 /// Where each event_stream corresponds to a runing container marked with ContainerLogInfo.
@@ -199,6 +213,7 @@ impl DockerSource {
         options.filter(
             self.esb
                 .core
+                .config
                 .include_labels
                 .iter()
                 .map(|s| ContainerFilter::LabelName(s.clone()))
@@ -255,9 +270,9 @@ impl DockerSource {
                         }
                     }
 
-                    // This block is necessary since shiplift doesn't have way to include
+                    // This check is necessary since shiplift doesn't have way to include
                     // names into request to docker.
-                    if !self.name_included(
+                    if !self.esb.core.config.container_name_included(
                         container.id.as_str(),
                         container.names.iter().map(|s| {
                             // In this case shiplift gives names with starting '/' so it needs to be removed.
@@ -286,25 +301,6 @@ impl DockerSource {
                 self
             })
             .map_err(|error| error!(message="Listing currently running containers, failed",%error))
-    }
-
-    fn name_included<'a, I: IntoIterator<Item = &'a str>>(&self, id: &str, names: I) -> bool {
-        let include_empty = self.esb.core.include_containers.is_empty();
-        let id_flag = self
-            .esb
-            .core
-            .include_containers
-            .iter()
-            .any(|include| id.starts_with(include));
-        let name_flag = names.into_iter().any(|name| {
-            self.esb
-                .core
-                .include_containers
-                .iter()
-                .any(|include| name.starts_with(include))
-        });
-
-        include_empty || id_flag || name_flag
     }
 }
 
@@ -363,16 +359,20 @@ impl Future for DockerSource {
                                                     })
                                                     .is_ok();
 
-                                                let include_name = self.name_included(
-                                                    id.as_str(),
-                                                    event
-                                                        .actor
-                                                        .attributes
-                                                        .get("name")
-                                                        .map(|s| s.as_str()),
-                                                );
+                                                // This check is necessary since shiplift doesn't have way to include
+                                                // names into request to docker.
+                                                let include_name =
+                                                    self.esb.core.config.container_name_included(
+                                                        id.as_str(),
+                                                        event
+                                                            .actor
+                                                            .attributes
+                                                            .get("name")
+                                                            .map(|s| s.as_str()),
+                                                    );
 
                                                 if !ignore_flag && include_name {
+                                                    // Included
                                                     self.containers
                                                         .insert(id.clone(), self.esb.start(id));
                                                 } else {
