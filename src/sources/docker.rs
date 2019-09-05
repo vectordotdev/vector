@@ -818,21 +818,34 @@ mod tests {
 
     /// Returns once container has started
     #[must_use]
-    fn container_start(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) -> Option<()> {
+    fn container_start(
+        id: &str,
+        docker: &Docker,
+        rt: &mut tokio::runtime::Runtime,
+    ) -> Result<(), shiplift::errors::Error> {
         let future = docker.containers().get(id).start();
-        rt.block_on(future).ok()
+        rt.block_on(future)
     }
 
     /// Returns once container is done running
     #[must_use]
-    fn container_wait(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) -> Option<()> {
+    fn container_wait(
+        id: &str,
+        docker: &Docker,
+        rt: &mut tokio::runtime::Runtime,
+    ) -> Result<(), shiplift::errors::Error> {
         let future = docker.containers().get(id).wait();
-        rt.block_on(future).map_err(|e| error!(%e)).map(|_| ()).ok()
+        rt.block_on(future)
+            .map(|exit| info!("Container exited with status code: {}", exit.status_code))
     }
 
     /// Returns once container is done running
     #[must_use]
-    fn container_run(id: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) -> Option<()> {
+    fn container_run(
+        id: &str,
+        docker: &Docker,
+        rt: &mut tokio::runtime::Runtime,
+    ) -> Result<(), shiplift::errors::Error> {
         container_start(id, docker, rt)?;
         container_wait(id, docker, rt)
     }
@@ -858,9 +871,9 @@ mod tests {
     ) {
         let id = log_container(name, label, log, docker, rt);
         for _ in 0..n {
-            if container_run(&id, docker, rt).is_none() {
+            if let Err(error) = container_run(&id, docker, rt) {
                 container_remove(&id, docker, rt);
-                panic!("Container run failed");
+                panic!("Container start failed with error: {:?}", error);
             }
         }
         container_remove(&id, docker, rt);
@@ -947,9 +960,9 @@ mod tests {
         let docker = docker();
 
         let id = delayed_container(name, None, message, delay, &docker, &mut rt);
-        if container_start(&id, &docker, &mut rt).is_none() {
+        if let Err(error) = container_start(&id, &docker, &mut rt) {
             container_remove(&id, &docker, &mut rt);
-            panic!("Container start failed");
+            panic!("Container start failed with error: {:?}", error);
         }
 
         std::thread::sleep(std::time::Duration::from_secs(1));
