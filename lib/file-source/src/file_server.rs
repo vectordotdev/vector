@@ -31,6 +31,7 @@ pub struct FileServer {
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: time::Duration,
     pub fingerprinter: Fingerprinter,
+    pub oldest_first: bool,
 }
 
 /// `FileServer` as Source
@@ -52,7 +53,6 @@ impl FileServer {
         mut chans: impl Sink<SinkItem = (Bytes, String), SinkError = ()>,
         shutdown: std::sync::mpsc::Receiver<()>,
     ) {
-        let mut read_from_beginning = self.start_at_beginning;
         let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
@@ -63,6 +63,50 @@ impl FileServer {
 
         let mut checkpointer = Checkpointer::new(&self.data_dir);
         checkpointer.read_checkpoints(self.ignore_before);
+
+        let exclude_patterns = self
+            .exclude
+            .iter()
+            .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
+            .collect::<Vec<_>>();
+
+        let mut existing_files = Vec::new();
+        for include_pattern in &self.include {
+            for path in glob(include_pattern.to_str().expect("no ability to glob"))
+                .expect("Failed to read glob pattern")
+                .filter_map(Result::ok)
+            {
+                if exclude_patterns
+                    .iter()
+                    .any(|e| e.matches(path.to_str().unwrap()))
+                {
+                    continue;
+                }
+
+                if let Ok(file_id) = self
+                    .fingerprinter
+                    .get_fingerprint_of_file(&path, &mut fingerprint_buffer)
+                {
+                    existing_files.push((path, file_id));
+                }
+            }
+        }
+
+        existing_files.sort_by_key(|(path, _file_id)| {
+            fs::metadata(&path)
+                .and_then(|m| m.created())
+                .unwrap_or(time::SystemTime::now())
+        });
+
+        for (path, file_id) in existing_files {
+            self.watch_new_file(
+                path,
+                file_id,
+                &mut fp_map,
+                &checkpointer,
+                self.start_at_beginning,
+            );
+        }
 
         // Alright friends, how does this work?
         //
@@ -88,11 +132,6 @@ impl FileServer {
                     .ok();
 
                 // Search (glob) for files to detect major file changes.
-                let exclude_patterns = self
-                    .exclude
-                    .iter()
-                    .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
-                    .collect::<Vec<_>>();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
@@ -154,32 +193,22 @@ impl FileServer {
                                 }
                             } else {
                                 // untracked file fingerprint
-                                let file_position = if read_from_beginning {
-                                    0
-                                } else {
-                                    checkpointer.get_checkpoint(file_id).unwrap_or(0)
-                                };
-                                if let Ok(mut watcher) =
-                                    FileWatcher::new(path, file_position, self.ignore_before)
-                                {
-                                    info!(
-                                        message = "Found file to watch.",
-                                        path = field::debug(&watcher.path),
-                                        file_position = field::debug(&file_position),
-                                    );
-                                    watcher.set_file_findable(true);
-                                    fp_map.insert(file_id, watcher);
-                                };
+                                self.watch_new_file(
+                                    path,
+                                    file_id,
+                                    &mut fp_map,
+                                    &checkpointer,
+                                    false,
+                                );
                             }
                         }
                     }
                 }
-                // This special flag only applies to first iteration on startup.
-                read_from_beginning = false;
             }
 
             // Collect lines by polling files.
             let mut global_bytes_read: usize = 0;
+            let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
                 let mut bytes_read: usize = 0;
                 while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
@@ -203,12 +232,17 @@ impl FileServer {
                         break;
                     }
                     if bytes_read > self.max_read_bytes {
+                        maxed_out_reading_single_file = true;
                         break;
                     }
                 }
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
                     checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                }
+                // Do not move on to newer files if we are behind on an older file
+                if self.oldest_first && maxed_out_reading_single_file {
+                    break;
                 }
             }
 
@@ -248,6 +282,30 @@ impl FileServer {
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }
+    }
+
+    fn watch_new_file(
+        &self,
+        path: PathBuf,
+        file_id: FileFingerprint,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+        checkpointer: &Checkpointer,
+        read_from_beginning: bool,
+    ) {
+        let file_position = if read_from_beginning {
+            0
+        } else {
+            checkpointer.get_checkpoint(file_id).unwrap_or(0)
+        };
+        if let Ok(mut watcher) = FileWatcher::new(path, file_position, self.ignore_before) {
+            info!(
+                message = "Found file to watch.",
+                path = field::debug(&watcher.path),
+                file_position = field::debug(&file_position),
+            );
+            watcher.set_file_findable(true);
+            fp_map.insert(file_id, watcher);
+        };
     }
 }
 

@@ -30,6 +30,8 @@ pub struct FileConfig {
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
+    pub max_read_bytes: usize,
+    pub oldest_first: bool,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -80,6 +82,8 @@ impl Default for FileConfig {
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
+            max_read_bytes: 2048,
+            oldest_first: false,
         }
     }
 }
@@ -128,13 +132,14 @@ pub fn file_source(
     let file_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
-        max_read_bytes: 2048,
+        max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown: glob_minimum_cooldown,
         fingerprinter: config.fingerprinting.clone().into(),
+        oldest_first: config.oldest_first,
     };
 
     let file_key = config.file_key.clone();
@@ -1149,6 +1154,124 @@ mod tests {
                 "too slow".into(),
                 "INFO doesn't have".into(),
                 "to be INFO in\nthe middle".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_fair_reads() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            oldest_first: false,
+            ..test_default_file_config(&dir)
+        };
+
+        let older_path = dir.path().join("z_older_file");
+        let mut older = File::create(&older_path).unwrap();
+
+        sleep();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).unwrap();
+
+        writeln!(&mut older, "hello i am the old file").unwrap();
+        writeln!(&mut older, "i have been around a while").unwrap();
+        writeln!(&mut older, "you can read newer files at the same time").unwrap();
+
+        writeln!(&mut newer, "and i am the new file").unwrap();
+        writeln!(&mut newer, "this should be interleaved with the old one").unwrap();
+        writeln!(&mut newer, "which is fine because we want fairness").unwrap();
+
+        sleep();
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am the old file".into(),
+                "and i am the new file".into(),
+                "i have been around a while".into(),
+                "this should be interleaved with the old one".into(),
+                "you can read newer files at the same time".into(),
+                "which is fine because we want fairness".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_oldest_first() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            oldest_first: true,
+            ..test_default_file_config(&dir)
+        };
+
+        let older_path = dir.path().join("z_older_file");
+        let mut older = File::create(&older_path).unwrap();
+
+        sleep();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).unwrap();
+
+        writeln!(&mut older, "hello i am the old file").unwrap();
+        writeln!(&mut older, "i have been around a while").unwrap();
+        writeln!(&mut older, "you should definitely read all of me first").unwrap();
+
+        writeln!(&mut newer, "i'm new").unwrap();
+        writeln!(&mut newer, "hopefully you read all the old stuff first").unwrap();
+        writeln!(&mut newer, "because otherwise i'm not going to make sense").unwrap();
+
+        sleep();
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am the old file".into(),
+                "i have been around a while".into(),
+                "you should definitely read all of me first".into(),
+                "i'm new".into(),
+                "hopefully you read all the old stuff first".into(),
+                "because otherwise i'm not going to make sense".into(),
             ]
         );
     }
