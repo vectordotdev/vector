@@ -1,8 +1,8 @@
 use crate::{
-    event::{self, Event, ValueKind},
+    event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, FixedOffset};
 use futures::{
     sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
@@ -582,9 +582,9 @@ impl ContainerLogInfo {
         };
         log_event.insert_implicit(event::STREAM.clone(), stream.into());
 
-        let mut message = String::from_utf8(message.data)
-            .map_err(|error| error!(message="Recieved corrupted message",%error))
-            .ok()?;
+        let mut bytes_message = BytesMut::from(message.data);
+
+        let message = String::from_utf8_lossy(bytes_message.borrow());
 
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -618,7 +618,7 @@ impl ContainerLogInfo {
 
                 let log = splitter.next()?;
                 let remove_len = message.len() - log.len();
-                message.drain(..remove_len);
+                bytes_message.advance(remove_len);
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
@@ -629,13 +629,16 @@ impl ContainerLogInfo {
 
         // Message is actually one line from stderr or stdout, and they are delimited with newline
         // so that newline needs to be removed.
-        message.pop().filter(|&c| c != '\n').map(|c| {
-            // For some reason last character isn't a newline, so return it
-            message.push(c);
-        });
+        if bytes_message
+            .last()
+            .map(|&b| b as char == '\n')
+            .unwrap_or(false)
+        {
+            bytes_message.truncate(bytes_message.len() - 1);
+        }
 
         // Supply message
-        log_event.insert_explicit(event::MESSAGE.clone(), message.into());
+        log_event.insert_explicit(event::MESSAGE.clone(), bytes_message.freeze().into());
 
         // Supply container
         log_event.insert_implicit(event::CONTAINER.clone(), self.id.0.clone().into());
