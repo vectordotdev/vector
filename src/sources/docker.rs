@@ -16,7 +16,6 @@ use shiplift::{
     Docker,
 };
 use std::borrow::Borrow;
-use std::ops::Deref;
 use std::{collections::HashMap, env};
 use tracing::field;
 
