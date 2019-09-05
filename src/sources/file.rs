@@ -132,7 +132,7 @@ impl SourceConfig for FileConfig {
         DirBuilder::new()
             .recursive(true)
             .create(&data_dir)
-            .context(MakeSubdirectoryError {
+            .with_context(|| MakeSubdirectoryError {
                 data_dir: data_dir.parent().unwrap().to_path_buf(),
                 subdir: name,
             })?;
