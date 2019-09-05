@@ -647,7 +647,7 @@ impl ContainerLogInfo {
                     _ => {
                         trace!(
                             message = "Recieved older log",
-                            timestamp = field::display(timestamp_str)
+                            timestamp = %timestamp_str
                         );
                         return None;
                     }
