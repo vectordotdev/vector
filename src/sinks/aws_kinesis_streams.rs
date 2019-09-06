@@ -16,6 +16,7 @@ use rusoto_kinesis::{
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
@@ -161,6 +162,21 @@ impl RetryLogic for KinesisRetryLogic {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("ListStreams failed: {}", source))]
+    ListStreamsFailed {
+        source: rusoto_kinesis::ListStreamsError,
+    },
+    #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
+    StreamNamesMismatch { name: String, stream_name: String },
+    #[snafu(display(
+        "Stream returned does not contain any streams that match {}",
+        stream_name
+    ))]
+    NoMatchingStreamName { stream_name: String },
+}
+
 fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, crate::Error> {
     let client = KinesisClient::new(config.region.try_into()?);
     let stream_name = config.stream_name;
@@ -170,23 +186,22 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, crate::E
             exclusive_start_stream_name: Some(stream_name.clone()),
             limit: Some(1),
         })
-        .map_err(|e| format!("ListStreams failed: {}", e))
+        .map_err(|source| crate::box_error(HealthcheckError::ListStreamsFailed { source }))
         .and_then(move |res| Ok(res.stream_names.into_iter().next()))
         .and_then(move |name| {
             if let Some(name) = name {
                 if name == stream_name {
                     Ok(())
                 } else {
-                    Err(format!(
-                        "Stream names do not match, got {}, expected {}",
-                        name, stream_name
-                    ))
+                    Err(crate::box_error(HealthcheckError::StreamNamesMismatch {
+                        name,
+                        stream_name,
+                    }))
                 }
             } else {
-                Err(format!(
-                    "Stream returned does not contain any streams that match {}",
-                    stream_name
-                ))
+                Err(crate::box_error(HealthcheckError::NoMatchingStreamName {
+                    stream_name,
+                }))
             }
         });
 

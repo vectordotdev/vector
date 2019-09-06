@@ -125,7 +125,7 @@ impl CloudWatchMetricsSvc {
         };
 
         let response = client.put_metric_data(request);
-        let healthcheck = response.map_err(|err| err.to_string());
+        let healthcheck = response.map_err(|err| crate::box_error(err));
 
         Ok(Box::new(healthcheck))
     }

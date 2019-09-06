@@ -18,6 +18,7 @@ use rusoto_s3::{
     S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::convert::TryInto;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
@@ -93,6 +94,16 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid credentials"))]
+    InvalidCredentials,
+    #[snafu(display("Unknown bucket"))]
+    UnknownBucket,
+    #[snafu(display("Unknown error: Status code: {}", status))]
+    UnknownStatus { status: hyper::StatusCode },
+}
+
 impl S3Sink {
     pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
@@ -162,11 +173,15 @@ impl S3Sink {
 
         let healthcheck = response.map_err(|err| match err {
             HeadBucketError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
-                http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
-                status => format!("Unknown error: Status code: {}", status),
+                http::status::StatusCode::FORBIDDEN => {
+                    crate::box_error(HealthcheckError::InvalidCredentials)
+                }
+                http::status::StatusCode::NOT_FOUND => {
+                    crate::box_error(HealthcheckError::UnknownBucket)
+                }
+                status => crate::box_error(HealthcheckError::UnknownStatus { status }),
             },
-            err => err.to_string(),
+            err => crate::box_error(err),
         });
 
         Ok(Box::new(healthcheck))

@@ -32,7 +32,7 @@ impl SinkConfig for BlackholeConfig {
     }
 }
 
-fn healthcheck() -> impl Future<Item = (), Error = String> {
+fn healthcheck() -> impl Future<Item = (), Error = crate::Error> {
     future::ok(())
 }
 

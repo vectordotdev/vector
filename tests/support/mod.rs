@@ -5,6 +5,7 @@ use futures::{
     Future, Stream,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::buffers::Acker;
 use vector::event::{Event, Metric, ValueKind, MESSAGE};
@@ -176,6 +177,12 @@ impl MockSinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("unhealthy"))]
+    Unhealthy,
+}
+
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
     fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
@@ -187,7 +194,7 @@ impl SinkConfig for MockSinkConfig {
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),
-            false => future::err("unhealthy".to_owned()),
+            false => future::err(vector::box_error(HealthcheckError::Unhealthy)),
         };
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

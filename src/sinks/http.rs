@@ -210,13 +210,15 @@ fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthchec
 
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
+        .map_err(|err| crate::box_error(err))
         .and_then(|response| {
             use hyper::StatusCode;
 
             match response.status() {
                 StatusCode::OK => Ok(()),
-                other => Err(format!("Unexpected status: {}", other)),
+                status => Err(crate::box_error(
+                    super::HealthcheckError::UnexpectedStatus { status },
+                )),
             }
         });
 

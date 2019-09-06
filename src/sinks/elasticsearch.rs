@@ -194,18 +194,17 @@ fn healthcheck(host: &str) -> super::Healthcheck {
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);
-    let healthcheck = client
-        .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            if response.status() == hyper::StatusCode::OK {
-                Ok(())
-            } else {
-                Err(format!("Unexpected status: {}", response.status()))
-            }
-        });
-
-    Box::new(healthcheck)
+    Box::new(
+        client
+            .request(request)
+            .map_err(|err| crate::box_error(err))
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(crate::box_error(
+                    super::HealthcheckError::UnexpectedStatus { status },
+                )),
+            }),
+    )
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
@@ -386,7 +385,7 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: String) -> impl Future<Item = (), Error = String> {
+    fn flush(host: String) -> impl Future<Item = (), Error = Box<dyn Error + 'static>> {
         let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
@@ -394,13 +393,12 @@ mod integration_tests {
         let client = Client::builder().build(https);
         client
             .request(request)
-            .map_err(|err| err.to_string())
-            .and_then(|response| {
-                if response.status() == hyper::StatusCode::OK {
-                    Ok(())
-                } else {
-                    Err(format!("Unexpected status: {}", response.status()))
-                }
+            .context(RequestError)
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(crate::box_error(
+                    super::HealthcheckError::UnexpectedStatus { status },
+                )),
             })
     }
 

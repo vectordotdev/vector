@@ -22,12 +22,20 @@ use crate::Event;
 
 pub type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
-pub type Healthcheck = Box<dyn Future<Item = (), Error = String> + Send>;
+pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
 
+/// Common build errors
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Socket address problem: {}", source))]
     SocketAddressError { source: std::io::Error },
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+}
+
+/// Common healthcheck errors
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Unexpected status: {}", status))]
+    UnexpectedStatus { status: hyper::http::StatusCode },
 }

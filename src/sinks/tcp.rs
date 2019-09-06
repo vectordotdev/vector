@@ -424,12 +424,18 @@ pub fn raw_tcp(
     )
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Connect error: {}", source))]
+    ConnectError { source: std::io::Error },
+}
+
 pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
             .map(|_| ())
-            .map_err(|err| err.to_string())
+            .map_err(|source| crate::box_error(HealthcheckError::ConnectError { source }))
     });
 
     Box::new(check)

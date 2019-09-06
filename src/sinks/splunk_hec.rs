@@ -138,6 +138,14 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, cra
     Ok(Box::new(sink))
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid HEC token"))]
+    InvalidToken,
+    #[snafu(display("HEC is unhealthy, queues are full"))]
+    QueuesFull,
+}
+
 pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, crate::Error> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
@@ -153,12 +161,14 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, cr
 
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
+        .map_err(|err| crate::box_error(err))
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
-            StatusCode::BAD_REQUEST => Err("Invalid HEC token".to_string()),
-            StatusCode::SERVICE_UNAVAILABLE => Err("HEC is unhealthy, queues are full".to_string()),
-            other => Err(format!("Unexpected status: {}", other)),
+            StatusCode::BAD_REQUEST => Err(crate::box_error(HealthcheckError::InvalidToken)),
+            StatusCode::SERVICE_UNAVAILABLE => Err(crate::box_error(HealthcheckError::QueuesFull)),
+            other => Err(crate::box_error(
+                super::HealthcheckError::UnexpectedStatus { status: other },
+            )),
         });
 
     Ok(Box::new(healthcheck))

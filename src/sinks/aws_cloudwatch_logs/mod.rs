@@ -395,6 +395,20 @@ fn partition(
     Some(PartitionInnerBuffer::new(event, key))
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("DescribeLogStreams failed: {}", source))]
+    DescribeLogStreamsFailed {
+        source: rusoto_logs::DescribeLogGroupsError,
+    },
+    #[snafu(display("No log group found"))]
+    NoLogGroup,
+    #[snafu(display("Unable to extract group name"))]
+    GroupNameError,
+    #[snafu(display("Group name mismatch: expected {}, found {}", expected, name))]
+    GroupNameMismatch { expected: String, name: String },
+}
+
 fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, crate::Error> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
@@ -417,11 +431,11 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, c
     // it matches the one that AWS sends back.
     let fut = client
         .describe_log_groups(request)
-        .map_err(|e| format!("DescribeLogStreams failed: {}", e))
+        .map_err(|source| crate::box_error(HealthcheckError::DescribeLogStreamsFailed { source }))
         .and_then(|response| {
             response
                 .log_groups
-                .ok_or_else(|| "No log group found".to_string())
+                .ok_or_else(|| crate::box_error(HealthcheckError::NoLogGroup))
         })
         .and_then(move |groups| {
             if let Some(group) = groups.into_iter().next() {
@@ -429,16 +443,16 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, c
                     if name == expected_group_name {
                         Ok(())
                     } else {
-                        Err(format!(
-                            "Group name mismatch: Expected {}, found {}",
-                            expected_group_name, name
-                        ))
+                        Err(crate::box_error(HealthcheckError::GroupNameMismatch {
+                            expected: expected_group_name,
+                            name,
+                        }))
                     }
                 } else {
-                    Err("Unable to extract group name".to_string())
+                    Err(crate::box_error(HealthcheckError::GroupNameError))
                 }
             } else {
-                Err("No log group found".to_string())
+                Err(crate::box_error(HealthcheckError::NoLogGroup))
             }
         });
 

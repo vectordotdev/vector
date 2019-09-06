@@ -61,12 +61,18 @@ pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::Router
     )
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Connect error: {}", source))]
+    ConnectError { source: std::io::Error },
+}
+
 pub fn vector_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
             .map(|_| ())
-            .map_err(|err| err.to_string())
+            .map_err(|source| crate::box_error(source))
     });
 
     Box::new(check)

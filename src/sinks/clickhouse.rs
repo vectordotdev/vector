@@ -127,13 +127,12 @@ fn healthcheck(host: String) -> super::Healthcheck {
     let client = Client::builder().build(https);
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            if response.status() == hyper::StatusCode::OK {
-                Ok(())
-            } else {
-                Err(format!("Unexpected status: {}", response.status()))
-            }
+        .map_err(|err| crate::box_error(err))
+        .and_then(|response| match response.status() {
+            hyper::StatusCode::OK => Ok(()),
+            status => Err(crate::box_error(
+                super::HealthcheckError::UnexpectedStatus { status },
+            )),
         });
 
     Box::new(healthcheck)
