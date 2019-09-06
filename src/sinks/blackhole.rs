@@ -5,7 +5,6 @@ use crate::{
 };
 use futures::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 
 pub struct BlackholeSink {
     total_events: usize,
@@ -21,10 +20,7 @@ pub struct BlackholeConfig {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = Box::new(BlackholeSink::new(self.clone(), acker));
         let healthcheck = Box::new(healthcheck());
 

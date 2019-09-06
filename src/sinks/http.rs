@@ -19,7 +19,6 @@ use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -89,10 +88,7 @@ pub struct BasicAuth {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         validate_headers(&self.headers)?;
         let sink = http(self.clone(), acker)?;
 
@@ -109,10 +105,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(
-    config: HttpSinkConfig,
-    acker: Acker,
-) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
+fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -204,10 +197,7 @@ fn http(
     Ok(Box::new(sink))
 }
 
-fn healthcheck(
-    uri: String,
-    auth: Option<BasicAuth>,
-) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, crate::Error> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -240,9 +230,7 @@ impl BasicAuth {
     }
 }
 
-fn validate_headers(
-    headers: &Option<IndexMap<String, String>>,
-) -> Result<(), Box<dyn Error + 'static>> {
+fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), crate::Error> {
     if let Some(map) = headers {
         for (name, value) in map {
             HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
@@ -253,7 +241,7 @@ fn validate_headers(
     Ok(())
 }
 
-fn build_uri(raw: &str) -> Result<Uri, Box<dyn Error + 'static>> {
+fn build_uri(raw: &str) -> Result<Uri, crate::Error> {
     let base: Uri = raw.parse().context(super::UriParseError)?;
     Ok(Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))

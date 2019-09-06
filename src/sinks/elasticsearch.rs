@@ -16,7 +16,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use std::error::Error;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -54,10 +53,7 @@ pub struct ElasticSearchBasicAuthConfig {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = es(self, acker);
         let healthcheck = healthcheck(&self.host);
 

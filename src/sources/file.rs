@@ -9,7 +9,6 @@ use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, VecDeque};
-use std::error::Error;
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
@@ -123,7 +122,7 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
         // now before passing on the validated data_dir, we add the source_name as a subdir,
         // so that multiple sources can operate within the same given data_dir (e.g. the global one)
@@ -152,7 +151,7 @@ impl SourceConfig for FileConfig {
 fn resolve_and_validate_data_dir(
     config: &FileConfig,
     globals: &GlobalOptions,
-) -> Result<PathBuf, Box<dyn Error + 'static>> {
+) -> Result<PathBuf, crate::Error> {
     let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
         Some(v) => v.clone(),
         None => return Err(Box::new(BuildError::NoDataDir)),

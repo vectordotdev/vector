@@ -16,7 +16,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
@@ -61,10 +60,7 @@ fn default_host_field() -> Atom {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
@@ -77,10 +73,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(
-    config: HecSinkConfig,
-    acker: Acker,
-) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -145,10 +138,7 @@ pub fn hec(
     Ok(Box::new(sink))
 }
 
-pub fn healthcheck(
-    token: String,
-    host: String,
-) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, crate::Error> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
@@ -174,7 +164,7 @@ pub fn healthcheck(
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> Result<(), Box<dyn Error + 'static>> {
+pub fn validate_host(host: &String) -> Result<(), crate::Error> {
     let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme_part() {

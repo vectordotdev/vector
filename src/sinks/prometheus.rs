@@ -11,7 +11,6 @@ use hyper::{
 use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::error::Error;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -68,10 +67,7 @@ pub fn default_flush_period() -> Duration {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         // Checks
         if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
             return Err(Box::new(BuildError::FlushPeriodTooShort {

@@ -15,7 +15,6 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::error::Error;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -40,10 +39,7 @@ pub struct ClickhouseConfig {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = clickhouse(self.clone(), acker)?;
         let healtcheck = healthcheck(self.host.clone());
 
@@ -55,10 +51,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(
-    config: ClickhouseConfig,
-    acker: Acker,
-) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
+fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -146,7 +139,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, Box<dyn Error + 'static>> {
+fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, crate::Error> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",

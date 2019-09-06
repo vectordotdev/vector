@@ -1,6 +1,5 @@
 use futures::{future, sync::mpsc, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use vector::{
     buffers::Acker,
     test_util::{
@@ -22,7 +21,7 @@ impl config::SinkConfig for PanicSink {
     fn build(
         &self,
         _acker: Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>> {
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
 
@@ -94,7 +93,7 @@ impl config::SinkConfig for ErrorSink {
     fn build(
         &self,
         _acker: Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>> {
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
 
@@ -167,7 +166,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, Box<dyn Error + 'static>> {
+    ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::err(())))
     }
 
@@ -224,7 +223,7 @@ impl config::SourceConfig for PanicSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, Box<dyn Error + 'static>> {
+    ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

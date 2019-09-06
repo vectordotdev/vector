@@ -24,3 +24,5 @@ pub mod transforms;
 pub mod types;
 
 pub use event::Event;
+
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

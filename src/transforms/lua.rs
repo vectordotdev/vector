@@ -5,7 +5,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -23,7 +22,7 @@ pub struct LuaConfig {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -44,7 +43,7 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, Box<dyn Error + 'static>> {
+    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, crate::Error> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs

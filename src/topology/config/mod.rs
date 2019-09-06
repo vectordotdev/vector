@@ -2,7 +2,6 @@ use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::{collections::HashMap, path::PathBuf};
 
 mod validation;
@@ -46,7 +45,7 @@ pub trait SourceConfig: core::fmt::Debug {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, Box<dyn Error + 'static>>;
+    ) -> Result<sources::Source, crate::Error>;
 
     fn output_type(&self) -> DataType;
 }
@@ -67,7 +66,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(
         &self,
         acker: crate::buffers::Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), Box<dyn Error + 'static>>;
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), crate::Error>;
 
     fn input_type(&self) -> DataType;
 }
@@ -81,7 +80,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> Result<Box<dyn transforms::Transform>, Box<dyn Error + 'static>>;
+    fn build(&self) -> Result<Box<dyn transforms::Transform>, crate::Error>;
 
     fn input_type(&self) -> DataType;
 

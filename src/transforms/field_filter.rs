@@ -4,7 +4,6 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -16,7 +15,7 @@ pub struct FieldFilterConfig {
 
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),

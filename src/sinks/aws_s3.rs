@@ -19,7 +19,6 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
-use std::error::Error;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
@@ -82,10 +81,7 @@ impl Default for Compression {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
@@ -98,10 +94,7 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3Sink {
-    pub fn new(
-        config: &S3SinkConfig,
-        acker: Acker,
-    ) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
+    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -158,9 +151,7 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(
-        config: &S3SinkConfig,
-    ) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, crate::Error> {
         let client = Self::create_client(config.region.clone().try_into()?);
 
         let request = HeadBucketRequest {

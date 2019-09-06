@@ -16,7 +16,6 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
-use std::error::Error;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
@@ -56,10 +55,7 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -80,7 +76,7 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, Box<dyn Error + 'static>> {
+    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, crate::Error> {
         let producer = config.to_rdkafka().create().context(KafkaCreateError)?;
         Ok(KafkaSink {
             producer,

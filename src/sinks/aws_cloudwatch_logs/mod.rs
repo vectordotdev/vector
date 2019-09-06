@@ -24,7 +24,6 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use tower::{
     buffer::Buffer,
@@ -129,10 +128,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
@@ -167,7 +163,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, Box<dyn Error + 'static>> {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, crate::Error> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
@@ -256,7 +252,7 @@ impl CloudwatchLogsSvc {
     pub fn new(
         config: &CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
-    ) -> Result<Self, Box<dyn Error + 'static>> {
+    ) -> Result<Self, crate::Error> {
         let region = config.region.clone().try_into()?;
         let client = create_client(region)?;
 
@@ -399,9 +395,7 @@ fn partition(
     Some(PartitionInnerBuffer::new(event, key))
 }
 
-fn healthcheck(
-    config: CloudwatchLogsSinkConfig,
-) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, crate::Error> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(Box::new(future::ok(())));
@@ -451,7 +445,7 @@ fn healthcheck(
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region) -> Result<CloudWatchLogsClient, Box<dyn Error + 'static>> {
+fn create_client(region: Region) -> Result<CloudWatchLogsClient, crate::Error> {
     let http = HttpClient::new().context(HttpClientError)?;
     let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
 

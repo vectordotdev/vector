@@ -4,7 +4,6 @@ use crate::topology::config::DataType;
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -17,7 +16,7 @@ pub struct CoercerConfig {
 
 #[typetag::serde(name = "coercer")]
 impl crate::topology::config::TransformConfig for CoercerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer { types }))
     }

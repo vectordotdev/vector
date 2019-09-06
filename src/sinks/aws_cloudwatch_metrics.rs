@@ -16,7 +16,6 @@ use rusoto_cloudwatch::{
 use rusoto_core::{Region, RusotoFuture};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 use std::{convert::TryInto, time::Duration};
 use tower::{Service, ServiceBuilder};
 
@@ -52,10 +51,7 @@ pub struct CloudWatchMetricsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = CloudWatchMetricsSvc::new(self.clone(), acker)?;
         let healthcheck = CloudWatchMetricsSvc::healthcheck(self)?;
         Ok((sink, healthcheck))
@@ -70,7 +66,7 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         acker: Acker,
-    ) -> Result<super::RouterSink, Box<dyn Error + 'static>> {
+    ) -> Result<super::RouterSink, crate::Error> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
         let batch_size = config.batch_size.unwrap_or(20);
@@ -115,7 +111,7 @@ impl CloudWatchMetricsSvc {
 
     fn healthcheck(
         config: &CloudWatchMetricsSinkConfig,
-    ) -> Result<super::Healthcheck, Box<dyn Error + 'static>> {
+    ) -> Result<super::Healthcheck, crate::Error> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
         let datum = MetricDatum {
@@ -134,7 +130,7 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(healthcheck))
     }
 
-    fn create_client(region: Region) -> Result<CloudWatchClient, Box<dyn Error + 'static>> {
+    fn create_client(region: Region) -> Result<CloudWatchClient, crate::Error> {
         #[cfg(test)]
         {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name

@@ -11,7 +11,6 @@ use futures::{future, Future, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::net::TcpStream;
 
@@ -35,10 +34,7 @@ impl VectorSinkConfig {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let addr = self
             .address
             .to_socket_addrs()

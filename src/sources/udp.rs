@@ -6,7 +6,6 @@ use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
 use tokio::net::udp::{UdpFramed, UdpSocket};
@@ -35,7 +34,7 @@ impl SourceConfig for UdpConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.clone());
         Ok(udp(self.address, host_key, out))
     }

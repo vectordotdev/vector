@@ -4,7 +4,6 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -19,7 +18,7 @@ pub struct RemoveFields {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 

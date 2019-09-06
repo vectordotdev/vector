@@ -10,7 +10,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
-use std::error::Error;
 use std::io;
 use std::iter::FromIterator;
 use std::sync::mpsc::RecvTimeoutError;
@@ -46,7 +45,7 @@ impl SourceConfig for JournaldConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
         let journal = Journal::open(local_only, runtime_only).context(JournaldError)?;

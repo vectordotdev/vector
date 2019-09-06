@@ -7,7 +7,6 @@ use bytes::Bytes;
 use codec::{self, BytesDelimitedCodec};
 use futures::sync::mpsc;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
 use tracing::field;
@@ -49,7 +48,7 @@ impl SourceConfig for TcpConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         let tcp = RawTcpSource {
             config: self.clone(),
         };

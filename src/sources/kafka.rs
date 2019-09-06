@@ -13,7 +13,6 @@ use rdkafka::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::sync::Arc;
 
 #[derive(Debug, Snafu)]
@@ -53,7 +52,7 @@ impl SourceConfig for KafkaSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         kafka_source(self.clone(), out)
     }
 
@@ -65,7 +64,7 @@ impl SourceConfig for KafkaSourceConfig {
 fn kafka_source(
     config: KafkaSourceConfig,
     out: mpsc::Sender<Event>,
-) -> Result<super::Source, Box<dyn Error + 'static>> {
+) -> Result<super::Source, crate::Error> {
     let consumer = Arc::new(create_consumer(config.clone())?);
     let source = future::lazy(move || {
         let consumer_ref = Arc::clone(&consumer);
@@ -119,7 +118,7 @@ fn kafka_source(
     Ok(Box::new(source))
 }
 
-fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, Box<dyn Error + 'static>> {
+fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, crate::Error> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", &config.group_id)
         .set("bootstrap.servers", &config.bootstrap_servers)

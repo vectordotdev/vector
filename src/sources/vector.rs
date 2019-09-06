@@ -8,7 +8,6 @@ use bytes::{Bytes, BytesMut};
 use futures::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::net::SocketAddr;
 use tokio::codec::LengthDelimitedCodec;
 use tracing::field;
@@ -41,7 +40,7 @@ impl SourceConfig for VectorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, Box<dyn Error + 'static>> {
+    ) -> Result<super::Source, crate::Error> {
         let vector = VectorSource;
         vector.run(self.address, self.shutdown_timeout_secs, out)
     }

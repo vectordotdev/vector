@@ -5,7 +5,6 @@ use futures::{
     Future, Stream,
 };
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use vector::buffers::Acker;
 use vector::event::{Event, Metric, ValueKind, MESSAGE};
@@ -59,7 +58,7 @@ impl SourceConfig for MockSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: Sender<Event>,
-    ) -> Result<Source, Box<dyn Error + 'static>> {
+    ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let source = future::lazy(move || {
             wrapped
@@ -144,7 +143,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -179,7 +178,7 @@ impl MockSinkConfig {
 
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
         let sink = self
             .sender
             .clone()

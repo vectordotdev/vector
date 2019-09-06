@@ -6,7 +6,6 @@ use crate::{
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use string_cache::DefaultAtom as Atom;
 use toml::value::Value;
 
@@ -22,7 +21,7 @@ pub struct AddFields {
 
 #[typetag::serde(name = "augmenter")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 

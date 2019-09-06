@@ -14,7 +14,6 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::error::Error;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
@@ -112,10 +111,7 @@ impl TcpSinkConfig {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(
-        &self,
-        acker: Acker,
-    ) -> Result<(super::RouterSink, super::Healthcheck), Box<dyn Error + 'static>> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let addr = self
             .address
             .to_socket_addrs()
@@ -175,9 +171,7 @@ impl SinkConfig for TcpSinkConfig {
     }
 }
 
-fn load_certificate<T: AsRef<Path> + Debug>(
-    filename: T,
-) -> Result<Certificate, Box<dyn Error + 'static>> {
+fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, crate::Error> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate authority")?;
     Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
@@ -186,7 +180,7 @@ fn load_certificate<T: AsRef<Path> + Debug>(
 fn load_key<T: AsRef<Path> + Debug>(
     filename: T,
     pass_phrase: &Option<String>,
-) -> Result<PKey<Private>, Box<dyn Error + 'static>> {
+) -> Result<PKey<Private>, crate::Error> {
     let filename = filename.as_ref();
     let data = open_read(filename, "key")?;
     match pass_phrase {
@@ -201,7 +195,7 @@ fn load_key<T: AsRef<Path> + Debug>(
     }
 }
 
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, Box<dyn Error + 'static>> {
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, crate::Error> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate")?;
     Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
@@ -210,7 +204,7 @@ fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, Box<dyn Error 
 fn open_read<F: AsRef<Path> + Debug>(
     filename: F,
     note: &'static str,
-) -> Result<Vec<u8>, Box<dyn Error + 'static>> {
+) -> Result<Vec<u8>, crate::Error> {
     let mut text = Vec::<u8>::new();
     let filename = filename.as_ref();
 
@@ -251,7 +245,7 @@ pub struct TcpSinkTls {
 }
 
 impl TcpSinkTls {
-    fn make_connector(&self) -> Result<TlsConnector, Box<dyn Error + 'static>> {
+    fn make_connector(&self) -> Result<TlsConnector, crate::Error> {
         let mut connector = native_tls::TlsConnector::builder();
         connector.danger_accept_invalid_certs(!self.verify);
         if let Some(ref certificate) = self.add_ca {

@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::error::Error;
 use std::str;
 use string_cache::DefaultAtom as Atom;
 
@@ -25,7 +24,7 @@ pub struct RegexParserConfig {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, Box<dyn Error + 'static>> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
