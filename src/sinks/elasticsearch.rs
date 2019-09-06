@@ -385,7 +385,7 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: String) -> impl Future<Item = (), Error = Box<dyn Error + 'static>> {
+    fn flush(host: String) -> impl Future<Item = (), Error = crate::Error> {
         let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
@@ -393,11 +393,11 @@ mod integration_tests {
         let client = Client::builder().build(https);
         client
             .request(request)
-            .context(RequestError)
+            .map_err(|source| crate::box_error(source))
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(crate::box_error(
-                    super::HealthcheckError::UnexpectedStatus { status },
+                    super::super::HealthcheckError::UnexpectedStatus { status },
                 )),
             })
     }

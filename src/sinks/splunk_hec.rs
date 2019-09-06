@@ -501,10 +501,12 @@ mod integration_tests {
             let healthcheck =
                 sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
                     .unwrap();
-            assert_eq!(
-                rt.block_on(healthcheck).unwrap_err(),
-                "HEC is unhealthy, queues are full"
-            );
+            assert!(rt
+                .block_on(healthcheck)
+                .unwrap_err()
+                .to_string()
+                .find("HEC is unhealthy, queues are full")
+                .is_some());
         }
     }
 

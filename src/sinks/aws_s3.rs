@@ -600,7 +600,12 @@ mod integration_tests {
             ..config()
         };
         let healthcheck = S3Sink::healthcheck(&config).unwrap();
-        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
+        assert!(rt
+            .block_on(healthcheck)
+            .unwrap_err()
+            .to_string()
+            .find("Unknown bucket")
+            .is_some());
     }
 
     fn client() -> S3Client {
