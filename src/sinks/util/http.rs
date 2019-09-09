@@ -135,7 +135,7 @@ impl RetryLogic for HttpRetryLogic {
             StatusCode::TOO_MANY_REQUESTS => Some("Too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => None,
             _ if status.is_server_error() => {
-                Some(format!("{}: {:?}", status, response.body()).into())
+                Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
             }
             _ => None,
         }

@@ -186,7 +186,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 //
                 // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
                 match body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
-                    false => Some(format!("{:?}", body).into()),
+                    false => Some(String::from_utf8_lossy(body).to_string().into()),
                     true => None,
                 }
             }
