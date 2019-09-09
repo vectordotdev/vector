@@ -202,6 +202,14 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: true
   current_runtime_only = true
 
+  # The directory used to persist the journal checkpoint position. By default,
+  # the global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
+
   # Include only entries from the local system
   # 
   # * optional
