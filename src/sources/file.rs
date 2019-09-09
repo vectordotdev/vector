@@ -8,7 +8,6 @@ use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -93,19 +92,11 @@ impl SourceConfig for FileConfig {
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
-        // now before passing on the validated data_dir, we add the source_name as a subdir,
-        // so that multiple sources can operate within the same given data_dir (e.g. the global one)
-        // without the file servers' checkpointers interfering with each other
-        data_dir.push(name);
-        if let Err(e) = DirBuilder::new().recursive(true).create(&data_dir) {
-            return Err(format!(
-                "could not create subdirectory '{}' inside of data_dir '{}': {}",
-                name,
-                data_dir.parent().unwrap().display(),
-                e
-            ));
-        };
+        // add the source name as a subdir, so that multiple sources can
+        // operate within the same given data_dir (e.g. the global one)
+        // without the file servers' checkpointers interfering with each
+        // other
+        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
         if let Some(Err(err)) = self.message_start_indicator.as_ref().map(|s| Regex::new(s)) {
             return Err(format!(
@@ -120,32 +111,6 @@ impl SourceConfig for FileConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
-}
-
-fn resolve_and_validate_data_dir(
-    config: &FileConfig,
-    globals: &GlobalOptions,
-) -> Result<PathBuf, String> {
-    let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
-        Some(v) => v.clone(),
-        None => return Err("data_dir option required, but not given here or globally".into()),
-    };
-    if !data_dir.exists() {
-        return Err(format!(
-            "data_dir '{}' does not exist",
-            data_dir.to_string_lossy()
-        ));
-    }
-    let readonly = std::fs::metadata(&data_dir)
-        .map(|meta| meta.permissions().readonly())
-        .unwrap_or(true);
-    if readonly {
-        return Err(format!(
-            "data_dir '{}' is not writable",
-            data_dir.to_string_lossy()
-        ));
-    }
-    Ok(data_dir)
 }
 
 pub fn file_source(
@@ -435,19 +400,15 @@ mod tests {
         config.data_dir = global_dir.into_path().into();
 
         // local path given -- local should win
-        let res = super::resolve_and_validate_data_dir(
-            &test_default_file_config(&local_dir),
-            &GlobalOptions::from(&config),
-        )
-        .unwrap();
+        let res = GlobalOptions::from(&config)
+            .resolve_and_validate_data_dir(test_default_file_config(&local_dir).data_dir.as_ref())
+            .unwrap();
         assert_eq!(res, local_dir.path());
 
         // no local path given -- global fallback should be in effect
-        let res = super::resolve_and_validate_data_dir(
-            &Default::default(),
-            &GlobalOptions::from(&config),
-        )
-        .unwrap();
+        let res = GlobalOptions::from(&config)
+            .resolve_and_validate_data_dir(None)
+            .unwrap();
         assert_eq!(res, config.data_dir.unwrap());
     }
 
