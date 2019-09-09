@@ -6,5 +6,6 @@ sample.log
 miniodat
 .DS_Store
 .idea/
+.vscode/
 checkpoints/*
 *.iml
