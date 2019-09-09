@@ -67,10 +67,7 @@ where
                 }
 
                 if let Some(ref reason) = self.logic.should_retry_response(response) {
-                    warn!(
-                        message = "retrying after response.",
-                        reason = tracing::field::display(reason),
-                    );
+                    warn!(message = "retrying after response.", %reason);
                     Some(self.build_retry())
                 } else {
                     None
