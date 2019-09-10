@@ -140,8 +140,8 @@ class Links
       raw_path_or_url = parts.first
       section = parts.length > 1 ? parts.last : nil
 
-      if raw_path_or_url.start_with?("../")
-        path_parts = raw_path_or_url.split(File::SEPARATOR).select { |part| part != ".." }
+      if raw_path_or_url.start_with?(".")
+        path_parts = raw_path_or_url.split(File::SEPARATOR).select { |part| part != ".." && part != "." }
         raw_path_or_url = "/" + File.join(path_parts)
       end
 
