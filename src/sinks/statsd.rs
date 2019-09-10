@@ -21,10 +21,11 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn new(address: SocketAddr) -> Result<Self, String> {
         let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
-        let socket = UdpSocket::bind(&from).expect("failed to bind to udp listener socket");
-        Client { socket, address }
+        let socket = UdpSocket::bind(&from)
+            .map_err(|e| format!("failed to bind to udp listener socket, error = {:?}", e))?;
+        Ok(Client { socket, address })
     }
 
     pub fn send(&self, buf: &[u8]) -> usize {
@@ -72,7 +73,7 @@ impl StatsdSvc {
         let batch_timeout = config.batch_timeout.unwrap_or(1);
         let namespace = config.namespace.clone();
 
-        let client = Client::new(config.address);
+        let client = Client::new(config.address)?;
         let service = StatsdSvc { client };
 
         let svc = ServiceBuilder::new().service(service);
