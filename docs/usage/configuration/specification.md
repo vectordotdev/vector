@@ -246,11 +246,12 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   group_id = "consumer-group-name"
 
-  # The Kafka topics names to read events from.
+  # The Kafka topics names to read events from. Regex is supported if the topic
+  # begins with `^`.
   # 
   # * required
   # * no default
-  topics = ["topic-1", "topic-2", "topic-3"]
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.

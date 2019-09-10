@@ -256,10 +256,13 @@ to initially to bootstrap itself.\
 
 [sources.kafka.options.topics]
 type = "[string]"
-examples = [["topic-1", "topic-2", "topic-3"]]
+examples = [
+  ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+]
 null = false
 description = """\
-The Kafka topics names to read events from.
+The Kafka topics names to read events from. Regex is supported if the topic \
+begins with `^`.
 """
 
 [sources.kafka.options.group_id]
