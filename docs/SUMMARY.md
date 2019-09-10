@@ -72,19 +72,19 @@
     * [sampler transform][docs.sampler_transform]
     * [tokenizer transform][docs.tokenizer_transform]
   * [Sinks](usage/configuration/sinks/README.md)
-    * [aws_cloudwatch_logs sink][docs.aws_cloudwatch_logs_transform]
-    * [aws_kinesis_streams sink][docs.aws_kinesis_streams_transform]
-    * [aws_s3 sink][docs.aws_s3_transform]
-    * [blackhole sink][docs.blackhole_transform]
-    * [clickhouse sink][docs.clickhouse_transform]
-    * [console sink][docs.console_transform]
-    * [elasticsearch sink][docs.elasticsearch_transform]
-    * [http sink][docs.http_transform]
-    * [kafka sink][docs.kafka_transform]
-    * [prometheus sink][docs.prometheus_transform]
-    * [splunk_hec sink][docs.splunk_hec_transform]
-    * [tcp sink][docs.tcp_transform]
-    * [vector sink][docs.vector_transform]
+    * [aws_cloudwatch_logs sink][docs.aws_cloudwatch_logs_sink]
+    * [aws_kinesis_streams sink][docs.aws_kinesis_streams_sink]
+    * [aws_s3 sink][docs.aws_s3_sink]
+    * [blackhole sink][docs.blackhole_sink]
+    * [clickhouse sink][docs.clickhouse_sink]
+    * [console sink][docs.console_sink]
+    * [elasticsearch sink][docs.elasticsearch_sink]
+    * [http sink][docs.http_sink]
+    * [kafka sink][docs.kafka_sink]
+    * [prometheus sink][docs.prometheus_sink]
+    * [splunk_hec sink][docs.splunk_hec_sink]
+    * [tcp sink][docs.tcp_sink]
+    * [vector sink][docs.vector_sink]
   * [Specification](usage/configuration/specification.md)
 * [Administration](usage/administration/README.md)
   * [Starting](usage/administration/starting.md)
@@ -112,35 +112,35 @@
 
 
 [docs.add_fields_transform]: ./usage/configuration/transforms/add_fields.md
-[docs.aws_cloudwatch_logs_transform]: ./usage/configuration/transforms/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_transform]: ./usage/configuration/transforms/aws_kinesis_streams.md
-[docs.aws_s3_transform]: ./usage/configuration/transforms/aws_s3.md
-[docs.blackhole_transform]: ./usage/configuration/transforms/blackhole.md
-[docs.clickhouse_transform]: ./usage/configuration/transforms/clickhouse.md
+[docs.aws_cloudwatch_logs_sink]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.aws_kinesis_streams_sink]: ./usage/configuration/sinks/aws_kinesis_streams.md
+[docs.aws_s3_sink]: ./usage/configuration/sinks/aws_s3.md
+[docs.blackhole_sink]: ./usage/configuration/sinks/blackhole.md
+[docs.clickhouse_sink]: ./usage/configuration/sinks/clickhouse.md
 [docs.coercer_transform]: ./usage/configuration/transforms/coercer.md
-[docs.console_transform]: ./usage/configuration/transforms/console.md
-[docs.elasticsearch_transform]: ./usage/configuration/transforms/elasticsearch.md
+[docs.console_sink]: ./usage/configuration/sinks/console.md
+[docs.elasticsearch_sink]: ./usage/configuration/sinks/elasticsearch.md
 [docs.field_filter_transform]: ./usage/configuration/transforms/field_filter.md
 [docs.file_source]: ./usage/configuration/sources/file.md
 [docs.grok_parser_transform]: ./usage/configuration/transforms/grok_parser.md
-[docs.http_transform]: ./usage/configuration/transforms/http.md
+[docs.http_sink]: ./usage/configuration/sinks/http.md
 [docs.journald_source]: ./usage/configuration/sources/journald.md
 [docs.json_parser_transform]: ./usage/configuration/transforms/json_parser.md
+[docs.kafka_sink]: ./usage/configuration/sinks/kafka.md
 [docs.kafka_source]: ./usage/configuration/sources/kafka.md
-[docs.kafka_transform]: ./usage/configuration/transforms/kafka.md
 [docs.log_to_metric_transform]: ./usage/configuration/transforms/log_to_metric.md
 [docs.lua_transform]: ./usage/configuration/transforms/lua.md
-[docs.prometheus_transform]: ./usage/configuration/transforms/prometheus.md
+[docs.prometheus_sink]: ./usage/configuration/sinks/prometheus.md
 [docs.regex_parser_transform]: ./usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ./usage/configuration/transforms/remove_fields.md
 [docs.sampler_transform]: ./usage/configuration/transforms/sampler.md
-[docs.splunk_hec_transform]: ./usage/configuration/transforms/splunk_hec.md
+[docs.splunk_hec_sink]: ./usage/configuration/sinks/splunk_hec.md
 [docs.statsd_source]: ./usage/configuration/sources/statsd.md
 [docs.stdin_source]: ./usage/configuration/sources/stdin.md
 [docs.syslog_source]: ./usage/configuration/sources/syslog.md
+[docs.tcp_sink]: ./usage/configuration/sinks/tcp.md
 [docs.tcp_source]: ./usage/configuration/sources/tcp.md
-[docs.tcp_transform]: ./usage/configuration/transforms/tcp.md
 [docs.tokenizer_transform]: ./usage/configuration/transforms/tokenizer.md
 [docs.udp_source]: ./usage/configuration/sources/udp.md
+[docs.vector_sink]: ./usage/configuration/sinks/vector.md
 [docs.vector_source]: ./usage/configuration/sources/vector.md
-[docs.vector_transform]: ./usage/configuration/transforms/vector.md
