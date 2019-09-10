@@ -70,7 +70,7 @@ pub enum Provider {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(self, &common);
+        let healthcheck = healthcheck(&common);
         let sink = es(self, common, acker);
 
         Ok((sink, healthcheck))
@@ -82,6 +82,7 @@ impl SinkConfig for ElasticSearchConfig {
 }
 
 struct ElasticSearchCommon {
+    host: String,
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
@@ -89,6 +90,11 @@ struct ElasticSearchCommon {
 
 impl ElasticSearchCommon {
     fn parse_config(config: &ElasticSearchConfig) -> Result<Self, String> {
+        // Test the configured host, but ignore the result
+        let uri = format!("{}/_test", config.host);
+        uri.parse::<Uri>()
+            .map_err(|err| format!("Invalid elasticsearch host: {}", err))?;
+
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
@@ -118,10 +124,20 @@ impl ElasticSearchCommon {
         };
 
         Ok(Self {
+            host: config.host.clone(),
             authorization,
             region,
             credentials,
         })
+    }
+
+    fn builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
+        let uri = format!("{}{}", self.host, path);
+        let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
+        let mut builder = Request::builder();
+        builder.method(method);
+        builder.uri(&uri);
+        (uri, builder)
     }
 }
 
@@ -171,17 +187,14 @@ fn es(
             path_query.append_pair(&p[..], &v[..]);
         }
     }
-    let uri = format!("{}{}", config.host, path_query.finish());
-    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
+    let path_query = path_query.finish();
 
     if common.credentials.is_some() {
         gzip = false;
     }
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(&uri);
+        let (uri, mut builder) = common.builder(Method::POST, &path_query);
 
         match common.credentials {
             None => {
@@ -280,10 +293,8 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(config: &ElasticSearchConfig, common: &ElasticSearchCommon) -> super::Healthcheck {
-    let uri = format!("{}/_cluster/health", config.host);
-    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
-    let mut builder = Request::get(&uri);
+fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
+    let (uri, mut builder) = common.builder(Method::GET, "/_cluster/health");
     match &common.credentials {
         None => {
             if let Some(authorization) = &common.authorization {
