@@ -81,7 +81,7 @@ impl SinkConfig for ElasticSearchConfig {
 
 fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, String> {
     let id_key = config.id_key.clone();
-    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+    let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };
@@ -136,6 +136,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
     let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
         Provider::Default => None,
         Provider::Aws => {
+            gzip = false;
             if region.is_none() {
                 return Err("AWS provider requires a configured region".into());
             }
@@ -177,9 +178,6 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
                 request.set_hostname(uri.host().map(|s| s.into()));
 
                 request.add_header("Content-Type", "application/x-ndjson");
-                if gzip {
-                    request.add_header("Content-Encoding", "gzip");
-                }
 
                 for (header, value) in &headers {
                     request.add_header(header, value);
