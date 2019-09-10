@@ -133,7 +133,7 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
 | `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"` |
 
 ## Examples
 
