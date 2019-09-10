@@ -133,7 +133,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
 | `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp&#124;strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## How It Works
 

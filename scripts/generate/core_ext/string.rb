@@ -51,6 +51,6 @@ class String
   end
 
   def table_escape
-    gsub("|", "&#124;")
+    gsub("|", '\|')
   end
 end
