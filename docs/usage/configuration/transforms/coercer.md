@@ -102,7 +102,7 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 | `type` | `string` | The component type<br />`required` `must be: "coercer"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of field type conversions. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp&#124;strftime"` |
 
 ## Examples
 
