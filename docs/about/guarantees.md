@@ -27,7 +27,7 @@ and [source][docs.sources].
 | **Sources** | |
 | [`file` source][docs.file_source] | `best_effort` |
 | [`journald` source][docs.journald_source] | `best_effort` |
-| [`kafka` source][docs.kafka_source] | `best_effort` |
+| [`kafka` source][docs.kafka_source] | `at_least_once` |
 | [`statsd` source][docs.statsd_source] | `best_effort` |
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
 | [`syslog` source][docs.syslog_source] | `best_effort` |

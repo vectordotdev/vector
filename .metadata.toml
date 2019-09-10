@@ -238,7 +238,7 @@ Unit names lacking a `"."` will have `".service"` appended to make them a valid 
 # ------------------------------------------------------------------------------
 [sources.kafka]
 beta = true
-delivery_guarantee = "best_effort"
+delivery_guarantee = "at_least_once"
 guides = []
 output_types = ["log"]
 resources = []

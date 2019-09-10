@@ -161,8 +161,8 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Delivery Guarantee
 
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
+if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
 
 ### Environment Variables
 
@@ -194,7 +194,7 @@ issue, please:
 * [**Source code**][url.kafka_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
