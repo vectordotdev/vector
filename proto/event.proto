@@ -12,7 +12,7 @@ message EventWrapper {
 }
 
 message Log {
-  map<string, Value> structured = 1;
+  map<string, Value> fields = 1;
 }
 
 message Value {
