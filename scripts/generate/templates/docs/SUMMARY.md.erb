@@ -1,0 +1,90 @@
+# Table of contents
+
+* [What Is Vector?](README.md)
+* [Use Cases](use-cases/README.md)
+  * [Reduce Lock-In](use-cases/lock-in.md)
+  * [Multi-Cloud](use-cases/multi-cloud.md)
+  * [Governance & Control](use-cases/governance.md)
+  * [Reduce Cost](use-cases/cost.md)
+  * [Security & Compliance](use-cases/security-and-compliance.md)
+  * [Backups & Archives](use-cases/backups.md)
+* [Performance](performance.md)
+* [Correctness](correctness.md)
+
+## About
+
+* [Concepts](about/concepts.md)
+* [Data Model](about/data-model/README.md)
+  * [Log Event](about/data-model/log.md)
+  * [Metric Event](about/data-model/metric.md)
+* [Guarantees](about/guarantees.md)
+
+## Setup
+
+* [Installation](setup/installation/README.md)
+  * [Platforms](setup/installation/platforms/README.md)
+    * [Docker](setup/installation/platforms/docker.md)
+  * [Package Managers](setup/installation/package-managers/README.md)
+    * [APT](setup/installation/package-managers/apt.md)
+    * [Homebrew](setup/installation/package-managers/homebrew.md)
+    * [YUM](setup/installation/package-managers/yum.md)
+  * [Operating Systems](setup/installation/operating-systems/README.md)
+    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
+    * [CentOS](setup/installation/operating-systems/centos.md)
+    * [Debian](setup/installation/operating-systems/debian.md)
+    * [MacOS](setup/installation/operating-systems/macos.md)
+    * [RHEL](setup/installation/operating-systems/rhel.md)
+    * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
+  * [Manual](setup/installation/manual/README.md)
+    * [From Archives](setup/installation/manual/from-archives.md)
+    * [From Source](setup/installation/manual/from-source.md)
+* [Getting Started](setup/getting-started/README.md)
+  * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
+* [Deployment](setup/deployment/README.md)
+  * [Topologies](setup/deployment/topologies.md)
+  * [Roles](setup/deployment/roles/README.md)
+    * [Agent Role](setup/deployment/roles/agent.md)
+    * [Service Role](setup/deployment/roles/service.md)
+
+## Usage
+
+* [Configuration](usage/configuration/README.md)
+  * [Sources](usage/configuration/sources/README.md)
+    <%- metadata.sources.to_h.values.sort.each do |source| -%>
+    * [<%= source.name %> source][docs.<%= source.name %>_source]
+    <%- end -%>
+  * [Transforms](usage/configuration/transforms/README.md)
+    <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
+    * [<%= transform.name %> transform][docs.<%= transform.name %>_transform]
+    <%- end -%>
+  * [Sinks](usage/configuration/sinks/README.md)
+    <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
+    * [<%= sink.name %> sink][docs.<%= sink.name %>_sink]
+    <%- end -%>
+  * [Specification](usage/configuration/specification.md)
+* [Administration](usage/administration/README.md)
+  * [Starting](usage/administration/starting.md)
+  * [Reloading](usage/administration/reloading.md)
+  * [Stopping](usage/administration/stopping.md)
+  * [Monitoring](usage/administration/monitoring.md)
+  * [Tuning](usage/administration/tuning.md)
+  * [Updating](usage/administration/updating.md)
+  * [Validating](usage/administration/validating.md)
+  * [Env Vars](usage/administration/env-vars.md)
+* [Guides](usage/guides/README.md)
+  * [Troubleshooting Guide](usage/guides/troubleshooting.md)
+
+## Resources
+
+* [Community](https://vector.dev/community/)
+* [Download](https://github.com/timberio/vector/releases)
+* [Github Repo](https://github.com/timberio/vector)
+* [Roadmap](https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open)
+
+## Meta
+
+* [Conventions](meta/conventions.md)
+* [Glossary](meta/glossary.md)
+
+
+
