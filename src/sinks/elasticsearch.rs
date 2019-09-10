@@ -66,21 +66,40 @@ pub enum Provider {
     Aws,
 }
 
-impl ElasticSearchConfig {
-    fn authorization(&self) -> Option<String> {
-        self.basic_auth.as_ref().map(|auth| {
-            let token = format!("{}:{}", auth.user, auth.password);
-            format!("Basic {}", base64::encode(token.as_bytes()))
-        })
+#[typetag::serde(name = "elasticsearch")]
+impl SinkConfig for ElasticSearchConfig {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+        let common = ElasticSearchCommon::parse_config(&self)?;
+        let healthcheck = healthcheck(self, &common);
+        let sink = es(self, common, acker);
+
+        Ok((sink, healthcheck))
     }
 
-    fn credentials(&self) -> Result<(Option<Region>, Option<AwsCredentials>), String> {
-        let region: Option<Region> = match self.region {
+    fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+}
+
+struct ElasticSearchCommon {
+    authorization: Option<String>,
+    region: Option<Region>,
+    credentials: Option<AwsCredentials>,
+}
+
+impl ElasticSearchCommon {
+    fn parse_config(config: &ElasticSearchConfig) -> Result<Self, String> {
+        let authorization = config.basic_auth.as_ref().map(|auth| {
+            let token = format!("{}:{}", auth.user, auth.password);
+            format!("Basic {}", base64::encode(token.as_bytes()))
+        });
+
+        let region: Option<Region> = match config.region {
             Some(ref region) => Some(region.try_into().map_err(|err| format!("{}", err))?),
             None => None,
         };
 
-        let credentials = match self.provider.as_ref().unwrap_or(&Provider::Default) {
+        let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
             Provider::Default => None,
             Provider::Aws => {
                 if region.is_none() {
@@ -97,25 +116,20 @@ impl ElasticSearchConfig {
                 )
             }
         };
-        Ok((region, credentials))
+
+        Ok(Self {
+            authorization,
+            region,
+            credentials,
+        })
     }
 }
 
-#[typetag::serde(name = "elasticsearch")]
-impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = es(self, acker)?;
-        let healthcheck = healthcheck(self);
-
-        Ok((sink, healthcheck))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Log
-    }
-}
-
-fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, String> {
+fn es(
+    config: &ElasticSearchConfig,
+    common: ElasticSearchCommon,
+    acker: Acker,
+) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -145,7 +159,6 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
         HttpRetryLogic,
     );
 
-    let authorization = config.authorization();
     let headers = config
         .headers
         .as_ref()
@@ -161,8 +174,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
     let uri = format!("{}{}", config.host, path_query.finish());
     let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
 
-    let (region, credentials) = config.credentials()?;
-    if credentials.is_some() {
+    if common.credentials.is_some() {
         gzip = false;
     }
 
@@ -171,7 +183,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
         builder.method(Method::POST);
         builder.uri(&uri);
 
-        match credentials {
+        match common.credentials {
             None => {
                 builder.header("Content-Type", "application/x-ndjson");
                 if gzip {
@@ -182,7 +194,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
                     builder.header(&header[..], &value[..]);
                 }
 
-                if let Some(ref auth) = authorization {
+                if let Some(ref auth) = common.authorization {
                     builder.header("Authorization", &auth[..]);
                 }
 
@@ -190,7 +202,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
             }
             Some(ref credentials) => {
                 let mut request =
-                    SignedRequest::new("POST", "es", region.as_ref().unwrap(), uri.path());
+                    SignedRequest::new("POST", "es", common.region.as_ref().unwrap(), uri.path());
                 request.set_hostname(uri.host().map(|s| s.into()));
 
                 request.add_header("Content-Type", "application/x-ndjson");
@@ -229,7 +241,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
         )
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
-    Ok(Box::new(sink))
+    Box::new(sink)
 }
 
 fn encode_event(
@@ -268,19 +280,19 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(config: &ElasticSearchConfig) -> super::Healthcheck {
+fn healthcheck(config: &ElasticSearchConfig, common: &ElasticSearchCommon) -> super::Healthcheck {
     let uri = format!("{}/_cluster/health", config.host);
     let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
     let mut builder = Request::get(&uri);
-    let (region, credentials) = config.credentials().expect("FIXME");
-    match credentials {
+    match &common.credentials {
         None => {
-            if let Some(authorization) = config.authorization() {
-                builder.header("Authorization", authorization);
+            if let Some(authorization) = &common.authorization {
+                builder.header("Authorization", authorization.clone());
             }
         }
         Some(credentials) => {
-            let mut signer = SignedRequest::new("GET", "es", region.as_ref().unwrap(), uri.path());
+            let mut signer =
+                SignedRequest::new("GET", "es", common.region.as_ref().unwrap(), uri.path());
             signer.set_hostname(uri.host().map(|s| s.into()));
             finish_signer(&mut signer, &credentials, &mut builder);
         }
