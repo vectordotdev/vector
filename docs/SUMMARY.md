@@ -52,6 +52,7 @@
   * [Sources](usage/configuration/sources/README.md)
     * [file source](usage/configuration/sources/file.md)
     * [journald source](usage/configuration/sources/journald.md)
+    * [kafka source](usage/configuration/sources/kafka.md)
     * [statsd source](usage/configuration/sources/statsd.md)
     * [stdin source](usage/configuration/sources/stdin.md)
     * [syslog source](usage/configuration/sources/syslog.md)

@@ -92,7 +92,16 @@ CHECK_URLS = ARGV.any? { |arg| arg == "--check-urls" }
 #
 
 puts ""
-puts "Generating files"
+puts "Generating files..."
+
+if CHECK_URLS
+  puts ""
+  puts "NOTE"
+  puts "URL checking is enabled, this process may take a few minutes."
+  puts "You can disable URL checking by calling scripts/generate.rb directly"
+  puts "without the --check-urls flag."
+end
+
 puts ""
 
 context = Context.new(metadata)
