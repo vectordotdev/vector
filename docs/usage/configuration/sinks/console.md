@@ -189,11 +189,11 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.console_sink]: ../../../assets/console-sink.svg
-[url.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22+label%3A%22Type%3A+Bug%22
-[url.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22+label%3A%22Type%3A+Enhancement%22
-[url.console_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+console%22
+[url.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+bug%22
+[url.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+enhancement%22
+[url.console_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22
 [url.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
-[url.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+console&labels=Type%3A+Bug
-[url.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+console&labels=Type%3A+Enhancement
+[url.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+bug
+[url.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+enhancement
 [url.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [url.vector_chat]: https://chat.vector.dev

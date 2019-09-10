@@ -42,6 +42,8 @@ pub struct HttpSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+
+    pub verify_certificate: Option<bool>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -108,6 +110,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
+    let verify = config.verify_certificate.unwrap_or(true);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -115,41 +118,50 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
         HttpRetryLogic,
     );
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
+    if !verify {
+        warn!(
+            message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
+        );
+    }
 
-        let method = match method {
-            HttpMethod::Post => Method::POST,
-            HttpMethod::Put => Method::PUT,
-        };
+    let http_service =
+        HttpService::builder()
+            .verify_certificate(verify)
+            .build(move |body: Vec<u8>| {
+                let mut builder = hyper::Request::builder();
 
-        builder.method(method);
+                let method = match method {
+                    HttpMethod::Post => Method::POST,
+                    HttpMethod::Put => Method::PUT,
+                };
 
-        builder.uri(uri.clone());
+                builder.method(method);
 
-        match encoding {
-            Encoding::Text => builder.header("Content-Type", "text/plain"),
-            Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
-        };
+                builder.uri(uri.clone());
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                match encoding {
+                    Encoding::Text => builder.header("Content-Type", "text/plain"),
+                    Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                };
 
-        if let Some(headers) = &headers {
-            for (header, value) in headers.iter() {
-                builder.header(header.as_str(), value.as_str());
-            }
-        }
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        let mut request = builder.body(body).unwrap();
+                if let Some(headers) = &headers {
+                    for (header, value) in headers.iter() {
+                        builder.header(header.as_str(), value.as_str());
+                    }
+                }
 
-        if let Some(auth) = &basic_auth {
-            auth.apply(request.headers_mut());
-        }
+                let mut request = builder.body(body).unwrap();
 
-        request
-    });
+                if let Some(auth) = &basic_auth {
+                    auth.apply(request.headers_mut());
+                }
+
+                request
+            });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

@@ -2,6 +2,7 @@ use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
 mod validation;
@@ -28,6 +29,63 @@ impl GlobalOptions {
         Self {
             data_dir: config.data_dir.clone(),
         }
+    }
+
+    /// Resolve the `data_dir` option in either the global or local
+    /// config, and validate that it exists and is writable.
+    pub fn resolve_and_validate_data_dir(
+        &self,
+        local_data_dir: Option<&PathBuf>,
+    ) -> Result<PathBuf, String> {
+        let data_dir = local_data_dir
+            .or(self.data_dir.as_ref())
+            .ok_or_else(|| {
+                String::from("data_dir option required, but not given here or globally")
+            })?
+            .to_path_buf();
+        if !data_dir.exists() {
+            return Err(format!(
+                "data_dir '{}' does not exist",
+                data_dir.to_string_lossy()
+            ));
+        }
+        let readonly = std::fs::metadata(&data_dir)
+            .map(|meta| meta.permissions().readonly())
+            .unwrap_or(true);
+        if readonly {
+            return Err(format!(
+                "data_dir '{}' is not writable",
+                data_dir.to_string_lossy()
+            ));
+        }
+        Ok(data_dir)
+    }
+
+    /// Resolve the `data_dir` option using
+    /// `resolve_and_validate_data_dir` and then ensure a named
+    /// subdirectory exists.
+    pub fn resolve_and_make_data_subdir(
+        &self,
+        local: Option<&PathBuf>,
+        subdir: &str,
+    ) -> Result<PathBuf, String> {
+        let data_dir = self.resolve_and_validate_data_dir(local)?;
+
+        let mut data_subdir = data_dir.clone();
+        data_subdir.push(subdir);
+
+        DirBuilder::new()
+            .recursive(true)
+            .create(&data_subdir)
+            .map_err(|err| {
+                format!(
+                    "could not create subdirectory '{}' inside of data_dir '{}': {}",
+                    subdir,
+                    data_dir.display(),
+                    err
+                )
+            })?;
+        Ok(data_subdir)
     }
 }
 

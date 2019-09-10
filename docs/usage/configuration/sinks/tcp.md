@@ -40,6 +40,15 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     when_full = "block" # default, enum: "block" or "drop_newest"
     max_size = 104900000 # no default, bytes, relevant when type = "disk"
     num_items = 500 # default, events, relevant when type = "memory"
+  
+  # OPTIONAL - Tls
+  [sinks.my_sink_id.tls]
+    enabled = false # default
+    verify = true # default
+    ca_file = "/path/to/certificate_authority.crt" # no default
+    crt_file = "/path/to/host_certificate.crt" # no default
+    key_file = "/path/to/host_certificate.key" # no default
+    key_phrase = "PassWord1" # no default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -62,6 +71,15 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     when_full = {"block" | "drop_newest"}
     max_size = <int>
     num_items = <int>
+
+  # OPTIONAL - Tls
+  [sinks.<sink-id>.tls]
+    enabled = <bool>
+    verify = <bool>
+    ca_file = "<string>"
+    crt_file = "<string>"
+    key_file = "<string>"
+    key_phrase = "<string>"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -145,6 +163,51 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Tls
+  #
+
+  [sinks.tcp_sink.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify = true
+
+    # Absolute path to additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_file = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -166,6 +229,13 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 | `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
 | `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
 | `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
+| **OPTIONAL** - Tls | | |
+| `tls.enabled` | `bool` | Enable TLS during connections to the remote.<br />`default: false` |
+| `tls.verify` | `bool` | If `true`, Vector will force certificate validation. Do NOT set this to `false` unless you know the risks of not verifying the remote certificate.<br />`default: true` |
+| `tls.ca_file` | `string` | Absolute path to additional CA certificate file, in PEM format.<br />`no default` `example: (see above)` |
+| `tls.crt_file` | `string` | Absolute path to certificate file used to identify this connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_file` | `string` | Absolute path to key file used to identify this connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
+| `tls.key_phrase` | `string` | Pass phrase to unlock the encrypted key file. This has no effect unless `key_file` above is set.<br />`no default` `example: "PassWord1"` |
 
 ## How It Works
 
@@ -260,10 +330,10 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tcp_sink]: ../../../assets/tcp-sink.svg
-[url.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+tcp&labels=Type%3A+Bug
-[url.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+tcp&labels=Type%3A+Enhancement
-[url.tcp_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+tcp%22+label%3A%22Type%3A+Bug%22
-[url.tcp_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+tcp%22+label%3A%22Type%3A+Enhancement%22
-[url.tcp_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+tcp%22
+[url.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug
+[url.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+enhancement
+[url.tcp_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+bug%22
+[url.tcp_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+enhancement%22
+[url.tcp_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22
 [url.tcp_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/tcp.rs
 [url.vector_chat]: https://chat.vector.dev

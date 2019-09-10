@@ -33,6 +33,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   compression = "gzip" # no default, must be: "gzip" (if supplied)
   healthcheck = true # default
   healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
+  verify_certificate = true # default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
@@ -76,6 +77,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   compression = "gzip"
   healthcheck = <bool>
   healthcheck_uri = "<string>"
+  verify_certificate = <bool>
 
   # OPTIONAL - Batching
   batch_size = <int>
@@ -161,6 +163,15 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   # * optional
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
+
+  # When making a connection to a HTTPS server, this controls if the TLS
+  # certificate presented by the server will be verified. Do not set this unless
+  # you know what you are doing. Turning this off introduces significant
+  # vulnerabilities.
+  # 
+  # * optional
+  # * default: true
+  verify_certificate = true
 
   #
   # Batching
@@ -304,6 +315,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 | `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
+| `verify_certificate` | `bool` | When making a connection to a HTTPS server, this controls if the TLS certificate presented by the server will be verified. Do not set this unless you know what you are doing. Turning this off introduces significant vulnerabilities.<br />`default: true` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 5` `unit: seconds` |
@@ -524,11 +536,11 @@ issue, please:
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [url.gzip]: https://www.gzip.org/
-[url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Bug%22
-[url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22+label%3A%22Type%3A+Enhancement%22
-[url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+http%22
+[url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+bug%22
+[url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+enhancement%22
+[url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
 [url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
-[url.new_http_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http&labels=Type%3A+Bug
-[url.new_http_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http&labels=Type%3A+Enhancement
-[url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+http
+[url.new_http_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+bug
+[url.new_http_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+enhancement
+[url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http
 [url.vector_chat]: https://chat.vector.dev

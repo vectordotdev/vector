@@ -30,16 +30,18 @@ assets = [
 [workspace]
 members = [
   ".",
+  "lib/codec",
   "lib/file-source",
+  "lib/journald",
   "lib/tracing-metrics",
   "lib/tracing-limit",
-  "lib/codec",
 ]
 
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
+journald = { path = "lib/journald" }
 tracing-metrics = { path = "lib/tracing-metrics" }
 tracing-limit = { path = "lib/tracing-limit" }
 
@@ -49,6 +51,7 @@ tokio = { version = "0.1.22", features = ["io", "uds", "tcp", "rt-full", "experi
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
 tokio-threadpool = "0.1.8"
+tokio-tls = "0.2.1"
 
 # Tracing
 tracing = "0.1.2"
@@ -92,6 +95,8 @@ stream-cancel = "0.4.3"
 prometheus = "0.4.2"
 hyper = "0.12.18"
 hyper-tls = "0.3.1"
+native-tls = "0.2.3"
+openssl = "0.10.23"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
 structopt = "0.2.16"
@@ -120,6 +125,7 @@ exitcode = "1.1.2"
 snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
+owning_ref = "0.4.0"
 
 [build-dependencies]
 prost-build = "0.4.0"
@@ -144,6 +150,7 @@ default = ["rdkafka", "leveldb", "jemallocator"]
 docker = [
   "cloudwatch-logs-integration-tests",
   "cloudwatch-metrics-integration-tests",
+  "clickhouse-integration-tests",
   "es-integration-tests",
   "kafka-integration-tests",
   "kinesis-integration-tests",
@@ -152,6 +159,7 @@ docker = [
 ]
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
+clickhouse-integration-tests = []
 es-integration-tests = []
 kafka-integration-tests = []
 kinesis-integration-tests = []

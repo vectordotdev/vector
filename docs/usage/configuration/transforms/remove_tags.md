@@ -125,10 +125,10 @@ Finally, consider the following alternatives:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.remove_tags_transform]: ../../../assets/remove_tags-transform.svg
-[url.new_remove_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+remove_tags&labels=Type%3A+Bug
-[url.new_remove_tags_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=Transform%3A+remove_tags&labels=Type%3A+Enhancement
-[url.remove_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_tags%22+label%3A%22Type%3A+Bug%22
-[url.remove_tags_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_tags%22+label%3A%22Type%3A+Enhancement%22
-[url.remove_tags_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Transform%3A+remove_tags%22
+[url.new_remove_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+bug
+[url.new_remove_tags_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+enhancement
+[url.remove_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22+label%3A%22Type%3A+bug%22
+[url.remove_tags_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22+label%3A%22Type%3A+enhancement%22
+[url.remove_tags_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+remove_tags%22
 [url.remove_tags_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/remove_tags.rs
 [url.vector_chat]: https://chat.vector.dev

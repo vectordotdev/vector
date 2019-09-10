@@ -3,7 +3,7 @@ FROM japaric/armv7-unknown-linux-musleabihf:latest
 RUN apt-get update
 RUN apt-get install -y software-properties-common python-software-properties
 RUN apt-get update
-RUN add-apt-repository ppa:git-core/ppa
+RUN add-apt-repository -y ppa:git-core/ppa
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
     curl \
