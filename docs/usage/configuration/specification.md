@@ -1833,6 +1833,34 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+[sinks.file]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "file"
+  type = "file"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # File name to write events to.
+  # 
+  # * required
+  # * no default
+  path = "vector-%Y-%m-%d.log"
+  path = "application-{{ application_id }}-%Y-%m-%d.log"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 [sinks.http]
   #
   # General

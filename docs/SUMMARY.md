@@ -79,6 +79,7 @@
     * [clickhouse sink][docs.clickhouse_sink]
     * [console sink][docs.console_sink]
     * [elasticsearch sink][docs.elasticsearch_sink]
+    * [file sink][docs.file_sink]
     * [http sink][docs.http_sink]
     * [kafka sink][docs.kafka_sink]
     * [prometheus sink][docs.prometheus_sink]
@@ -121,6 +122,7 @@
 [docs.console_sink]: ./usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ./usage/configuration/sinks/elasticsearch.md
 [docs.field_filter_transform]: ./usage/configuration/transforms/field_filter.md
+[docs.file_sink]: ./usage/configuration/sinks/file.md
 [docs.file_source]: ./usage/configuration/sources/file.md
 [docs.grok_parser_transform]: ./usage/configuration/transforms/grok_parser.md
 [docs.http_sink]: ./usage/configuration/sinks/http.md

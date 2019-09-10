@@ -1360,6 +1360,27 @@ null = false
 description = "A custom parameter to be added to each Elasticsearch request."
 
 # ------------------------------------------------------------------------------
+# sinks.file
+# ------------------------------------------------------------------------------
+[sinks.file]
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = false
+input_types = ["log"]
+write_to_description = "a file"
+
+[sinks.file.options.path]
+type = "string"
+examples = [
+  "vector-%Y-%m-%d.log",
+  "application-{{ application_id }}-%Y-%m-%d.log"
+]
+null = false
+templateable = true
+description = "File name to write events to."
+
+# ------------------------------------------------------------------------------
 # sinks.http
 # ------------------------------------------------------------------------------
 [sinks.http]

@@ -123,6 +123,7 @@ data_dir = "/var/lib/vector"
 | [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
 | [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`file`**][docs.file_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a file. |
 | [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
 | [**`kafka`**][docs.kafka_sink] | [Streams](#streaming) [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
 | [**`prometheus`**][docs.prometheus_sink] | [Exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
@@ -296,6 +297,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.console_sink]: ../../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../../usage/configuration/sinks/elasticsearch.md
 [docs.field_filter_transform]: ../../usage/configuration/transforms/field_filter.md
+[docs.file_sink]: ../../usage/configuration/sinks/file.md
 [docs.file_source]: ../../usage/configuration/sources/file.md
 [docs.grok_parser_transform]: ../../usage/configuration/transforms/grok_parser.md
 [docs.http_sink]: ../../usage/configuration/sinks/http.md
