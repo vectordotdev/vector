@@ -8,7 +8,7 @@ FROM japaric/x86_64-unknown-linux-gnu:latest
 RUN apt-get update
 RUN apt-get install -y software-properties-common python-software-properties
 RUN apt-get update
-RUN add-apt-repository ppa:git-core/ppa
+RUN add-apt-repository -y ppa:git-core/ppa
 RUN apt-get update
 
 # Note: We do not call `apt-get upgrade` because we do not want Vector to

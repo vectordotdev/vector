@@ -2,17 +2,13 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
+use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{future, sync::mpsc, Async, Future, Sink, Stream};
+use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, net::SocketAddr};
 use string_cache::DefaultAtom as Atom;
-use tokio::{
-    codec::{BytesCodec, Decoder},
-    net::{UdpFramed, UdpSocket},
-    prelude::stream::poll_fn,
-};
-use tracing::field;
+use tokio::net::udp::{UdpFramed, UdpSocket};
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -61,43 +57,20 @@ pub fn udp(address: SocketAddr, host_key: Atom, out: mpsc::Sender<Event>) -> sup
         })
         .and_then(move |socket| {
             let host_key = host_key.clone();
-            let mut new_line_decoder = BytesDelimitedCodec::new(b'\n');
-            UdpFramed::new(socket, BytesCodec::new())
-                .map(move |(mut bytes, addr)| {
-                    // A packet has come.
-                    // UDP processes messages per packet, where messages are separated by newline.
-                    let host_key = host_key.clone();
-                    poll_fn(move || {
-                        let maybe_event = match new_line_decoder.decode_eof(&mut bytes) {
-                            Ok(Some(line)) => {
-                                // One message
-                                let mut event = Event::from(line);
+            // UDP processes messages per packet, where messages are separated by newline.
+            // And stretch to end of packet.
+            UdpFramed::with_decode(socket, BytesDelimitedCodec::new(b'\n'), true)
+                .map(move |(line, addr): (Bytes, _)| {
+                    let mut event = Event::from(line);
 
-                                event.as_mut_log().insert_implicit(
-                                    host_key.clone().into(),
-                                    addr.to_string().into(),
-                                );
+                    event
+                        .as_mut_log()
+                        .insert_implicit(host_key.clone().into(), addr.to_string().into());
 
-                                trace!(
-                                    message = "Received one event.",
-                                    event = field::debug(&event)
-                                );
-                                Some(event)
-                            }
-                            Ok(None) => None,
-                            Err(error) => {
-                                // Even if an Error occures, it should not be propagated further as it
-                                // only affects this datagram.
-                                error!(message = "error decoding datagram.", %error);
-                                None
-                            }
-                        };
-                        Ok(Async::Ready(maybe_event))
-                    })
+                    trace!(message = "Received one event.", ?event);
+                    event
                 })
-                // Flatten messages from single packet
-                .flatten()
-                // Error from UdpSocket
+                // Error from Decoder or UdpSocket
                 .map_err(|error: io::Error| error!(message = "error reading datagram.", %error))
                 .forward(out)
                 // Done with listening and sending

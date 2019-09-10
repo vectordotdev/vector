@@ -18,8 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_kinesis_streams: Added configurable partition keys
 - topology: Added ability to disable individual sink healthchecks
 - aws_cloudwatch_logs: Add dynamic group and stream creation
+- tcp sink: Add support for TLS connections.
 - elasticsearch sink: Add support for custom headers and query parameters
 - `file` sink: New sink with templates-based partitioning
+- journald: New source to read in logs from journald
 
 ### Changed
 

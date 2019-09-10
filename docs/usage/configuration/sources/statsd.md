@@ -219,11 +219,11 @@ issue, please:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.statsd_source]: ../../../assets/statsd-source.svg
-[url.new_statsd_source_bug]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd&labels=Type%3A+Bug
-[url.new_statsd_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd&labels=Type%3A+Enhancement
-[url.new_statsd_source_issue]: https://github.com/timberio/vector/issues/new?labels=Source%3A+statsd
-[url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Bug%22
-[url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22+label%3A%22Type%3A+Enhancement%22
-[url.statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Source%3A+statsd%22
+[url.new_statsd_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+statsd&labels=Type%3A+bug
+[url.new_statsd_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+statsd&labels=Type%3A+enhancement
+[url.new_statsd_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+statsd
+[url.statsd_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22+label%3A%22Type%3A+bug%22
+[url.statsd_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22+label%3A%22Type%3A+enhancement%22
+[url.statsd_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+statsd%22
 [url.statsd_source_source]: https://github.com/timberio/vector/tree/master/src/sources/statsd/mod.rs
 [url.vector_chat]: https://chat.vector.dev

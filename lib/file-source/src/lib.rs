@@ -6,7 +6,8 @@ extern crate tracing;
 mod file_server;
 mod file_watcher;
 
-pub use self::file_server::FileServer;
+pub use self::file_server::{FileServer, Fingerprinter};
+
 type FileFingerprint = u64;
 type FilePosition = u64;
 

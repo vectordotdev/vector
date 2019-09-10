@@ -44,22 +44,28 @@ function extend_cross_base_image() {
 
 # The following images are basic Docker images that do not extend a
 # cross base image.
-build_image "builder-armv7-unknown-linux-gnueabihf"
-build_image "builder-armv7-unknown-linux-musleabihf"
-build_image "builder-x86_64-unknown-linux-gnu"
-build_image "builder-x86_64-unknown-linux-musl"
-build_image "checker"
-build_image "packager-deb"
-build_image "packager-rpm"
-build_image "releaser"
-build_image "verifier-amazonlinux-1"
-build_image "verifier-amazonlinux-2"
-build_image "verifier-deb-8"
-build_image "verifier-deb-9"
-build_image "verifier-deb-10"
-build_image "verifier-ubuntu-16-04"
-build_image "verifier-ubuntu-18-04"
-build_image "verifier-ubuntu-19-04"
+all_images=(
+	builder-armv7-unknown-linux-gnueabihf
+	builder-armv7-unknown-linux-musleabihf
+	builder-x86_64-unknown-linux-gnu
+	builder-x86_64-unknown-linux-musl
+	checker
+	packager-deb
+	packager-rpm
+	releaser
+	verifier-amazonlinux-1
+	verifier-amazonlinux-2
+	verifier-deb-8
+	verifier-deb-9
+	verifier-deb-10
+	verifier-ubuntu-16-04
+	verifier-ubuntu-18-04
+	verifier-ubuntu-19-04
+)
+for image in ${*:-${all_images[*]}}
+do
+	build_image $image
+done
 
 # The following images extend re-built cross base images. The end result
 # is 2 new containers. See the README.md in the docker folder for more info.

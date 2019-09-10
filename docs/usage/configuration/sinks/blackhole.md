@@ -151,10 +151,10 @@ issue, please:
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.blackhole_sink]: ../../../assets/blackhole-sink.svg
-[url.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22+label%3A%22Type%3A+Bug%22
-[url.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22+label%3A%22Type%3A+Enhancement%22
-[url.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22Sink%3A+blackhole%22
+[url.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+bug%22
+[url.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+enhancement%22
+[url.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
 [url.blackhole_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
-[url.new_blackhole_sink_bug]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+blackhole&labels=Type%3A+Bug
-[url.new_blackhole_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=Sink%3A+blackhole&labels=Type%3A+Enhancement
+[url.new_blackhole_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+bug
+[url.new_blackhole_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+enhancement
 [url.vector_chat]: https://chat.vector.dev

@@ -165,6 +165,11 @@ mod tests {
     }
 
     #[test]
+    fn so_much_space() {
+        assert_eq!(parse("foo  \t bar     baz"), &["foo", "bar", "baz"]);
+    }
+
+    #[test]
     fn quotes() {
         assert_eq!(parse(r#"foo "bar baz""#), &["foo", r#"bar baz"#]);
     }

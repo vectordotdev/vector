@@ -1,7 +1,7 @@
 # Nightly Rust is used because at the moment only nightly uses recent enough
 # LLVM version that supports libc++ with musl. It can be changed to a stable
 # version after Rust 1.38 release.
-ARG RUST_VERSION=nightly-2019-07-29
+ARG RUST_VERSION=nightly-2019-08-24
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -10,23 +10,13 @@ ARG MUSL_VERSION=1.1.22
 # used by Rust. For each Rust version it can be found here
 # https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
 # submodule "llvm-project".
-ARG LLVM_GIT_COMMIT=9b64ca5b7e1e3583978f9ac8af6d93b220a13d90
+ARG LLVM_GIT_COMMIT=48818e9f5d0f2d5978a9b43ad1a2e8d0b83f6aa0
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.2.2
+ARG LINUX_HEADERS_VERSION=5.2.9
 # LibreSSL uses more modern build system than OpenSSL, which makes it better
 # suited for use with musl.
 ARG LIBRESSL_VERSION=2.9.2
-
-# LTO type is set as a build arg because it is used for compilation of the
-# libraries and configuration of the linker. Possible values: "lto", "lto=thin",
-# and "". See https://doc.rust-lang.org/rustc/linker-plugin-lto.html and
-# http://blog.llvm.org/2016/06/thinlto-scalable-and-incremental-lto.html.
-#
-# It is a linker-level LTO that uses output of rustc produced with
-# -C linker-plugin-lto option. That is different from LLVM LTO inside rustc
-# that can be activated by -C lto.
-ARG LTO="lto"
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
@@ -56,9 +46,13 @@ WORKDIR $LLVM_DIR
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DLLVM_ENABLE_PROJECTS="clang;lld" \
+    -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
     -DLLVM_TARGETS_TO_BUILD="X86" \
     -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
+    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DCOMPILER_RT_BUILD_XRAY=OFF \
+    -DCOMPILER_RT_BUILD_PROFILE=OFF \
     -DCMAKE_BUILD_TYPE=release \
     -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
     -G Ninja \
@@ -98,13 +92,12 @@ ENV LIBRESSL_DIR=$SRC_DIR/libressl-$LIBRESSL_VERSION
 RUN apt-get update && apt-get -y install curl ninja-build cmake python3-distutils
 
 ARG LIBS_PREFIX
-ARG LTO
 
 # Compile musl.
 WORKDIR $MUSL_DIR
 ENV CC=clang
-ENV CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
-ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles"
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV LDFLAGS="-static -nostdlib -nostartfiles"
 RUN cd $MUSL_DIR && \
   mkdir build && \
   cd build && \
@@ -117,38 +110,17 @@ RUN cd $MUSL_DIR && \
 # Install Linux headers.
 WORKDIR $LINUX_DIR
 ENV CC=clang
-ENV CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
-ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles $LIBS_PREFIX/lib/crt1.o -L$LIBS_PREFIX/lib -lc"
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV LDFLAGS="-static -nostdlib -nostartfiles $LIBS_PREFIX/lib/crt1.o -L$LIBS_PREFIX/lib"
+ENV LDLIBS="-lc"
 RUN make -j$(nproc) headers_install \
+  KBUILD_VERBOSE=1 \
   HOSTCC="$CC" \
   CC="$CC" \
   HOSTCFLAGS="$CFLAGS" \
   HOSTLDFLAGS="$LDFLAGS" \
+  HOSTLDLIBS="$LDLIBS" \
   INSTALL_HDR_PATH=$LIBS_PREFIX
-
-# Compile Clang runtime (https://compiler-rt.llvm.org).
-# We need crtbegin.o, crtend.o, and libclang_rt.builtins.a from there.
-# It depends on libc, so it has to be built after musl.
-# LTO flags are not added here because compiler-rt doesn't support LTO.
-WORKDIR $LLVM_DIR/compiler-rt
-ENV CC=clang
-ENV CXX=clang++
-ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
-ENV CXXFLAGS="$CFLAGS -nostdinc++"
-ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles $LIBS_PREFIX/lib/crt1.o -L$LIBS_PREFIX/lib -lc"
-RUN mkdir build && \
-  cd build && \
-  cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLLVM_CONFIG_PATH=$CLANG_PREFIX/bin/llvm-config \
-    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-    -DCOMPILER_RT_BUILD_XRAY=OFF \
-    -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
-    -G Ninja \
-    .. && \
-  ninja install
 
 # Compile libc++ with musl using Clang as the compiler. See
 # https://blogs.gentoo.org/gsoc2016-native-clang/2016/05/05/build-a-freestanding-libcxx/
@@ -158,9 +130,9 @@ RUN mkdir build && \
 WORKDIR $LLVM_DIR/libunwind
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
-ENV LDFLAGS="-fuse-ld=lld ${LTO:+-f$LTO} -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
+ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -176,9 +148,9 @@ RUN mkdir build && \
 WORKDIR $LLVM_DIR/libcxxabi
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LLVM_DIR/libcxx/include"
-ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
+ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -198,9 +170,9 @@ RUN mkdir build && \
 WORKDIR $LLVM_DIR/libcxx
 ENV CC=clang
 ENV CXX=clang++
-ENV CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
-ENV LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwind -lc"
+ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwind -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
@@ -223,11 +195,11 @@ RUN mkdir build && \
 # https://blogs.gentoo.org/gsoc2016-native-clang/2016/05/31/build-gnu-free-executables-with-clang/
 # and
 # https://renenyffenegger.ch/notes/development/languages/C-C-plus-plus/GCC/options/no/compare-nostartfiles-nodefaultlibs-nolibc-nostdlib.
-ENV MUSL_CFLAGS="${LTO:+-f$LTO} -nostdinc -isystem $LIBS_PREFIX/include"
+ENV MUSL_CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
-ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -lclang_rt.builtins-x86_64 -lc"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $LIBS_PREFIX/lib/linux/clang_rt.crtbegin-x86_64.o $LIBS_PREFIX/lib/linux/clang_rt.crtend-x86_64.o"
+ENV MUSL_LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -lc"
+ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
@@ -240,10 +212,6 @@ RUN echo \
 "case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
 "$CLANG_PREFIX/bin/clang++ -Qunused-arguments $MUSL_CXXFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
 "exit \$?" > $LIBS_PREFIX/bin/musl-c++
-RUN echo \
-"#!/bin/sh\n"\
-"$CLANG_PREFIX/bin/ld.lld -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux \$@\n"\
-"exit \$?" > $LIBS_PREFIX/bin/musl-ld
 RUN chmod +x $LIBS_PREFIX/bin/*
 
 # At this point a fully functional C++ compiler that is able to produce
@@ -257,7 +225,6 @@ RUN ln -s $LIBS_PREFIX/bin/musl-cc $LIBS_PREFIX/bin/musl-gcc
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/c++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
-RUN ln -s $LIBS_PREFIX/bin/musl-ld $LIBS_PREFIX/bin/ld
 
 # Some build systems hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
@@ -265,7 +232,7 @@ RUN ln -s $LIBS_PREFIX/bin/musl-ld $LIBS_PREFIX/bin/ld
 # For example, macOS provides similar experience, where
 # `clang++ -o program program.cpp -lstdc++` would still link to libc++.
 RUN echo > dummy.c && \
-  $CLANG_PREFIX/bin/clang ${LTO:+-f$LTO} -c dummy.c && \
+  $CLANG_PREFIX/bin/clang -c dummy.c && \
   $CLANG_PREFIX/bin/ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
   rm dummy.c dummy.o
 
@@ -316,7 +283,7 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y build-essential git cmake pkg-config
+RUN apt-get update && apt-get install -y build-essential pkg-config
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
@@ -336,10 +303,6 @@ ENV LD_x86_64_unknown_linux_gnu=/usr/bin/ld
 ENV AR_x86_64_unknown_linux_gnu=/usr/bin/ar
 
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gnu-cc
-
-# Set up linker and enable LTO plugin in rustc if necessary.
-ARG LTO
-ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="${LTO:+-Clinker-plugin-lto -Clink-arg=-O3 }-Clink-arg=${LTO:+-f$LTO}"
 
 # Set up pkg-config.
 ENV PKG_CONFIG_PATH=$LIBS_PREFIX/lib/pkgconfig

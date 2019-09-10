@@ -77,16 +77,6 @@ description = """\
 The key name added to each event with the full path of the file.\
 """
 
-[sources.file.options.fingerprint_bytes]
-type = "int"
-default = 256
-null = false
-unit = "bytes"
-description = """\
-The number of bytes read off the head of the file to generate a unique \
-fingerprint.\
-"""
-
 [sources.file.options.glob_minimum_cooldown]
 type = "int"
 default = 1000
@@ -117,16 +107,6 @@ description = """\
 Ignore files with a data modification date that does not exceed this age.\
 """
 
-[sources.file.options.ignored_header_bytes]
-type = "int"
-default = 0
-null = false
-unit = "bytes"
-description = """\
-The number of bytes to skipe ahead (or ignore) when generating a unique \
-fingerprint. This is helpful if all files share a common header.\
-"""
-
 [sources.file.options.max_line_bytes]
 type = "int"
 unit = "bytes"
@@ -145,6 +125,183 @@ default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
 `false` Vector will only read new data added to the file.\
+"""
+
+[sources.file.options.fingerprinting]
+type = "table"
+null = true
+description = """\
+Configuration for how the file source should identify files.\
+"""
+
+[sources.file.options.fingerprinting.options.strategy]
+type = "string"
+enum = ["checksum", "device_and_inode"]
+default = "checksum"
+null = true
+description = """\
+Whether to use the content of a file to differentiate it (`checksum`) or the \
+storage device and inode (`device_and_inode`). Depending on your log rotation \
+strategy, one may be a better fit than the other.\
+"""
+
+[sources.file.options.fingerprinting.options.fingerprint_bytes]
+type = "int"
+default = 256
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes read off the head of the file to generate a unique \
+fingerprint.\
+"""
+
+[sources.file.options.fingerprinting.options.ignored_header_bytes]
+type = "int"
+default = 0
+null = false
+unit = "bytes"
+relevant_when = {strategy = "checksum"}
+description = """\
+The number of bytes to skip ahead (or ignore) when generating a unique \
+fingerprint. This is helpful if all files share a common header.\
+"""
+
+[sources.file.options.message_start_indicator]
+type = "string"
+null = true
+examples = ["^(INFO|ERROR)"]
+description = """\
+When present, Vector will aggregate multiple lines into a single event, using \
+this pattern as the indicator that the previous lines should be flushed and \
+a new event started. The pattern will be matched against entire lines as \
+a regular expression, so remember to anchor as appropriate.\
+"""
+
+[sources.file.options.multi_line_timeout]
+type = "int"
+default = 1000
+null = true
+unit = "milliseconds"
+description = """\
+When `message_start_indicator` is present, this sets the amount of time Vector \
+will buffer lines into a single event before flushing, regardless of whether \
+or not it has seen a line indicating the start of a new message.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.journald
+# ------------------------------------------------------------------------------
+[sources.journald]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "log records from journald"
+
+[sources.journald.options.current_runtime_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the current runtime (boot)"
+
+[sources.journald.options.data_dir]
+type = "string"
+examples = ["/var/lib/vector"]
+null = true
+description = """\
+The directory used to persist the journal checkpoint position. By \
+default, the global `data_dir` is used. Please make sure the Vector \
+project has write permissions to this dir. \
+"""
+
+[sources.journald.options.local_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the local system"
+
+[sources.journald.options.units]
+type = "[string]"
+null = true
+default = []
+examples = [["ntpd", "sysinit.target"]]
+description = """\
+The list of units names to monitor. \
+If empty or not present, all units are accepted. \
+Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
+"""
+
+# ------------------------------------------------------------------------------
+# sources.kafka
+# ------------------------------------------------------------------------------
+[sources.kafka]
+beta = true
+delivery_guarantee = "at_least_once"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "Kafka 0.9 or later"
+
+[sources.kafka.options.bootstrap_servers]
+type = "string"
+examples = ["10.14.22.123:9092,10.14.23.332:9092"]
+null = false
+description = """\
+A comma-separated list of host and port pairs that are the addresses of the \
+Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
+to initially to bootstrap itself.\
+"""
+
+[sources.kafka.options.topics]
+type = "[string]"
+examples = [
+  ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+]
+null = false
+description = """\
+The Kafka topics names to read events from. Regex is supported if the topic \
+begins with `^`.
+"""
+
+[sources.kafka.options.group_id]
+type = "string"
+examples = ["consumer-group-name"]
+null = false
+description = """\
+The consumer group name to be used to consume events from Kafka.
+"""
+
+[sources.kafka.options.key_field]
+type = "string"
+examples = ["user_id"]
+null = true
+description = """\
+The field name to use for the topic key. If unspecified, the key would not \
+be added to the events. If the message has null key, then this field would \
+not be added to the event.\
+"""
+
+[sources.kafka.options.auto_offset_reset]
+type = "string"
+examples = ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
+null = true
+default = "largest"
+description = """\
+If offsets for consumer group do not exist, set them using this strategy. \
+[librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) \
+for `auto.offset.reset` option for explanation.\
+"""
+
+[sources.kafka.options.session_timeout_ms]
+type = "int"
+examples = [5000, 10000]
+null = true
+default = 10000
+unit = "milliseconds"
+description = """\
+The Kafka session timeout in milliseconds.
 """
 
 # ------------------------------------------------------------------------------
@@ -1277,6 +1434,15 @@ examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 
+[sinks.http.options.verify_certificate]
+type = "bool"
+null = true
+default = true
+description = """When making a connection to a HTTPS server, this \
+controls if the TLS certificate presented by the server will be \
+verified. Do not set this unless you know what you are doing. Turning \
+this off introduces significant vulnerabilities."""
+
 # ------------------------------------------------------------------------------
 # sinks.kafka
 # ------------------------------------------------------------------------------
@@ -1428,6 +1594,52 @@ description = """\
 The encoding format used to serialize the events before flushing. The default \
 is dynamic based on if the event is structured or not.\
 """
+
+[sinks.tcp.options.tls]
+type = "table"
+null = true
+description = "Options for TLS support"
+
+[sinks.tcp.options.tls.options.enabled]
+type = "bool"
+null = true
+default = false
+description = "Enable TLS during connections to the remote."
+
+[sinks.tcp.options.tls.options.verify]
+type = "bool"
+null = true
+default = true
+description = """If `true`, Vector will force certificate validation. \
+Do NOT set this to `false` unless you know the risks of not verifying \
+the remote certificate."""
+
+[sinks.tcp.options.tls.options.ca_file]
+type = "string"
+null = true
+description = "Absolute path to additional CA certificate file, in PEM format."
+examples = ["/path/to/certificate_authority.crt"]
+
+[sinks.tcp.options.tls.options.crt_file]
+type = "string"
+null = true
+description = """Absolute path to certificate file used to identify this \
+connection, in PEM format. If this is set, `key_file` must also be set."""
+examples = ["/path/to/host_certificate.crt"]
+
+[sinks.tcp.options.tls.options.key_file]
+type = "string"
+null = true
+description = """Absolute path to key file used to identify this \
+connection, in PEM format. If this is set, `crt_file` must also be set."""
+examples = ["/path/to/host_certificate.key"]
+
+[sinks.tcp.options.tls.options.key_phrase]
+type = "string"
+null = true
+description = """Pass phrase to unlock the encrypted key file. \
+This has no effect unless `key_file` above is set."""
+examples = ["PassWord1"]
 
 # ------------------------------------------------------------------------------
 # sinks.vector

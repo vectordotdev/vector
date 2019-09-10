@@ -73,14 +73,6 @@
   # * no default
   data_dir = "/var/lib/vector"
 
-  # The number of bytes read off the head of the file to generate a unique
-  # fingerprint.
-  # 
-  # * optional
-  # * default: 256
-  # * unit: bytes
-  fingerprint_bytes = 256
-
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
   # 
@@ -96,14 +88,6 @@
   # * unit: seconds
   ignore_older = 86400
 
-  # The number of bytes to skipe ahead (or ignore) when generating a unique
-  # fingerprint. This is helpful if all files share a common header.
-  # 
-  # * optional
-  # * default: 0
-  # * unit: bytes
-  ignored_header_bytes = 0
-
   # The maximum number of a bytes a line can contain before being discarded. This
   # protects against malformed lines or tailing incorrect files.
   # 
@@ -111,6 +95,24 @@
   # * default: 102400
   # * unit: bytes
   max_line_bytes = 102400
+
+  # When present, Vector will aggregate multiple lines into a single event, using
+  # this pattern as the indicator that the previous lines should be flushed and a
+  # new event started. The pattern will be matched against entire lines as a
+  # regular expression, so remember to anchor as appropriate.
+  # 
+  # * optional
+  # * no default
+  message_start_indicator = "^(INFO|ERROR)"
+
+  # When `message_start_indicator` is present, this sets the amount of time
+  # Vector will buffer lines into a single event before flushing, regardless of
+  # whether or not it has seen a line indicating the start of a new message.
+  # 
+  # * optional
+  # * default: 1000
+  # * unit: milliseconds
+  multi_line_timeout = 1000
 
   # When `true` Vector will read from the beginning of new files, when `false`
   # Vector will only read new data added to the file.
@@ -134,6 +136,131 @@
   # * optional
   # * default: "host"
   host_key = "host"
+
+  #
+  # Fingerprinting
+  #
+
+  [sources.file.fingerprinting]
+    # Whether to use the content of a file to differentiate it (`checksum`) or the
+    # storage device and inode (`device_and_inode`). Depending on your log rotation
+    # strategy, one may be a better fit than the other.
+    # 
+    # * optional
+    # * default: "checksum"
+    # * enum: "checksum" or "device_and_inode"
+    strategy = "checksum"
+    strategy = "device_and_inode"
+
+    # The number of bytes read off the head of the file to generate a unique
+    # fingerprint.
+    # 
+    # * optional
+    # * default: 256
+    # * unit: bytes
+    fingerprint_bytes = 256
+
+    # The number of bytes to skip ahead (or ignore) when generating a unique
+    # fingerprint. This is helpful if all files share a common header.
+    # 
+    # * optional
+    # * default: 0
+    # * unit: bytes
+    ignored_header_bytes = 0
+
+[sources.journald]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "journald"
+  type = "journald"
+
+  # Include only entries from the current runtime (boot)
+  # 
+  # * optional
+  # * default: true
+  current_runtime_only = true
+
+  # The directory used to persist the journal checkpoint position. By default,
+  # the global `data_dir` is used. Please make sure the Vector project has write
+  # permissions to this dir.
+  # 
+  # * optional
+  # * no default
+  data_dir = "/var/lib/vector"
+
+  # Include only entries from the local system
+  # 
+  # * optional
+  # * default: true
+  local_only = true
+
+  # The list of units names to monitor. If empty or not present, all units are
+  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
+  # them a valid service unit name.
+  # 
+  # * optional
+  # * no default
+  units = ["ntpd", "sysinit.target"]
+
+[sources.kafka]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "kafka"
+  type = "kafka"
+
+  # A comma-separated list of host and port pairs that are the addresses of the
+  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
+  # initially to bootstrap itself.
+  # 
+  # * required
+  # * no default
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+
+  # The consumer group name to be used to consume events from Kafka.
+  # 
+  # * required
+  # * no default
+  group_id = "consumer-group-name"
+
+  # The Kafka topics names to read events from. Regex is supported if the topic
+  # begins with `^`.
+  # 
+  # * required
+  # * no default
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+
+  # If offsets for consumer group do not exist, set them using this strategy.
+  # librdkafka documentation for `auto.offset.reset` option for explanation.
+  # 
+  # * optional
+  # * no default
+  auto_offset_reset = "smallest"
+  auto_offset_reset = "earliest"
+  auto_offset_reset = "beginning"
+  auto_offset_reset = "largest"
+  auto_offset_reset = "latest"
+  auto_offset_reset = "end"
+  auto_offset_reset = "error"
+
+  # The field name to use for the topic key. If unspecified, the key would not be
+  # added to the events. If the message has null key, then this field would not
+  # be added to the event.
+  # 
+  # * optional
+  # * no default
+  key_field = "user_id"
+
+  # The Kafka session timeout in milliseconds.
+  # 
+  # * optional
+  # * no default
+  # * unit: milliseconds
+  session_timeout_ms = 5000
+  session_timeout_ms = 10000
 
 [sources.statsd]
   # The component type
@@ -1740,6 +1867,15 @@ end
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
 
+  # When making a connection to a HTTPS server, this controls if the TLS
+  # certificate presented by the server will be verified. Do not set this unless
+  # you know what you are doing. Turning this off introduces significant
+  # vulnerabilities.
+  # 
+  # * optional
+  # * default: true
+  verify_certificate = true
+
   #
   # Batching
   #
@@ -2222,6 +2358,51 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Tls
+  #
+
+  [sinks.tcp.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify = true
+
+    # Absolute path to additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_file = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
 
 [sinks.vector]
   #
