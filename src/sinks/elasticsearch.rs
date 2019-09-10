@@ -65,11 +65,20 @@ pub enum Provider {
     Aws,
 }
 
+impl ElasticSearchConfig {
+    fn authorization(&self) -> Option<String> {
+        self.basic_auth.as_ref().map(|auth| {
+            let token = format!("{}:{}", auth.user, auth.password);
+            format!("Basic {}", base64::encode(token.as_bytes()))
+        })
+    }
+}
+
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = es(self, acker)?;
-        let healthcheck = healthcheck(&self.host);
+        let healthcheck = healthcheck(self);
 
         Ok((sink, healthcheck))
     }
@@ -109,10 +118,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
         HttpRetryLogic,
     );
 
-    let authorization = config.basic_auth.clone().map(|auth| {
-        let token = format!("{}:{}", auth.user, auth.password);
-        format!("Basic {}", base64::encode(token.as_bytes()))
-    });
+    let authorization = config.authorization();
     let headers = config
         .headers
         .as_ref()
@@ -263,9 +269,13 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(host: &str) -> super::Healthcheck {
-    let uri = format!("{}/_cluster/health", host);
-    let request = Request::get(uri).body(Body::empty()).unwrap();
+fn healthcheck(config: &ElasticSearchConfig) -> super::Healthcheck {
+    let uri = format!("{}/_cluster/health", config.host);
+    let mut builder = Request::get(uri);
+    if let Some(authorization) = config.authorization() {
+        builder.header("Authorization", authorization);
+    }
+    let request = builder.body(Body::empty()).unwrap();
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);
