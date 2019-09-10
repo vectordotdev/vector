@@ -1,10 +1,12 @@
 require 'word_wrap/core_ext'
 
 class String
+  # Comments out a block of text
   def commentify
     "# " + self.gsub("\n", "\n# ")
   end
 
+  # Downcases the first letter, even if it has markdown syntax
   def continuize
     i = 0
     
@@ -46,5 +48,9 @@ class String
 
   def replace!(match, sub)
     gsub! match, match => sub
+  end
+
+  def table_escape
+    gsub("|", "\\|")
   end
 end
