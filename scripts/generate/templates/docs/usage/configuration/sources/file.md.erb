@@ -49,11 +49,11 @@ context. You can further parse the `"message"` key with a
 ### Auto Discovery
 
 Vector will continually look for new files matching any of your include
-patterns. The frequency is controlled via the `glob_minimum_cooldown` option. 
+patterns. The frequency is controlled via the `glob_minimum_cooldown` option.
 If a new file is added that matches any of the supplied patterns, Vector will
 begin tailing it. Vector maintains a unique list of files and will not tail a
 file more than once, even if it matches multiple patterns. You can read more
-about how we identify file in the [Identification](#file-identification)
+about how we identify files in the [Identification](#file-identification)
 section.
 
 ### Checkpointing
@@ -65,10 +65,23 @@ the data directory which is specified via the
 [global `data_dir` option][docs.configuration.data-directory] but can be
 overridden via the `data_dir` option in the `file` sink directly.
 
-### File Deletions
+### File Rotation
 
-If a file is deleted Vector will flush the current buffer and stop tailing
-the file.
+Vector supports tailing across a number of file rotation strategies. The default
+behavior of `logrotate` is simply to move the old log file and create a new one.
+This requires no special configuration of Vector, as it will maintain its open
+file handle to the rotated log until it has finished reading and it will find
+the newly created file normally.
+
+A popular alternative strategy is `copytruncate`, in which `logrotate` will copy
+the old log file to a new location before truncating the original. Vector will
+also handle this well out of the box, but there are a couple configuration options
+that will help reduce the very small chance of missed data in some edge cases.
+We recommend a combination of `delaycompress` (if applicable) on the logrotate
+side and including the first rotated file in Vector's `include` option. This
+allows Vector to find the file after rotation, read it uncompressed to identify
+it, and then ensure it has all of the data, including any written in a gap
+between Vector's last read and the actual rotation event.
 
 ### File Identification
 
@@ -79,24 +92,13 @@ controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
 
 This strategy avoids the common pitfalls of using device and inode names since
 inode names can be reused across files. This enables Vector to [properly tail
-files in the event of rotation][docs.correctness].
+files across various rotation strategies][docs.correctness].
 
-### File Rotation
+### File Deletion
 
-Vector will follow files across rotations in the manner of tail, and because of
-the way Vector [identifies files](#file-identification), Vector will properly
-recognize newly rotated files regardless if you are using `copytruncate` or
-`create` directive. To ensure Vector handles rotated files properly we
-recommend:
-
-1. Ensure the `includes` paths include rotated files. For example, use
-   `/var/log/nginx*.log` to recognize `/var/log/nginx.2.log`.
-2. Use either the `copytruncate` or `create` directives when rotating files.
-   If historical data is compressed, or altered in any way, Vector will not be
-   able to properly identify the file.
-3. Only delete files when they have exceeded the `ignore_older` age. While
-   extremely rare, this ensures you do not delete data before Vector has a
-   chance to ingest it.
+When a watched file is deleted, Vector will maintain its open file handle and
+continue reading until it reaches EOF. When a file is no longer findable in the
+`includes` glob and the reader has reached EOF, that file's reader is discarded.
 
 ### Globbing
 
@@ -116,6 +118,37 @@ the `start_at_beginning` option to `true`.
 
 Previously discovered files will be [checkpointed](#checkpointing), and the
 read position will resume from the last checkpoint.
+
+### File Read Order
+
+By default, Vector attempts to allocate its read bandwidth fairly across all of
+the files it's currently watching. This prevents a single very busy file from
+starving other independent files from being read. In certain situations,
+however, this can lead to interleaved reads from files that should be read one
+after the other.
+
+For example, consider a service that logs to timestamped file, creating
+a new one at an interval and leaving the old one as-is. Under normal operation,
+Vector would follow writes as they happen to each file and there would be no
+interleaving. In an overload situation, however, Vector may pick up and begin
+tailing newer files before catching up to the latest writes from older files.
+This would cause writes from a single logical log stream to be interleaved in
+time and potentially slow down ingestion as a whole, since the fixed total read
+bandwidth is allocated across an increasing number of files.
+
+To address this type of situation, Vector provides the `oldest_first` flag. When
+set, Vector will not read from any file younger than the oldest file that it
+hasn't yet caught up to. In other words, Vector will continue reading from older
+files as long as there is more data to read. Only once it hits the end will it
+then move on to read from younger files.
+
+Whether or not to use the `oldest_first` flag depends on the organization of the
+logs you're configuring Vector to tail. If your `include` glob contains multiple
+independent logical log streams (e.g. nginx's `access.log` and `error.log`, or
+logs from multiple services), you are likely better off with the default
+behavior. If you're dealing with a single logical log stream or if you value
+per-stream ordering over fairness across streams, consider setting
+`oldest_first` to `true`.
 
 ## Troubleshooting
 

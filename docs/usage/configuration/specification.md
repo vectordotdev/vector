@@ -142,12 +142,9 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * unit: milliseconds
   multi_line_timeout = 1000
 
-  # By default, the file source will try to share read capacity fairly between
-  # all the files that it is currently tailing. Depending on your file rotation
-  # strategy, log file organization, and throughput patterns, it could be better
-  # for the file source to focus on draining the oldest files it's aware of
-  # before moving on to read data from younger files. This flag enables that
-  # behavior.
+  # Instead of balancing read capacity fairly across all watched files,
+  # prioritize draining the oldest files before moving on to read data from
+  # younger files.
   # 
   # * optional
   # * default: false
