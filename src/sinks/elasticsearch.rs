@@ -17,6 +17,7 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
+use rusoto_credential::AwsCredentials;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -71,6 +72,32 @@ impl ElasticSearchConfig {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
         })
+    }
+
+    fn credentials(&self) -> Result<(Option<Region>, Option<AwsCredentials>), String> {
+        let region: Option<Region> = match self.region {
+            Some(ref region) => Some(region.try_into().map_err(|err| format!("{}", err))?),
+            None => None,
+        };
+
+        let credentials = match self.provider.as_ref().unwrap_or(&Provider::Default) {
+            Provider::Default => None,
+            Provider::Aws => {
+                if region.is_none() {
+                    return Err("AWS provider requires a configured region".into());
+                }
+                Some(
+                    DefaultCredentialsProvider::new()
+                        .map_err(|err| {
+                            format!("Could not create AWS credentials provider: {}", err)
+                        })?
+                        .credentials()
+                        .wait()
+                        .map_err(|err| format!("Could not generate AWS credentials: {}", err))?,
+                )
+            }
+        };
+        Ok((region, credentials))
     }
 }
 
@@ -134,27 +161,10 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
     let uri = format!("{}{}", config.host, path_query.finish());
     let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
 
-    let region: Option<Region> = match config.region {
-        Some(ref region) => Some(region.try_into().map_err(|err| format!("{}", err))?),
-        None => None,
-    };
-
-    let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
-        Provider::Default => None,
-        Provider::Aws => {
-            gzip = false;
-            if region.is_none() {
-                return Err("AWS provider requires a configured region".into());
-            }
-            Some(
-                DefaultCredentialsProvider::new()
-                    .map_err(|err| format!("Could not create AWS credentials provider: {}", err))?
-                    .credentials()
-                    .wait()
-                    .map_err(|err| format!("Could not generate AWS credentials: {}", err))?,
-            )
-        }
-    };
+    let (region, credentials) = config.credentials()?;
+    if credentials.is_some() {
+        gzip = false;
+    }
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
         let mut builder = hyper::Request::builder();
@@ -191,18 +201,7 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> Result<super::RouterSink, S
 
                 request.set_payload(Some(body));
 
-                request.sign_with_plus(&credentials, true);
-
-                for (name, values) in request.headers() {
-                    let header_name = name
-                        .parse::<HeaderName>()
-                        .expect("Could not parse header name.");
-                    for value in values {
-                        let header_value =
-                            HeaderValue::from_bytes(value).expect("Could not parse header value.");
-                        builder.header(&header_name, header_value);
-                    }
-                }
+                finish_signer(&mut request, &credentials, &mut builder);
 
                 // The SignedRequest ends up owning the body, so we have
                 // to play games here
@@ -271,9 +270,20 @@ fn encode_event(
 
 fn healthcheck(config: &ElasticSearchConfig) -> super::Healthcheck {
     let uri = format!("{}/_cluster/health", config.host);
-    let mut builder = Request::get(uri);
-    if let Some(authorization) = config.authorization() {
-        builder.header("Authorization", authorization);
+    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
+    let mut builder = Request::get(&uri);
+    let (region, credentials) = config.credentials().expect("FIXME");
+    match credentials {
+        None => {
+            if let Some(authorization) = config.authorization() {
+                builder.header("Authorization", authorization);
+            }
+        }
+        Some(credentials) => {
+            let mut signer = SignedRequest::new("GET", "es", region.as_ref().unwrap(), uri.path());
+            signer.set_hostname(uri.host().map(|s| s.into()));
+            finish_signer(&mut signer, &credentials, &mut builder);
+        }
     }
     let request = builder.body(Body::empty()).unwrap();
 
@@ -291,6 +301,25 @@ fn healthcheck(config: &ElasticSearchConfig) -> super::Healthcheck {
         });
 
     Box::new(healthcheck)
+}
+
+fn finish_signer(
+    signer: &mut SignedRequest,
+    credentials: &AwsCredentials,
+    builder: &mut http::request::Builder,
+) {
+    signer.sign_with_plus(&credentials, true);
+
+    for (name, values) in signer.headers() {
+        let header_name = name
+            .parse::<HeaderName>()
+            .expect("Could not parse header name.");
+        for value in values {
+            let header_value =
+                HeaderValue::from_bytes(value).expect("Could not parse header value.");
+            builder.header(&header_name, header_value);
+        }
+    }
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
