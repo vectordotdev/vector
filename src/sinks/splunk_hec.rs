@@ -22,7 +22,7 @@ use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
-    #[snafu(display("Host must include a scheme (https or http)"))]
+    #[snafu(display("Host must include a scheme (https:// or http://)"))]
     UriMissingScheme,
 }
 
@@ -142,7 +142,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, cra
 enum HealthcheckError {
     #[snafu(display("Invalid HEC token"))]
     InvalidToken,
-    #[snafu(display("HEC is unhealthy, queues are full"))]
+    #[snafu(display("Queues are full"))]
     QueuesFull,
 }
 
