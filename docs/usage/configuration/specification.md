@@ -864,7 +864,9 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The maximum number of events allowed per second.
+  # The rate at which events will be forwarded, expressed as 1/N. For example,
+  # `rate = 10` means 1 out of every 10 events will be forwarded and the rest
+  # will be dropped.
   # 
   # * required
   # * no default

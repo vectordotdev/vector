@@ -1,4 +1,4 @@
-#                                    __   __  __  
+#                                    __   __  __
 #                                    \ \ / / / /
 #                                     \ V / / /
 #                                      \_/  \/
@@ -905,7 +905,11 @@ _not_ be sampled.\
 type = "int"
 examples = [10]
 null = false
-description = "The maximum number of events allowed per second."
+description = """\
+The rate at which events will be forwarded, expressed as 1/N. For example, \
+`rate = 10` means 1 out of every 10 events will be forwarded and the rest \
+will be dropped.\
+"""
 
 ## TODO: Add regex synax docs?
 
