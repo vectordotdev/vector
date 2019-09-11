@@ -61,16 +61,16 @@ impl GlobalOptions {
     ) -> Result<PathBuf, crate::Error> {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
-            .ok_or_else(|| crate::box_error(DataDirError::MissingDataDir))?
+            .ok_or_else(|| Box::new(DataDirError::MissingDataDir) as crate::Error)? // Rust can't infer type here
             .to_path_buf();
         if !data_dir.exists() {
-            return Err(crate::box_error(DataDirError::DoesNotExist { data_dir }));
+            return Err(DataDirError::DoesNotExist { data_dir }.into());
         }
         let readonly = std::fs::metadata(&data_dir)
             .map(|meta| meta.permissions().readonly())
             .unwrap_or(true);
         if readonly {
-            return Err(crate::box_error(DataDirError::NotWritable { data_dir }));
+            return Err(DataDirError::NotWritable { data_dir }.into());
         }
         Ok(data_dir)
     }

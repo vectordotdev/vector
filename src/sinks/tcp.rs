@@ -435,7 +435,7 @@ pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
             .map(|_| ())
-            .map_err(|source| crate::box_error(HealthcheckError::ConnectError { source }))
+            .map_err(|source| HealthcheckError::ConnectError { source }.into())
     });
 
     Box::new(check)

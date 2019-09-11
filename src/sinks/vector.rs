@@ -72,7 +72,7 @@ pub fn vector_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
             .map(|_| ())
-            .map_err(|source| crate::box_error(source))
+            .map_err(|err| err.into())
     });
 
     Box::new(check)

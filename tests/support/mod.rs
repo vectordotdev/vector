@@ -194,7 +194,7 @@ impl SinkConfig for MockSinkConfig {
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),
-            false => future::err(vector::box_error(HealthcheckError::Unhealthy)),
+            false => future::err(HealthcheckError::Unhealthy.into()),
         };
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

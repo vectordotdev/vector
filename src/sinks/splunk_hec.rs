@@ -161,14 +161,12 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, cr
 
     let healthcheck = client
         .request(request)
-        .map_err(|err| crate::box_error(err))
+        .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
-            StatusCode::BAD_REQUEST => Err(crate::box_error(HealthcheckError::InvalidToken)),
-            StatusCode::SERVICE_UNAVAILABLE => Err(crate::box_error(HealthcheckError::QueuesFull)),
-            other => Err(crate::box_error(
-                super::HealthcheckError::UnexpectedStatus { status: other },
-            )),
+            StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
+            StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))

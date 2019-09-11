@@ -431,11 +431,11 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, c
     // it matches the one that AWS sends back.
     let fut = client
         .describe_log_groups(request)
-        .map_err(|source| crate::box_error(HealthcheckError::DescribeLogStreamsFailed { source }))
+        .map_err(|source| HealthcheckError::DescribeLogStreamsFailed { source }.into())
         .and_then(|response| {
             response
                 .log_groups
-                .ok_or_else(|| crate::box_error(HealthcheckError::NoLogGroup))
+                .ok_or_else(|| HealthcheckError::NoLogGroup.into())
         })
         .and_then(move |groups| {
             if let Some(group) = groups.into_iter().next() {
@@ -443,16 +443,17 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, c
                     if name == expected_group_name {
                         Ok(())
                     } else {
-                        Err(crate::box_error(HealthcheckError::GroupNameMismatch {
+                        Err(HealthcheckError::GroupNameMismatch {
                             expected: expected_group_name,
                             name,
-                        }))
+                        }
+                        .into())
                     }
                 } else {
-                    Err(crate::box_error(HealthcheckError::GroupNameError))
+                    Err(HealthcheckError::GroupNameError.into())
                 }
             } else {
-                Err(crate::box_error(HealthcheckError::NoLogGroup))
+                Err(HealthcheckError::NoLogGroup.into())
             }
         });
 

@@ -173,15 +173,11 @@ impl S3Sink {
 
         let healthcheck = response.map_err(|err| match err {
             HeadBucketError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => {
-                    crate::box_error(HealthcheckError::InvalidCredentials)
-                }
-                http::status::StatusCode::NOT_FOUND => {
-                    crate::box_error(HealthcheckError::UnknownBucket)
-                }
-                status => crate::box_error(HealthcheckError::UnknownStatus { status }),
+                http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                http::status::StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket.into(),
+                status => HealthcheckError::UnknownStatus { status }.into(),
             },
-            err => crate::box_error(err),
+            err => err.into(),
         });
 
         Ok(Box::new(healthcheck))

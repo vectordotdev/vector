@@ -186,22 +186,17 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, crate::E
             exclusive_start_stream_name: Some(stream_name.clone()),
             limit: Some(1),
         })
-        .map_err(|source| crate::box_error(HealthcheckError::ListStreamsFailed { source }))
+        .map_err(|source| HealthcheckError::ListStreamsFailed { source }.into())
         .and_then(move |res| Ok(res.stream_names.into_iter().next()))
         .and_then(move |name| {
             if let Some(name) = name {
                 if name == stream_name {
                     Ok(())
                 } else {
-                    Err(crate::box_error(HealthcheckError::StreamNamesMismatch {
-                        name,
-                        stream_name,
-                    }))
+                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
                 }
             } else {
-                Err(crate::box_error(HealthcheckError::NoMatchingStreamName {
-                    stream_name,
-                }))
+                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
             }
         });
 

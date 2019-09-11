@@ -174,10 +174,10 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
             consumer
                 .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
                 .map(|_| ())
-                .map_err(|err| crate::box_error(err))
+                .map_err(|err| err.into())
         })
     })
-    .map_err(|err| crate::box_error(err))
+    .map_err(|err| err.into())
     .and_then(|result| result.into_future());
 
     Box::new(check)

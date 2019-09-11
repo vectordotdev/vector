@@ -26,7 +26,3 @@ pub mod types;
 pub use event::Event;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub fn box_error<E: std::error::Error + Send + Sync + 'static>(err: E) -> Error {
-    Box::new(err) as Error
-}

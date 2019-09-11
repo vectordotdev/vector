@@ -197,12 +197,10 @@ fn healthcheck(host: &str) -> super::Healthcheck {
     Box::new(
         client
             .request(request)
-            .map_err(|err| crate::box_error(err))
+            .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
-                status => Err(crate::box_error(
-                    super::HealthcheckError::UnexpectedStatus { status },
-                )),
+                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }),
     )
 }
@@ -393,12 +391,10 @@ mod integration_tests {
         let client = Client::builder().build(https);
         client
             .request(request)
-            .map_err(|source| crate::box_error(source))
+            .map_err(|source| source.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
-                status => Err(crate::box_error(
-                    super::super::HealthcheckError::UnexpectedStatus { status },
-                )),
+                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
     }
 
