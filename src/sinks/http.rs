@@ -11,7 +11,7 @@ use crate::{
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::{
-    header::{HeaderName, HeaderValue},
+    header::{self, HeaderName, HeaderValue},
     Method, Uri,
 };
 use hyper::{Body, Client, Request};
@@ -27,12 +27,12 @@ enum BuildError {
     #[snafu(display("{}: {}", source, name))]
     InvalidHeaderName {
         name: String,
-        source: ::http::header::InvalidHeaderName,
+        source: header::InvalidHeaderName,
     },
     #[snafu(display("{}: {}", source, value))]
     InvalidHeaderValue {
         value: String,
-        source: ::http::header::InvalidHeaderValue,
+        source: header::InvalidHeaderValue,
     },
 }
 

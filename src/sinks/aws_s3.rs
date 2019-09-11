@@ -101,7 +101,7 @@ enum HealthcheckError {
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
     #[snafu(display("Unknown status code: {}", status))]
-    UnknownStatus { status: hyper::StatusCode },
+    UnknownStatus { status: http::StatusCode },
 }
 
 impl S3Sink {

@@ -39,5 +39,5 @@ enum BuildError {
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
-    UnexpectedStatus { status: hyper::http::StatusCode },
+    UnexpectedStatus { status: ::http::StatusCode },
 }
