@@ -394,6 +394,7 @@ mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
+        assert_downcast_matches,
         event::Event,
         region::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
@@ -599,12 +600,11 @@ mod integration_tests {
             ..config()
         };
         let healthcheck = S3Sink::healthcheck(&config).unwrap();
-        assert!(rt
-            .block_on(healthcheck)
-            .unwrap_err()
-            .to_string()
-            .find("Unknown bucket")
-            .is_some());
+        assert_downcast_matches!(
+            rt.block_on(healthcheck).unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::UnknownBucket{ .. }
+        );
     }
 
     fn client() -> S3Client {

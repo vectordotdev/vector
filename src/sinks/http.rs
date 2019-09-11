@@ -278,6 +278,7 @@ mod tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
+        assert_downcast_matches,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkConfig,
@@ -343,10 +344,11 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        assert!(super::validate_headers(&config.headers)
-            .unwrap_err()
-            .to_string()
-            .contains("invalid HTTP header name"));
+        assert_downcast_matches!(
+            super::validate_headers(&config.headers).unwrap_err(),
+            BuildError,
+            BuildError::InvalidHeaderName{..}
+        );
     }
 
     #[test]

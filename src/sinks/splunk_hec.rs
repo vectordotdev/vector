@@ -270,7 +270,7 @@ mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
-        sinks,
+        assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
@@ -499,12 +499,11 @@ mod integration_tests {
             let healthcheck =
                 sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
                     .unwrap();
-            assert!(rt
-                .block_on(healthcheck)
-                .unwrap_err()
-                .to_string()
-                .find("HEC is unhealthy, queues are full")
-                .is_some());
+            assert_downcast_matches!(
+                rt.block_on(healthcheck).unwrap_err(),
+                HealthcheckError,
+                HealthcheckError::QueuesFull
+            );
         }
     }
 
