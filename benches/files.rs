@@ -49,7 +49,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     &["in"],
                     sinks::file::FileSinkConfig {
                         path: output.into(),
-                        close_timeout_secs: None,
+                        idle_timeout_secs: None,
                         encoding: None,
                     },
                 );

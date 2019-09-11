@@ -18,7 +18,7 @@ use tokio::timer::Delay;
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     pub path: Template,
-    pub close_timeout_secs: Option<u64>,
+    pub idle_timeout_secs: Option<u64>,
     pub encoding: Option<Encoding>,
 }
 
@@ -34,7 +34,7 @@ impl SinkConfig for FileSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
         let sink = PartitionedFileSink {
             path: self.path.clone(),
-            close_timeout_secs: self.close_timeout_secs,
+            idle_timeout_secs: self.idle_timeout_secs.unwrap_or(30),
             encoding: self.encoding.clone(),
             ..Default::default()
         }
@@ -52,7 +52,7 @@ impl SinkConfig for FileSinkConfig {
 pub struct PartitionedFileSink {
     path: Template,
     encoding: Option<Encoding>,
-    close_timeout_secs: Option<u64>,
+    idle_timeout_secs: u64,
     partitions: HashMap<Bytes, File>,
     last_accessed: HashMap<Bytes, Instant>,
     closing: HashMap<Bytes, File>,
@@ -89,9 +89,7 @@ impl Sink for PartitionedFileSink {
                 .entry(key.clone())
                 .or_insert_with(|| File::new(key.clone(), encoding.clone()));
 
-            if let Some(_) = self.close_timeout_secs {
-                self.last_accessed.insert(key.clone(), Instant::now());
-            }
+            self.last_accessed.insert(key.clone(), Instant::now());
 
             partition
                 .start_send(event)
@@ -118,39 +116,46 @@ impl Sink for PartitionedFileSink {
             all_files_ready = all_files_ready || ready;
         }
 
-        if let Some(timeout) = self.close_timeout_secs {
-            for (key, last_accessed) in &self.last_accessed {
-                if last_accessed.elapsed().as_secs() > timeout {
-                    if let Some(file) = self.partitions.remove(key) {
-                        self.closing.insert(key.clone(), file);
-                    }
+        for (key, last_accessed) in &self.last_accessed {
+            if last_accessed.elapsed().as_secs() > self.idle_timeout_secs {
+                if let Some(file) = self.partitions.remove(key) {
+                    let file_path = String::from_utf8_lossy(&key[..]);
+                    debug!(message = "Closing file.", file = %file_path);
+                    self.closing.insert(key.clone(), file);
                 }
             }
+        }
 
-            let mut closed_files = Vec::new();
+        let mut closed_files = Vec::new();
 
-            for (key, file) in &mut self.closing {
-                if let Async::Ready(()) = file.close().unwrap() {
-                    closed_files.push(key.clone());
-                }
+        for (key, file) in &mut self.closing {
+            if let Async::Ready(()) = file.close().unwrap() {
+                closed_files.push(key.clone());
             }
+        }
 
-            for closed_file in closed_files {
-                self.closing.remove(&closed_file);
-            }
+        for closed_file in closed_files {
+            self.closing.remove(&closed_file);
+        }
 
-            // Set `next_linger_timeout` to
-            if let Some(min_last_accessed) = self.last_accessed.iter().map(|(_, v)| v).min() {
-                let next_timeout = min_last_accessed.elapsed();
-                let linger_deadline = *min_last_accessed - next_timeout;
-                self.next_linger_timeout = Some(Delay::new(linger_deadline));
-            }
+        // Set `next_linger_timeout` to the oldest file's elapsed time since last
+        // write minus the idle_timeout.
+        if let Some(min_last_accessed) = self
+            .last_accessed
+            .iter()
+            .map(|(_, v)| v)
+            .filter(|l| l.elapsed().as_secs() < self.idle_timeout_secs)
+            .min()
+        {
+            let next_timeout = self.idle_timeout_secs - min_last_accessed.elapsed().as_secs();
+            let linger_deadline = *min_last_accessed - std::time::Duration::from_secs(next_timeout);
+            self.next_linger_timeout = Some(Delay::new(linger_deadline));
+        }
 
-            if let Some(next_linger) = &mut self.next_linger_timeout {
-                next_linger
-                    .poll()
-                    .expect("This is a bug; we are always in a timer context");
-            }
+        if let Some(next_linger) = &mut self.next_linger_timeout {
+            next_linger
+                .poll()
+                .expect("This is a bug; we are always in a timer context");
         }
 
         // This sink has completely fnished when one of these is true in order:
@@ -185,7 +190,7 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().into(),
-            close_timeout_secs: None,
+            idle_timeout_secs: None,
             encoding: None,
         };
 
@@ -212,7 +217,7 @@ mod tests {
 
         let config = FileSinkConfig {
             path: template.clone().into(),
-            close_timeout_secs: None,
+            idle_timeout_secs: None,
             encoding: None,
         };
 
