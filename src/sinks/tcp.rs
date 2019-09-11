@@ -32,8 +32,6 @@ use tracing::field;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Unable to resolve DNS for provided address"))]
-    DNSFailure,
     #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
     FileOpenFailed {
         note: &'static str,
@@ -117,7 +115,9 @@ impl SinkConfig for TcpSinkConfig {
             .to_socket_addrs()
             .context(super::SocketAddressError)?
             .next()
-            .ok_or(Box::new(BuildError::DNSFailure))?;
+            .ok_or(Box::new(super::BuildError::DNSFailure {
+                address: self.address.clone(),
+            }))?;
 
         let tls = match self.tls {
             Some(ref tls) => {

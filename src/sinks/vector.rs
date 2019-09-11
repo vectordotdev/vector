@@ -14,12 +14,6 @@ use snafu::{ResultExt, Snafu};
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::net::TcpStream;
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Unable to resolve DNS for provided address"))]
-    DNSFailure,
-}
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorSinkConfig {
@@ -40,7 +34,9 @@ impl SinkConfig for VectorSinkConfig {
             .to_socket_addrs()
             .context(super::SocketAddressError)?
             .next()
-            .ok_or(Box::new(BuildError::DNSFailure))?;
+            .ok_or(Box::new(super::BuildError::DNSFailure {
+                address: self.address.clone(),
+            }))?;
 
         let sink = vector(self.address.clone(), addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);
