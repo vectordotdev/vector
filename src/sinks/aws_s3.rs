@@ -98,9 +98,9 @@ impl SinkConfig for S3SinkConfig {
 enum HealthcheckError {
     #[snafu(display("Invalid credentials"))]
     InvalidCredentials,
-    #[snafu(display("Unknown bucket"))]
-    UnknownBucket,
-    #[snafu(display("Unknown error: Status code: {}", status))]
+    #[snafu(display("Unknown bucket: {:?}", bucket))]
+    UnknownBucket { bucket: String },
+    #[snafu(display("Unknown status code: {}", status))]
     UnknownStatus { status: hyper::StatusCode },
 }
 
@@ -171,10 +171,13 @@ impl S3Sink {
 
         let response = client.head_bucket(request);
 
+        let bucket = config.bucket.clone();
         let healthcheck = response.map_err(|err| match err {
             HeadBucketError::Unknown(response) => match response.status {
                 http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
-                http::status::StatusCode::NOT_FOUND => HealthcheckError::UnknownBucket.into(),
+                http::status::StatusCode::NOT_FOUND => {
+                    HealthcheckError::UnknownBucket { bucket }.into()
+                }
                 status => HealthcheckError::UnknownStatus { status }.into(),
             },
             err => err.into(),
