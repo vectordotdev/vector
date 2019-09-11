@@ -27,7 +27,9 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
   inputs = ["my-source-id"]
   path = "vector-%Y-%m-%d.log"
   
+  encoding = "ndjson" # no default, enum: "ndjson" or "text"
   healthcheck = true # default
+  idle_timeout_secs = "30" # default
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (schema)" %}
@@ -36,7 +38,9 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
   type = "file"
   inputs = ["<string>", ...]
   path = "<string>"
+  encoding = {"ndjson" | "text"}
   healthcheck = <bool>
+  idle_timeout_secs = <int>
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
@@ -63,11 +67,27 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
   path = "vector-%Y-%m-%d.log"
   path = "application-{{ application_id }}-%Y-%m-%d.log"
 
+  # The encoding format used to serialize the events before appending. The
+  # default is dynamic based on if the event is structured or not.
+  # 
+  # * optional
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
+
+  # The amount of time a file can be idle  and stay open. After not receiving any
+  # events for this timeout, the file will be flushed and closed.
+  # 
+  # * optional
+  # * default: "30"
+  idle_timeout_secs = "30"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -81,7 +101,9 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `path` | `string` | File name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`required` `example: "vector-%Y-%m-%d.log"` |
 | **OPTIONAL** | | |
+| `encoding` | `string` | The encoding format used to serialize the events before appending. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson" or "text"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
+| `idle_timeout_secs` | `int` | The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.<br />`default: "30"` |
 
 ## How It Works
 
@@ -89,6 +111,30 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
 
 Due to the nature of this component, it offers a
 [**best effort** delivery guarantee][docs.best_effort_delivery].
+
+### Encodings
+
+The `file` sink encodes events before writing
+them downstream. This is controlled via the `encoding` option which accepts
+the following options:
+
+| Encoding | Description |
+| :------- | :---------- |
+| `ndjson` | The payload will be encoded in new line delimited JSON payload, each line representing a JSON encoded event. |
+| `text` | The payload will be encoded as new line delimited text, each line representing the value of the `"message"` key. |
+
+#### Dynamic encoding
+
+By default, the `encoding` chosen is dynamic based on the explicit/implcit
+nature of the event's structure. For example, if this event is parsed (explicit
+structuring), Vector will use `json` to encode the structured data. If the event
+was not explicitly structured, the `text` encoding will be used.
+
+To further explain why Vector adopts this default, take the simple example of
+accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+it directly to the `file` sink. It is less
+surprising that the outgoing data reflects the incoming data exactly since it
+was not explicitly structured.
 
 ### Environment Variables
 
@@ -155,6 +201,7 @@ issue, please:
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
+[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.file_sink]: ../../../assets/file-sink.svg

@@ -1835,11 +1835,27 @@ end
   path = "vector-%Y-%m-%d.log"
   path = "application-{{ application_id }}-%Y-%m-%d.log"
 
+  # The encoding format used to serialize the events before appending. The
+  # default is dynamic based on if the event is structured or not.
+  # 
+  # * optional
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
+
+  # The amount of time a file can be idle  and stay open. After not receiving any
+  # events for this timeout, the file will be flushed and closed.
+  # 
+  # * optional
+  # * default: "30"
+  idle_timeout_secs = "30"
 
 [sinks.http]
   #
