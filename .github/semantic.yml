@@ -42,6 +42,7 @@ scopes:
   - clickhouse sink
   - console sink
   - elasticsearch sink
+  - file sink
   - http sink
   - kafka sink
   - prometheus sink

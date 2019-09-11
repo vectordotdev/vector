@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## v0.4.0-dev
 
 ### Added
-
-- [configuration] Added `--dry-run` and `--healthchecks-only` options [#233]
+- [configuration] Added `--dry-run` option [#233]
 - aws_s3: Add `filename_extension` options.
 - aws_cloudwatch_logs: `stream_name` now accepts `{{key}}` syntax for extracting values from events.
 - aws_cloudwatch_logs: retry support added and more stability improvements
@@ -21,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - aws_cloudwatch_logs: Add dynamic group and stream creation
 - tcp sink: Add support for TLS connections.
 - elasticsearch sink: Add support for custom headers and query parameters
+- `file` sink: New sink with templates-based partitioning
 - journald: New source to read in logs from journald
 
 ### Changed

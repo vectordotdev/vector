@@ -150,6 +150,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
 | [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
 | [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`file`**][docs.file_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a file. |
 | [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
 | [**`kafka`**][docs.kafka_sink] | [Streams](#streaming) [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
 | [**`prometheus`**][docs.prometheus_sink] | [Exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
@@ -210,6 +211,7 @@ the License.
 [docs.docker]: https://docs.vector.dev/setup/installation/platforms/docker
 [docs.elasticsearch_sink]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
 [docs.field_filter_transform]: https://docs.vector.dev/usage/configuration/transforms/field_filter
+[docs.file_sink]: https://docs.vector.dev/usage/configuration/sinks/file
 [docs.file_source]: https://docs.vector.dev/usage/configuration/sources/file
 [docs.getting_started]: https://docs.vector.dev/setup/getting-started
 [docs.grok_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/grok_parser

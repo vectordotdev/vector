@@ -1,7 +1,11 @@
 use crate::Event;
 use futures::{future, stream, sync::mpsc, try_ready, Async, Future, Poll, Sink, Stream};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::mem;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use stream_cancel::{StreamExt, Trigger, Tripwire};
@@ -62,12 +66,25 @@ pub fn random_events_with_stream(
     len: usize,
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
-    let events = (0..count)
-        .map(|_| random_string(len))
-        .map(Event::from)
-        .collect::<Vec<_>>();
-    let stream = stream::iter_ok(events.clone().into_iter());
-    (events, stream)
+    random_events_with_stream_generic(count, move || Event::from(random_string(len)))
+}
+
+pub fn random_nested_events_with_stream(
+    len: usize,
+    breadth: usize,
+    depth: usize,
+    count: usize,
+) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>) {
+    random_events_with_stream_generic(count, move || {
+        let mut log = Event::new_empty_log().into_log();
+
+        let tree = random_pseudonested_map(len, breadth, depth);
+        for (k, v) in tree.into_iter() {
+            log.insert_explicit(k.into(), v.into())
+        }
+
+        Event::Log(log)
+    })
 }
 
 pub fn random_string(len: usize) -> String {
@@ -94,6 +111,13 @@ pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = V
         }
         Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
     })
+}
+
+pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    let mut file = File::open(path).unwrap();
+    let mut output = String::new();
+    file.read_to_string(&mut output).unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
 }
 
 pub fn wait_for(f: impl Fn() -> bool) {
@@ -261,4 +285,48 @@ pub fn count_receive(addr: &SocketAddr) -> CountReceiver {
         trigger,
         _runtime: runtime,
     }
+}
+
+fn random_events_with_stream_generic<F>(
+    count: usize,
+    generator: F,
+) -> (Vec<Event>, impl Stream<Item = Event, Error = ()>)
+where
+    F: Fn() -> Event,
+{
+    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
+    let stream = stream::iter_ok(events.clone().into_iter());
+    (events, stream)
+}
+
+fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
+    if breadth == 0 || depth == 0 {
+        return HashMap::new();
+    }
+
+    if depth == 1 {
+        let mut leaf = HashMap::new();
+        leaf.insert(random_string(len), random_string(len));
+        return leaf;
+    }
+
+    let mut tree = HashMap::new();
+    for _ in 0..breadth {
+        let prefix = random_string(len);
+        let subtree = random_pseudonested_map(len, breadth, depth - 1);
+
+        let subtree: HashMap<String, String> = subtree
+            .into_iter()
+            .map(|(mut key, value)| {
+                key.insert(0, '.');
+                key.insert_str(0, &prefix[..]);
+                (key, value)
+            })
+            .collect();
+
+        for (key, value) in subtree.into_iter() {
+            tree.insert(key, value);
+        }
+    }
+    tree
 }
