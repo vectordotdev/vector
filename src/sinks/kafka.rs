@@ -21,8 +21,8 @@ use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Error creating kafka producer: {}", source))]
-    KafkaCreateError { source: rdkafka::error::KafkaError },
+    #[snafu(display("creating kafka producer failed: {}", source))]
+    KafkaCreateFailed { source: rdkafka::error::KafkaError },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -77,7 +77,7 @@ impl KafkaSinkConfig {
 
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, crate::Error> {
-        let producer = config.to_rdkafka().create().context(KafkaCreateError)?;
+        let producer = config.to_rdkafka().create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
             topic: config.topic,
