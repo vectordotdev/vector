@@ -1,5 +1,5 @@
-use http::Uri;
-use rusoto_core::Region;
+use http::{uri::InvalidUri, Uri};
+use rusoto_core::{region::ParseRegionError, Region};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
@@ -30,11 +30,9 @@ impl RegionOrEndpoint {
 #[derive(Debug, Snafu)]
 pub enum ParseError {
     #[snafu(display("Failed to parse custom endpoint as URI: {}", source))]
-    EndpointParseError { source: http::uri::InvalidUri },
+    EndpointParseError { source: InvalidUri },
     #[snafu(display("{}", source))]
-    RegionParseError {
-        source: rusoto_core::region::ParseRegionError,
-    },
+    RegionParseError { source: ParseRegionError },
     #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
     BothRegionAndEndpoint,
     #[snafu(display("Must set either 'region' or 'endpoint'"))]
