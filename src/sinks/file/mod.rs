@@ -1,48 +1,43 @@
-use crate::{
-    buffers::Acker,
-    event::{self, Event},
-    sinks::util::SinkExt,
-    template::Template,
-    topology::config::DataType,
-};
-use futures::{future, Async, AsyncSink, Sink, StartSend};
-use serde::{Deserialize, Serialize};
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Instant;
-
 mod file;
 
-use file::Encoding;
+use self::file::File;
+use crate::{
+    buffers::Acker,
+    event::Event,
+    sinks::util::SinkExt,
+    template::Template,
+    topology::config::{DataType, SinkConfig},
+};
+use bytes::Bytes;
+use futures::{future, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, time::Instant};
+use tokio::timer::Delay;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
-    pub path: String,
+    pub path: Template,
     pub close_timeout_secs: Option<u64>,
     pub encoding: Option<Encoding>,
 }
 
-impl FileSinkConfig {
-    pub fn new(path: String) -> Self {
-        Self {
-            path,
-            close_timeout_secs: None,
-            encoding: None,
-        }
-    }
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Ndjson,
 }
 
 #[typetag::serde(name = "file")]
-impl crate::topology::config::SinkConfig for FileSinkConfig {
+impl SinkConfig for FileSinkConfig {
     fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = PartitionedFileSink::new(
-            Template::from(&self.path[..]),
-            self.close_timeout_secs,
-            self.encoding.clone(),
-        )
+        let sink = PartitionedFileSink {
+            path: self.path.clone(),
+            close_timeout_secs: self.close_timeout_secs,
+            encoding: self.encoding.clone(),
+            ..Default::default()
+        }
         .stream_ack(acker);
 
         Ok((Box::new(sink), Box::new(future::ok(()))))
@@ -53,75 +48,31 @@ impl crate::topology::config::SinkConfig for FileSinkConfig {
     }
 }
 
-pub type EmbeddedFileSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
-
+#[derive(Debug, Default)]
 pub struct PartitionedFileSink {
     path: Template,
     encoding: Option<Encoding>,
     close_timeout_secs: Option<u64>,
-    partitions: HashMap<Arc<Path>, EmbeddedFileSink>,
-    last_accessed: HashMap<Arc<Path>, Instant>,
-    closing: Vec<EmbeddedFileSink>,
+    partitions: HashMap<Bytes, File>,
+    last_accessed: HashMap<Bytes, Instant>,
+    closing: HashMap<Bytes, File>,
+    next_linger_timeout: Option<Delay>,
 }
 
 impl PartitionedFileSink {
-    pub fn new(
-        path: Template,
-        close_timeout_secs: Option<u64>,
-        encoding: Option<Encoding>,
-    ) -> Self {
-        PartitionedFileSink {
-            path,
-            encoding,
-            close_timeout_secs,
-            partitions: HashMap::new(),
-            last_accessed: HashMap::new(),
-            closing: Vec::new(),
-        }
-    }
+    fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
+        let bytes = match self.path.render(event) {
+            Ok(b) => b,
+            Err(missing_keys) => {
+                warn!(
+                    message = "Keys do not exist on the event. Dropping event.",
+                    ?missing_keys
+                );
+                return None;
+            }
+        };
 
-    fn poll_close_old_files(&mut self) {
-        let mut recently_outdated = Vec::new();
-        if let Some(timeout) = self.close_timeout_secs {
-            self.last_accessed.retain(|path, time| {
-                if time.elapsed().as_secs() > timeout {
-                    debug!(message = "removing file.", file = ?path);
-                    recently_outdated.push(path.clone());
-                    false
-                } else {
-                    true
-                }
-            });
-        }
-
-        let mut recently_outdated = recently_outdated
-            .into_iter()
-            .map(|ref path| {
-                self.partitions
-                    .remove(path)
-                    .expect("Partition is already removed")
-            })
-            .collect();
-
-        //it is easier to empty a `closing` buffer and then put back all sinks which are not closed yet (see `poll_close`)
-        let mut closing: Vec<EmbeddedFileSink> = self.closing.drain(..).collect();
-        closing.append(&mut recently_outdated);
-
-        for file in closing.into_iter() {
-            self.poll_close(file);
-        }
-    }
-
-    fn poll_close(&mut self, mut file: EmbeddedFileSink) {
-        match file.close() {
-            Err(err) => error!("Error while closing FileSink: {:?}", err),
-            Ok(Async::Ready(())) => debug!("a FileSink closed"),
-            Ok(Async::NotReady) => self.closing.push(file),
-        }
-    }
-
-    fn opened_files(&self) -> Vec<Arc<Path>> {
-        self.partitions.keys().map(|path| path.clone()).collect()
+        Some(bytes)
     }
 }
 
@@ -130,66 +81,91 @@ impl Sink for PartitionedFileSink {
     type SinkError = ();
 
     fn start_send(&mut self, event: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.path.render(&event) {
-            Ok(bytes) => match std::str::from_utf8(&bytes) {
-                Err(err) => {
-                    warn!(
-                        message = "Path produced is not valid UTF-8. Dropping event.",
-                        ?err
-                    );
-                    Ok(AsyncSink::Ready)
-                }
+        if let Some(key) = self.partition_event(&event) {
+            let encoding = self.encoding.clone();
 
-                Ok(path) => {
-                    let path: Arc<Path> = Arc::from(PathBuf::from(path));
+            let partition = self
+                .partitions
+                .entry(key.clone())
+                .or_insert_with(|| File::new(key.clone(), encoding.clone()));
 
-                    if self.close_timeout_secs.is_some() {
-                        self.last_accessed.insert(path.clone(), Instant::now());
-                    }
-
-                    let ref mut partition = match self.partitions.entry(path) {
-                        Entry::Occupied(entry) => entry.into_mut(),
-                        Entry::Vacant(entry) => {
-                            let path = entry.key();
-                            let encoding = self.encoding.clone();
-                            let sink = file::FileSink::new_with_encoding(&path, encoding);
-                            entry.insert(sink)
-                        }
-                    };
-
-                    partition.start_send(event)
-                }
-            },
-
-            Err(missing_keys) => {
-                warn!(
-                    message = "Keys do not exist on the event. Dropping event.",
-                    ?missing_keys
-                );
-                Ok(AsyncSink::Ready)
+            if let Some(_) = self.close_timeout_secs {
+                self.last_accessed.insert(key.clone(), Instant::now());
             }
+
+            partition
+                .start_send(event)
+                .map_err(|error| error!(message = "Error writing to partition.", %error))
+        } else {
+            Ok(AsyncSink::Ready)
         }
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        self.partitions
-            .iter_mut()
-            .for_each(|(path, partition)| match partition.poll_complete() {
-                Ok(_) => {}
-                Err(()) => error!("Error in downstream FileSink with path {:?}", path),
-            });
+    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        let mut all_files_ready = false;
 
-        self.poll_close_old_files();
+        for (file, partition) in &mut self.partitions {
+            let ready = match partition.poll_complete() {
+                Ok(Async::Ready(())) => true,
+                Ok(Async::NotReady) => false,
+                Err(error) => {
+                    let file = String::from_utf8_lossy(&file[..]);
+                    error!(message = "Unable to flush file.", %file, %error);
+                    true
+                }
+            };
 
-        debug!(message = "keeping opened", files = ?self.opened_files());
+            all_files_ready = all_files_ready || ready;
+        }
 
-        Ok(Async::Ready(()))
+        if let Some(timeout) = self.close_timeout_secs {
+            for (key, last_accessed) in &self.last_accessed {
+                if last_accessed.elapsed().as_secs() > timeout {
+                    if let Some(file) = self.partitions.remove(key) {
+                        self.closing.insert(key.clone(), file);
+                    }
+                }
+            }
+
+            let mut closed_files = Vec::new();
+
+            for (key, file) in &mut self.closing {
+                if let Async::Ready(()) = file.close().unwrap() {
+                    closed_files.push(key.clone());
+                }
+            }
+
+            for closed_file in closed_files {
+                self.closing.remove(&closed_file);
+            }
+
+            // Set `next_linger_timeout` to
+            if let Some(min_last_accessed) = self.last_accessed.iter().map(|(_, v)| v).min() {
+                let next_timeout = min_last_accessed.elapsed();
+                let linger_deadline = *min_last_accessed - next_timeout;
+                self.next_linger_timeout = Some(Delay::new(linger_deadline));
+            }
+
+            if let Some(next_linger) = &mut self.next_linger_timeout {
+                next_linger
+                    .poll()
+                    .expect("This is a bug; we are always in a timer context");
+            }
+        }
+
+        // This sink has completely fnished when one of these is true in order:
+        // 1. There are no active partitions and not files currently closing.
+        // 2. All files have been flushed completely
+        if (self.partitions.is_empty() && self.closing.is_empty()) || all_files_ready {
+            Ok(Async::Ready(()))
+        } else {
+            Ok(Async::NotReady)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{
         buffers::Acker,
@@ -197,24 +173,26 @@ mod tests {
         test_util::{lines_from_file, random_events_with_stream, random_lines_with_stream},
         topology::config::SinkConfig,
     };
-
-    use core::convert::From;
     use futures::stream;
     use tempfile::tempdir;
 
     #[test]
-    fn without_partitions() {
+    fn single_partition() {
         let directory = tempdir().unwrap();
 
         let mut template = directory.into_path().to_string_lossy().to_string();
         template.push_str("/test.out");
 
-        let config = FileSinkConfig::new(template.clone());
+        let config = FileSinkConfig {
+            path: template.clone().into(),
+            close_timeout_secs: None,
+            encoding: None,
+        };
 
         let (sink, _) = config.build(Acker::Null).unwrap();
         let (input, events) = random_lines_with_stream(100, 64);
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::test_util::runtime();
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
@@ -225,14 +203,18 @@ mod tests {
     }
 
     #[test]
-    fn partitions_are_created_dynamically() {
+    fn many_partitions() {
         let directory = tempdir().unwrap();
         let directory = directory.into_path();
 
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
 
-        let config = FileSinkConfig::new(template.clone());
+        let config = FileSinkConfig {
+            path: template.clone().into(),
+            close_timeout_secs: None,
+            encoding: None,
+        };
 
         let (sink, _) = config.build(Acker::Null).unwrap();
 
@@ -287,7 +269,7 @@ mod tests {
             .insert_implicit("level".into(), "error".into());
 
         let events = stream::iter_ok(input.clone().into_iter());
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = crate::test_util::runtime();
         let pump = sink.send_all(events);
         let _ = rt.block_on(pump).unwrap();
 

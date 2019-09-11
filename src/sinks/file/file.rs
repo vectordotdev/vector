@@ -1,179 +1,175 @@
-use super::*;
-use bytes::Bytes;
-use std::io::{self, ErrorKind};
-use std::path::{Path, PathBuf};
-
+use super::Encoding;
+use crate::event::{self, Event};
+use bytes::{Bytes, BytesMut};
+use codec::BytesDelimitedCodec;
 use futures::{try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
-use tokio::codec::{BytesCodec, FramedWrite};
-use tokio::fs::file::{File, OpenFuture};
-use tokio::fs::OpenOptions;
+use std::{ffi, io, path};
+use tokio::{codec::Encoder, fs::file, io::AsyncWrite};
 
-use tracing::field;
+const INITIAL_CAPACITY: usize = 8 * 1024;
+const BACKPRESSURE_BOUNDARY: usize = INITIAL_CAPACITY;
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
+#[derive(Debug)]
+pub struct File {
+    state: State,
+    encoding: Option<Encoding>,
+    buffer: BytesMut,
+    codec: BytesDelimitedCodec,
 }
 
-pub struct FileSink {
-    pub path: PathBuf,
-    state: FileSinkState,
-}
-
-enum FileSinkState {
+#[derive(Debug)]
+enum State {
+    Creating(file::OpenFuture<BytesPath>),
+    Open(file::File),
     Closed,
-    OpeningFile(OpenFuture<PathBuf>),
-    FileProvided(FramedWrite<File, BytesCodec>),
 }
 
-impl FileSinkState {
-    fn init(path: PathBuf) -> Self {
-        debug!(message = "opening", file = ?path);
-        let mut options = OpenOptions::new();
-        options.create(true).append(true);
+impl File {
+    pub fn new(path: Bytes, encoding: Option<Encoding>) -> Self {
+        let path = BytesPath(path);
 
-        FileSinkState::OpeningFile(options.open(path))
-    }
-}
+        let fut = file::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path);
 
-impl FileSink {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path: path.clone(),
-            state: FileSinkState::init(path),
+        let state = State::Creating(fut);
+        let buffer = BytesMut::with_capacity(INITIAL_CAPACITY);
+        let codec = BytesDelimitedCodec::new(b'\n');
+
+        File {
+            state,
+            encoding,
+            buffer,
+            codec,
         }
     }
 
-    pub fn new_with_encoding(path: &Path, encoding: Option<Encoding>) -> EmbeddedFileSink {
-        let sink = FileSink::new(path.to_path_buf())
-            .sink_map_err(|err| error!("Terminating the sink due to error: {}", err))
-            .with(move |event| Self::encode_event(event, &encoding));
-
-        Box::new(sink)
-    }
-
-    pub fn poll_file(&mut self) -> Poll<&mut FramedWrite<File, BytesCodec>, io::Error> {
-        loop {
-            match self.state {
-                FileSinkState::Closed => return Err(closed()),
-
-                FileSinkState::FileProvided(ref mut sink) => return Ok(Async::Ready(sink)),
-
-                FileSinkState::OpeningFile(ref mut open_future) => match open_future.poll() {
-                    Ok(Async::Ready(file)) => {
-                        debug!(message = "provided", file = ?file);
-                        self.state =
-                            FileSinkState::FileProvided(FramedWrite::new(file, BytesCodec::new()));
-                    }
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Err(err) => {
-                        self.state = FileSinkState::Closed;
-                        return Err(err);
-                    }
-                },
-            }
-        }
-    }
-
-    fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> {
+    fn encode_event(&self, event: Event) -> Bytes {
         let log = event.into_log();
 
-        let result = match (encoding, log.is_structured()) {
-            (&Some(Encoding::Json), _) | (_, true) => serde_json::to_vec(&log.unflatten())
-                .map_err(|e| panic!("Error encoding event as json: {}", e)),
-
-            (&Some(Encoding::Text), _) | (_, false) => Ok(log
+        match (&self.encoding, log.is_structured()) {
+            (&Some(Encoding::Ndjson), _) | (None, true) => serde_json::to_vec(&log.unflatten())
+                .map(Bytes::from)
+                .expect("Unable to encode event as JSON."),
+            (&Some(Encoding::Text), _) | (None, false) => log
                 .get(&event::MESSAGE)
-                .map(|v| v.as_bytes().to_vec())
-                .unwrap_or(Vec::new())),
-        };
-
-        result.map(|mut bytes| {
-            bytes.push(b'\n');
-            Bytes::from(bytes)
-        })
+                .map(|v| v.as_bytes())
+                .unwrap_or(Bytes::new()),
+        }
     }
 }
 
-impl Sink for FileSink {
-    type SinkItem = Bytes;
-    type SinkError = io::Error;
+// This implements a futures 0.3 based sink api that provides a `poll_ready`
+// that doesn't require us to consume the event.
+impl File {
+    fn poll_ready(&mut self) -> Poll<(), io::Error> {
+        match &mut self.state {
+            State::Open(_file) => {
+                // If the buffer is already over 8KiB, then attempt to flush it. If after flushing it's
+                // *still* over 8KiB, then apply backpressure (reject the send).
+                if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+                    self.poll_complete()?;
 
-    fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.poll_file() {
-            Ok(Async::Ready(file)) => {
-                debug!(
-                    message = "sending event",
-                    bytes = &field::display(line.len())
-                );
-                match file.start_send(line) {
-                    Ok(ok) => Ok(ok),
-
-                    Err(err) => {
-                        self.state = FileSinkState::Closed;
-                        Err(err)
+                    if self.buffer.len() >= BACKPRESSURE_BOUNDARY {
+                        return Ok(Async::NotReady);
                     }
                 }
             }
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
-            Err(err) => Err(err),
-        }
-    }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        if let FileSinkState::Closed = self.state {
-            return Err(closed());
-        }
-
-        let file = try_ready!(self.poll_file());
-
-        match file.poll_complete() {
-            Err(err) => {
-                error!("Error while completing {:?}: {}", self.path, err);
-                self.state = FileSinkState::Closed;
-                Ok(Async::Ready(()))
+            State::Creating(fut) => {
+                let file = try_ready!(fut.poll());
+                self.state = State::Open(file);
             }
-            Ok(ok) => Ok(ok),
+
+            State::Closed => unreachable!(),
         }
-    }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        match self.poll_complete() {
-            Ok(Async::Ready(())) => match &mut self.state {
-                FileSinkState::Closed => Ok(Async::Ready(())),
-
-                FileSinkState::FileProvided(sink) => sink.close(),
-
-                //this state is eliminated during poll_complete()
-                FileSinkState::OpeningFile(_) => unreachable!(),
-            },
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(err) => Err(err),
-        }
+        Ok(Async::Ready(()))
     }
 }
 
-fn closed() -> io::Error {
-    io::Error::new(ErrorKind::NotConnected, "FileSink is in closed state")
+impl Sink for File {
+    type SinkItem = Event;
+    type SinkError = io::Error;
+
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        if let Async::NotReady = self.poll_ready()? {
+            return Ok(AsyncSink::NotReady(item));
+        }
+
+        let event = self.encode_event(item);
+        self.codec.encode(event, &mut self.buffer)?;
+        Ok(AsyncSink::Ready)
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), io::Error> {
+        if let State::Open(file) = &mut self.state {
+            trace!("flushing framed transport");
+
+            while !self.buffer.is_empty() {
+                trace!("writing; remaining={}", self.buffer.len());
+
+                let n = try_ready!(file.poll_write(&self.buffer));
+
+                if n == 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::WriteZero,
+                        "failed to \
+                         write frame to transport",
+                    )
+                    .into());
+                }
+
+                let _ = self.buffer.split_to(n);
+            }
+
+            // Try flushing the underlying IO
+            try_ready!(file.poll_flush());
+
+            trace!("framed transport flushed");
+            return Ok(Async::Ready(()));
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn close(&mut self) -> Poll<(), io::Error> {
+        try_ready!(self.poll_complete());
+
+        if let State::Open(file) = &mut self.state {
+            try_ready!(file.shutdown());
+        }
+
+        self.state = State::Closed;
+        Ok(Async::Ready(()))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BytesPath(Bytes);
+
+impl AsRef<path::Path> for BytesPath {
+    fn as_ref(&self) -> &path::Path {
+        use std::os::unix::ffi::OsStrExt;
+        let os_str = ffi::OsStr::from_bytes(&self.0[..]);
+        &path::Path::new(os_str)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{
         event::Event,
         test_util::{lines_from_file, random_lines_with_stream, random_nested_events_with_stream},
     };
-
     use futures::Stream;
-    use std::collections::HashMap;
+    use std::{collections::HashMap, path::PathBuf};
     use tempfile::tempdir;
 
     #[test]
-    fn text_output_is_correct() {
+    fn encode_text() {
         let (input, events) = random_lines_with_stream(100, 16);
         let output = test_unpartitioned_with_encoding(events, Encoding::Text, None);
 
@@ -183,9 +179,9 @@ mod tests {
     }
 
     #[test]
-    fn json_tree_output_is_correct() {
+    fn encode_json() {
         let (input, events) = random_nested_events_with_stream(4, 3, 3, 16);
-        let output = test_unpartitioned_with_encoding(events, Encoding::Json, None);
+        let output = test_unpartitioned_with_encoding(events, Encoding::Ndjson, None);
 
         for (input, output) in input.into_iter().zip(output) {
             let output: HashMap<String, HashMap<String, HashMap<String, String>>> =
@@ -205,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn file_is_appended_not_truncated() {
+    fn file_is_appended() {
         let directory = tempdir().unwrap().into_path();
 
         let (mut input1, events) = random_lines_with_stream(100, 16);
@@ -237,13 +233,15 @@ mod tests {
             .unwrap_or(tempdir().unwrap().into_path())
             .join("test.out");
 
-        let sink = FileSink::new_with_encoding(&path, Some(encoding));
+        let b = Bytes::from(path.clone().to_str().unwrap().as_bytes());
+        let sink = File::new(b, Some(encoding));
 
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let pump = sink.send_all(events);
+        let mut rt = crate::test_util::runtime();
+        let pump = sink
+            .sink_map_err(|e| panic!("error {:?}", e))
+            .send_all(events);
         let _ = rt.block_on(pump).unwrap();
 
         lines_from_file(&path)
     }
-
 }
