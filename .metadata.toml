@@ -189,6 +189,25 @@ will buffer lines into a single event before flushing, regardless of whether \
 or not it has seen a line indicating the start of a new message.\
 """
 
+[sources.file.options.max_read_bytes]
+type = "int"
+default = 2048
+null = true
+unit = "bytes"
+description = """\
+An approximate limit on the amount of data read from a single file at a given \
+time.\
+"""
+
+[sources.file.options.oldest_first]
+type = "bool"
+default = false
+null = true
+description = """\
+Instead of balancing read capacity fairly across all watched files, prioritize \
+draining the oldest files before moving on to read data from younger files.\
+"""
+
 # ------------------------------------------------------------------------------
 # sources.journald
 # ------------------------------------------------------------------------------
