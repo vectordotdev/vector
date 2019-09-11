@@ -7,7 +7,11 @@ labels: Type: Enhancement
 <!--
 Hi there,
 
-Thank you for opening an issue. Please note that we try to keep the Vector issue tracker reserved for bug reports and feature requests. For general usage questions, please see: https://vector.dev/community.
+Thank you for opening an issue. Please note that we try to keep the Vector issue tracker reserved for bug reports and feature requests. For general usage questions, please see: https://chat.vector.dev.
+
+PSA: Using Vector? Let us know! Add your company here:
+
+https://github.com/timberio/vector/blob/master/.companies.toml
 -->
 
 ### Current Vector Version

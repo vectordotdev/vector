@@ -160,7 +160,7 @@ Or view [platform specific installation instructions][docs.installation].
 [+ request a new sink][url.new_sink]
 
 
-## Companies Using Vector In Production
+## Companies Using Vector
 
 * [Timber](https://timber.io)
 
@@ -273,7 +273,7 @@ the License.
 [url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [url.prometheus]: https://prometheus.io/
 [url.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
+[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [url.rust]: https://www.rust-lang.org/
 [url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [url.test_harness]: https://github.com/timberio/vector-test-harness/
