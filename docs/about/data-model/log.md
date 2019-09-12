@@ -55,8 +55,8 @@ Keys are `string` representations of the field name.
 
 ##### Special Characters
 
-As described in the [nested fields](#nested-fields) section, only `.` is
-treated as a special character to delimit nesting.
+`.` is used to denote [field nesting](#nested-fields) and `[`/`]` are used
+to denote [arrays](#arrays).
 
 #### Values
 
