@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to remove one or more event fields.
+description: Accepts `log` events and allows you to remove one or more log fields.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to remove one or more event fie
 ![][images.remove_fields_transform]
 
 
-The `remove_fields` transform accepts [`log`][docs.log_event] events and allows you to remove one or more event fields.
+The `remove_fields` transform accepts [`log`][docs.log_event] events and allows you to remove one or more log fields.
 
 ## Config File
 
@@ -53,7 +53,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] events and allows 
   # * no default
   inputs = ["my-source-id"]
 
-  # The field names to drop.
+  # The log field names to drop.
   # 
   # * required
   # * no default
@@ -69,7 +69,7 @@ The `remove_fields` transform accepts [`log`][docs.log_event] events and allows 
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "remove_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `fields` | `[string]` | The field names to drop.<br />`required` `example: ["field1", "field2"]` |
+| `fields` | `[string]` | The log field names to drop.<br />`required` `example: ["field1", "field2"]` |
 
 ## How It Works
 
@@ -103,9 +103,7 @@ issue, please:
 Finally, consider the following alternatives:
 
 * [`add_fields` transform][docs.add_fields_transform]
-* [`add_tags` transform][docs.add_tags_transform]
 * [`lua` transform][docs.lua_transform]
-* [`remove_tags` transform][docs.remove_tags_transform]
 
 ## Resources
 
@@ -114,13 +112,11 @@ Finally, consider the following alternatives:
 
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
-[docs.add_tags_transform]: ../../../usage/configuration/transforms/add_tags.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

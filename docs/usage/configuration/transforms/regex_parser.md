@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to parse a field's value with a Regular Expression.
+description: Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to parse a field's value with a
 ![][images.regex_parser_transform]
 
 
-The `regex_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex].
+The `regex_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a log field's value with a [Regular Expression][url.regex].
 
 ## Config File
 
@@ -87,13 +87,13 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   # * no default
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
-  # If the `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The field to parse.
+  # The log field to parse.
   # 
   # * optional
   # * default: "message"
@@ -104,8 +104,9 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   #
 
   [transforms.regex_parser_transform.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -130,10 +131,10 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
-| `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
+| `drop_field` | `bool` | If the specified `field` should be dropped (removed) after parsing.<br />`default: true` |
+| `field` | `string` | The log field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 

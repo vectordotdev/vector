@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to parse a field value with Grok.
+description: Accepts `log` events and allows you to parse a log field value with Grok.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to parse a field value with Gro
 ![][images.grok_parser_transform]
 
 
-The `grok_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok].
+The `grok_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a log field value with [Grok][url.grok].
 
 ## Config File
 
@@ -87,13 +87,13 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # * no default
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
-  # If `true` will drop the `field` after parsing.
+  # If `true` will drop the specified `field` after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The field to execute the `pattern` against. Must be a `string` value.
+  # The log field to execute the `pattern` against. Must be a `string` value.
   # 
   # * optional
   # * default: "message"
@@ -104,8 +104,9 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   #
 
   [transforms.grok_parser_transform.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -130,10 +131,10 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If `true` will drop the `field` after parsing.<br />`default: true` |
-| `field` | `string` | The field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
+| `drop_field` | `bool` | If `true` will drop the specified `field` after parsing.<br />`default: true` |
+| `field` | `string` | The log field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## How It Works
 

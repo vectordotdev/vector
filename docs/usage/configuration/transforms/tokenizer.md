@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
+description: Accepts `log` events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to tokenize a field's value by 
 ![][images.tokenizer_transform]
 
 
-The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
+The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
 
 ## Config File
 
@@ -81,7 +81,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   # * no default
   inputs = ["my-source-id"]
 
-  # The field names assigned to the resulting tokens, in order.
+  # The log field names assigned to the resulting tokens, in order.
   # 
   # * required
   # * no default
@@ -93,7 +93,7 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   # * default: true
   drop_field = true
 
-  # The field to tokenize.
+  # The log field to tokenize.
   # 
   # * optional
   # * default: "message"
@@ -104,8 +104,9 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
   #
 
   [transforms.tokenizer_transform.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -128,12 +129,12 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 | **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `must be: "tokenizer"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
+| `field_names` | `[string]` | The log field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
 | `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
-| `field` | `string` | The field to tokenize.<br />`default: "message"` |
+| `field` | `string` | The log field to tokenize.<br />`default: "message"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 

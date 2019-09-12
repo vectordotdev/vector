@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` and `metric` events and allows you to filter events by a field's value.
+description: Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 ---
 
 <!--
@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][url.new_field_filter_transform_i
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value.
+The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a log field's value.
 
 ## Config File
 
@@ -62,7 +62,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
   # * no default
   inputs = ["my-source-id"]
 
-  # The target field to compare against the `value`.
+  # The target log field to compare against the `value`.
   # 
   # * required
   # * no default
@@ -85,7 +85,7 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "field_filter"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `field` | `string` | The target field to compare against the `value`.<br />`required` `example: "file"` |
+| `field` | `string` | The target log field to compare against the `value`.<br />`required` `example: "file"` |
 | `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
 
 ## How It Works

@@ -1,5 +1,5 @@
 ---
-description: Accepts `metric` events and allows you to add one or more tags.
+description: Accepts `metric` events and allows you to add one or more metric tags.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `metric` events and allows you to add one or more tags.
 ![][images.add_tags_transform]
 
 
-The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows you to add one or more tags.
+The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows you to add one or more metric tags.
 
 ## Config File
 
@@ -122,9 +122,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`add_fields` transform][docs.add_fields_transform]
 * [`lua` transform][docs.lua_transform]
-* [`remove_fields` transform][docs.remove_fields_transform]
 * [`remove_tags` transform][docs.remove_tags_transform]
 
 ## Resources
@@ -133,13 +131,11 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_tags_transform_source]
 
 
-[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
