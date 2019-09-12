@@ -30,7 +30,7 @@ struct State {
     start: Option<Instant>,
     count: AtomicUsize,
     limit: u64,
-    message: Option<String>,
+    message: String,
 }
 
 impl Limit {
@@ -78,7 +78,7 @@ where
                 start: None,
                 count: AtomicUsize::new(0),
                 limit: DEFAULT_LIMIT,
-                message: None,
+                message: String::new(),
             };
 
             events.insert(id.clone(), state);
@@ -95,27 +95,23 @@ where
     }
 
     fn enabled(&self, metadata: &Metadata, ctx: Context<S>) -> bool {
-        if is_limited(metadata) {
-            let id = metadata.callsite();
-            let events = self.events.read().expect("lock poisoned!");
+        let events = self.events.read().expect("lock poisoned!");
+        let id = metadata.callsite();
 
+        if events.contains_key(&id) {
             // check if the event exists within the map, if it does
             // that means we are currently rate limiting it.
             if let Some(state) = events.get(&id) {
                 let start = state.start.unwrap_or_else(|| Instant::now());
 
                 if start.elapsed().as_secs() < state.limit {
-                    if state.count.load(Ordering::SeqCst) == 1 {
-                        let message = if let Some(event_message) = &state.message {
-                            format!("{:?} is being rate limited.", event_message)
-                        } else {
-                            format!("unknown message is being rate limited.")
-                        };
+                    if state.count.load(Ordering::Acquire) == 1 {
+                        let message = format!("{:?} is being rate limited.", state.message);
 
                         self.create_event(&id, &ctx, message);
                     }
 
-                    let prev = state.count.fetch_add(1, Ordering::SeqCst);
+                    let prev = state.count.fetch_add(1, Ordering::Relaxed);
 
                     if prev == 0 {
                         return true;
@@ -126,26 +122,20 @@ where
                     let mut events = self.events.write().expect("lock poisoned!");
 
                     if let Some(state) = events.remove(&id) {
-                        let message = if let Some(event_message) = &state.message {
-                            format!(
-                                "{:?} {:?} events were rate limited.",
-                                state.count, event_message
-                            )
-                        } else {
-                            format!("{:?} unknown messages were rate limited.", state.count)
-                        };
+                        let message = format!(
+                            "{:?} {:?} events were rate limited.",
+                            state.count, state.message
+                        );
 
                         self.create_event(&id, &ctx, message);
                     }
                 }
 
-                false
-            } else {
-                true
+                return false;
             }
-        } else {
-            true
         }
+
+        true
     }
 
     fn on_event(&self, event: &Event, _ctx: Context<S>) {
@@ -164,7 +154,9 @@ where
                     start: Some(start),
                     count: AtomicUsize::new(1),
                     limit: limit as u64,
-                    message: limit_visitor.message,
+                    message: limit_visitor
+                        .message
+                        .unwrap_or_else(|| event.metadata().name().into()),
                 };
 
                 events.insert(id, state);
