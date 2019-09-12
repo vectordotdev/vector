@@ -448,7 +448,7 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(config.host)).unwrap();
+        block_on(flush(&config.host)).unwrap();
 
         let client = SyncClientBuilder::new().build().unwrap();
 
@@ -477,15 +477,30 @@ mod integration_tests {
 
     #[test]
     fn insert_events() {
-        let index = gen_index();
-        let config = ElasticSearchConfig {
-            host: "http://localhost:9200/".into(),
-            index: Some(index.clone()),
+        run_insert_tests(ElasticSearchConfig {
+            host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
             ..Default::default()
-        };
+        });
+    }
+
+    #[test]
+    fn insert_events_on_aws() {
+        let url = "http://localhost:4571";
+        run_insert_tests(ElasticSearchConfig {
+            host: url.into(),
+            batch_size: Some(1),
+            provider: Some(Provider::Aws),
+            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
+            ..Default::default()
+        });
+    }
+
+    fn run_insert_tests(mut config: ElasticSearchConfig) {
+        let index = gen_index();
+        config.index = Some(index.clone());
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
@@ -495,9 +510,12 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(config.host)).unwrap();
+        block_on(flush(&config.host)).unwrap();
 
-        let client = SyncClientBuilder::new().build().unwrap();
+        let client = SyncClientBuilder::new()
+            .static_node(config.host)
+            .build()
+            .unwrap();
 
         let response = client
             .search::<Value>()
@@ -523,7 +541,7 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: String) -> impl Future<Item = (), Error = String> {
+    fn flush(host: &str) -> impl Future<Item = (), Error = String> {
         let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
@@ -540,5 +558,4 @@ mod integration_tests {
                 }
             })
     }
-
 }
