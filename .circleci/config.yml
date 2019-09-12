@@ -127,7 +127,7 @@ jobs:
   #         command: |
   #           export VERSION=$(make version)
   #           export FEATURES="jemallocator"
-  #           make build-archive 
+  #           make build-archive
   #     - persist_to_workspace:
   #         root: target/artifacts
   #         paths:
@@ -382,6 +382,7 @@ jobs:
             export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-docker
+          no_output_timeout: 30m
 
   release-github:
     docker:
