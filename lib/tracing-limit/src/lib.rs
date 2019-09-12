@@ -5,7 +5,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         RwLock,
     },
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 use tracing_core::{
     callsite::Identifier,
@@ -26,9 +26,9 @@ pub struct Limit {
 
 #[derive(Debug)]
 struct State {
-    start: usize,
+    start: Instant,
     count: AtomicUsize,
-    limit: usize,
+    limit: Duration,
     message: Option<String>,
 }
 
@@ -70,10 +70,7 @@ where
             .iter()
             .any(|f| f.name() == RATE_LIMIT_FIELD)
         {
-            let start = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as usize;
+            let start = Instant::now();
 
             let id = metadata.callsite();
 
@@ -82,7 +79,7 @@ where
             let state = State {
                 start,
                 count: AtomicUsize::new(0),
-                limit: 5,
+                limit: Duration::from_secs(5),
                 message: None,
             };
 
@@ -107,10 +104,7 @@ where
             // check if the event exists within the map, if it does
             // that means we are currently rate limiting it.
             if let Some(state) = events.get(&id) {
-                let ts = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as usize;
+                let ts = Instant::now();
 
                 if ts - state.start < state.limit {
                     if state.count.load(Ordering::SeqCst) == 1 {
@@ -162,10 +156,7 @@ where
             event.record(&mut limit_visitor);
 
             if let Some(limit) = limit_visitor.limit {
-                let start = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as usize;
+                let start = Instant::now();
 
                 let id = event.metadata().callsite();
 
@@ -174,7 +165,7 @@ where
                 let state = State {
                     start,
                     count: AtomicUsize::new(1),
-                    limit,
+                    limit: Duration::from_secs(limit as u64),
                     message: limit_visitor.message,
                 };
 
