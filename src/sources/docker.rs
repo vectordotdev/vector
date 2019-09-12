@@ -697,6 +697,28 @@ mod tests {
     use super::*;
     use crate::test_util::{self, collect_n, trace_init};
 
+    fn pull(image: &str, docker: &Docker, rt: &mut tokio::runtime::Runtime) {
+        let list_option = shiplift::ImageListOptions::builder()
+            .filter_name(image)
+            .build();
+
+        if let Ok(images) = rt
+            .block_on(docker.images().list(&list_option))
+            .map_err(|e| error!(%e))
+        {
+            if images.is_empty() {
+                let options = shiplift::PullOptions::builder()
+                    .image(image)
+                    .tag("latest")
+                    .build();
+                let _ = rt
+                    .block_on(docker.images().pull(&options).collect())
+                    .map_err(|e| error!(%e));
+            }
+        }
+        // Try running the tests in any case.
+    }
+
     /// None if docker is not present on the system
     fn source<'a, L: Into<Option<&'a str>>>(
         name: &str,
@@ -799,6 +821,7 @@ mod tests {
         docker: &Docker,
         rt: &mut tokio::runtime::Runtime,
     ) -> Option<String> {
+        pull("busybox", docker, rt);
         let mut options = shiplift::builder::ContainerOptions::builder("busybox");
         options
             .name(name)
