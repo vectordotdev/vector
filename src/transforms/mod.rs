@@ -11,6 +11,7 @@ pub mod regex_parser;
 pub mod remove_fields;
 pub mod sampler;
 pub mod tokenizer;
+pub mod map_fields;
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
