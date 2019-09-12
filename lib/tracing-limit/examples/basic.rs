@@ -2,12 +2,15 @@
 extern crate tracing;
 
 use tracing::Dispatch;
-use tracing_limit::LimitSubscriber;
+use tracing_limit::Limit;
+use tracing_subscriber::layer::SubscriberExt;
 
 fn main() {
-    let subscriber = tracing_fmt::FmtSubscriber::builder().finish();
-    tracing_env_logger::try_init().expect("init log adapter");
-    let subscriber = LimitSubscriber::new(subscriber);
+    let subscriber = tracing_fmt::FmtSubscriber::builder()
+        .with_filter(tracing_fmt::filter::EnvFilter::from("trace"))
+        .finish()
+        .with(Limit::default());
+
     let dispatch = Dispatch::new(subscriber);
 
     tracing::dispatcher::with_default(&dispatch, || {
@@ -18,6 +21,7 @@ fn main() {
                 count = &i,
                 rate_limit_secs = 5 as u64
             );
+            trace!("this field is not rate limited!");
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }
     })
