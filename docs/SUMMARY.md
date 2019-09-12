@@ -61,6 +61,7 @@
     * [vector source][docs.vector_source]
   * [Transforms](usage/configuration/transforms/README.md)
     * [add_fields transform][docs.add_fields_transform]
+    * [add_tags transform][docs.add_tags_transform]
     * [coercer transform][docs.coercer_transform]
     * [field_filter transform][docs.field_filter_transform]
     * [grok_parser transform][docs.grok_parser_transform]
@@ -69,6 +70,7 @@
     * [lua transform][docs.lua_transform]
     * [regex_parser transform][docs.regex_parser_transform]
     * [remove_fields transform][docs.remove_fields_transform]
+    * [remove_tags transform][docs.remove_tags_transform]
     * [sampler transform][docs.sampler_transform]
     * [tokenizer transform][docs.tokenizer_transform]
   * [Sinks](usage/configuration/sinks/README.md)
@@ -113,6 +115,7 @@
 
 
 [docs.add_fields_transform]: ./usage/configuration/transforms/add_fields.md
+[docs.add_tags_transform]: ./usage/configuration/transforms/add_tags.md
 [docs.aws_cloudwatch_logs_sink]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
 [docs.aws_kinesis_streams_sink]: ./usage/configuration/sinks/aws_kinesis_streams.md
 [docs.aws_s3_sink]: ./usage/configuration/sinks/aws_s3.md
@@ -135,6 +138,7 @@
 [docs.prometheus_sink]: ./usage/configuration/sinks/prometheus.md
 [docs.regex_parser_transform]: ./usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ./usage/configuration/transforms/remove_fields.md
+[docs.remove_tags_transform]: ./usage/configuration/transforms/remove_tags.md
 [docs.sampler_transform]: ./usage/configuration/transforms/sampler.md
 [docs.splunk_hec_sink]: ./usage/configuration/sinks/splunk_hec.md
 [docs.statsd_source]: ./usage/configuration/sources/statsd.md

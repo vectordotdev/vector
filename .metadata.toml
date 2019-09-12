@@ -297,9 +297,9 @@ type = "string"
 examples = ["user_id"]
 null = true
 description = """\
-The field name to use for the topic key. If unspecified, the key would not \
-be added to the events. If the message has null key, then this field would \
-not be added to the event.\
+The log field name to use for the topic key. If unspecified, the key would not \
+be added to the log event. If the message has null key, then this field would \
+not be added to the log event.\
 """
 
 [sources.kafka.options.auto_offset_reset]
@@ -529,7 +529,7 @@ The timeout before a connection is forcefully closed during shutdown.\
 # transforms.add_fields
 # ------------------------------------------------------------------------------
 [transforms.add_fields]
-allow_you_to_description = "add one or more fields"
+allow_you_to_description = "add one or more log fields"
 function_categories = ["change_fields"]
 guides = []
 input_types = ["log"]
@@ -558,15 +558,45 @@ examples = [
   {name = "my_list", value = ["first", "second", "third"]},
 ]
 description = """\
-A key/value pair representing the new field to be added. Accepts all \
+A key/value pair representing the new log fields to be added. Accepts all \
 [supported types][docs.config_value_types]. Use `.` for adding nested fields.\
+"""
+
+# ------------------------------------------------------------------------------
+# transforms.add_tags
+# ------------------------------------------------------------------------------
+[transforms.add_tags]
+allow_you_to_description = "add one or more metric tags"
+function_categories = ["change_tags"]
+guides = []
+input_types = ["metric"]
+output_types = ["metric"]
+resources = []
+
+[transforms.add_tags.options.tags]
+type = "table"
+null = false
+description = """\
+A table of key/value pairs representing the tags to be added to the \
+metric.\
+"""
+
+[transforms.add_tags.options.tags.options."*"]
+type = "*"
+null = false
+examples = [
+  {name = "my_tag", value = "my value"},
+  {name = "my_env_tag", value = "${ENV_VAR}"},
+]
+description = """\
+A key/value pair representing the new tag to be added.\
 """
 
 # ------------------------------------------------------------------------------
 # transforms.coercer
 # ------------------------------------------------------------------------------
 [transforms.coercer]
-allow_you_to_description = "coerce event fields into fixed types"
+allow_you_to_description = "coerce log fields into fixed types"
 function_categories = ["coerce"]
 guides = []
 input_types = ["log"]
@@ -576,7 +606,7 @@ resources = []
 [transforms.coercer.options.types]
 type = "table"
 null = true
-description = "Key/Value pairs representing mapped field types."
+description = "Key/Value pairs representing mapped log field types."
 
 [transforms.coercer.options.types.options."*"]
 type = "string"
@@ -592,15 +622,16 @@ examples = [
 ]
 null = false
 description = """\
-A definition of field type conversions. They key is the field name and the value \
-is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+A definition of log field type conversions. They key is the log field name and \
+the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+supported for the `timestamp` type.\
 """
 
 # ------------------------------------------------------------------------------
 # transforms.field_filter
 # ------------------------------------------------------------------------------
 [transforms.field_filter]
-allow_you_to_description = "filter events by a field's value"
+allow_you_to_description = "filter events by a log field's value"
 beta = true
 function_categories = ["filter"]
 guides = []
@@ -612,7 +643,7 @@ resources = []
 type = "string"
 examples = ["file"]
 null = false
-description = "The target field to compare against the `value`."
+description = "The target log field to compare against the `value`."
 
 [transforms.field_filter.options.value]
 type = "string"
@@ -627,7 +658,7 @@ will be permitted, otherwise it is dropped.\
 # transforms.grok_parser
 # ------------------------------------------------------------------------------
 [transforms.grok_parser]
-allow_you_to_description = "parse a field value with [Grok][url.grok]"
+allow_you_to_description = "parse a log field value with [Grok][url.grok]"
 function_categories = ["parse"]
 guides = []
 input_types = ["log"]
@@ -642,7 +673,7 @@ type = "bool"
 default = true
 null = false
 description = """\
-If `true` will drop the `field` after parsing.\
+If `true` will drop the specified `field` after parsing.\
 """
 
 [transforms.grok_parser.options.field]
@@ -650,7 +681,7 @@ type = "string"
 default = "message"
 null = false
 description = """\
-The field to execute the `pattern` against. Must be a `string` value.\
+The log field to execute the `pattern` against. Must be a `string` value.\
 """
 
 [transforms.grok_parser.options.pattern]
@@ -662,7 +693,7 @@ description = "The [Grok pattern][url.grok_patterns]"
 [transforms.grok_parser.options.types]
 type = "table"
 null = true
-description = "Key/Value pairs representing mapped field types."
+description = "Key/Value pairs representing mapped log field types."
 
 [transforms.grok_parser.options.types.options."*"]
 type = "string"
@@ -678,15 +709,16 @@ examples = [
 ]
 null = false
 description = """\
-A definition of mapped field types. They key is the field name and the value \
-is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+A definition of mapped log field types. They key is the log field name and \
+the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+supported for the `timestamp` type.\
 """
 
 # ------------------------------------------------------------------------------
 # transforms.json_parser
 # ------------------------------------------------------------------------------
 [transforms.json_parser]
-allow_you_to_description = "parse a field value as JSON"
+allow_you_to_description = "parse a log field value as JSON"
 function_categories = ["parse_json"]
 guides = []
 input_types = ["log"]
@@ -707,7 +739,7 @@ type = "string"
 default = "message"
 null = false
 description = """\
-The field decode as JSON. Must be a `string` value.\
+The log field to decode as JSON. Must be a `string` value type.\
 """
 
 # ------------------------------------------------------------------------------
@@ -822,7 +854,7 @@ function.\
 # ------------------------------------------------------------------------------
 [transforms.regex_parser]
 allow_you_to_description = """\
-parse a field's value with a [Regular Expression][url.regex]\
+parse a log field's value with a [Regular Expression][url.regex]\
 """
 function_categories = ["parse"]
 guides = []
@@ -834,13 +866,13 @@ resources = []
 type = "bool"
 default = true
 null = false
-description = "If the `field` should be dropped (removed) after parsing."
+description = "If the specified `field` should be dropped (removed) after parsing."
 
 [transforms.regex_parser.options.field]
 type = "string"
 default = "message"
 null = false
-description = "The field to parse."
+description = "The log field to parse."
 
 [transforms.regex_parser.options.regex]
 type = "string"
@@ -857,7 +889,7 @@ The Regular Expression to apply. Do not inlcude the leading or trailing `/`.\
 [transforms.regex_parser.options.types]
 type = "table"
 null = true
-description = "Key/Value pairs representing mapped field types."
+description = "Key/Value pairs representing mapped log field types."
 
 [transforms.regex_parser.options.types.options."*"]
 type = "string"
@@ -873,8 +905,9 @@ examples = [
 ]
 null = false
 description = """\
-A definition of mapped field types. They key is the field name and the value \
-is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+A definition of mapped log field types. They key is the log field name and \
+the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+supported for the `timestamp` type.\
 """
 
 [[transforms.regex_parser.resources]]
@@ -889,16 +922,31 @@ short_link = "rust_regex_syntax"
 # transforms.remove_fields
 # ------------------------------------------------------------------------------
 [transforms.remove_fields]
-allow_you_to_description = "remove one or more event fields"
+allow_you_to_description = "remove one or more log fields"
 function_categories = ["change_fields"]
-input_types = ["log", "metric"]
-output_types = ["log", "metric"]
+input_types = ["log"]
+output_types = ["log"]
 
 [transforms.remove_fields.options.fields]
 type = "[string]"
 examples = [["field1", "field2"]]
 null = false
-description = "The field names to drop."
+description = "The log field names to drop."
+
+# ------------------------------------------------------------------------------
+# transforms.remove_tags
+# ------------------------------------------------------------------------------
+[transforms.remove_tags]
+allow_you_to_description = "remove one or more metric tags"
+function_categories = ["change_tags"]
+input_types = ["metric"]
+output_types = ["metric"]
+
+[transforms.remove_tags.options.tags]
+type = "[string]"
+examples = [["tag1", "tag2"]]
+null = false
+description = "The tag names to drop."
 
 # ------------------------------------------------------------------------------
 # transforms.sampler
@@ -937,7 +985,7 @@ will be dropped.\
 # ------------------------------------------------------------------------------
 [transforms.tokenizer]
 allow_you_to_description = """\
-tokenize a field's value by splitting on white space, ignoring special \
+tokenize a log field's value by splitting on white space, ignoring special \
 wrapping characters, and zipping the tokens into ordered field names\
 """
 function_categories = ["parse"]
@@ -948,13 +996,13 @@ output_types = ["log"]
 type = "string"
 default = "message"
 null = false
-description = "The field to tokenize."
+description = "The log field to tokenize."
 
 [transforms.tokenizer.options.field_names]
 type = "[string]"
 examples = [["timestamp", "level", "message"]]
 null = false
-description = "The field names assigned to the resulting tokens, in order."
+description = "The log field names assigned to the resulting tokens, in order."
 
 [transforms.tokenizer.options.drop_field]
 type = "bool"
@@ -965,7 +1013,7 @@ description = "If `true` the `field` will be dropped after parsing."
 [transforms.tokenizer.options.types]
 type = "table"
 null = true
-description = "Key/Value pairs representing mapped field types."
+description = "Key/Value pairs representing mapped log field types."
 
 [transforms.tokenizer.options.types.options."*"]
 type = "string"
@@ -981,8 +1029,9 @@ examples = [
 ]
 null = false
 description = """\
-A definition of mapped field types. They key is the field name and the value \
-is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+A definition of mapped log field types. They key is the log field name and \
+the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+supported for the `timestamp` type.\
 """
 
 # ------------------------------------------------------------------------------
@@ -1098,7 +1147,7 @@ is dynamic based on if the event is structured or not.\
 type = "string"
 examples = ["user_id"]
 null = true
-description = "The event field used as the Kinesis record's partition key value."
+description = "The log field used as the Kinesis record's partition key value."
 
 [sinks.aws_kinesis_streams.options.region]
 type = "string"
@@ -1542,8 +1591,8 @@ type = "string"
 examples = ["user_id"]
 null = false
 description = """\
-The field name to use for the topic key. If unspecified, the key will be \
-randomly generated. If the field does not exist on the event, a blank value \
+The log field name to use for the topic key. If unspecified, the key will be \
+randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
 

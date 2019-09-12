@@ -142,7 +142,7 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
   # * no default
   hostname = "127.0.0.0:5000"
 
-  # The event field used as the Kinesis record's partition key value.
+  # The log field used as the Kinesis record's partition key value.
   # 
   # * optional
   # * no default
@@ -270,7 +270,7 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 | **OPTIONAL** - General | | |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
-| `partition_key_field` | `string` | The event field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.<br />`no default` `example: "user_id"` |
+| `partition_key_field` | `string` | The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.<br />`no default` `example: "user_id"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |

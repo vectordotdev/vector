@@ -1,5 +1,5 @@
 ---
-description: 'A deeper look into Vector''s internal log event.'
+description: 'A deeper look into Vector''s internal log event data model.'
 ---
 
 # Log Event
@@ -7,20 +7,19 @@ description: 'A deeper look into Vector''s internal log event.'
 ![][images.data-model-log]
 
 As mentioned in the [data model page][docs.data-model], Vector's events must
-be one of 2 types: a `LogEvent` or a `Metric`. This page provides a deeper dive
-into Vector's `LogEvent` type and how they flow through Vector internally.
-Understanding this goes a long way in properly [configuring][docs.configuration]
-Vector for your use case.
+be one of 2 types: a `log` or a `metric`. This page provides a deeper dive
+into Vector's `log` event type. Understanding this goes a long way in properly
+[configuring][docs.configuration] Vector for your use case.
 
-## Structure
+## Schema
 
-Vector characterizes a `log` as a _flat_ map of arbitrary fields:
+Vector characterizes a `log` event as a _flat_ map of fields:
 
 {% code-tabs %}
 {% code-tabs-item title="log.proto" %}
 ```coffeescript
 message Log {
-  map<string, Value> structured = 1;
+  map<string, Value> fields = 1;
 }
 
 message Value {
@@ -35,18 +34,6 @@ message Value {
 }
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="log.json" %}
-```javascript
-{
-    "timestamp": "2019-05-02T00:23:22Z",
-    "parent.child": "...",
-    "message": "message",
-    "host": "my.host.com",
-    "key": "value",
-    "parent.child": "value"
-}
-```
-{% endcode-tabs-item %}
 {% endcode-tabs %}
 
 You can view a complete definition in the [event proto \
@@ -57,11 +44,62 @@ free to use whatever fields and shape you like. In places where Vector must
 operate on a field, Vector will default to the [default schema](#default-schema)
 and provide options to specify custom field names.
 
-### Nested Keys
+### Fields
 
-For simplicity and performance reasons, Vector represents nested keys with a
-`.` delimiter. This means that when Vector ingests nested data, it will
-flatten the keys and delimit hierarchies with a `.` character. Additionally,
+A "field" represents a [key](#keys)/[value](#values) pair and a `log` event is
+comprised of many fields. 
+
+#### Keys
+
+Keys are `string` representations of the field name.
+
+##### Special Characters
+
+`.` is used to denote [field nesting](#nested-fields) and `[`/`]` are used
+to denote [arrays](#arrays).
+
+#### Values
+
+A field must contains a value of one of the following types.
+
+##### Strings
+
+Strings are UTF8 compatible and are only bounded by the available system
+memory.
+
+##### Ints
+
+Integers are signed integers up to 64 bits.
+
+##### Floats
+
+Floats are signed floats up to 64 bits.
+
+##### Booleans
+
+Booleans represent binary true/false values.
+
+##### Timestamps
+
+Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
+stored as UTC.
+
+{% hint style="warning" %}
+**A note about timestamps without timezone information:**
+
+If Vector receives a timestamp that does not contain timezone information
+Vector assumes the timestamp is in local time, and will convert the timestamp
+to UTC from the local time. It is important that the host system contain
+time zone data files to properly determine the local time zone. This is
+typically installed through the `tzdata` package. See [issue 551][url.issue_551]
+for more info.
+{% endhint %}
+
+### Nested fields
+
+For simplicity and performance reasons, Vector represents nested fields with a
+`.` delimiter. This means that when Vector ingests nested fields, it will
+flatten the fields and delimit hierarchies with a `.` character. Additionally,
 when Vector outputs data it will explode the map back into it's original nested
 structure.
 
@@ -112,8 +150,8 @@ This makes it _much_ easier to access and operate on nested fields in Vector's
 ### Arrays
 
 For simplicity and performance reasons, Vector represents arrays with indexed
-keys. This means that when Vector ingests arrays it will flatten the items
-into keys containing the index. Additionally, when Vector outputs data it will
+fields. This means that when Vector ingests arrays it will flatten the items
+into fields containing the index. Additionally, when Vector outputs data it will
 explode the array back into it's original array structure.
 
 For example, if Vector ingests the following data:
@@ -185,55 +223,11 @@ The output will contain a `null` value for `array[1]` like so:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-### Special Characters
-
-As described above in the [Nested Keys](#nested-keys) section, only `.` is
-treated as a special character to represent nesting.
-
-## Types
-
-Externally, Vector supports all [JSON types][url.json_types] and
-[TOML types][url.toml_types]. These types are mapped to Vector's internal
-types which are described below.
-
-### String
-
-Strings are UTF8 compatible and are only bounded by the available system
-memory.
-
-### Int
-
-Integers are signed integers up to 64 bits.
-
-### Float
-
-Floats are signed floats up to 64 bits.
-
-### Boolean
-
-Booleans represent binary true/false values.
-
-### Timestamp
-
-Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
-stored as UTC.
-
-{% hint style="warning" %}
-**A note about timestamps without timezone information:**
-
-If Vector receives a timestamp that does not contain timezone information
-Vector assumes the timestamp is in local time, and will convert the timestamp
-to UTC from the local time. It is important that the host system contain
-time zone data files to properly determine the local time zone. This is
-typically installed through the `tzdata` package. See [issue 551][url.issue_551]
-for more info.
-{% endhint %}
-
 ## Default Schema
 
 In all cases where a component must operate on a key, the following schema is
-used as the default. Each component will provide configuration options to
-override the keys used, if relevant.
+used as the _default_. Each component will provide configuration options to
+override the fields used, if relevant.
 
 | Name        | Type                      | Description                                                                                                                                                                     |
 |:------------|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -247,6 +241,21 @@ As mentioned in the [structure](#structure) section, Vector does require any
 specific fields. You are free to use [transforms][docs.transforms] to add,
 remove, or rename fields as desired.
 
+## Examples
+
+{% code-tabs-item title="log.json" %}
+```javascript
+{
+    "timestamp": "2019-05-02T00:23:22Z",
+    "parent.child": "...",
+    "message": "message",
+    "host": "my.host.com",
+    "key": "value",
+    "parent.child": "value"
+}
+```
+{% endcode-tabs-item %}
+
 
 [docs.configuration]: ../../usage/configuration
 [docs.data-model]: ../../about/data-model
@@ -256,6 +265,4 @@ remove, or rename fields as desired.
 [images.data-model-log]: ../../assets/data-model-log.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.issue_551]: https://github.com/timberio/vector/issues/551
-[url.json_types]: https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax
 [url.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
-[url.toml_types]: https://github.com/toml-lang/toml#table-of-contents

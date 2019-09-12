@@ -282,9 +282,9 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
-  # The field name to use for the topic key. If unspecified, the key would not be
-  # added to the events. If the message has null key, then this field would not
-  # be added to the event.
+  # The log field name to use for the topic key. If unspecified, the key would
+  # not be added to the log event. If the message has null key, then this field
+  # would not be added to the log event.
   # 
   # * optional
   # * no default
@@ -521,7 +521,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   #
 
   [transforms.add_fields.fields]
-    # A key/value pair representing the new field to be added. Accepts all
+    # A key/value pair representing the new log fields to be added. Accepts all
     # supported types. Use `.` for adding nested fields.
     # 
     # * required
@@ -534,6 +534,37 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
+
+[transforms.add_tags]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "add_tags"
+  type = "add_tags"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  #
+  # Tags
+  #
+
+  [transforms.add_tags.tags]
+    # A key/value pair representing the new tag to be added.
+    # 
+    # * required
+    # * no default
+    my_tag = "my value"
+    my_env_tag = "${ENV_VAR}"
 
 [transforms.coercer]
   #
@@ -559,9 +590,9 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   #
 
   [transforms.coercer.types]
-    # A definition of field type conversions. They key is the field name and the
-    # value is the type. `strftime` specifiers are supported for the `timestamp`
-    # type.
+    # A definition of log field type conversions. They key is the log field name
+    # and the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -589,7 +620,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   inputs = ["my-source-id"]
 
-  # The target field to compare against the `value`.
+  # The target log field to compare against the `value`.
   # 
   # * required
   # * no default
@@ -627,13 +658,13 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 
-  # If `true` will drop the `field` after parsing.
+  # If `true` will drop the specified `field` after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The field to execute the `pattern` against. Must be a `string` value.
+  # The log field to execute the `pattern` against. Must be a `string` value.
   # 
   # * optional
   # * default: "message"
@@ -644,8 +675,9 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   #
 
   [transforms.grok_parser.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -680,7 +712,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   drop_invalid = true
 
-  # The field decode as JSON. Must be a `string` value.
+  # The log field to decode as JSON. Must be a `string` value type.
   # 
   # * optional
   # * default: "message"
@@ -813,13 +845,13 @@ end
   # * no default
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
-  # If the `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The field to parse.
+  # The log field to parse.
   # 
   # * optional
   # * default: "message"
@@ -830,8 +862,9 @@ end
   #
 
   [transforms.regex_parser.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -859,11 +892,32 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The field names to drop.
+  # The log field names to drop.
   # 
   # * required
   # * no default
   fields = ["field1", "field2"]
+
+[transforms.remove_tags]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "remove_tags"
+  type = "remove_tags"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The tag names to drop.
+  # 
+  # * required
+  # * no default
+  tags = ["tag1", "tag2"]
 
 [transforms.sampler]
   # The component type
@@ -915,7 +969,7 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # The field names assigned to the resulting tokens, in order.
+  # The log field names assigned to the resulting tokens, in order.
   # 
   # * required
   # * no default
@@ -927,7 +981,7 @@ end
   # * default: true
   drop_field = true
 
-  # The field to tokenize.
+  # The log field to tokenize.
   # 
   # * optional
   # * default: "message"
@@ -938,8 +992,9 @@ end
   #
 
   [transforms.tokenizer.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -1177,7 +1232,7 @@ end
   # * no default
   hostname = "127.0.0.0:5000"
 
-  # The event field used as the Kinesis record's partition key value.
+  # The log field used as the Kinesis record's partition key value.
   # 
   # * optional
   # * no default
@@ -2111,8 +2166,8 @@ end
   # * no default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
-  # The field name to use for the topic key. If unspecified, the key will be
-  # randomly generated. If the field does not exist on the event, a blank value
+  # The log field name to use for the topic key. If unspecified, the key will be
+  # randomly generated. If the field does not exist on the log, a blank value
   # will be used.
   # 
   # * required

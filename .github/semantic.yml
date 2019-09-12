@@ -24,6 +24,7 @@ scopes:
   - vector source
   # transforms
   - add_fields transform
+  - add_tags transform
   - coercer transform
   - field_filter transform
   - grok_parser transform
@@ -32,6 +33,7 @@ scopes:
   - lua transform
   - regex_parser transform
   - remove_fields transform
+  - remove_tags transform
   - sampler transform
   - tokenizer transform
   # sinks

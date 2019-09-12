@@ -93,8 +93,8 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
   # * no default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
-  # The field name to use for the topic key. If unspecified, the key will be
-  # randomly generated. If the field does not exist on the event, a blank value
+  # The log field name to use for the topic key. If unspecified, the key will be
+  # randomly generated. If the field does not exist on the log, a blank value
   # will be used.
   # 
   # * required
@@ -169,7 +169,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 | `type` | `string` | The component type<br />`required` `must be: "kafka"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the event, a blank value will be used.<br />`required` `example: "user_id"` |
+| `key_field` | `string` | The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.<br />`required` `example: "user_id"` |
 | `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
 | **OPTIONAL** - General | | |
 | `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |

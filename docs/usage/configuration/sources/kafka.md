@@ -96,9 +96,9 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
-  # The field name to use for the topic key. If unspecified, the key would not be
-  # added to the events. If the message has null key, then this field would not
-  # be added to the event.
+  # The log field name to use for the topic key. If unspecified, the key would
+  # not be added to the log event. If the message has null key, then this field
+  # would not be added to the log event.
   # 
   # * optional
   # * no default
@@ -126,7 +126,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 | `topics` | `[string]` | The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key would not be added to the events. If the message has null key, then this field would not be added to the event.<br />`no default` `example: "user_id"` |
+| `key_field` | `string` | The log field name to use for the topic key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event.<br />`no default` `example: "user_id"` |
 | `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
 
 ## Examples
