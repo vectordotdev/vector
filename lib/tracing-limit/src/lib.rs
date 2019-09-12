@@ -42,21 +42,30 @@ impl Limit {
 
         let message = tracing_core::field::display(message);
 
-        let values = [
-            (
-                &fields.field("message").unwrap(),
-                Some(&message as &dyn Value),
-            ),
-            (
+        if let Some(message_field) = fields.field("message") {
+            let values = [
+                (&message_field, Some(&message as &dyn Value)),
+                (
+                    &fields.field(RATE_LIMIT_FIELD).unwrap(),
+                    Some(&5 as &dyn Value),
+                ),
+            ];
+
+            let valueset = fields.value_set(&values);
+            let event = Event::new(metadata, &valueset);
+            ctx.event(&event);
+            drop(store);
+        } else {
+            let values = [(
                 &fields.field(RATE_LIMIT_FIELD).unwrap(),
                 Some(&5 as &dyn Value),
-            ),
-        ];
-        let valueset = fields.value_set(&values);
+            )];
 
-        let event = Event::new(metadata, &valueset);
-        ctx.event(&event);
-        drop(store);
+            let valueset = fields.value_set(&values);
+            let event = Event::new(metadata, &valueset);
+            ctx.event(&event);
+            drop(store);
+        }
     }
 }
 
