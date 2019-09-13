@@ -3,7 +3,7 @@ use bytes::Bytes;
 use futures::{stream, Future, Sink, Stream};
 use glob::{glob, Pattern};
 use indexmap::IndexMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Read, Seek, Write};
 use std::os::unix::fs::MetadataExt;
@@ -70,6 +70,8 @@ impl FileServer {
             .map(|e| Pattern::new(e.to_str().expect("no ability to glob")).unwrap())
             .collect::<Vec<_>>();
 
+        let mut known_small_files = HashSet::new();
+
         let mut existing_files = Vec::new();
         for include_pattern in &self.include {
             for path in glob(include_pattern.to_str().expect("no ability to glob"))
@@ -83,10 +85,11 @@ impl FileServer {
                     continue;
                 }
 
-                if let Ok(file_id) = self
-                    .fingerprinter
-                    .get_fingerprint_of_file(&path, &mut fingerprint_buffer)
-                {
+                if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
+                    &path,
+                    &mut fingerprint_buffer,
+                    &mut known_small_files,
+                ) {
                     existing_files.push((path, file_id));
                 }
             }
@@ -147,10 +150,11 @@ impl FileServer {
                             continue;
                         }
 
-                        if let Ok(file_id) = self
-                            .fingerprinter
-                            .get_fingerprint_of_file(&path, &mut fingerprint_buffer)
-                        {
+                        if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
+                            &path,
+                            &mut fingerprint_buffer,
+                            &mut known_small_files,
+                        ) {
                             if let Some(watcher) = fp_map.get_mut(&file_id) {
                                 // file fingerprint matches a watched file
                                 let was_found_this_cycle = watcher.file_findable();
@@ -405,6 +409,26 @@ impl Fingerprinter {
         }
         let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
         Ok(fingerprint)
+    }
+
+    fn get_fingerprint_or_log_error(
+        &self,
+        path: &PathBuf,
+        buffer: &mut Vec<u8>,
+        known_small_files: &mut HashSet<PathBuf>,
+    ) -> Option<FileFingerprint> {
+        self.get_fingerprint_of_file(path, buffer)
+            .map_err(|err| {
+                if err.kind() == io::ErrorKind::UnexpectedEof {
+                    if !known_small_files.contains(path) {
+                        warn!(message = "Ignoring file smaller than fingerprint_bytes", file = ?path);
+                        known_small_files.insert(path.clone());
+                    }
+                } else {
+                    error!(message = "Error reading file for fingerprinting", %err, file = ?path);
+                }
+            })
+            .ok()
     }
 }
 
