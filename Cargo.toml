@@ -120,7 +120,7 @@ exitcode = "1.1.2"
 snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
-shiplift = "0.5"
+shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "lucio/fix-encrypted-tcp" }
 owning_ref = "0.4.0"
 
 [build-dependencies]

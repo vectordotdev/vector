@@ -88,6 +88,8 @@ jobs:
       - image: yandex/clickhouse-server:19
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Test
           command: cargo test --all --features docker -- --test-threads 4
@@ -127,7 +129,7 @@ jobs:
   #         command: |
   #           export VERSION=$(make version)
   #           export FEATURES="jemallocator"
-  #           make build-archive 
+  #           make build-archive
   #     - persist_to_workspace:
   #         root: target/artifacts
   #         paths:
