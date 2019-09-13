@@ -53,7 +53,9 @@ module PostProcessors
     end
 
     def check!
-      verify_no_direct_links!
+      if !file_path.include?("SUMMARY.md")
+        verify_no_direct_links!
+      end
 
       link_names = content.scan(/\]\[([a-zA-Z0-9_\-\. ]*)\]/).flatten.uniq
 

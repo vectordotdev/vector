@@ -33,7 +33,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
-  topics = ["topic-1", "topic-2", "topic-3"]
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
   
   auto_offset_reset = "smallest"
   key_field = "user_id" # no default
@@ -76,11 +76,12 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   # * no default
   group_id = "consumer-group-name"
 
-  # The Kafka topics names to read events from.
+  # The Kafka topics names to read events from. Regex is supported if the topic
+  # begins with `^`.
   # 
   # * required
   # * no default
-  topics = ["topic-1", "topic-2", "topic-3"]
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
@@ -95,9 +96,9 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
-  # The field name to use for the topic key. If unspecified, the key would not be
-  # added to the events. If the message has null key, then this field would not
-  # be added to the event.
+  # The log field name to use for the topic key. If unspecified, the key would
+  # not be added to the log event. If the message has null key, then this field
+  # would not be added to the log event.
   # 
   # * optional
   # * no default
@@ -122,10 +123,10 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 | `type` | `string` | The component type<br />`required` `must be: "kafka"` |
 | `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.<br />`required` `example: (see above)` |
 | `group_id` | `string` | The consumer group name to be used to consume events from Kafka.<br />`required` `example: "consumer-group-name"` |
-| `topics` | `[string]` | The Kafka topics names to read events from.<br />`required` `example: (see above)` |
+| `topics` | `[string]` | The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.<br />`required` `example: (see above)` |
 | **OPTIONAL** | | |
 | `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key would not be added to the events. If the message has null key, then this field would not be added to the event.<br />`no default` `example: "user_id"` |
+| `key_field` | `string` | The log field name to use for the topic key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event.<br />`no default` `example: "user_id"` |
 | `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
 
 ## Examples
@@ -160,8 +161,8 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Delivery Guarantee
 
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
+if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
 
 ### Environment Variables
 
@@ -193,7 +194,7 @@ issue, please:
 * [**Source code**][url.kafka_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

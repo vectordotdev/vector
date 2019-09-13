@@ -39,22 +39,29 @@ pub enum ParseError {
     MissingRegionAndEndpoint,
 }
 
-impl TryFrom<RegionOrEndpoint> for Region {
+impl TryFrom<&RegionOrEndpoint> for Region {
     type Error = ParseError;
 
-    fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
-        match (r.region, r.endpoint) {
+    fn try_from(r: &RegionOrEndpoint) -> Result<Self, Self::Error> {
+        match (&r.region, &r.endpoint) {
             (Some(region), None) => region.parse().context(RegionParseError),
             (None, Some(endpoint)) => endpoint
                 .parse::<Uri>()
                 .map(|_| Region::Custom {
                     name: "custom".into(),
-                    endpoint,
+                    endpoint: endpoint.into(),
                 })
                 .context(EndpointParseError),
             (Some(_), Some(_)) => Err(ParseError::BothRegionAndEndpoint),
             (None, None) => Err(ParseError::MissingRegionAndEndpoint),
         }
+    }
+}
+
+impl TryFrom<RegionOrEndpoint> for Region {
+    type Error = ParseError;
+    fn try_from(r: RegionOrEndpoint) -> Result<Self, Self::Error> {
+        Region::try_from(&r)
     }
 }
 
@@ -119,7 +126,10 @@ mod tests {
         )
         .unwrap();
 
-        let region: Result<Region, super::ParseError> = config.inner.region.try_into();
-        assert!(region.is_err());
+        let region: Result<Region, ParseError> = config.inner.region.try_into();
+        match region {
+            Err(ParseError::MissingRegionAndEndpoint) => {}
+            other => panic!("assertion failed, wrong result {:?}", other),
+        }
     }
 }

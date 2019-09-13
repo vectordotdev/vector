@@ -63,7 +63,9 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
   # * no default
   inputs = ["my-source-id"]
 
-  # The maximum number of events allowed per second.
+  # The rate at which events will be forwarded, expressed as 1/N. For example,
+  # `rate = 10` means 1 out of every 10 events will be forwarded and the rest
+  # will be dropped.
   # 
   # * required
   # * no default
@@ -87,7 +89,7 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "sampler"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `rate` | `int` | The maximum number of events allowed per second.<br />`required` `example: 10` |
+| `rate` | `int` | The rate at which events will be forwarded, expressed as 1/N. For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.<br />`required` `example: 10` |
 | **OPTIONAL** | | |
 | `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 

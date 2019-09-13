@@ -5,8 +5,9 @@ services:
       ports:
         - "4568:4568"
         - "4582:4582"
+        - "4571:4571"
       environment:
-        SERVICES: kinesis:4568,cloudwatch:4582
+        SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571
     minio:
       image: minio/minio
       ports:

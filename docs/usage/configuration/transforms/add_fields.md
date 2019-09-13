@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to add one or more fields.
+description: Accepts `log` events and allows you to add one or more log fields.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to add one or more fields.
 ![][images.add_fields_transform]
 
 
-The `add_fields` transform accepts [`log`][docs.log_event] events and allows you to add one or more fields.
+The `add_fields` transform accepts [`log`][docs.log_event] events and allows you to add one or more log fields.
 
 ## Config File
 
@@ -77,7 +77,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
   #
 
   [transforms.add_fields_transform.fields]
-    # A key/value pair representing the new field to be added. Accepts all
+    # A key/value pair representing the new log fields to be added. Accepts all
     # supported types. Use `.` for adding nested fields.
     # 
     # * required
@@ -102,7 +102,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 | `type` | `string` | The component type<br />`required` `must be: "add_fields"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **REQUIRED** - Fields | | |
-| `fields.*` | `*` | A key/value pair representing the new field to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`required` `example: (see above)` |
+| `fields.*` | `*` | A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`required` `example: (see above)` |
 
 ## Examples
 

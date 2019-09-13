@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to parse a field value as JSON.
+description: Accepts `log` events and allows you to parse a log field value as JSON.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to parse a field value as JSON.
 ![][images.json_parser_transform]
 
 
-The `json_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON.
+The `json_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a log field value as JSON.
 
 ## Config File
 
@@ -63,7 +63,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # * no default
   drop_invalid = true
 
-  # The field decode as JSON. Must be a `string` value.
+  # The log field to decode as JSON. Must be a `string` value type.
   # 
   # * optional
   # * default: "message"
@@ -81,7 +81,7 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`required` `example: true` |
 | **OPTIONAL** | | |
-| `field` | `string` | The field decode as JSON. Must be a `string` value. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
+| `field` | `string` | The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
 ## Examples
 

@@ -20,22 +20,25 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 
 | Name  | Description |
 |:------|:------------|
-| [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
-| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce event fields into fixed types. |
-| [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
-| [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
-| [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
+| [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more log fields. |
+| [**`add_tags`**][docs.add_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to add one or more metric tags. |
+| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce log fields into fixed types. |
+| [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a log field's value. |
+| [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field value with [Grok][url.grok]. |
+| [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field value as JSON. |
 | [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
 | [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
-| [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
-| [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
+| [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field's value with a [Regular Expression][url.regex]. |
+| [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to remove one or more log fields. |
+| [**`remove_tags`**][docs.remove_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to remove one or more metric tags. |
 | [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
 
 [+ request a new transform][url.new_transform]
 
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
+[docs.add_tags_transform]: ../../../usage/configuration/transforms/add_tags.md
 [docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
 [docs.event]: ../../../about/data-model/README.md#event
 [docs.field_filter_transform]: ../../../usage/configuration/transforms/field_filter.md
@@ -48,6 +51,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.pipelines]: ../../../usage/configuration/README.md#composition
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
 [docs.sinks]: ../../../usage/configuration/sinks
 [docs.sources]: ../../../usage/configuration/sources

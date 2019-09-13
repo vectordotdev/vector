@@ -70,7 +70,7 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis,cloudwatch
+          SERVICES: kinesis,cloudwatch,elasticsearch
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
@@ -127,7 +127,7 @@ jobs:
   #         command: |
   #           export VERSION=$(make version)
   #           export FEATURES="jemallocator"
-  #           make build-archive 
+  #           make build-archive
   #     - persist_to_workspace:
   #         root: target/artifacts
   #         paths:
@@ -382,6 +382,7 @@ jobs:
             export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-docker
+          no_output_timeout: 30m
 
   release-github:
     docker:

@@ -47,7 +47,7 @@ class Context
       end
 
       if option.enum
-        escaped_values = option.enum.collect { |enum| enum.to_toml.gsub("|", "\\|") }
+        escaped_values = option.enum.collect { |enum| enum.to_toml }
         if escaped_values.length > 1
           tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
         else

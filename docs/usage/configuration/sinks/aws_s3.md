@@ -708,7 +708,7 @@ issue, please:
 [url.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+bug
 [url.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+enhancement
 [url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open
+[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
 [url.vector_chat]: https://chat.vector.dev

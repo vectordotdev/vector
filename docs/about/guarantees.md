@@ -27,7 +27,7 @@ and [source][docs.sources].
 | **Sources** | |
 | [`file` source][docs.file_source] | `best_effort` |
 | [`journald` source][docs.journald_source] | `best_effort` |
-| [`kafka` source][docs.kafka_source] | `best_effort` |
+| [`kafka` source][docs.kafka_source] | `at_least_once` |
 | [`statsd` source][docs.statsd_source] | `best_effort` |
 | [`stdin` source][docs.stdin_source] | `at_least_once` |
 | [`syslog` source][docs.syslog_source] | `best_effort` |
@@ -42,6 +42,7 @@ and [source][docs.sources].
 | [`clickhouse` sink][docs.clickhouse_sink] | `best_effort` |
 | [`console` sink][docs.console_sink] | `best_effort` |
 | [`elasticsearch` sink][docs.elasticsearch_sink] | `best_effort` |
+| [`file` sink][docs.file_sink] | `best_effort` |
 | [`http` sink][docs.http_sink] | `at_least_once` |
 | [`kafka` sink][docs.kafka_sink] | `at_least_once` |
 | [`prometheus` sink][docs.prometheus_sink] | `best_effort` |
@@ -118,6 +119,7 @@ keep you in the loop if this ever changes.
 [docs.console_sink]: ../usage/configuration/sinks/console.md
 [docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
 [docs.event]: ../about/data-model/README.md#event
+[docs.file_sink]: ../usage/configuration/sinks/file.md
 [docs.file_source]: ../usage/configuration/sources/file.md
 [docs.http_sink]: ../usage/configuration/sinks/http.md
 [docs.journald_source]: ../usage/configuration/sources/journald.md

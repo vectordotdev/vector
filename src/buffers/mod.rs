@@ -64,6 +64,7 @@ impl BufferInputCloner {
                     Box::new(inner)
                 }
             }
+
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
                 if when_full == &WhenFull::DropNewest {
@@ -102,6 +103,7 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))
             }
+
             #[cfg(feature = "leveldb")]
             BufferConfig::Disk {
                 max_size,

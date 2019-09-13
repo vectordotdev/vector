@@ -1,5 +1,5 @@
 ---
-description: 'A deeper look into Vector''s internal metric event.'
+description: 'A deeper look into Vector''s internal metric event data model.'
 ---
 
 # Metric Event
@@ -8,11 +8,10 @@ description: 'A deeper look into Vector''s internal metric event.'
 
 As mentioned in the [data model page][docs.data-model], Vector's events must
 be one of 2 types: a `log` or a `metric`. This page provides a deeper dive into
-Vector's `metric` event type and how they flow through Vector internally.
-Understanding this goes a long way in properly [configuring][docs.configuration]
-Vector for your use case.
+Vector's `metric` event type. Understanding this goes a long way in properly
+[configuring][docs.configuration] Vector for your use case.
 
-## Structure
+## Schema
 
 Vector characterizes a `metric` event as a data structure that must be one of
 a fixed set of types:
@@ -65,6 +64,72 @@ message Set {
 }
 ```
 {% endcode-tabs-item %}
+{% endcode-tabs %}
+
+You can view a complete definition in the [event proto \
+definition][url.event_proto].
+
+### Counters
+
+A `counter` is a single value that can _only_ be incremented, it cannot be
+decremented. Your downstream metrics [sink][docs.sinks] will receive this value
+and aggregate appropriately.
+
+| Name        | Type        | Description                       |
+|:------------|:------------|:----------------------------------|
+| `name`      | `string`    | Counter metric name.              |
+| `val`       | `double`    | Amount to increment.              |
+| `timestamp` | `timestamp` | Time metric was created/ingested. |
+
+### Histograms
+
+Also called a "timer". A `histogram` represents the frequency distribution of a
+value. This is commonly used for timings, helping to understand quantiles, max,
+min, and other aggregations.
+
+Depending on the downstream service Vector will aggregate histograms internally
+(such is the case for the [`prometheus` sink][docs.prometheus_sink]) or forward
+them immediately to the service for aggregation.
+
+| Name          | Type        | Description                                      |
+|:--------------|:------------|:-------------------------------------------------|
+| `name`        | `string`    | Histogram metric name.                           |
+| `val`         | `double`    | Specific value.                                  |
+| `sample_rate` | `int`       | The bucket/distribution the metric is a part of. |
+| `timestamp`   | `timestamp` | Time metric was created/ingested.                |
+
+### Gauges
+
+A gauge represents a point-in-time value that can increase and decrease.
+Vector's internal gauge type represents changes to that value. Gauges should be
+used to track fluctuations in values, like current memory or CPU usage.
+
+| Name        | Type        | Description                                                                   |
+|:------------|:------------|:------------------------------------------------------------------------------|
+| `name`      | `string`    | Histogram metric name.                                                        |
+| `val`       | `double`    | Specific value.                                                               |
+| `direction` | `string`    | The value direction. If it should increase or descrease the aggregated value. |
+| `timestamp` | `timestamp` | Time metric was created/ingested.                                             |
+
+### Sets
+
+A set represents a count of unique values. The `val` attribute below represents
+that unique value.
+
+| Name        | Type        | Description                       |
+|:------------|:------------|:----------------------------------|
+| `name`      | `string`    | Set metric name.                  |
+| `val`       | `string`    | Specific value.                   |
+| `timestamp` | `timestamp` | Time metric was created/ingested. |
+
+### Tags
+
+You'll notice that each metric type contains a `tags` key. Tags are simple
+key/value pairs represented as single-level strings.
+
+## Examples
+
+{% code-tabs %}
 {% code-tabs-item title="counter.json" %}
 ```javascript
 {
@@ -121,68 +186,7 @@ message Set {
 }
 ```
 {% endcode-tabs-item %}
-{% endcode-tabs %}
-
-You can view a complete definition in the [event proto \
-definition][url.event_proto].
-
-## Types
-
-A vector metric must be one of the following types: `Counter`, `Histogram`,
-`Gauge`, `Set`. Each are described below:
-
-### Counter
-
-A `counter` is a single value that can _only_ be incremented, it cannot be
-decremented. Your downstream metrics [sink][docs.sinks] will receive this value
-and aggregate appropriately.
-
-| Name        | Type        | Description                       |
-|:------------|:------------|:----------------------------------|
-| `name`      | `string`    | Counter metric name.              |
-| `val`       | `double`    | Amount to increment.              |
-| `timestamp` | `timestamp` | Time metric was created/ingested. |
-
-### Histogram
-
-Also called a "timer". A `histogram` represents the frequency distribution of a
-value. This is commonly used for timings, helping to understand quantiles, max,
-min, and other aggregations.
-
-Depending on the downstream service Vector will aggregate histograms internally
-(such is the case for the [`prometheus` sink][docs.prometheus_sink]) or forward
-them immediately to the service for aggregation.
-
-| Name          | Type        | Description                                      |
-|:--------------|:------------|:-------------------------------------------------|
-| `name`        | `string`    | Histogram metric name.                           |
-| `val`         | `double`    | Specific value.                                  |
-| `sample_rate` | `int`       | The bucket/distribution the metric is a part of. |
-| `timestamp`   | `timestamp` | Time metric was created/ingested.                |
-
-### Gauge
-
-A gauge represents a point-in-time value that can increase and decrease.
-Vector's internal gauge type represents changes to that value. Gauges should be
-used to track fluctuations in values, like current memory or CPU usage.
-
-| Name        | Type        | Description                                                                   |
-|:------------|:------------|:------------------------------------------------------------------------------|
-| `name`      | `string`    | Histogram metric name.                                                        |
-| `val`       | `double`    | Specific value.                                                               |
-| `direction` | `string`    | The value direction. If it should increase or descrease the aggregated value. |
-| `timestamp` | `timestamp` | Time metric was created/ingested.                                             |
-
-### Set
-
-A set represents a count of unique values. The `val` attribute below represents
-that unique value.
-
-| Name        | Type        | Description                       |
-|:------------|:------------|:----------------------------------|
-| `name`      | `string`    | Set metric name.                  |
-| `val`       | `string`    | Specific value.                   |
-| `timestamp` | `timestamp` | Time metric was created/ingested. |
+{% endcode-tabs}
 
 
 [docs.configuration]: ../../usage/configuration
