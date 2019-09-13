@@ -301,14 +301,17 @@ impl FileServer {
         } else {
             checkpointer.get_checkpoint(file_id).unwrap_or(0)
         };
-        if let Ok(mut watcher) = FileWatcher::new(path, file_position, self.ignore_before) {
-            info!(
-                message = "Found file to watch.",
-                path = field::debug(&watcher.path),
-                file_position = field::debug(&file_position),
-            );
-            watcher.set_file_findable(true);
-            fp_map.insert(file_id, watcher);
+        match FileWatcher::new(path.clone(), file_position, self.ignore_before) {
+            Ok(mut watcher) => {
+                info!(
+                    message = "Found file to watch.",
+                    path = field::debug(&watcher.path),
+                    file_position = field::debug(&file_position),
+                );
+                watcher.set_file_findable(true);
+                fp_map.insert(file_id, watcher);
+            }
+            Err(e) => error!(message = "Error watching new file", %e, file = ?path),
         };
     }
 }
