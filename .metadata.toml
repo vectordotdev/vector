@@ -1420,6 +1420,13 @@ examples = [{ name = "X-Powered-By", value = "Vector"}]
 null = false
 description = "A custom header to be added to each outgoing Elasticsearch request."
 
+[sinks.elasticsearch.options.provider]
+type = "string"
+enum = ["default", "aws"]
+null = true
+default = "default"
+description = "The provider of the Elasticsearch service."
+
 [sinks.elasticsearch.options.query]
 type = "table"
 null = true
@@ -1430,6 +1437,12 @@ type = "string"
 examples = [{ name = "X-Powered-By", value = "Vector"}]
 null = false
 description = "A custom parameter to be added to each Elasticsearch request."
+
+[sinks.elasticsearch.options.region]
+type = "string"
+examples = ["us-east-1"]
+null = true
+description = "When using the AWS provider, the [AWS region][url.aws_cw_logs_regions] of the target Elasticsearch instance."
 
 # ------------------------------------------------------------------------------
 # sinks.file
