@@ -173,7 +173,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
   index = "application-{{ application_id }}-%Y-%m-%d"
 
   # The provider of the Elasticsearch service.
-  #
+  # 
   # * optional
   # * default: "default"
   # * enum: "default" or "aws"
@@ -182,7 +182,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 
   # When using the AWS provider, the AWS region of the target Elasticsearch
   # instance.
-  #
+  # 
   # * optional
   # * no default
   region = "us-east-1"

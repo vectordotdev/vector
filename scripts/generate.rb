@@ -127,6 +127,12 @@ templates.each do |template|
     content = render(template, context)
     target = template.gsub(/^templates\//, "#{VECTOR_ROOT}/").gsub(/\.erb$/, "")
     content = post_process(content, target, metadata.links)
+
+    # Create the file if it does not exist
+    if !File.exists?(target)
+      File.open(target, "w") {}
+    end
+
     current_content = File.read(target)
 
     if current_content != content
