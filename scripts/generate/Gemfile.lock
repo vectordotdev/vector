@@ -1,11 +1,12 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (5.2.3)
+    activesupport (6.0.0)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
       tzinfo (~> 1.1)
+      zeitwerk (~> 2.1, >= 2.1.8)
     citrus (3.0.2)
     concurrent-ruby (1.1.5)
     differ (0.1.2)
@@ -13,7 +14,7 @@ GEM
     i18n (1.6.0)
       concurrent-ruby (~> 1.0)
     minitest (5.11.3)
-    paint (2.1.0)
+    paint (2.1.1)
     thread_safe (0.3.6)
     toml-rb (1.1.2)
       citrus (~> 3.0, > 3.0)
@@ -21,18 +22,19 @@ GEM
       thread_safe (~> 0.1)
     unindent (1.0)
     word_wrap (1.0.0)
+    zeitwerk (2.1.10)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  activesupport
-  differ
-  front_matter_parser
-  paint
-  toml-rb
-  unindent
-  word_wrap
+  activesupport (~> 6.0)
+  differ (~> 0.1)
+  front_matter_parser (~> 0.2)
+  paint (~> 2.1)
+  toml-rb (~> 1.1)
+  unindent (~> 1.0)
+  word_wrap (~> 1.0)
 
 BUNDLED WITH
    2.0.2

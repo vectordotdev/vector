@@ -36,9 +36,10 @@ check-generate: ## Checks for pending `make generate` changes
 	@bundle install --gemfile=scripts/generate/Gemfile
 	@scripts/check-generate.sh
 
+check_urls ?= true
 generate: ## Generates files across the repo from the /.metadata.toml file
 	@bundle install --gemfile=scripts/generate/Gemfile
-	@export VERSION=$(_latest_version); scripts/generate.rb --check-urls
+	@export VERSION=$(_latest_version); scripts/generate.rb --check-urls=$(check_urls)
 
 fmt: ## Format code
 	@cargo fmt
