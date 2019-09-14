@@ -1,0 +1,54 @@
+
+# Vector agent runned on each Node where it collects logs from all pods.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector-agent
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: vector
+spec:
+  minReadySeconds: 1
+  selector:
+    matchLabels:
+      name: vector-agent
+  template:
+    metadata:
+      labels:
+        name: vector-agent
+    volumes:
+      - name: logs_dir
+        hostPath:
+          path: /var/log
+      # Empty directory doesn't persist between pod restarts,
+      # nor updates, but will persist between container crashes.
+      - name: data_dir
+        emptyDir: {}
+    spec:
+      containers:
+        name: vector
+        image: timberio/vector:0.4.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: logs_dir
+          mountPath: /var/log
+          readOnly: true
+        - name: data_dir
+          mountPath: /var/lib/vector
+        env:
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        - name: CONFIG
+          value: |
+                # VECTOR.TOML
+
+                # Set global options
+                data_dir = "/var/lib/vector"
+
+                # Ingest logs from Kubernetes
+                [sources.kubernetes_logs]
+                  type = "kubernetes"
+
+        # This line is not in VECTOR.TOML       
