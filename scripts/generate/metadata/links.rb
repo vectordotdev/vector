@@ -21,7 +21,7 @@ require 'net/http'
 #
 # == Statically defined linked
 #
-# Links can be statically defined in the ./metadata.toml file. At the bottom
+# Links can be statically defined in the ./meta/links.toml file. At the bottom
 # of the file is a `[links]` table comprosied of the categories above.
 #
 # == Dynamically defined linked

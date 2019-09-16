@@ -8,9 +8,9 @@ require_relative "metadata/source"
 require_relative "metadata/streaming_sink"
 require_relative "metadata/transform"
 
-# Object representation of the /.metadata.toml file
+# Object representation of the /.meta directory
 #
-# This represents the /.metadata.toml in object form. Sub-classes represent
+# This represents the /.meta directory in object form. Sub-classes represent
 # each sub-component.
 class Metadata
   class << self

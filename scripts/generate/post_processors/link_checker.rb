@@ -22,9 +22,9 @@ module PostProcessors
   # [My link][docs.configuration] to link to the `/docs/configuration` page.
   # Auhtors can also use [My link][url.vector_repo] to link to
   # `https://github.com/timberio/vector`. "urls" links are defined in the root
-  # `/.metadata.toml` file and "docs" links are automatically inferred from the
+  # `/.meta/links.toml` file and "docs" links are automatically inferred from the
   # documentation's file name. If the file name is ambiguous it can be defined
-  # directly in the `/.metadata.toml` file.
+  # directly in the `/.meta/links.toml` file.
   class LinkChecker
     class << self
       def check!(*args)
@@ -88,7 +88,7 @@ module PostProcessors
           Please:
 
           1. Update your links to use a short link.
-          2. Add the short link to the /.metadata.toml file.
+          2. Add the short link to the /.meta/links.toml file.
           EOF
         end
 
