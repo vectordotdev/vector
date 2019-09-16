@@ -22,14 +22,20 @@ services:
         - "6000:6000"
       environment:
         RUST_LOG: trace
+    zookeeper:
+      image: wurstmeister/zookeeper
+      ports:
+        - "2181:2181"
     kafka:
-      image: spotify/kafka
+      image: wurstmeister/kafka
       ports:
         - "9092:9092"
-        - "2181:2181"
+        - "9093:9093"
       environment:
-        ADVERTISED_HOST: localhost
-        ADVERTISED_PORT: 9092
+        KAFKA_BROKER_ID: 1
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_LISTENERS: PLAINTEXT://:9092
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:
