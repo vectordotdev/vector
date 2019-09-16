@@ -24,6 +24,7 @@ pub enum Conversion {
     Timestamp,
     TimestampFmt(String),
     TimestampTZFmt(String),
+    TimestampAnyFmt(String, String),
 }
 
 impl FromStr for Conversion {
@@ -46,17 +47,17 @@ impl FromStr for Conversion {
             "float" => Ok(Conversion::Float),
             "bool" | "boolean" => Ok(Conversion::Boolean),
             "timestamp" => Ok(Conversion::Timestamp),
-            _ if s.starts_with("timestamp|") => {
-                let fmt = &s[10..];
-                // DateTime<Utc> can only convert timestamps without
-                // time zones, and DateTime<FixedOffset> can only
-                // convert with tone zones, so this has to distinguish
-                // between the two types of formats.
+            _ if s.starts_with("timestamp|") && s.split('|').count() == 2 => {
+                let fmt: &str = s.split('|').nth(1).unwrap();
                 if format_has_zone(fmt) {
                     Ok(Conversion::TimestampTZFmt(fmt.into()))
                 } else {
                     Ok(Conversion::TimestampFmt(fmt.into()))
                 }
+            }
+            _ if s.starts_with("timestamp|") && s.split('|').count() == 3 => {
+                let fmts: Vec<&str> = s.split('|').collect();
+                Ok(Conversion::TimestampAnyFmt(fmts[1].into(), fmts[2].into()))
             }
             _ => Err(ConversionError::UnknownConversion { name: s.into() }),
         }
@@ -147,6 +148,11 @@ impl Conversion {
                     DateTime::parse_from_str(&s, &format)
                         .with_context(|| TimestampParseError { s })?,
                 ))
+            }
+            Conversion::TimestampAnyFmt(fmt1, fmt2) => {
+                let s = String::from_utf8_lossy(&bytes);
+                let ts = DateTime::parse_from_str(&s, &fmt1).context(TimestampParseError { s })?;
+                ValueKind::from(ts.format(fmt2).to_string())
             }
         })
     }
@@ -299,6 +305,14 @@ mod tests {
         assert_eq!(
             parse_timestamp("Sat, 03 Feb 2001 07:05:06 +0300"),
             Ok(dateref())
+        );
+    }
+
+    #[test]
+    fn parse_timestamp_any() {
+        assert_eq!(
+            convert("timestamp|%+|%F", "2001-02-03T04:05:06Z"),
+            Ok(ValueKind::from("2001-02-03"))
         );
     }
 
