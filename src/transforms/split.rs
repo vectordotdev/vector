@@ -21,7 +21,7 @@ pub struct SplitConfig {
 
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
