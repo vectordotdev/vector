@@ -1,3 +1,6 @@
+require "ostruct"
+require "toml-rb"
+
 require_relative "metadata/batching_sink"
 require_relative "metadata/exposing_sink"
 require_relative "metadata/links"
@@ -11,10 +14,15 @@ require_relative "metadata/transform"
 # each sub-component.
 class Metadata
   class << self
-    def load()
-      metadata_toml = TomlRB.load_file("#{DOCS_ROOT}/../.metadata.toml")
-      companies_toml = TomlRB.load_file("#{DOCS_ROOT}/../.companies.toml")
-      new(metadata_toml.merge(companies_toml))
+    def load(meta_dir)
+      metadata = {}
+
+      Dir.glob("#{meta_dir}/**/*.toml").each do |file|
+        hash = TomlRB.load_file(file)
+        metadata.deep_merge!(hash)
+      end
+
+      new(metadata)
     end
   end
 

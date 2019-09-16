@@ -1,0 +1,47 @@
+[sources.syslog]
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "the Syslog 5424 protocol"
+
+[sources.syslog.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = true
+description = "The TCP or UDP address to listen on."
+
+[sources.syslog.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.syslog.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+[sources.syslog.options.mode]
+type = "string"
+enum = ["tcp", "udp", "unix"]
+null = false
+description = "The input mode."
+
+[sources.syslog.options.path]
+type = "string"
+examples = ["/path/to/socket"]
+null = true
+relevant_when = {mode = "unix"}
+description = """\
+The unix socket path. *This should be absolute path.*
+"""

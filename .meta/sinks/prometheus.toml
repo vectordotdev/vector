@@ -1,0 +1,32 @@
+[sinks.prometheus]
+beta = true
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "exposing"
+healthcheck = false
+input_types = ["metric"]
+write_to_description = "[Prometheus][url.prometheus] metrics service"
+
+[sinks.prometheus.options.address]
+type = "string"
+examples = ["0.0.0.0:9598"]
+null = false
+description = "The address to expose for scraping."
+
+[sinks.prometheus.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = """\
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+"""
+
+[sinks.prometheus.options.buckets]
+type = "[float]"
+default = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+null = false
+unit = "seconds"
+description = """\
+Default buckets to use for [histogram][docs.metric_event.histogram] metrics.\
+"""

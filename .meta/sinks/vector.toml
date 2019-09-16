@@ -1,0 +1,13 @@
+[sinks.vector]
+buffer = true
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = true
+input_types = ["log"]
+write_to_description = "another downstream Vector instance"
+
+[sinks.vector.options.address]
+type = "string"
+examples = ["92.12.333.224:5000"]
+null = false
+description = "The downstream Vector address."

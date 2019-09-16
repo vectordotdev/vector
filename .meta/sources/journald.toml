@@ -1,0 +1,40 @@
+[sources.journald]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "log records from journald"
+
+[sources.journald.options.current_runtime_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the current runtime (boot)"
+
+[sources.journald.options.data_dir]
+type = "string"
+examples = ["/var/lib/vector"]
+null = true
+description = """\
+The directory used to persist the journal checkpoint position. By \
+default, the global `data_dir` is used. Please make sure the Vector \
+project has write permissions to this dir. \
+"""
+
+[sources.journald.options.local_only]
+type = "bool"
+null = true
+default = true
+description = "Include only entries from the local system"
+
+[sources.journald.options.units]
+type = "[string]"
+null = true
+default = []
+examples = [["ntpd", "sysinit.target"]]
+description = """\
+The list of units names to monitor. \
+If empty or not present, all units are accepted. \
+Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.\
+"""
