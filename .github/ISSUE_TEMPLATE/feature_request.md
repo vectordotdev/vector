@@ -11,7 +11,7 @@ Thank you for opening an issue. Please note that we try to keep the Vector issue
 
 PSA: Using Vector? Let us know! Add your company here:
 
-https://github.com/timberio/vector/blob/master/.companies.toml
+https://github.com/timberio/vector/blob/master/.meta/companies.toml
 -->
 
 ### Current Vector Version
