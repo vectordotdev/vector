@@ -208,7 +208,7 @@ issue, please:
 [url.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
 [url.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22
 [url.file_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
-[url.file_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/file.rs
+[url.file_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
 [url.new_file_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+bug
 [url.new_file_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+enhancement
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html

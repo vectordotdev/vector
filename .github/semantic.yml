@@ -35,6 +35,7 @@ scopes:
   - remove_fields transform
   - remove_tags transform
   - sampler transform
+  - split transform
   - tokenizer transform
   # sinks
   - aws_cloudwatch_logs sink

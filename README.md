@@ -136,7 +136,8 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to remove one or more log fields. |
 | [**`remove_tags`**][docs.remove_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to remove one or more metric tags. |
 | [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`split`**][docs.split_transform] | Accepts [`log`][docs.log_event] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
+| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
 
 [+ request a new transform][url.new_transform]
 
@@ -161,13 +162,6 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`vector`**][docs.vector_sink] | [Streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance. |
 
 [+ request a new sink][url.new_sink]
-
-
-## Companies Using Vector
-
-* [Timber](https://timber.io)
-
-[+ add your company][url.add_company]
 
 
 ## License
@@ -244,6 +238,7 @@ the License.
 [docs.service_role]: https://docs.vector.dev/setup/deployment/roles/service
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
 [docs.sources]: https://docs.vector.dev/usage/configuration/sources
+[docs.split_transform]: https://docs.vector.dev/usage/configuration/transforms/split
 [docs.splunk_hec_sink]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
 [docs.starting]: https://docs.vector.dev/usage/administration/starting
 [docs.statsd_source]: https://docs.vector.dev/usage/configuration/sources/statsd
@@ -261,7 +256,6 @@ the License.
 [docs.vector_sink]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.vector_source]: https://docs.vector.dev/usage/configuration/sources/vector
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum
-[url.add_company]: https://github.com/timberio/vector/blob/master/.companies.toml
 [url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_s3]: https://aws.amazon.com/s3/

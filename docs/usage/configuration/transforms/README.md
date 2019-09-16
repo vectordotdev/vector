@@ -32,7 +32,8 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 | [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to remove one or more log fields. |
 | [**`remove_tags`**][docs.remove_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to remove one or more metric tags. |
 | [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`split`**][docs.split_transform] | Accepts [`log`][docs.log_event] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
+| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
 
 [+ request a new transform][url.new_transform]
 
@@ -55,6 +56,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
 [docs.sinks]: ../../../usage/configuration/sinks
 [docs.sources]: ../../../usage/configuration/sources
+[docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [images.transforms]: ../../../assets/transforms.svg
 [url.grok]: http://grokdebug.herokuapp.com/

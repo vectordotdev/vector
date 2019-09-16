@@ -72,6 +72,7 @@
     * [remove_fields transform][docs.remove_fields_transform]
     * [remove_tags transform][docs.remove_tags_transform]
     * [sampler transform][docs.sampler_transform]
+    * [split transform][docs.split_transform]
     * [tokenizer transform][docs.tokenizer_transform]
   * [Sinks](usage/configuration/sinks/README.md)
     * [aws_cloudwatch_logs sink][docs.aws_cloudwatch_logs_sink]
@@ -140,6 +141,7 @@
 [docs.remove_fields_transform]: ./usage/configuration/transforms/remove_fields.md
 [docs.remove_tags_transform]: ./usage/configuration/transforms/remove_tags.md
 [docs.sampler_transform]: ./usage/configuration/transforms/sampler.md
+[docs.split_transform]: ./usage/configuration/transforms/split.md
 [docs.splunk_hec_sink]: ./usage/configuration/sinks/splunk_hec.md
 [docs.statsd_source]: ./usage/configuration/sources/statsd.md
 [docs.stdin_source]: ./usage/configuration/sources/stdin.md
