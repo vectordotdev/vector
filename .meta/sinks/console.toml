@@ -1,0 +1,23 @@
+[sinks.console]
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = true
+input_types = ["log", "metric"]
+write_to_description = "the console, `STDOUT` or `STDERR`"
+
+[sinks.console.options.encoding]
+type = "string"
+enum = ["json", "text"]
+null = true
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
+
+[sinks.console.options.target]
+type = "string"
+defaukt = "stdout"
+enum = ["stdout", "stderr"]
+null = false
+description = "The [standard stream][url.standard_streams] to write to."

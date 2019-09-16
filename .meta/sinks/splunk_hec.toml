@@ -1,0 +1,38 @@
+[sinks.splunk_hec]
+batch_size = 1049000
+batch_timeout = 1
+buffer = true
+delivery_guarantee = "at_least_once"
+egress_method = "batching"
+healthcheck = true
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 10
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 10
+request_timeout_secs = 60
+service_provider = "Splunk"
+write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
+
+[sinks.splunk_hec.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["ndjson", "text"]
+null = true
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
+
+[sinks.splunk_hec.options.host]
+type = "string"
+examples = ["my-splunk-host.com"]
+null = false
+description = "Your Splunk HEC host."
+
+[sinks.splunk_hec.options.token]
+type = "string"
+examples = ["A94A8FE5CCB19BA61C4C08"]
+null = false
+description = "Your Splunk HEC token."

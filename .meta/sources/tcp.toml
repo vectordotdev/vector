@@ -1,0 +1,41 @@
+[sources.tcp]
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "the TCP protocol"
+
+[sources.tcp.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = false
+description = "The address to bind the socket to."
+
+[sources.tcp.options.host_key]
+name = "host_key"
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""
+
+[sources.tcp.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = """\
+The maximum bytes size of incoming messages before they are discarded.\
+"""
+
+[sources.tcp.options.shutdown_timeout_secs]
+type = "int"
+default = 30
+null = false
+unit = "seconds"
+description = """\
+The timeout before a connection is forcefully closed during shutdown.\
+"""

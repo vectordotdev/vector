@@ -1,0 +1,90 @@
+[sinks.aws_s3]
+batch_size = 10490000
+batch_timeout = 300
+beta = true
+buffer = true
+delivery_guarantee = "at_least_once"
+egress_method = "batching"
+healthcheck = true
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 30
+service_limits_short_link = "aws_s3_service_limits"
+service_provider = "AWS"
+write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
+
+[sinks.aws_s3.options.bucket]
+type = "string"
+examples = ["my-bucket"]
+null = false
+description = "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
+
+[sinks.aws_s3.options.compression]
+type = "string"
+category = "Requests"
+enum = ["gzip"]
+null = true
+description = "The compression type to use before writing data."
+
+[sinks.aws_s3.options.encoding]
+type = "string"
+category = "Requests"
+enum = ["ndjson", "text"]
+null = true
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
+
+[sinks.aws_s3.options.filename_append_uuid]
+type = "bool"
+category = "Object Names"
+default = true
+null = false
+description = "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
+
+[sinks.aws_s3.options.filename_extension]
+type = "bool"
+category = "Object Names"
+default = "log"
+null = false
+description = "The extension to use in the object name."
+
+[sinks.aws_s3.options.filename_time_format]
+type = "string"
+category = "Object Names"
+default = "%s"
+null = false
+description = "The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported."
+
+[sinks.aws_s3.options.gzip]
+type = "bool"
+category = "Requests"
+default = false
+null = false
+description = "Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth."
+
+[sinks.aws_s3.options.key_prefix]
+type = "string"
+category = "Object Names"
+default = "date=%F"
+examples = [
+  "date=%F/",
+  "date=%F/hour=%H/",
+  "year=%Y/month=%m/day=%d/",
+  "application_id={{ application_id }}/date=%F/"
+]
+null = true
+partition_key = true
+templateable = true
+description = "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
+
+[sinks.aws_s3.options.region]
+type = "string"
+examples = ["us-east-1"]
+null = false
+description = "The [AWS region][url.aws_s3_regions] of the target S3 bucket."

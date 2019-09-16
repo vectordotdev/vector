@@ -1,0 +1,92 @@
+[sinks.elasticsearch]
+batch_size = 10490000
+batch_timeout = 1
+beta = true
+buffer = true
+delivery_guarantee = "best_effort"
+egress_method = "batching"
+healthcheck = true
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 60
+service_provider = "Elastic"
+write_to_description = "[Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html)"
+
+[sinks.elasticsearch.options.doc_type]
+type = "string"
+default = "_doc"
+null = false
+description = "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
+
+[sinks.elasticsearch.options.host]
+type = "string"
+examples = ["http://10.24.32.122:9000"]
+null = false
+description = "The host of your Elasticsearch cluster. This should be the full URL as shown in the example."
+
+[sinks.elasticsearch.options.index]
+type = "string"
+default = "vector-%F"
+examples = [
+  "vector-%Y-%m-%d",
+  "application-{{ application_id }}-%Y-%m-%d"
+]
+null = false
+templateable = true
+description = "Index name to write events to."
+
+[sinks.elasticsearch.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.elasticsearch.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.elasticsearch.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
+[sinks.elasticsearch.options.headers]
+type = "table"
+null = true
+description = "Options for custom headers."
+
+[sinks.elasticsearch.options.headers.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom header to be added to each outgoing Elasticsearch request."
+
+[sinks.elasticsearch.options.provider]
+type = "string"
+enum = ["default", "aws"]
+null = true
+default = "default"
+description = "The provider of the Elasticsearch service."
+
+[sinks.elasticsearch.options.query]
+type = "table"
+null = true
+description = "Custom parameters to Elasticsearch query string."
+
+[sinks.elasticsearch.options.query.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom parameter to be added to each Elasticsearch request."
+
+[sinks.elasticsearch.options.region]
+type = "string"
+examples = ["us-east-1"]
+null = true
+description = "When using the AWS provider, the [AWS region][url.aws_cw_logs_regions] of the target Elasticsearch instance."

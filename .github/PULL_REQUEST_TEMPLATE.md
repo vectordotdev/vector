@@ -6,6 +6,6 @@
 
 Using Vector? Let us know! Add your company here:
 
-https://github.com/timberio/vector/blob/master/.companies.toml
+https://github.com/timberio/vector/blob/master/.meta/companies.toml
 
 -->

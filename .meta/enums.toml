@@ -1,0 +1,18 @@
+[enums]
+correctness_tests = [
+  "file_rotate_create_correctness",
+  "file_rotate_truncate_correctness",
+  "file_truncate_correctness",
+  "wrapped_json_correctness"
+]
+
+performance_tests = [
+  "file_to_tcp_performance",
+  "regex_parsing_performance",
+  "tcp_to_blackhole_performance",
+  "tcp_to_http_performance",
+  "tcp_to_tcp_performance"
+]
+
+delivery_guarantees = ["at_least_once", "best_effort"]
+event_types = ["log", "metric"]

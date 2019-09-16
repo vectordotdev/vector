@@ -1,0 +1,80 @@
+[sinks.http]
+batch_size = 1049000
+batch_timeout = 5
+buffer = true
+delivery_guarantee = "at_least_once"
+egress_method = "batching"
+healthcheck = true
+input_types = ["log"]
+rate_limit_duration = 1
+rate_limit_num = 10
+retry_attempts = 10
+retry_backoff_secs = 1
+request_in_flight_limit = 10
+request_timeout_secs = 30
+service_provider = "Elastic"
+write_to_description = "a generic HTTP endpoint"
+
+[sinks.http.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.http.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.http.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."
+
+[sinks.http.options.compression]
+type = "string"
+enum = ["gzip"]
+null = true
+description = "The compression strategy used to compress the payload before sending."
+
+[sinks.http.options.encoding]
+type = "string"
+enum = ["ndjson", "text"]
+null = false
+description = """\
+The encoding format used to serialize the events before flushing. The default \
+is dynamic based on if the event is structured or not.\
+"""
+
+[sinks.http.options.headers]
+type = "table"
+null = true
+description = "Options for custom headers."
+
+[sinks.http.options.headers.options."*"]
+type = "string"
+examples = [{ name = "X-Powered-By", value = "Vector"}]
+null = false
+description = "A custom header to be added to each outgoing HTTP request."
+
+[sinks.http.options.healthcheck_uri]
+type = "string"
+examples = ["https://10.22.212.22:9000/_health"]
+null = true
+description = "A URI that Vector can request in order to determine the service health."
+
+[sinks.http.options.uri]
+type = "string"
+examples = ["https://10.22.212.22:9000/endpoint"]
+null = false
+description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
+
+[sinks.http.options.verify_certificate]
+type = "bool"
+null = true
+default = true
+description = """When making a connection to a HTTPS server, this \
+controls if the TLS certificate presented by the server will be \
+verified. Do not set this unless you know what you are doing. Turning \
+this off introduces significant vulnerabilities."""

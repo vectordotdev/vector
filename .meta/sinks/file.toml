@@ -1,0 +1,36 @@
+[sinks.file]
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = false
+input_types = ["log"]
+write_to_description = "a file"
+
+[sinks.file.options.path]
+type = "string"
+examples = [
+  "vector-%Y-%m-%d.log",
+  "application-{{ application_id }}-%Y-%m-%d.log"
+]
+null = false
+templateable = true
+description = "File name to write events to."
+
+[sinks.file.options.idle_timeout_secs]
+type = "int"
+null = true
+default = "30"
+description = """\
+The amount of time a file can be idle  and stay open. \
+After not receiving any events for this timeout, the file will be flushed and \
+closed.
+"""
+
+[sinks.file.options.encoding]
+type = "string"
+enum = ["ndjson", "text"]
+null = true
+description = """\
+The encoding format used to serialize the events before appending. The default \
+is dynamic based on if the event is structured or not.\
+"""

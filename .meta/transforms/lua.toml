@@ -1,0 +1,37 @@
+[transforms.lua]
+allow_you_to_description = "transform events with a full embedded [Lua][url.lua] engine"
+beta = true
+function_categories = ["program"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = [
+  {name = "Lua Reference Manual", short_link = "lua_manual"}
+]
+
+[transforms.lua.options.source]
+type = "string"
+examples = [
+"""\
+require("script") # a `script.lua` file must be in your `search_dirs`
+
+if event["host"] == nil then
+  local f = io.popen ("/bin/hostname")
+  local hostname = f:read("*a") or ""
+  f:close()
+  hostname = string.gsub(hostname, "\\n$", "")
+  event["host"] = hostname
+end\
+"""
+]
+null = false
+description = "The inline Lua source to evaluate."
+
+[transforms.lua.options.search_dirs]
+type = "[string]"
+examples = [["/etc/vector/lua"]]
+null = true
+description = """\
+A list of directories search when loading a Lua file via the `require` \
+function.\
+"""

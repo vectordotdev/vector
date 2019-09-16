@@ -84,14 +84,15 @@ def say(words, color: nil, title: false)
 end
 
 #
-# Vars
+# Constants
 #
 
-VECTOR_DOCS_HOST = "https://docs.vector.dev"
 VECTOR_ROOT = File.join(Dir.pwd.split(File::SEPARATOR)[0..-3])
-DOCS_ROOT = File.join(VECTOR_ROOT, "docs")
-metadata = Metadata.load()
+
 CHECK_URLS = ARGV.any? { |arg| arg == "--check-urls=true" }
+DOCS_ROOT = File.join(VECTOR_ROOT, "docs")
+META_ROOT = File.join(VECTOR_ROOT, ".meta")
+VECTOR_DOCS_HOST = "https://docs.vector.dev"
 
 #
 # Render templates
@@ -116,7 +117,7 @@ else
   say("URL checking is disabled.", color: :yellow)
 end
 
-
+metadata = Metadata.load(META_ROOT)
 context = Context.new(metadata)
 templates = Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).to_a
 templates.each do |template|
