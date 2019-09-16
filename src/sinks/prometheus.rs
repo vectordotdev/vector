@@ -10,6 +10,7 @@ use hyper::{
 };
 use prometheus::{Encoder, Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -28,6 +29,12 @@ use tracing::field;
 /// Limits minimal acceptable flush_period for PrometheusSinkConfig.
 /// 3ms to account for timer and time source inprecisions.
 const MIN_FLUSH_PERIOD_MS: u64 = 3; //ms
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Flush period for sets must be greater or equal to {}ms", min))]
+    FlushPeriodTooShort { min: u64 },
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -60,13 +67,12 @@ pub fn default_flush_period() -> Duration {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         // Checks
         if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
-            return Err(format!(
-                "Flush period for sets must be greater or equal to {} ms",
-                MIN_FLUSH_PERIOD_MS
-            ));
+            return Err(Box::new(BuildError::FlushPeriodTooShort {
+                min: MIN_FLUSH_PERIOD_MS,
+            }));
         }
 
         // Build

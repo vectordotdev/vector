@@ -39,7 +39,7 @@ impl SourceConfig for StdinConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, crate::Error> {
         Ok(stdin_source(stdin(), self.clone(), out))
     }
 

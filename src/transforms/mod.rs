@@ -1,4 +1,5 @@
 use crate::Event;
+use snafu::Snafu;
 
 pub mod add_fields;
 pub mod add_tags;
@@ -23,4 +24,10 @@ pub trait Transform: Send {
             output.push(transformed);
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Invalid regular expression: {}", source))]
+    InvalidRegex { source: regex::Error },
 }

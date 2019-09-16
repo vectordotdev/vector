@@ -14,6 +14,7 @@ use http::{Method, Uri};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -38,7 +39,7 @@ pub struct ClickhouseConfig {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = clickhouse(self.clone(), acker)?;
         let healtcheck = healthcheck(self.host.clone());
 
@@ -50,7 +51,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, String> {
+fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -126,19 +127,16 @@ fn healthcheck(host: String) -> super::Healthcheck {
     let client = Client::builder().build(https);
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            if response.status() == hyper::StatusCode::OK {
-                Ok(())
-            } else {
-                Err(format!("Unexpected status: {}", response.status()))
-            }
+        .map_err(|err| err.into())
+        .and_then(|response| match response.status() {
+            hyper::StatusCode::OK => Ok(()),
+            status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
         });
 
     Box::new(healthcheck)
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
+fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, crate::Error> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
@@ -157,8 +155,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, String> {
         format!("{}/?{}", host, query)
     };
 
-    url.parse::<Uri>()
-        .map_err(|e| format!("Unable to parse host as URI: {}", e))
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[derive(Clone)]

@@ -6,6 +6,7 @@ use crate::{
 };
 use regex::bytes::{CaptureLocations, Regex};
 use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::str;
@@ -23,10 +24,10 @@ pub struct RegexParserConfig {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
-        let regex = Regex::new(&self.regex).map_err(|err| err.to_string())?;
+        let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;
 
         let types = parse_check_conversion_map(
             &self.types,
@@ -34,8 +35,7 @@ impl TransformConfig for RegexParserConfig {
                 .capture_names()
                 .filter_map(|s| s.map(|s| s.into()))
                 .collect(),
-        )
-        .map_err(|err| format!("{}", err))?;
+        )?;
 
         Ok(Box::new(RegexParser::new(
             regex,

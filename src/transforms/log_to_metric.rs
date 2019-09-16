@@ -70,7 +70,7 @@ pub struct LogToMetric {
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 

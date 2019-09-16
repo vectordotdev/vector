@@ -14,9 +14,16 @@ use rdkafka::{
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
 };
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("creating kafka producer failed: {}", source))]
+    KafkaCreateFailed { source: rdkafka::error::KafkaError },
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KafkaSinkConfig {
@@ -48,7 +55,7 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -69,22 +76,19 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, String> {
-        config
-            .to_rdkafka()
-            .create()
-            .map_err(|e| format!("error creating kafka producer: {}", e))
-            .map(|producer| KafkaSink {
-                producer,
-                topic: config.topic,
-                key_field: config.key_field,
-                encoding: config.encoding,
-                in_flight: FuturesUnordered::new(),
-                acker,
-                seq_head: 0,
-                seq_tail: 0,
-                pending_acks: HashSet::new(),
-            })
+    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, crate::Error> {
+        let producer = config.to_rdkafka().create().context(KafkaCreateFailed)?;
+        Ok(KafkaSink {
+            producer,
+            topic: config.topic,
+            key_field: config.key_field,
+            encoding: config.encoding,
+            in_flight: FuturesUnordered::new(),
+            acker,
+            seq_head: 0,
+            seq_tail: 0,
+            pending_acks: HashSet::new(),
+        })
     }
 }
 
@@ -170,10 +174,10 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
             consumer
                 .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
                 .map(|_| ())
-                .map_err(|e| e.to_string())
+                .map_err(|err| err.into())
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|err| err.into())
     .and_then(|result| result.into_future());
 
     Box::new(check)

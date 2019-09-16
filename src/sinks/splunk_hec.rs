@@ -15,9 +15,16 @@ use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snafu::{ResultExt, Snafu};
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
+
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("Host must include a scheme (https:// or http://)"))]
+    UriMissingScheme,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -53,7 +60,7 @@ fn default_host_field() -> Atom {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
@@ -66,7 +73,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -94,7 +101,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
 
     let uri = format!("{}/services/collector/event", host)
         .parse::<Uri>()
-        .map_err(|e| format!("{}", e))?;
+        .context(super::UriParseError)?;
     let token = Bytes::from(format!("Splunk {}", token));
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
@@ -131,10 +138,18 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, Str
     Ok(Box::new(sink))
 }
 
-pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, String> {
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid HEC token"))]
+    InvalidToken,
+    #[snafu(display("Queues are full"))]
+    QueuesFull,
+}
+
+pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, crate::Error> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
-        .map_err(|e| format!("{}", e))?;
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
@@ -146,24 +161,23 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, St
 
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.into())
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
-            StatusCode::BAD_REQUEST => Err("Invalid HEC token".to_string()),
-            StatusCode::SERVICE_UNAVAILABLE => Err("HEC is unhealthy, queues are full".to_string()),
-            other => Err(format!("Unexpected status: {}", other)),
+            StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
+            StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
+            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> Result<(), String> {
-    let uri = Uri::try_from(host).map_err(|e| format!("{}", e))?;
+pub fn validate_host(host: &String) -> Result<(), crate::Error> {
+    let uri = Uri::try_from(host).context(super::UriParseError)?;
 
-    if let None = uri.scheme_part() {
-        Err("Host must include a scheme (https or http)".into())
-    } else {
-        Ok(())
+    match uri.scheme_part() {
+        Some(_) => Ok(()),
+        None => Err(Box::new(BuildError::UriMissingScheme)),
     }
 }
 
@@ -244,7 +258,7 @@ mod tests {
         let invalid_scheme = "localhost:8888".to_string();
         let invalid_uri = "iminvalidohnoes".to_string();
 
-        assert_eq!(validate_host(&valid), Ok(()));
+        assert!(validate_host(&valid).is_ok());
         assert!(validate_host(&invalid_scheme).is_err());
         assert!(validate_host(&invalid_uri).is_err());
     }
@@ -256,7 +270,7 @@ mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
-        sinks,
+        assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
@@ -485,9 +499,10 @@ mod integration_tests {
             let healthcheck =
                 sinks::splunk_hec::healthcheck(get_token(), "http://503.returnco.de".to_string())
                     .unwrap();
-            assert_eq!(
+            assert_downcast_matches!(
                 rt.block_on(healthcheck).unwrap_err(),
-                "HEC is unhealthy, queues are full"
+                HealthcheckError,
+                HealthcheckError::QueuesFull
             );
         }
     }

@@ -16,6 +16,7 @@ use rusoto_kinesis::{
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
@@ -56,7 +57,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let config = self.clone();
         let sink = KinesisService::new(config, acker)?;
         let healthcheck = healthcheck(self.clone())?;
@@ -72,7 +73,7 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
+    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, crate::Error> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
@@ -161,7 +162,22 @@ impl RetryLogic for KinesisRetryLogic {
     }
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> {
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("ListStreams failed: {}", source))]
+    ListStreamsFailed {
+        source: rusoto_kinesis::ListStreamsError,
+    },
+    #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
+    StreamNamesMismatch { name: String, stream_name: String },
+    #[snafu(display(
+        "Stream returned does not contain any streams that match {}",
+        stream_name
+    ))]
+    NoMatchingStreamName { stream_name: String },
+}
+
+fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, crate::Error> {
     let client = KinesisClient::new(config.region.try_into()?);
     let stream_name = config.stream_name;
 
@@ -170,23 +186,17 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
             exclusive_start_stream_name: Some(stream_name.clone()),
             limit: Some(1),
         })
-        .map_err(|e| format!("ListStreams failed: {}", e))
+        .map_err(|source| HealthcheckError::ListStreamsFailed { source }.into())
         .and_then(move |res| Ok(res.stream_names.into_iter().next()))
         .and_then(move |name| {
             if let Some(name) = name {
                 if name == stream_name {
                     Ok(())
                 } else {
-                    Err(format!(
-                        "Stream names do not match, got {}, expected {}",
-                        name, stream_name
-                    ))
+                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
                 }
             } else {
-                Err(format!(
-                    "Stream returned does not contain any streams that match {}",
-                    stream_name
-                ))
+                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
             }
         });
 

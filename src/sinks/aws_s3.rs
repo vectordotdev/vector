@@ -18,6 +18,7 @@ use rusoto_s3::{
     S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::convert::TryInto;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
@@ -81,7 +82,7 @@ impl Default for Compression {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
@@ -93,8 +94,18 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid credentials"))]
+    InvalidCredentials,
+    #[snafu(display("Unknown bucket: {:?}", bucket))]
+    UnknownBucket { bucket: String },
+    #[snafu(display("Unknown status code: {}", status))]
+    UnknownStatus { status: http::StatusCode },
+}
+
 impl S3Sink {
-    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -124,9 +135,8 @@ impl S3Sink {
             Template::from("date=%F/")
         };
 
-        let region = config.region.clone();
         let s3 = S3Sink {
-            client: Self::create_client(region.try_into()?),
+            client: Self::create_client(config.region.clone().try_into()?),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -152,9 +162,8 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
-        let region = config.region.clone();
-        let client = Self::create_client(region.try_into()?);
+    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, crate::Error> {
+        let client = Self::create_client(config.region.clone().try_into()?);
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -162,13 +171,16 @@ impl S3Sink {
 
         let response = client.head_bucket(request);
 
+        let bucket = config.bucket.clone();
         let healthcheck = response.map_err(|err| match err {
             HeadBucketError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
-                http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
-                status => format!("Unknown error: Status code: {}", status),
+                http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                http::status::StatusCode::NOT_FOUND => {
+                    HealthcheckError::UnknownBucket { bucket }.into()
+                }
+                status => HealthcheckError::UnknownStatus { status }.into(),
             },
-            err => err.to_string(),
+            err => err.into(),
         });
 
         Ok(Box::new(healthcheck))
@@ -382,6 +394,7 @@ mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
+        assert_downcast_matches,
         event::Event,
         region::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
@@ -587,7 +600,11 @@ mod integration_tests {
             ..config()
         };
         let healthcheck = S3Sink::healthcheck(&config).unwrap();
-        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
+        assert_downcast_matches!(
+            rt.block_on(healthcheck).unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::UnknownBucket{ .. }
+        );
     }
 
     fn client() -> S3Client {

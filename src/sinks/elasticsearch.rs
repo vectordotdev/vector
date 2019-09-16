@@ -68,7 +68,7 @@ pub enum Provider {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common);
         let sink = es(self, common, acker);
@@ -312,18 +312,15 @@ fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);
-    let healthcheck = client
-        .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            if response.status() == hyper::StatusCode::OK {
-                Ok(())
-            } else {
-                Err(format!("Unexpected status: {}", response.status()))
-            }
-        });
-
-    Box::new(healthcheck)
+    Box::new(
+        client
+            .request(request)
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+            }),
+    )
 }
 
 fn finish_signer(
@@ -541,7 +538,7 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: &str) -> impl Future<Item = (), Error = String> {
+    fn flush(host: &str) -> impl Future<Item = (), Error = crate::Error> {
         let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
@@ -549,13 +546,10 @@ mod integration_tests {
         let client = Client::builder().build(https);
         client
             .request(request)
-            .map_err(|err| err.to_string())
-            .and_then(|response| {
-                if response.status() == hyper::StatusCode::OK {
-                    Ok(())
-                } else {
-                    Err(format!("Unexpected status: {}", response.status()))
-                }
+            .map_err(|source| source.into())
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
     }
 }

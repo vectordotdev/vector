@@ -41,7 +41,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send> = match self.target {

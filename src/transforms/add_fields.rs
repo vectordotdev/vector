@@ -21,7 +21,7 @@ pub struct AddFields {
 
 #[typetag::serde(name = "augmenter")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 

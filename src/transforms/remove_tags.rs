@@ -18,7 +18,7 @@ pub struct RemoveTags {
 
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 

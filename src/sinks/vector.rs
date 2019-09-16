@@ -10,6 +10,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use futures::{future, Future, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::net::TcpStream;
 
@@ -27,13 +28,15 @@ impl VectorSinkConfig {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         let addr = self
             .address
             .to_socket_addrs()
-            .map_err(|e| format!("IO Error: {}", e))?
+            .context(super::SocketAddressError)?
             .next()
-            .ok_or_else(|| "Unable to resolve DNS for provided address".to_string())?;
+            .ok_or(Box::new(super::BuildError::DNSFailure {
+                address: self.address.clone(),
+            }))?;
 
         let sink = vector(self.address.clone(), addr, acker);
         let healthcheck = super::tcp::tcp_healthcheck(addr);
@@ -54,12 +57,18 @@ pub fn vector(hostname: String, addr: SocketAddr, acker: Acker) -> super::Router
     )
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Connect error: {}", source))]
+    ConnectError { source: std::io::Error },
+}
+
 pub fn vector_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     // Lazy to avoid immediately connecting
     let check = future::lazy(move || {
         TcpStream::connect(&addr)
             .map(|_| ())
-            .map_err(|err| err.to_string())
+            .map_err(|err| err.into())
     });
 
     Box::new(check)

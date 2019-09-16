@@ -19,7 +19,7 @@ pub struct JsonParserConfig {
 
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         Ok(Box::new(JsonParser::from(self.clone())))
     }
 

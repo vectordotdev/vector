@@ -17,6 +17,16 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::{Builder, Runtime};
 use tokio::util::FutureExt;
 
+#[macro_export]
+macro_rules! assert_downcast_matches {
+    ($e:expr, $t:ty, $v:pat) => {{
+        match $e.downcast_ref::<$t>() {
+            Some($v) => (),
+            got => panic!("assertion failed: got wrong error variant {:?}", got),
+        }
+    }};
+}
+
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
 pub fn next_addr() -> SocketAddr {
     use std::net::{IpAddr, Ipv4Addr};

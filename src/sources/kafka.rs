@@ -12,7 +12,16 @@ use rdkafka::{
     message::{BorrowedMessage, Message},
 };
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Could not create Kafka consumer: {}", source))]
+    KafkaCreateError { source: rdkafka::error::KafkaError },
+    #[snafu(display("Could not subscribe to Kafka topics: {}", source))]
+    KafkaSubscribeError { source: rdkafka::error::KafkaError },
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -43,7 +52,7 @@ impl SourceConfig for KafkaSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, crate::Error> {
         kafka_source(self.clone(), out)
     }
 
@@ -55,7 +64,7 @@ impl SourceConfig for KafkaSourceConfig {
 fn kafka_source(
     config: KafkaSourceConfig,
     out: mpsc::Sender<Event>,
-) -> Result<super::Source, String> {
+) -> Result<super::Source, crate::Error> {
     let consumer = Arc::new(create_consumer(config.clone())?);
     let source = future::lazy(move || {
         let consumer_ref = Arc::clone(&consumer);
@@ -109,7 +118,7 @@ fn kafka_source(
     Ok(Box::new(source))
 }
 
-fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, String> {
+fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, crate::Error> {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", &config.group_id)
         .set("bootstrap.servers", &config.bootstrap_servers)
@@ -119,12 +128,10 @@ fn create_consumer(config: KafkaSourceConfig) -> Result<StreamConsumer, String> 
         .set("enable.auto.commit", "false")
         .set("client.id", "vector")
         .create()
-        .map_err(|e| format!("Cannot create Kafka consumer: {:?}", e))?;
+        .context(KafkaCreateError)?;
 
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
-    consumer
-        .subscribe(&topics)
-        .map_err(|e| format!("Cannot subscribe to topics: {:?}", e))?;
+    consumer.subscribe(&topics).context(KafkaSubscribeError)?;
 
     Ok(consumer)
 }

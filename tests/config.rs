@@ -151,7 +151,8 @@ fn bad_regex() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"sampler\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 
     let err = load(
         r#"
@@ -172,7 +173,8 @@ fn bad_regex() {
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"parser\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 }
 
 #[test]
@@ -278,7 +280,7 @@ fn bad_s3_region() {
     assert_eq!(
         err,
         vec![
-            "Sink \"out1\": Must set 'region' or 'endpoint'",
+            "Sink \"out1\": Must set either 'region' or 'endpoint'",
             "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
             "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"

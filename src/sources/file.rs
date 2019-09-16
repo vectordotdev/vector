@@ -7,12 +7,42 @@ use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::timer::DelayQueue;
 use tracing::dispatcher;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("data_dir option required, but not given here or globally"))]
+    NoDataDir,
+    #[snafu(display(
+        "could not create subdirectory {:?} inside of data_dir {:?}",
+        subdir,
+        data_dir
+    ))]
+    MakeSubdirectoryError {
+        subdir: PathBuf,
+        data_dir: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("data_dir {:?} does not exist", data_dir))]
+    MissingDataDir { data_dir: PathBuf },
+    #[snafu(display("data_dir {:?} is not writable", data_dir))]
+    DataDirNotWritable { data_dir: PathBuf },
+    #[snafu(display(
+        "message_start_indicator {:?} is not a valid regex: {}",
+        indicator,
+        source
+    ))]
+    InvalidMessageStartIndicator {
+        indicator: String,
+        source: regex::Error,
+    },
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields, default)]
@@ -95,18 +125,15 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> Result<super::Source, crate::Error> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
-        if let Some(Err(err)) = self.message_start_indicator.as_ref().map(|s| Regex::new(s)) {
-            return Err(format!(
-                "message_start_indicator is not a valid regex: {}",
-                err
-            ));
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
         }
 
         Ok(file_source(self, data_dir, out))

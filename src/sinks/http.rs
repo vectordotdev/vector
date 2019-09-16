@@ -11,15 +11,30 @@ use crate::{
 use futures::{future, Future, Sink};
 use headers::HeaderMapExt;
 use http::{
-    header::{HeaderName, HeaderValue},
+    header::{self, HeaderName, HeaderValue},
     Method, Uri,
 };
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::time::Duration;
 use tower::ServiceBuilder;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("{}: {}", source, name))]
+    InvalidHeaderName {
+        name: String,
+        source: header::InvalidHeaderName,
+    },
+    #[snafu(display("{}: {}", source, value))]
+    InvalidHeaderValue {
+        value: String,
+        source: header::InvalidHeaderValue,
+    },
+}
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -73,7 +88,7 @@ pub struct BasicAuth {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
         validate_headers(&self.headers)?;
         let sink = http(self.clone(), acker)?;
 
@@ -90,7 +105,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -182,7 +197,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, Strin
     Ok(Box::new(sink))
 }
 
-fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, String> {
+fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, crate::Error> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -195,13 +210,13 @@ fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthchec
 
     let healthcheck = client
         .request(request)
-        .map_err(|err| err.to_string())
+        .map_err(|err| err.into())
         .and_then(|response| {
             use hyper::StatusCode;
 
             match response.status() {
                 StatusCode::OK => Ok(()),
-                other => Err(format!("Unexpected status: {}", other)),
+                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }
         });
 
@@ -215,20 +230,19 @@ impl BasicAuth {
     }
 }
 
-fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), String> {
+fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), crate::Error> {
     if let Some(map) = headers {
         for (name, value) in map {
-            HeaderName::from_bytes(name.as_bytes()).map_err(|e| format!("{}: {}", e, name))?;
-            HeaderValue::from_bytes(value.as_bytes()).map_err(|e| format!("{}: {}", e, value))?;
+            HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
+            HeaderValue::from_bytes(value.as_bytes())
+                .with_context(|| InvalidHeaderValue { value })?;
         }
     }
     Ok(())
 }
 
-fn build_uri(raw: &str) -> Result<Uri, String> {
-    let base: Uri = raw
-        .parse()
-        .map_err(|e| format!("invalid uri ({}): {:?}", e, raw))?;
+fn build_uri(raw: &str) -> Result<Uri, crate::Error> {
+    let base: Uri = raw.parse().context(super::UriParseError)?;
     Ok(Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))
         .authority(
@@ -264,6 +278,7 @@ mod tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
+        assert_downcast_matches,
         sinks::http::HttpSinkConfig,
         test_util::{next_addr, random_lines_with_stream, shutdown_on_idle},
         topology::config::SinkConfig,
@@ -316,7 +331,7 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        assert_eq!(Ok(()), super::validate_headers(&config.headers));
+        assert!(super::validate_headers(&config.headers).is_ok());
     }
 
     #[test]
@@ -329,9 +344,10 @@ mod tests {
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        assert_eq!(
-            Err(String::from("invalid HTTP header name: \u{1}")),
-            super::validate_headers(&config.headers)
+        assert_downcast_matches!(
+            super::validate_headers(&config.headers).unwrap_err(),
+            BuildError,
+            BuildError::InvalidHeaderName{..}
         );
     }
 

@@ -18,7 +18,10 @@ struct PanicSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for PanicSink {
-    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(
+        &self,
+        _acker: Acker,
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(PanicSink), Box::new(future::ok(()))))
     }
 
@@ -87,7 +90,10 @@ struct ErrorSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for ErrorSink {
-    fn build(&self, _acker: Acker) -> Result<(sinks::RouterSink, sinks::Healthcheck), String> {
+    fn build(
+        &self,
+        _acker: Acker,
+    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
         Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
     }
 
@@ -160,7 +166,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String> {
+    ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::err(())))
     }
 
@@ -217,7 +223,7 @@ impl config::SourceConfig for PanicSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         _out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String> {
+    ) -> Result<sources::Source, vector::Error> {
         Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
             || panic!(),
         )))

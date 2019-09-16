@@ -6,9 +6,16 @@ use crate::{
 };
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Invalid grok pattern: {}", source))]
+    InvalidGrok { source: grok::Error },
+}
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -23,15 +30,15 @@ pub struct GrokParserConfig {
 
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types).map_err(|err| format!("{}", err))?;
+        let types = parse_conversion_map(&self.types)?;
 
-        grok.compile(&self.pattern, true)
-            .map_err(|err| format!("Grok pattern failed to compile: {}", err))
+        Ok(grok
+            .compile(&self.pattern, true)
             .map::<Box<dyn Transform>, _>(|p| {
                 Box::new(GrokParser {
                     pattern: p,
@@ -40,6 +47,7 @@ impl TransformConfig for GrokParserConfig {
                     types,
                 })
             })
+            .context(InvalidGrok)?)
     }
 
     fn input_type(&self) -> DataType {
