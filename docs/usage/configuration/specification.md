@@ -2301,6 +2301,17 @@ end
     # * unit: events
     num_items = 500
 
+  #
+  # Tls
+  #
+
+  [sinks.kafka.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
 [sinks.prometheus]
   # The component type
   # 

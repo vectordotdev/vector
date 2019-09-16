@@ -125,6 +125,17 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Tls
+  #
+
+  [sinks.kafka_sink.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -25,12 +25,13 @@ enum BuildError {
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct KafkaSinkConfig {
     bootstrap_servers: Vec<String>,
     topic: String,
     key_field: Option<Atom>,
     encoding: Option<Encoding>,
+    tls: Option<KafkaSinkTlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -38,6 +39,11 @@ pub struct KafkaSinkConfig {
 pub enum Encoding {
     Text,
     Json,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct KafkaSinkTlsConfig {
+    enabled: Option<bool>,
 }
 
 pub struct KafkaSink {
@@ -71,6 +77,13 @@ impl KafkaSinkConfig {
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = self.bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
+        if let Some(ref tls) = self.tls {
+            let enabled = tls.enabled.unwrap_or(false);
+            client_config.set(
+                "security.protocol",
+                if enabled { "ssl" } else { "plaintext" },
+            );
+        }
         client_config
     }
 }
@@ -249,7 +262,7 @@ mod tests {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{KafkaSink, KafkaSinkConfig};
+    use super::{KafkaSink, KafkaSinkConfig, KafkaSinkTlsConfig};
     use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
@@ -260,15 +273,30 @@ mod integration_test {
     use std::{thread, time::Duration};
 
     #[test]
-    fn kafka_happy_path() {
-        let bootstrap_servers = vec![String::from("localhost:9092")];
+    fn kafka_happy_path_plaintext() {
+        kafka_happy_path("localhost:9092", None);
+    }
+
+    #[test]
+    fn kafka_happy_path_tls() {
+        kafka_happy_path(
+            "localhost:9091",
+            Some(KafkaSinkTlsConfig {
+                enabled: Some(true),
+                ..Default::default()
+            }),
+        );
+    }
+
+    fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
+        let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
-            key_field: None,
-            encoding: None,
+            tls,
+            ..Default::default()
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();

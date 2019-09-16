@@ -41,3 +41,14 @@ type = "string"
 examples = ["topic-1234"]
 null = false
 description = "The Kafka topic name to write events to."
+
+[sinks.kafka.options.tls]
+type = "table"
+null = true
+description = "Options for TLS support"
+
+[sinks.kafka.options.tls.options.enabled]
+type = "bool"
+null = true
+default = false
+description = "Enable TLS during connections to the remote."
