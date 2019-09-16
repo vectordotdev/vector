@@ -131,6 +131,7 @@ where
             self.poll_complete()?;
 
             if self.batch.len() > self.max_size {
+                debug!(message = "Buffer full; applying back pressure.", max_size = %self.max_size, rate_limit_secs = 10);
                 return Ok(AsyncSink::NotReady(item));
             }
         }

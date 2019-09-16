@@ -1,6 +1,7 @@
 use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
+    trace::{current_span, Instrument},
 };
 use bytes::{Bytes, BytesMut};
 use file_source::{FileServer, Fingerprinter};
@@ -13,7 +14,6 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::timer::DelayQueue;
-use tracing::dispatcher;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -194,25 +194,28 @@ pub fn file_source(
                 Box::new(rx)
             };
 
+        let span = current_span();
+        let span2 = span.clone();
         tokio::spawn(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
-                    trace!(message = "Received one event.", file = file.as_str());
+                    let _enter = span2.enter();
+                    trace!(
+                        message = "Received one event.",
+                        file = file.as_str(),
+                        rate_limit_secs = 10
+                    );
                     create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
-                .map(|_| ()),
+                .map(|_| ())
+                .instrument(span),
         );
 
-        let span = info_span!("file-server");
-        let dispatcher = dispatcher::get_default(|d| d.clone());
+        let span = info_span!("file_server");
         thread::spawn(move || {
-            let dispatcher = dispatcher;
-            dispatcher::with_default(&dispatcher, || {
-                span.in_scope(|| {
-                    file_server.run(tx.sink_map_err(drop), shutdown_rx);
-                })
-            });
+            let _enter = span.enter();
+            file_server.run(tx.sink_map_err(drop), shutdown_rx);
         });
 
         // Dropping shutdown_tx is how we signal to the file server that it's time to shut down,

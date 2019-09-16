@@ -119,7 +119,8 @@ impl Transform for RegexParser {
                                 debug!(
                                     message = "Could not convert types.",
                                     name = &name[..],
-                                    %error
+                                    %error,
+                                    rate_limit_secs = 30
                                 );
                             }
                         }
@@ -133,6 +134,7 @@ impl Transform for RegexParser {
                 warn!(
                     message = "Regex pattern failed to match.",
                     field = &truncate_string_at(&String::from_utf8_lossy(&value), 60)[..],
+                    rate_limit_secs = 30
                 );
             }
         } else {

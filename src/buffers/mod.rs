@@ -165,7 +165,13 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.inner.start_send(item) {
-            Ok(AsyncSink::NotReady(_)) => Ok(AsyncSink::Ready),
+            Ok(AsyncSink::NotReady(_)) => {
+                debug!(
+                    message = "Shedding load; dropping event.",
+                    rate_limit_secs = 10
+                );
+                Ok(AsyncSink::Ready)
+            }
             other => other,
         }
     }
