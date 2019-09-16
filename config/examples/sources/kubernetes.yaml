@@ -1,12 +1,36 @@
+# Everything related to vector should be in this namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: logging
+---
+# ConfigMap which contains vector.toml configuration for pods.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: logging
+data:
+  vector-agent-config: |
+    # VECTOR.TOML
+    # Configuration for vector-agent
 
-# Vector agent runned on each Node where it collects logs from all pods.
+    # Set global options
+    data_dir = "/var/lib/vector/"
+
+    # Ingest logs from Kubernetes
+    [sources.kubernetes_logs]
+      type = "kubernetes"
+
+  # This line is not in VECTOR.TOML       
+
+---
+# Vector agent runned on each Node where it collects logs from pods.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: vector-agent
-  namespace: kube-system
-  labels:
-    app.kubernetes.io/name: vector
+  namespace: logging
 spec:
   minReadySeconds: 1
   selector:
@@ -16,39 +40,47 @@ spec:
     metadata:
       labels:
         name: vector-agent
-    volumes:
-      - name: logs_dir
-        hostPath:
-          path: /var/log
-      # Empty directory doesn't persist between pod restarts,
-      # nor updates, but will persist between container crashes.
-      - name: data_dir
-        emptyDir: {}
     spec:
+      volumes:
+      # Directory with logs
+      - name: var-log
+        hostPath:
+          path: /var/log/
+      # Docker log files in Kubernetes are symlinks to this folder.
+      # Vector can persist local data in here. Having that, updated
+      # Vector could continue where the last one stopped, if all the
+      # used sources have that capability.
+      - name: var-lib
+        hostPath:
+          path: /var/lib/
+      # Mount vector configuration from config map as a file vector.toml
+      - name: config-dir
+        configMap:
+         name: vector-config
+         items:
+           - key: vector-agent-config
+             path: vector.toml
       containers:
-        name: vector
+      - name: vector
+        # TODO: replace this with kubernetes version
+        # TODO: can be done by merging first implementation and then tests
         image: timberio/vector:0.4.0
         imagePullPolicy: Always
+        args: ["-c","/etc/vector/vector.toml"]
         volumeMounts:
-        - name: logs_dir
-          mountPath: /var/log
-          readOnly: true
-        - name: data_dir
-          mountPath: /var/lib/vector
-        env:
-        - name: POD_UID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.uid
-        - name: CONFIG
-          value: |
-                # VECTOR.TOML
-
-                # Set global options
-                data_dir = "/var/lib/vector"
-
-                # Ingest logs from Kubernetes
-                [sources.kubernetes_logs]
-                  type = "kubernetes"
-
-        # This line is not in VECTOR.TOML       
+        - name: var-log
+          mountPath: /var/log/
+          readOnly: true        
+        - name: var-lib
+          mountPath: /var/lib
+        - name: config-dir
+          mountPath: /etc/vector
+          readOnly: true 
+      # /var/lib/vector/ needs to be created
+      initContainers:
+      - name: init-vector-dir
+        image: busybox:1.28
+        command: ["mkdir","-p", "/var/lib/vector/"]
+        volumeMounts:  
+        - name: var-lib
+          mountPath: /var/lib

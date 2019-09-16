@@ -2,21 +2,25 @@ use crate::{
     event::{self, Event, ValueKind},
     sources::file::{FileConfig, FingerprintingConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, TransformConfig},
-    transforms::{regex_parser::RegexParserConfig, remove_fields::RemoveFields, Transform},
+    transforms::{
+        json_parser::{JsonParser, JsonParserConfig},
+        regex_parser::RegexParserConfig,
+        Transform,
+    },
 };
-use bytes::Bytes;
-use chrono;
+use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 
+// ?NOTE
+// Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
+// Current version: https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2
+// LogDirectory = `/var/log/pods/<podUID>/`
+// LogPath = `containerName/Instance#.log`
+
 /// Location in which by Kubernetes CRI, container runtimes are to store logs.
 const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
-
-// ?NOTE: Maybe having pod uid exposed as config field is a better approach.
-/// Kubernetes source expects it's pod uid in this env var.
-/// If it's not present it assumes that it's outside Kubernetes managment.
-const ENV_VAR_POD_UID: &'static str = "POD_UID";
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -30,65 +34,75 @@ impl SourceConfig for KubernetesConfig {
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> Result<super::Source, String> {
-        // Kubernetes source uses 'file source' and 'regex transform' to implement
-        // gathering of logs over all Kubernetes CRI supported container runtimes.
+        // Kubernetes source uses 'file source' and various transforms to implement
+        // gathering of logs over Kubernetes CRI supported container runtimes.
+        // Usability/generality is the goal of this implementation. Performance will
+        // be solved with per container runtime specialized source.
 
         // Side goal is to make kubernetes source behave as simillarly to docker source
         // as possible to set a default behavior for all container related sources.
         // This will help with interchangeability.
 
         // Only logs created at, or after this moment are logged.
-        let now = chrono::Utc::now();
+        let now = Utc::now();
 
         // Tailling logs are limited to those that can have logs created during or
         // after now.
 
         // File source
-        let file_source_name = name.to_owned() + "_file_source";
-        let (file_recv, file_source) = file_source(file_source_name.as_str(), globals)?;
+        let (file_recv, file_source) = file_source(name, globals)?;
 
-        // Remove field, timestamp
-        // This field is removed as we will supply our own timestamp gotten directly
-        // from container runtime.
-        let mut remove_timestamp = RemoveFields::new(vec![event::TIMESTAMP.clone()]);
-
-        // Regex transform, message
-        let mut regex_transform_message = transform_message()?;
-
-        // Regex transform, file
-        let mut regex_transform_file = transform_file()?;
-
-        // Is this in Kubernetes
-        let self_pod = std::env::var(ENV_VAR_POD_UID).ok().map(|uid| {
-            info!(message = "Self pod", uid = %uid);
-            Bytes::from(uid)
-        });
+        // Transforms
+        let mut transform_message = transform_message();
+        let mut transform_file = transform_file()?;
 
         // Kubernetes source
-        let pod = Atom::from("pod");
+        let atom_time = Atom::from("time");
+        let atom_log = Atom::from("log");
         let source = file_recv
-            .filter_map(move |event| remove_timestamp.transform(event))
-            .filter_map(move |event| regex_transform_message.transform(event))
+            .filter_map(move |event| transform_message.transform(event))
+            .map(move |mut event| {
+                // Rename fields
+                let log = event.as_mut_log();
+
+                // time -> timestamp
+                if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&atom_time) {
+                    match DateTime::parse_from_rfc3339(
+                        String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
+                    ) {
+                        Ok(timestamp) => log.insert_explicit(
+                            event::TIMESTAMP.clone(),
+                            timestamp.with_timezone(&Utc).into(),
+                        ),
+                        Err(error) => warn!(message="Non rfc3339 timestamp",error=%error),
+                    }
+                } else {
+                    warn!(message = "Missing field", field = %atom_time);
+                }
+
+                // log -> message
+                if let Some(message) = log.remove(&atom_log) {
+                    log.insert_explicit(event::MESSAGE.clone(), message);
+                } else {
+                    warn!(message = "Missing field", field = %atom_log);
+                }
+
+                event
+            })
             .filter_map(move |event| {
                 // Only logs created at, or after now are logged.
                 if let Some(ValueKind::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
                     if ts >= &now {
                         return Some(event);
                     }
+                    trace!(message = "Recieved older log", from = %ts.to_rfc3339());
                 }
                 None
             })
-            .filter_map(move |event| regex_transform_file.transform(event))
-            .filter_map(move |event| {
-                // Detect self and exclude own messages
-                if let Some(self_pod) = self_pod.as_ref() {
-                    if let Some(ValueKind::Bytes(pod)) = event.as_log().get(&pod) {
-                        if pod == self_pod {
-                            return None;
-                        }
-                    }
-                }
-                Some(event)
+            .filter_map(move |event| transform_file.transform(event))
+            .map(|e| {
+                println!("Event_out: {:?}", e);
+                e
             })
             .forward(out.sink_map_err(|_| ()))
             .map(|_| ())
@@ -104,65 +118,100 @@ impl SourceConfig for KubernetesConfig {
 }
 
 fn file_source(
-    name: &str,
+    kube_name: &str,
     globals: &GlobalOptions,
 ) -> Result<(mpsc::Receiver<Event>, super::Source), String> {
-    let mut fs_config = FileConfig::default();
-    fs_config
+    let mut config = FileConfig::default();
+    config
         .include
-        .push((LOG_DIRECTORY.to_owned() + r"*/[!_]*_[!.]*\.log").into());
-    fs_config.start_at_beginning = true;
+        .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
+    // TODO: Make this a configurable option for excluding namespaces
+    // Exclude whole kube-system namespace
+    config
+        .exclude
+        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/**").into());
+    // Exclude whole logging namespace
+    config
+        .exclude
+        .push((LOG_DIRECTORY.to_owned() + r"logging_*/**").into());
+
+    config.start_at_beginning = true;
+
     // Filter out files that certainly don't have logs newer than now timestamp.
-    fs_config.ignore_older = Some(10);
+    config.ignore_older = Some(10);
+
     // oldest_first false, having all pods equaly serviced is of greater importance
     //                     than having time order guarantee.
-    // Timestamps contained in the file will practically make it impossible to mistake
-    // two files as one
-    fs_config.fingerprinting = FingerprintingConfig::Checksum {
-        fingerprint_bytes: 1024, // The goal is to cover at least two timestamps
-        ignored_header_bytes: 0,
-    };
+
+    // CRI standard ensures unique naming.
+    config.fingerprinting = FingerprintingConfig::DevInode;
+
+    // Have a subdirectory for this source to avoid collision of naming its file source.
+    config.data_dir = Some(globals.resolve_and_make_data_subdir(None, kube_name)?);
 
     let (file_send, file_recv) = mpsc::channel(1000);
-    let file_source = fs_config
-        .build(name, globals, file_send)
+    let file_source = config
+        .build("file_source", globals, file_send)
         .map_err(|e| format!("Failed in creating file source with error: {:?}", e))?;
 
     Ok((file_recv, file_source))
 }
 
-fn transform_message() -> Result<Box<dyn Transform>, String> {
-    let mut rp_config = RegexParserConfig::default();
-    // message field
-    rp_config.regex = r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<message>.*)$".to_owned();
-    // drop field
-    rp_config
-        .types
-        .insert(event::TIMESTAMP.clone(), "timestamp|%+".to_owned());
-    // stream is a string
-    // message is a string
-    rp_config.build().map_err(|e| {
-        format!(
-            "Failed in creating message regex transform with error: {:?}",
-            e
-        )
-    })
+fn transform_message() -> JsonParser {
+    let mut config = JsonParserConfig::default();
+
+    // Don't drop if this is not json to allow user to have some options.
+    config.drop_invalid = false;
+
+    // In case this is json, message will be overwritten with log field.
+    // In other cases it's better to retain the field. This will allow
+    // the user to have some options in how to deal with this.
+    config.drop_field = false;
+
+    config.into()
 }
 
 fn transform_file() -> Result<Box<dyn Transform>, String> {
-    let mut rp_config = RegexParserConfig::default();
-    rp_config.field = Some("file".into());
-    rp_config.regex = r"^".to_owned()
+    let mut config = RegexParserConfig::default();
+
+    config.field = Some("file".into());
+
+    config.regex = r"^".to_owned()
         + LOG_DIRECTORY
-        + r"(?P<pod>[^/]*)/(?P<container_name>[^_]*)_(?P<container>[^.]*)\.log$";
-    // drop field, this field is implementation depended so remove it
-    // pod is a string
+        + r"(?P<pod_uid>[^/]*)/(?P<container_name>[^/]*)/[0-9]*[.]log$";
+
+    // this field is implementation depended so remove it
+    config.drop_field = true;
+
+    // pod_uid is a string
     // container_name is a string
-    // container is a string
-    rp_config.build().map_err(|e| {
+    config.build().map_err(|e| {
         format!(
             "Failed in creating file regex transform with error: {:?}",
             e
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_path_transform() {
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit("file".into(),"/var/log/pods/default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e/busybox/3.log".to_owned().into());
+
+        let mut transform = transform_file().unwrap();
+
+        assert_eq!(
+            transform
+                .transform(event)
+                .expect("Transformed")
+                .as_log()
+                .get(&"container_name".into())
+                .expect("container_name present"),
+            &ValueKind::from("busybox")
+        );
+    }
 }
