@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
+description: Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 ---
 
 <!--
@@ -15,7 +15,7 @@ description: Accepts `log` events and allows you to tokenize a log field's value
 ![][images.tokenizer_transform]
 
 
-The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you to tokenize a log field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names.
+The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 
 ## Config File
 
@@ -265,6 +265,7 @@ Finally, consider the following alternatives:
 * [`grok_parser` transform][docs.grok_parser_transform]
 * [`lua` transform][docs.lua_transform]
 * [`regex_parser` transform][docs.regex_parser_transform]
+* [`split` transform][docs.split_transform]
 
 ## Resources
 
@@ -280,6 +281,7 @@ Finally, consider the following alternatives:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.sources]: ../../../usage/configuration/sources
+[docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tokenizer_transform]: ../../../assets/tokenizer-transform.svg

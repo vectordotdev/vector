@@ -12,6 +12,7 @@ pub mod regex_parser;
 pub mod remove_fields;
 pub mod remove_tags;
 pub mod sampler;
+pub mod split;
 pub mod tokenizer;
 
 pub trait Transform: Send {

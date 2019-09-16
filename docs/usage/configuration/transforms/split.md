@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to parse a log field value with Grok.
+description: Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 ---
 
 <!--
@@ -7,15 +7,15 @@ description: Accepts `log` events and allows you to parse a log field value with
 
      To make changes please edit the template located at:
 
-     scripts/generate/templates/docs/usage/configuration/transforms/grok_parser.md.erb
+     scripts/generate/templates/docs/usage/configuration/transforms/split.md.erb
 -->
 
-# grok_parser transform
+# split transform
 
-![][images.grok_parser_transform]
+![][images.split_transform]
 
 
-The `grok_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a log field value with [Grok][url.grok].
+The `split` transform accepts [`log`][docs.log_event] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 
 ## Config File
 
@@ -24,13 +24,14 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = "grok_parser" # must be: "grok_parser"
+  type = "split" # must be: "split"
   inputs = ["my-source-id"]
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - General
   drop_field = true # default
   field = "message" # default
+  separator = ","
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -47,13 +48,14 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```coffeescript
 [transforms.<transform-id>]
   # REQUIRED - General
-  type = "grok_parser"
+  type = "split"
   inputs = ["<string>", ...]
-  pattern = "<string>"
+  field_names = ["<string>", ...]
 
   # OPTIONAL - General
   drop_field = <bool>
   field = "<string>"
+  separator = ["<string>", ...]
 
   # OPTIONAL - Types
   [transforms.<transform-id>.types]
@@ -62,7 +64,7 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (specification)" %}
 ```coffeescript
-[transforms.grok_parser_transform]
+[transforms.split_transform]
   #
   # General
   #
@@ -71,8 +73,8 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # 
   # * required
   # * no default
-  # * must be: "grok_parser"
-  type = "grok_parser"
+  # * must be: "split"
+  type = "split"
 
   # A list of upstream source or transform IDs. See Config Composition for more
   # info.
@@ -81,32 +83,38 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
   # * no default
   inputs = ["my-source-id"]
 
-  # The Grok pattern
+  # The field names assigned to the resulting tokens, in order.
   # 
   # * required
   # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+  field_names = ["timestamp", "level", "message"]
 
-  # If `true` will drop the specified `field` after parsing.
+  # If `true` the `field` will be dropped after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The log field to execute the `pattern` against. Must be a `string` value.
+  # The field to apply the split on.
   # 
   # * optional
   # * default: "message"
   field = "message"
 
+  # The separator to split the field on. If no separator is given, it will split
+  # on whitespace.
+  # 
+  # * optional
+  # * no default
+  separator = ","
+
   #
   # Types
   #
 
-  [transforms.grok_parser_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
+  [transforms.split_transform.types]
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
     # 
     # * required
     # * no default
@@ -127,27 +135,66 @@ The `grok_parser` transform accepts [`log`][docs.log_event] events and allows yo
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "grok_parser"` |
+| `type` | `string` | The component type<br />`required` `must be: "split"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `pattern` | `string` | The [Grok pattern][url.grok_patterns]<br />`required` `example: (see above)` |
+| `field_names` | `[string]` | The field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
 | **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If `true` will drop the specified `field` after parsing.<br />`default: true` |
-| `field` | `string` | The log field to execute the `pattern` against. Must be a `string` value.<br />`default: "message"` |
+| `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
+| `field` | `string` | The field to apply the split on.<br />`default: "message"` |
+| `separator` | `[string]` | The separator to split the field on. If no separator is given, it will split on whitespace.<br />`default: "whitespace"` |
 | **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
+
+## Examples
+
+Given the following log line:
+
+{% code-tabs %}
+{% code-tabs-item title="log" %}
+```json
+{
+  "message": "5.86.210.12,zieme4647,19/06/2019:17:20:49 -0400,GET /embrace/supply-chains/dynamic/vertical,201,20574"
+}
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+And the following configuration:
+
+{% code-tabs %}
+{% code-tabs-item title="vector.toml" %}
+```coffeescript
+[transforms.<transform-id>]
+type = "split"
+field = "message"
+fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
+  [transforms.<transform-id>.types]
+    status = "int"
+    bytes = "int"
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
+
+A [`log` event][docs.log_event] will be emitted with the following structure:
+
+```javascript
+{
+  // ... existing fields
+  "remote_addr": "5.86.210.12",
+  "user_id": "zieme4647",
+  "timestamp": "19/06/2019:17:20:49 -0400",
+  "message": "GET /embrace/supply-chains/dynamic/vertical",
+  "status": 201,
+  "bytes": 20574
+}
+```
+
+A few things to note about the output:
+
+1. The `message` field was overwritten.
+2. The `status` and `bytes` fields are integers because of type coercion.
 
 ## How It Works
-
-### Available Patterns
-
-Vector uses the Rust [`grok` library][url.rust_grok_library]. All patterns
-[listed here][url.grok_patterns] are supported. It is recommended to use
-maintained patterns when possible since they can be improved over time by
-the community.
-
-### Debugging
-
-We recommend the [Grok debugger][url.grok_debugger] for Grok testing.
 
 ### Environment Variables
 
@@ -157,14 +204,6 @@ will be replaced before being evaluated.
 
 You can learn more in the [Environment Variables][docs.configuration.environment-variables]
 section.
-
-### Performance
-
-Grok is approximately 50% slower than the [`regex_parser` transform][docs.regex_parser_transform].
-We plan to add a [performance test][docs.performance] for this in the future.
-While this is still plenty fast for most use cases we recommend using the
-[`regex_parser` transform][docs.regex_parser_transform] if you are experiencing
-performance issues.
 
 ### Types
 
@@ -207,9 +246,9 @@ The best place to start with troubleshooting is to check the
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `grok_parser_transform` issues][url.grok_parser_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_grok_parser_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_grok_parser_transform_enhancement].
+1. Check for any [open `split_transform` issues][url.split_transform_issues].
+2. If encountered a bug, please [file a bug report][url.new_split_transform_bug].
+3. If encountered a missing feature, please [file a feature request][url.new_split_transform_enhancement].
 4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
 
 
@@ -217,41 +256,34 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`grok_parser` transform][docs.grok_parser_transform]
 * [`lua` transform][docs.lua_transform]
 * [`regex_parser` transform][docs.regex_parser_transform]
-* [`split` transform][docs.split_transform]
 * [`tokenizer` transform][docs.tokenizer_transform]
 
 ## Resources
 
-* [**Issues**][url.grok_parser_transform_issues] - [enhancements][url.grok_parser_transform_enhancements] - [bugs][url.grok_parser_transform_bugs]
-* [**Source code**][url.grok_parser_transform_source]
-* [**Grok Debugger**][url.grok_debugger]
-* [**Grok Patterns**][url.grok_patterns]
+* [**Issues**][url.split_transform_issues] - [enhancements][url.split_transform_enhancements] - [bugs][url.split_transform_bugs]
+* [**Source code**][url.split_transform_source]
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.performance]: ../../../performance.md
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.sources]: ../../../usage/configuration/sources
-[docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
-[url.grok]: http://grokdebug.herokuapp.com/
-[url.grok_debugger]: http://grokdebug.herokuapp.com/
-[url.grok_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22+label%3A%22Type%3A+bug%22
-[url.grok_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22+label%3A%22Type%3A+enhancement%22
-[url.grok_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+grok_parser%22
-[url.grok_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/grok_parser.rs
-[url.grok_patterns]: https://github.com/daschl/grok/tree/master/patterns
-[url.new_grok_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+grok_parser&labels=Type%3A+bug
-[url.new_grok_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+grok_parser&labels=Type%3A+enhancement
-[url.rust_grok_library]: https://github.com/daschl/grok
+[images.split_transform]: ../../../assets/split-transform.svg
+[url.new_split_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+split&labels=Type%3A+bug
+[url.new_split_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+split&labels=Type%3A+enhancement
+[url.split_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22+label%3A%22Type%3A+bug%22
+[url.split_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22+label%3A%22Type%3A+enhancement%22
+[url.split_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+split%22
+[url.split_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/split.rs
 [url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [url.vector_chat]: https://chat.vector.dev

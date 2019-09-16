@@ -950,6 +950,69 @@ end
   # * no default
   pass_list = ["[error]", "field2"]
 
+[transforms.split]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "split"
+  type = "split"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The field names assigned to the resulting tokens, in order.
+  # 
+  # * required
+  # * no default
+  field_names = ["timestamp", "level", "message"]
+
+  # If `true` the `field` will be dropped after parsing.
+  # 
+  # * optional
+  # * default: true
+  drop_field = true
+
+  # The field to apply the split on.
+  # 
+  # * optional
+  # * default: "message"
+  field = "message"
+
+  # The separator to split the field on. If no separator is given, it will split
+  # on whitespace.
+  # 
+  # * optional
+  # * no default
+  separator = ","
+
+  #
+  # Types
+  #
+
+  [transforms.split.types]
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # 
+    # * required
+    # * no default
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+
 [transforms.tokenizer]
   #
   # General
