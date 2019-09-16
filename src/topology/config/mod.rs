@@ -61,7 +61,8 @@ impl GlobalOptions {
     ) -> Result<PathBuf, crate::Error> {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
-            .ok_or_else(|| Box::new(DataDirError::MissingDataDir) as crate::Error)? // Rust can't infer type here
+            .ok_or_else(|| DataDirError::MissingDataDir)
+            .map_err(|err| Box::new(err))?
             .to_path_buf();
         if !data_dir.exists() {
             return Err(DataDirError::DoesNotExist { data_dir }.into());
