@@ -321,6 +321,7 @@ Finally, consider the following alternatives:
 
 * [`grok_parser` transform][docs.grok_parser_transform]
 * [`lua` transform][docs.lua_transform]
+* [`split` transform][docs.split_transform]
 * [`tokenizer` transform][docs.tokenizer_transform]
 
 ## Resources
@@ -339,6 +340,7 @@ Finally, consider the following alternatives:
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
 [docs.sources]: ../../../usage/configuration/sources
+[docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
