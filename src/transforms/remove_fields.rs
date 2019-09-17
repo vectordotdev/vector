@@ -18,7 +18,7 @@ pub struct RemoveFields {
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields::new(self.fields.clone())))
     }
 

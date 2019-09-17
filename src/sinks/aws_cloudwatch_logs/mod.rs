@@ -128,7 +128,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
@@ -163,7 +163,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, crate::Error> {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> crate::Result<Self> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
@@ -249,10 +249,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(
-        config: &CloudwatchLogsSinkConfig,
-        key: &CloudwatchKey,
-    ) -> Result<Self, crate::Error> {
+    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> crate::Result<Self> {
         let region = config.region.clone().try_into()?;
         let client = create_client(region)?;
 
@@ -409,7 +406,7 @@ enum HealthcheckError {
     GroupNameMismatch { expected: String, name: String },
 }
 
-fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, crate::Error> {
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> crate::Result<super::Healthcheck> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(Box::new(future::ok(())));
@@ -460,7 +457,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, c
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region) -> Result<CloudWatchLogsClient, crate::Error> {
+fn create_client(region: Region) -> crate::Result<CloudWatchLogsClient> {
     let http = HttpClient::new().context(HttpClientError)?;
     let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
 

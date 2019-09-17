@@ -20,7 +20,7 @@ pub struct BlackholeConfig {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = Box::new(BlackholeSink::new(self.clone(), acker));
         let healthcheck = Box::new(healthcheck());
 

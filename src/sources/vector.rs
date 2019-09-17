@@ -40,7 +40,7 @@ impl SourceConfig for VectorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         vector.run(self.address, self.shutdown_timeout_secs, out)
     }

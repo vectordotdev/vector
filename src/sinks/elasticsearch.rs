@@ -69,7 +69,7 @@ pub enum Provider {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common);
         let sink = es(self, common, acker);
@@ -102,7 +102,7 @@ enum ParseError {
 }
 
 impl ElasticSearchCommon {
-    fn parse_config(config: &ElasticSearchConfig) -> Result<Self, crate::Error> {
+    fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", config.host);
         uri.parse::<Uri>().with_context(|| InvalidHost {

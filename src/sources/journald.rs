@@ -48,7 +48,7 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;

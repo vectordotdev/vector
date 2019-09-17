@@ -31,7 +31,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = PartitionedFileSink {
             path: self.path.clone(),
             idle_timeout_secs: self.idle_timeout_secs.unwrap_or(30),
