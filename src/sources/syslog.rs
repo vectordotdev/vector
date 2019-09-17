@@ -242,7 +242,12 @@ fn event_from_str(
 
             event
         })
-        .map_err(|_| warn!("Problem parsing incoming message, check syslog format"))
+        .map_err(|_| {
+            warn!(
+                message = "Problem parsing incoming message, check syslog format",
+                rate_limit_secs = 4 as u64
+            )
+        })
         .ok()
 }
 

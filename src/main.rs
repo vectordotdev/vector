@@ -13,7 +13,9 @@ use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 use topology::Config;
 use tracing::{field, Dispatch};
 use tracing_futures::Instrument;
+use tracing_limit::Limit;
 use tracing_metrics::MetricsSubscriber;
+use tracing_subscriber::layer::SubscriberExt;
 use vector::{metrics, topology};
 
 #[derive(StructOpt, Debug)]
@@ -118,7 +120,8 @@ fn main() {
     let subscriber = tracing_fmt::FmtSubscriber::builder()
         .with_ansi(color)
         .with_filter(tracing_fmt::filter::EnvFilter::from(levels.as_str()))
-        .finish();
+        .finish()
+        .with(Limit::default());
     tracing_env_logger::try_init().expect("init log adapter");
 
     let (metrics_controller, metrics_sink) = metrics::build();

@@ -59,6 +59,7 @@ tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
 tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
 tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
 tracing-tower-http = { git = "https://github.com/tokio-rs/tracing" }
+tracing-subscriber = "0.1.1"
 
 # Metrics
 hotmic = "0.8"
