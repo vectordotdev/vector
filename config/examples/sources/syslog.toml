@@ -2,6 +2,12 @@
 # ------------------------------------------------------------------------------
 # A simple example demonstrating the `syslog` source
 # Docs: https://docs.vector.dev/usage/configuration/sources/syslog
+#
+# Note, that format described in RFC3164 is not supported
+# In case, you are willing to apply Vector for collecting
+# Nginx logs in syslog format, refer to the recipe in RFC3164 discussion:
+# https://github.com/timberio/vector/issues/741
+# (full version of it is here: https://chabik.com/2019/02/nginx-logging-to-syslog/)
 
 [sources.my_syslog_source]
   # REQUIRED - General
