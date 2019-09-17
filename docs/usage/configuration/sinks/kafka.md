@@ -20,51 +20,19 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   key_field = "user_id"
   topic = "topic-1234"
-  
-  # OPTIONAL - General
-  encoding = "json" # no default, enum: "json" or "text"
-  healthcheck = true # default
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "kafka"
-  inputs = ["<string>", ...]
-  bootstrap_servers = "<string>"
-  key_field = "<string>"
-  topic = "<string>"
-
-  # OPTIONAL - General
-  encoding = {"json" | "text"}
-  healthcheck = <bool>
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.kafka_sink]
   #
@@ -161,25 +129,6 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "kafka"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself<br />`required` `example: (see above)` |
-| `key_field` | `string` | The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.<br />`required` `example: "user_id"` |
-| `topic` | `string` | The Kafka topic name to write events to.<br />`required` `example: "topic-1234"` |
-| **OPTIONAL** - General | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
-
 ## How It Works
 
 ### Delivery Guarantee
@@ -263,14 +212,10 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.kafka_sink]: ../../../assets/kafka-sink.svg
 [url.kafka]: https://kafka.apache.org/

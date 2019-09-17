@@ -27,25 +27,18 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "field_filter" # must be: "field_filter"
   inputs = ["my-source-id"]
   field = "file"
   value = "/var/log/nginx.log"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "field_filter"
-  inputs = ["<string>", ...]
-  field = "<string>"
-  value = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.field_filter_transform]
   # The component type
@@ -77,16 +70,6 @@ The `field_filter` transform accepts [`log`][docs.log_event] and [`metric`][docs
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "field_filter"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `field` | `string` | The target log field to compare against the `value`.<br />`required` `example: "file"` |
-| `value` | `string` | If the value of the specified `field` matches this value then the event will be permitted, otherwise it is dropped.<br />`required` `example: "/var/log/nginx.log"` |
 
 ## How It Works
 
@@ -135,14 +118,11 @@ Finally, consider the following alternatives:
 * [**Source code**][url.field_filter_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.field_filter_transform]: ../../../assets/field_filter-transform.svg
 [url.field_filter_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+field_filter%22+label%3A%22Type%3A+bug%22

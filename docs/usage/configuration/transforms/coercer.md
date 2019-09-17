@@ -20,37 +20,16 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "coercer"
-  inputs = ["<string>", ...]
 
-  # OPTIONAL - Types
-  [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.coercer_transform]
   #
@@ -93,16 +72,6 @@ The `coercer` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "coercer"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -227,13 +196,10 @@ Finally, consider the following alternatives:
 * [**Source code**][url.coercer_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.coercer_transform]: ../../../assets/coercer-transform.svg
 [url.coercer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+bug%22

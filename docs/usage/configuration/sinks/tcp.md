@@ -20,69 +20,17 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "tcp" # must be: "tcp"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
-  
-  # OPTIONAL - General
-  healthcheck = true # default
-  
-  # OPTIONAL - Requests
-  encoding = "json" # no default, enum: "json" or "text"
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
-  
-  # OPTIONAL - Tls
-  [sinks.my_sink_id.tls]
-    enabled = false # default
-    verify = true # default
-    ca_file = "/path/to/certificate_authority.crt" # no default
-    crt_file = "/path/to/host_certificate.crt" # no default
-    key_file = "/path/to/host_certificate.key" # no default
-    key_phrase = "PassWord1" # no default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "tcp"
-  inputs = ["<string>", ...]
-  address = "<string>"
-
-  # OPTIONAL - General
-  healthcheck = <bool>
-
-  # OPTIONAL - Requests
-  encoding = {"json" | "text"}
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-
-  # OPTIONAL - Tls
-  [sinks.<sink-id>.tls]
-    enabled = <bool>
-    verify = <bool>
-    ca_file = "<string>"
-    crt_file = "<string>"
-    key_file = "<string>"
-    key_phrase = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.tcp_sink]
   #
@@ -212,31 +160,6 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `address` | `string` | The TCP address.<br />`required` `example: "92.12.333.224:5000"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
-| **OPTIONAL** - Tls | | |
-| `tls.enabled` | `bool` | Enable TLS during connections to the remote.<br />`default: false` |
-| `tls.verify` | `bool` | If `true`, Vector will force certificate validation. Do NOT set this to `false` unless you know the risks of not verifying the remote certificate.<br />`default: true` |
-| `tls.ca_file` | `string` | Absolute path to additional CA certificate file, in PEM format.<br />`no default` `example: (see above)` |
-| `tls.crt_file` | `string` | Absolute path to certificate file used to identify this connection, in PEM format. If this is set, `key_file` must also be set.<br />`no default` `example: (see above)` |
-| `tls.key_file` | `string` | Absolute path to key file used to identify this connection, in PEM format. If this is set, `crt_file` must also be set.<br />`no default` `example: (see above)` |
-| `tls.key_phrase` | `string` | Pass phrase to unlock the encrypted key file. This has no effect unless `key_file` above is set.<br />`no default` `example: "PassWord1"` |
-
 ## How It Works
 
 ### Delivery Guarantee
@@ -320,14 +243,10 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tcp_sink]: ../../../assets/tcp-sink.svg
 [url.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug

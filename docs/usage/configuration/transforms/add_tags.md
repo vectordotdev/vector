@@ -20,7 +20,7 @@ The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -31,21 +31,11 @@ The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows
   [transforms.my_transform_id.tags]
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "add_tags"
-  inputs = ["<string>", ...]
 
-  # REQUIRED - Tags
-  [transforms.<transform-id>.tags]
-    * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.add_tags_transform]
   #
@@ -80,16 +70,6 @@ The `add_tags` transform accepts [`metric`][docs.metric_event] events and allows
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "add_tags"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **REQUIRED** - Tags | | |
-| `tags.*` | `*` | A key/value pair representing the new tag to be added.<br />`required` `example: (see above)` |
 
 ## How It Works
 
@@ -131,14 +111,11 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_tags_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.add_tags_transform]: ../../../assets/add_tags-transform.svg
 [url.add_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22+label%3A%22Type%3A+bug%22

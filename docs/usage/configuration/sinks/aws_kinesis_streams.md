@@ -27,77 +27,18 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "aws_kinesis_streams" # must be: "aws_kinesis_streams"
   inputs = ["my-source-id"]
   region = "us-east-1"
   stream_name = "my-stream"
-  
-  # OPTIONAL - General
-  healthcheck = true # default
-  hostname = "127.0.0.0:5000"
-  partition_key_field = "user_id" # no default
-  
-  # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Requests
-  encoding = "json" # no default, enum: "json" or "text"
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 5 # default
-  request_in_flight_limit = 5 # default
-  request_timeout_secs = 30 # default, seconds
-  retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, seconds
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "aws_kinesis_streams"
-  inputs = ["<string>", ...]
-  region = "<string>"
-  stream_name = "<string>"
-
-  # OPTIONAL - General
-  healthcheck = <bool>
-  hostname = "<string>"
-  partition_key_field = "<string>"
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Requests
-  encoding = {"json" | "text"}
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.aws_kinesis_streams_sink]
   #
@@ -257,36 +198,6 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.log_
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "aws_kinesis_streams"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `region` | `string` | The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides.<br />`required` `example: "us-east-1"` |
-| `stream_name` | `string` | The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream.<br />`required` `example: "my-stream"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
-| `partition_key_field` | `string` | The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.<br />`no default` `example: "user_id"` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
-| **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
 ## Examples
 
@@ -520,24 +431,18 @@ issue, please:
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring.logs]: ../../../usage/administration/monitoring.md#logs
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.aws_kinesis_streams_sink]: ../../../assets/aws_kinesis_streams-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
-[url.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [url.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [url.aws_kinesis_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html

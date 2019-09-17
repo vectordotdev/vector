@@ -20,28 +20,17 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
   target = "stdout" # enum: "stdout" or "stderr"
-  
-  encoding = "json" # no default, enum: "json" or "text"
-  healthcheck = true # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  type = "console"
-  inputs = ["<string>", ...]
-  target = {"stdout" | "stderr"}
-  encoding = {"json" | "text"}
-  healthcheck = <bool>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.console_sink]
   # The component type
@@ -83,18 +72,6 @@ The `console` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "console"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `target` | `string` | The [standard stream][url.standard_streams] to write to.<br />`required` `enum: "stdout" or "stderr"` |
-| **OPTIONAL** | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "json" or "text"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 
 ## How It Works
 
@@ -179,14 +156,11 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.console_sink]: ../../../assets/console-sink.svg
 [url.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+bug%22
@@ -195,5 +169,4 @@ issue, please:
 [url.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
 [url.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+bug
 [url.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+enhancement
-[url.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [url.vector_chat]: https://chat.vector.dev

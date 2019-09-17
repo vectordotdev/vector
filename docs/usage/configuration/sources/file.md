@@ -27,67 +27,16 @@ The `file` source ingests data through one or more local files and outputs [`log
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "file" # must be: "file"
-  exclude = ["/var/log/nginx/access.log"]
   include = ["/var/log/nginx/*.log"]
-  
-  # OPTIONAL - General
-  data_dir = "/var/lib/vector" # no default
-  glob_minimum_cooldown = 1000 # default, milliseconds
-  ignore_older = 86400 # no default, seconds
-  max_line_bytes = 102400 # default, bytes
-  max_read_bytes = 2048 # default, bytes
-  message_start_indicator = "^(INFO|ERROR)" # no default
-  multi_line_timeout = 1000 # default, milliseconds
-  oldest_first = false # default
-  start_at_beginning = false # default
-  
-  # OPTIONAL - Context
-  file_key = "file" # default
-  host_key = "host" # default
-  
-  # OPTIONAL - Fingerprinting
-  [sources.my_source_id.fingerprinting]
-    strategy = "checksum" # default, enum: "checksum" or "device_and_inode"
-    fingerprint_bytes = 256 # default, bytes, relevant when strategy = "checksum"
-    ignored_header_bytes = 0 # default, bytes, relevant when strategy = "checksum"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  # REQUIRED - General
-  type = "file"
-  exclude = ["<string>", ...]
-  include = ["<string>", ...]
-
-  # OPTIONAL - General
-  data_dir = "<string>"
-  glob_minimum_cooldown = <int>
-  ignore_older = <int>
-  max_line_bytes = <int>
-  max_read_bytes = <int>
-  message_start_indicator = "<string>"
-  multi_line_timeout = <int>
-  oldest_first = <bool>
-  start_at_beginning = <bool>
-
-  # OPTIONAL - Context
-  file_key = "<string>"
-  host_key = "<string>"
-
-  # OPTIONAL - Fingerprinting
-  [sources.<source-id>.fingerprinting]
-    strategy = {"checksum" | "device_and_inode"}
-    fingerprint_bytes = <int>
-    ignored_header_bytes = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.file_source]
   #
@@ -100,13 +49,6 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * no default
   # * must be: "file"
   type = "file"
-
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
-  # over the `include` option.*
-  # 
-  # * required
-  # * no default
-  exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
   # 
@@ -121,6 +63,13 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * optional
   # * no default
   data_dir = "/var/lib/vector"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
+  # 
+  # * optional
+  # * no default
+  exclude = ["/var/log/nginx/access.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -235,32 +184,6 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "file"` |
-| `exclude` | `[string]` | Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*<br />`required` `example: ["/var/log/nginx/access.log"]` |
-| `include` | `[string]` | Array of file patterns to include. [Globbing](#globbing) is supported. See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.<br />`required` `example: ["/var/log/nginx/*.log"]` |
-| **OPTIONAL** - General | | |
-| `data_dir` | `string` | The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.<br />`no default` `example: "/var/lib/vector"` |
-| `glob_minimum_cooldown` | `int` | Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.<br />`default: 1000` `unit: milliseconds` |
-| `ignore_older` | `int` | Ignore files with a data modification date that does not exceed this age.<br />`no default` `example: 86400` `unit: seconds` |
-| `max_line_bytes` | `int` | The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.<br />`default: 102400` `unit: bytes` |
-| `max_read_bytes` | `int` | An approximate limit on the amount of data read from a single file at a given time.<br />`default: 2048` `unit: bytes` |
-| `message_start_indicator` | `string` | When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.<br />`no default` `example: "^(INFO\|ERROR)"` |
-| `multi_line_timeout` | `int` | When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.<br />`default: 1000` `unit: milliseconds` |
-| `oldest_first` | `bool` | Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files. See [File Read Order](#file-read-order) for more info.<br />`default: false` |
-| `start_at_beginning` | `bool` | When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.<br />`default: false` |
-| **OPTIONAL** - Context | | |
-| `file_key` | `string` | The key name added to each event with the full path of the file. See [Context](#context) for more info.<br />`default: "file"` |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
-| **OPTIONAL** - Fingerprinting | | |
-| `fingerprinting.strategy` | `string` | Whether to use the content of a file to differentiate it (`checksum`) or the storage device and inode (`device_and_inode`). Depending on your log rotation strategy, one may be a better fit than the other.<br />`default: "checksum"` `enum: "checksum" or "device_and_inode"` |
-| `fingerprinting.fingerprint_bytes` | `int` | The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.<br />`default: 256` `unit: bytes` |
-| `fingerprinting.ignored_header_bytes` | `int` | The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.<br />`default: 0` `unit: bytes` |
 
 ## Examples
 

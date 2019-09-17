@@ -20,47 +20,17 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-  
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "tokenizer"
-  inputs = ["<string>", ...]
-  field_names = ["<string>", ...]
-
-  # OPTIONAL - General
-  drop_field = <bool>
-  field = "<string>"
-
-  # OPTIONAL - Types
-  [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.tokenizer_transform]
   #
@@ -121,20 +91,6 @@ The `tokenizer` transform accepts [`log`][docs.log_event] events and allows you 
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tokenizer"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `field_names` | `[string]` | The log field names assigned to the resulting tokens, in order.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If `true` the `field` will be dropped after parsing.<br />`default: true` |
-| `field` | `string` | The log field to tokenize.<br />`default: "message"` |
-| **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -273,16 +229,13 @@ Finally, consider the following alternatives:
 * [**Source code**][url.tokenizer_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.sources]: ../../../usage/configuration/sources
 [docs.split_transform]: ../../../usage/configuration/transforms/split.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
 [url.new_tokenizer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+bug

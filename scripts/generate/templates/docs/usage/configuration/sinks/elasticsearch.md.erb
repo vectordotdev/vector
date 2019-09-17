@@ -6,10 +6,6 @@
 
 <%= component_config_example(component) %>
 
-## Options
-
-<%= options_table(component.options.to_h.values.sort) %>
-
 ## Examples
 
 The `elasticsearch` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:

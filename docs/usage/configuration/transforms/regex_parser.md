@@ -20,47 +20,17 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-  
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "regex_parser"
-  inputs = ["<string>", ...]
-  regex = "<string>"
-
-  # OPTIONAL - General
-  drop_field = <bool>
-  field = "<string>"
-
-  # OPTIONAL - Types
-  [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.regex_parser_transform]
   #
@@ -121,20 +91,6 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "regex_parser"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If the specified `field` should be dropped (removed) after parsing.<br />`default: true` |
-| `field` | `string` | The log field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
-| **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -332,17 +288,14 @@ Finally, consider the following alternatives:
 * [**Rust Regex Syntax**][url.rust_regex_syntax]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
-[docs.sources]: ../../../usage/configuration/sources
 [docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
 [url.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+bug

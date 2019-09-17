@@ -20,30 +20,17 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "file" # must be: "file"
   inputs = ["my-source-id"]
   path = "vector-%Y-%m-%d.log"
-  
-  encoding = "ndjson" # no default, enum: "ndjson" or "text"
-  healthcheck = true # default
-  idle_timeout_secs = "30" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  type = "file"
-  inputs = ["<string>", ...]
-  path = "<string>"
-  encoding = {"ndjson" | "text"}
-  healthcheck = <bool>
-  idle_timeout_secs = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.file_sink]
   # The component type
@@ -91,19 +78,6 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "file"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `path` | `string` | File name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`required` `example: "vector-%Y-%m-%d.log"` |
-| **OPTIONAL** | | |
-| `encoding` | `string` | The encoding format used to serialize the events before appending. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson" or "text"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
-| `idle_timeout_secs` | `int` | The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.<br />`default: "30"` |
 
 ## How It Works
 
@@ -195,14 +169,11 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.file_sink]: ../../../assets/file-sink.svg
 [url.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22

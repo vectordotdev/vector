@@ -20,39 +20,16 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "syslog" # must be: "syslog"
   mode = "tcp" # enum: "tcp", "udp", and "unix"
-  
-  # OPTIONAL - General
-  address = "0.0.0.0:9000" # no default
-  max_length = 102400 # default, bytes
-  path = "/path/to/socket" # no default, relevant when mode = "unix"
-  
-  # OPTIONAL - Context
-  host_key = "host" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  # REQUIRED - General
-  type = "syslog"
-  mode = {"tcp" | "udp" | "unix"}
-
-  # OPTIONAL - General
-  address = "<string>"
-  max_length = <int>
-  path = "<string>"
-
-  # OPTIONAL - Context
-  host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.syslog_source]
   #
@@ -106,20 +83,6 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "syslog"` |
-| `mode` | `string` | The input mode.<br />`required` `enum: "tcp", "udp", and "unix"` |
-| **OPTIONAL** - General | | |
-| `address` | `string` | The TCP or UDP address to listen on.<br />`no default` `example: "0.0.0.0:9000"` |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `path` | `string` | The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"<br />`no default` `example: "/path/to/socket"` |
-| **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 
