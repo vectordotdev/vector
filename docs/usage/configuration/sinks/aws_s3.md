@@ -30,10 +30,22 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "aws_s3" # must be: "aws_s3"
   inputs = ["my-source-id"]
   bucket = "my-bucket"
   region = "us-east-1"
+  
+  # OPTIONAL - Batching
+  batch_size = 10490000 # default, bytes
+  batch_timeout = 300 # default, seconds
+  
+  # OPTIONAL - Object Names
+  key_prefix = "date=%F/"
+  
+  # OPTIONAL - Requests
+  compression = "gzip" # no default, must be: "gzip" (if supplied)
+  encoding = "ndjson" # no default, enum: "ndjson" or "text"
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -155,13 +167,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
-
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
 
   # The window used for the `request_rate_limit_num` option
   # 

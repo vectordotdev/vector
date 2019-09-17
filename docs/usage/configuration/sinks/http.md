@@ -23,10 +23,18 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "http" # must be: "http"
   inputs = ["my-source-id"]
   encoding = "ndjson" # enum: "ndjson" or "text"
   uri = "https://10.22.212.22:9000/endpoint"
+  
+  # OPTIONAL - General
+  compression = "gzip" # no default, must be: "gzip" (if supplied)
+  
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 5 # default, seconds
 
   # For a complete list of options see the "advanced" tab above.
 ```

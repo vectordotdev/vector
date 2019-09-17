@@ -16,6 +16,7 @@ class BatchingSink < Sink
   def initialize(hash)
     super(hash)
 
+    batch_is_simple = hash["batch_is_simple"] == true
     @batch_size = hash.fetch("batch_size")
     @batch_timeout = hash.fetch("batch_timeout")
     @rate_limit_duration = hash.fetch("rate_limit_duration")
@@ -33,6 +34,7 @@ class BatchingSink < Sink
       "default" => @batch_size,
       "description" => "The maximum size of a batch before it is flushed.",
       "null" => false,
+      "simple" => batch_is_simple,
       "type" => "int",
       "unit" => "bytes"
     })
@@ -43,6 +45,7 @@ class BatchingSink < Sink
       "default" => @batch_timeout,
       "description" => "The maximum age of a batch before it is flushed.",
       "null" => false,
+      "simple" => batch_is_simple,
       "type" => "int",
       "unit" => "seconds"
     })

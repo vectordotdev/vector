@@ -30,10 +30,14 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "clickhouse" # must be: "clickhouse"
   inputs = ["my-source-id"]
   host = "http://localhost:8123"
   table = "mytable"
+  
+  # OPTIONAL - Requests
+  compression = "gzip" # no default, must be: "gzip" (if supplied)
 
   # For a complete list of options see the "advanced" tab above.
 ```

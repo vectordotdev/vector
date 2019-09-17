@@ -1504,13 +1504,6 @@ end
   encoding = "ndjson"
   encoding = "text"
 
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
-
   # The window used for the `request_rate_limit_num` option
   # 
   # * optional
