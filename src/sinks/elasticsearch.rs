@@ -11,15 +11,16 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use futures::{stream::iter_ok, Future, Sink};
-use http::{Method, Uri};
+use http::{uri::InvalidUri, Method, Uri};
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
-use rusoto_credential::AwsCredentials;
+use rusoto_credential::{AwsCredentials, CredentialsError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::time::Duration;
@@ -88,12 +89,25 @@ struct ElasticSearchCommon {
     credentials: Option<AwsCredentials>,
 }
 
+#[derive(Debug, Snafu)]
+enum ParseError {
+    #[snafu(display("Invalid host {:?}: {:?}", host, source))]
+    InvalidHost { host: String, source: InvalidUri },
+    #[snafu(display("AWS provider requires a configured region"))]
+    AWSRequiresRegion,
+    #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
+    AWSCredentialsProviderFailed { source: CredentialsError },
+    #[snafu(display("Could not generate AWS credentials: {:?}", source))]
+    AWSCredentialsGenerateFailed { source: CredentialsError },
+}
+
 impl ElasticSearchCommon {
-    fn parse_config(config: &ElasticSearchConfig) -> Result<Self, String> {
+    fn parse_config(config: &ElasticSearchConfig) -> Result<Self, crate::Error> {
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", config.host);
-        uri.parse::<Uri>()
-            .map_err(|err| format!("Invalid elasticsearch host: {}", err))?;
+        uri.parse::<Uri>().with_context(|| InvalidHost {
+            host: config.host.clone(),
+        })?;
 
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
@@ -101,7 +115,7 @@ impl ElasticSearchCommon {
         });
 
         let region: Option<Region> = match config.region {
-            Some(ref region) => Some(region.try_into().map_err(|err| format!("{}", err))?),
+            Some(ref region) => Some(region.try_into()?),
             None => None,
         };
 
@@ -109,16 +123,14 @@ impl ElasticSearchCommon {
             Provider::Default => None,
             Provider::Aws => {
                 if region.is_none() {
-                    return Err("AWS provider requires a configured region".into());
+                    return Err(ParseError::AWSRequiresRegion.into());
                 }
                 Some(
                     DefaultCredentialsProvider::new()
-                        .map_err(|err| {
-                            format!("Could not create AWS credentials provider: {}", err)
-                        })?
+                        .context(AWSCredentialsProviderFailed)?
                         .credentials()
                         .wait()
-                        .map_err(|err| format!("Could not generate AWS credentials: {}", err))?,
+                        .context(AWSCredentialsGenerateFailed)?,
                 )
             }
         };
