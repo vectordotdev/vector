@@ -20,33 +20,15 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "stdin" # must be: "stdin"
-  
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
-  
-  # OPTIONAL - Context
-  host_key = "host" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  # REQUIRED - General
-  type = "stdin"
-
-  # OPTIONAL - General
-  max_length = <int>
-
-  # OPTIONAL - Context
-  host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.stdin_source]
   #
@@ -79,17 +61,6 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "stdin"` |
-| **OPTIONAL** - General | | |
-| `max_length` | `int` | The maxiumum bytes size of a message before it is discarded.<br />`default: 102400` `unit: bytes` |
-| **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 

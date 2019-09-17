@@ -20,7 +20,7 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -29,31 +29,19 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
+    # REQUIRED
     type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
     name = "duration_total"
     
+    # OPTIONAL
     increment_by_value = false # default, relevant when type = "counter"
     tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "log_to_metric"
-  inputs = ["<string>", ...]
 
-  # REQUIRED - Metrics
-  [[transforms.<transform-id>.metrics]]
-    type = {"counter" | "gauge" | "histogram" | "set"}
-    field = "<string>"
-    name = "<string>"
-    increment_by_value = <bool>
-    tags = {* = "<string>"}
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.log_to_metric_transform]
   #
@@ -120,20 +108,6 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "log_to_metric"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **REQUIRED** - Metrics | | |
-| `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge", "histogram", and "set"` |
-| `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
-| `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`required` `example: "duration_total"` |
-| `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"<br />`default: false` |
-| `metrics.tags.*` | `string` | Key/value pairs representing the metric tags.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -501,14 +475,11 @@ issue, please:
 * [**Source code**][url.log_to_metric_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
 [url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22

@@ -20,73 +20,18 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
   host = "my-splunk-host.com"
   token = "A94A8FE5CCB19BA61C4C08"
-  
-  # OPTIONAL - General
-  healthcheck = true # default
-  
-  # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Requests
-  encoding = "ndjson" # no default, enum: "ndjson" or "text"
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 10 # default
-  request_in_flight_limit = 10 # default
-  request_timeout_secs = 60 # default, seconds
-  retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, seconds
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "splunk_hec"
-  inputs = ["<string>", ...]
-  host = "<string>"
-  token = "<string>"
-
-  # OPTIONAL - General
-  healthcheck = <bool>
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Requests
-  encoding = {"ndjson" | "text"}
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.splunk_hec_sink]
   #
@@ -234,34 +179,6 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "splunk_hec"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `host` | `string` | Your Splunk HEC host.<br />`required` `example: "my-splunk-host.com"` |
-| `token` | `string` | Your Splunk HEC token.<br />`required` `example: "A94A8FE5CCB19BA61C4C08"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
-| **OPTIONAL** - Requests | | |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson" or "text"` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
 ## How It Works
 
@@ -414,15 +331,11 @@ should supply to the `host` and `token` options.
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
 [images.splunk_hec_sink]: ../../../assets/splunk_hec-sink.svg

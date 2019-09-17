@@ -27,32 +27,18 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
   topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
-  
-  auto_offset_reset = "smallest"
-  key_field = "user_id" # no default
-  session_timeout_ms = 5000 # milliseconds
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  type = "kafka"
-  bootstrap_servers = "<string>"
-  group_id = "<string>"
-  topics = ["<string>", ...]
-  auto_offset_reset = "<string>"
-  key_field = "<string>"
-  session_timeout_ms = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.kafka_source]
   # The component type
@@ -114,20 +100,6 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "kafka"` |
-| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.<br />`required` `example: (see above)` |
-| `group_id` | `string` | The consumer group name to be used to consume events from Kafka.<br />`required` `example: "consumer-group-name"` |
-| `topics` | `[string]` | The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
-| `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
-| `key_field` | `string` | The log field name to use for the topic key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event.<br />`no default` `example: "user_id"` |
-| `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
 
 ## Examples
 

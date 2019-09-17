@@ -20,23 +20,17 @@ The `remove_tags` transform accepts [`metric`][docs.metric_event] events and all
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "remove_tags" # must be: "remove_tags"
   inputs = ["my-source-id"]
   tags = ["tag1", "tag2"]
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "remove_tags"
-  inputs = ["<string>", ...]
-  tags = ["<string>", ...]
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.remove_tags_transform]
   # The component type
@@ -61,15 +55,6 @@ The `remove_tags` transform accepts [`metric`][docs.metric_event] events and all
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "remove_tags"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `tags` | `[string]` | The tag names to drop.<br />`required` `example: ["tag1", "tag2"]` |
 
 ## How It Works
 
@@ -112,13 +97,10 @@ Finally, consider the following alternatives:
 
 
 [docs.add_tags_transform]: ../../../usage/configuration/transforms/add_tags.md
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.remove_tags_transform]: ../../../assets/remove_tags-transform.svg
 [url.new_remove_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+bug

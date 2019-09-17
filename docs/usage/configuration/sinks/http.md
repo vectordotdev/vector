@@ -20,7 +20,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -31,84 +31,15 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
   
   # OPTIONAL - General
   compression = "gzip" # no default, must be: "gzip" (if supplied)
-  healthcheck = true # default
-  healthcheck_uri = "https://10.22.212.22:9000/_health" # no default
-  verify_certificate = true # default
   
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 5 # default, seconds
-  
-  # OPTIONAL - Requests
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 10 # default
-  request_in_flight_limit = 10 # default
-  request_timeout_secs = 30 # default, seconds
-  retry_attempts = 10 # default
-  retry_backoff_secs = 10 # default, seconds
-  
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "password"
-    user = "username"
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
-  
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    X-Powered-By = "Vector"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "http"
-  inputs = ["<string>", ...]
-  encoding = {"ndjson" | "text"}
-  uri = "<string>"
-
-  # OPTIONAL - General
-  compression = "gzip"
-  healthcheck = <bool>
-  healthcheck_uri = "<string>"
-  verify_certificate = <bool>
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Requests
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-
-  # OPTIONAL - Basic auth
-  [sinks.<sink-id>.basic_auth]
-    password = "<string>"
-    user = "<string>"
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-
-  # OPTIONAL - Headers
-  [sinks.<sink-id>.headers]
-    * = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.http_sink]
   #
@@ -302,41 +233,6 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "http"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`required` `enum: "ndjson" or "text"` |
-| `uri` | `string` | The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
-| `compression` | `string` | The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `healthcheck_uri` | `string` | A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.<br />`no default` `example: (see above)` |
-| `verify_certificate` | `bool` | When making a connection to a HTTPS server, this controls if the TLS certificate presented by the server will be verified. Do not set this unless you know what you are doing. Turning this off introduces significant vulnerabilities.<br />`default: true` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 5` `unit: seconds` |
-| **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 10` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 10` `unit: seconds` |
-| **OPTIONAL** - Basic auth | | |
-| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
-| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
-| **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing HTTP request.<br />`required` `example: (see above)` |
-
 ## Examples
 
 The `http` sink batches [`log`][docs.log_event] up to the `batch_size` or
@@ -522,15 +418,11 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.http_sink]: ../../../assets/http-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg

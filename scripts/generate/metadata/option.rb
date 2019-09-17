@@ -40,6 +40,7 @@ class Option
     @null = hash.fetch("null")
     @partition_key = hash["partition_key"] == true
     @relevant_when = hash["relevant_when"]
+    @simple = hash["simple"] == true
     @templateable = hash["templateable"] == true
     @type = hash.fetch("type")
     @unit = hash["unit"]
@@ -114,6 +115,10 @@ class Option
 
   def required?
     default.nil? && null == false
+  end
+
+  def simple?
+    @simple == true || required?
   end
 
   def sort_token

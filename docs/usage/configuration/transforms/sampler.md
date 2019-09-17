@@ -27,26 +27,17 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
   rate = 10
-  
-  pass_list = ["[error]", "field2"] # no default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "sampler"
-  inputs = ["<string>", ...]
-  rate = <int>
-  pass_list = ["<string>", ...]
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.sampler_transform]
   # The component type
@@ -81,17 +72,6 @@ The `sampler` transform accepts [`log`][docs.log_event] events and allows you to
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "sampler"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `rate` | `int` | The rate at which events will be forwarded, expressed as 1/N. For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.<br />`required` `example: 10` |
-| **OPTIONAL** | | |
-| `pass_list` | `[string]` | A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.<br />`no default` `example: ["[error]", "field2"]` |
 
 ## How It Works
 
@@ -132,13 +112,10 @@ Finally, consider the following alternatives:
 * [**Source code**][url.sampler_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.sampler_transform]: ../../../assets/sampler-transform.svg
 [url.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+bug

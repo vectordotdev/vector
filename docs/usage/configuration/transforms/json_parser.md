@@ -20,26 +20,17 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
-  
-  field = "message" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "json_parser"
-  inputs = ["<string>", ...]
-  drop_invalid = <bool>
-  field = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.json_parser_transform]
   # The component type
@@ -71,17 +62,6 @@ The `json_parser` transform accepts [`log`][docs.log_event] events and allows yo
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "json_parser"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `drop_invalid` | `bool` | If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.<br />`required` `example: true` |
-| **OPTIONAL** | | |
-| `field` | `string` | The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.<br />`default: "message"` |
 
 ## Examples
 
@@ -242,14 +222,11 @@ Finally, consider the following alternatives:
 * [**Source code**][url.json_parser_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.json_parser_transform]: ../../../assets/json_parser-transform.svg
 [url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22

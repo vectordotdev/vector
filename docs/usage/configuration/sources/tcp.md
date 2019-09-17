@@ -20,37 +20,16 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "tcp" # must be: "tcp"
   address = "0.0.0.0:9000"
-  
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
-  shutdown_timeout_secs = 30 # default, seconds
-  
-  # OPTIONAL - Context
-  host_key = "host" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  # REQUIRED - General
-  type = "tcp"
-  address = "<string>"
-
-  # OPTIONAL - General
-  max_length = <int>
-  shutdown_timeout_secs = <int>
-
-  # OPTIONAL - Context
-  host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.tcp_source]
   #
@@ -96,19 +75,6 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "tcp"` |
-| `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
-| **OPTIONAL** - General | | |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
-| **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
 
 ## Examples
 

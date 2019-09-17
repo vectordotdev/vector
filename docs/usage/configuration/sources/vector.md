@@ -27,24 +27,16 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
-  
-  shutdown_timeout_secs = 30 # default, seconds
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  type = "vector"
-  address = "<string>"
-  shutdown_timeout_secs = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.vector_source]
   # The component type
@@ -69,16 +61,6 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "vector"` |
-| `address` | `string` | The TCP address to bind to.<br />`required` `example: "0.0.0.0:9000"` |
-| **OPTIONAL** | | |
-| `shutdown_timeout_secs` | `int` | The timeout before a connection is forcefully closed during shutdown.<br />`default: 30` `unit: seconds` |
 
 ## How It Works
 

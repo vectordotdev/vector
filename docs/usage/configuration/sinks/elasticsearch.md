@@ -27,103 +27,17 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
-  
-  # OPTIONAL - General
-  doc_type = "_doc" # default
-  healthcheck = true # default
-  index = "vector-%Y-%m-%d"
-  provider = "default" # default, enum: "default" or "aws"
-  region = "us-east-1" # no default
-  
-  # OPTIONAL - Batching
-  batch_size = 10490000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
-  # OPTIONAL - Requests
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 5 # default
-  request_in_flight_limit = 5 # default
-  request_timeout_secs = 60 # default, seconds
-  retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, seconds
-  
-  # OPTIONAL - Basic auth
-  [sinks.my_sink_id.basic_auth]
-    password = "password"
-    user = "username"
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
-  
-  # OPTIONAL - Headers
-  [sinks.my_sink_id.headers]
-    X-Powered-By = "Vector"
-  
-  # OPTIONAL - Query
-  [sinks.my_sink_id.query]
-    X-Powered-By = "Vector"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "elasticsearch"
-  inputs = ["<string>", ...]
-  host = "<string>"
-
-  # OPTIONAL - General
-  doc_type = "<string>"
-  healthcheck = <bool>
-  index = "<string>"
-  provider = {"default" | "aws"}
-  region = "<string>"
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Requests
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-
-  # OPTIONAL - Basic auth
-  [sinks.<sink-id>.basic_auth]
-    password = "<string>"
-    user = "<string>"
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-
-  # OPTIONAL - Headers
-  [sinks.<sink-id>.headers]
-    * = "<string>"
-
-  # OPTIONAL - Query
-  [sinks.<sink-id>.query]
-    * = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.elasticsearch_sink]
   #
@@ -327,43 +241,6 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "elasticsearch"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `host` | `string` | The host of your Elasticsearch cluster. This should be the full URL as shown in the example.<br />`required` `example: "http://10.24.32.122:9000"` |
-| **OPTIONAL** - General | | |
-| `doc_type` | `string` | The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.<br />`default: "_doc"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `index` | `string` | Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Template Syntax](#template-syntax) for more info.<br />`default: "vector-%F"` |
-| `provider` | `string` | The provider of the Elasticsearch service.<br />`default: "default"` `enum: "default" or "aws"` |
-| `region` | `string` | When using the AWS provider, the [AWS region][url.aws_cw_logs_regions] of the target Elasticsearch instance.<br />`no default` `example: "us-east-1"` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 1` `unit: seconds` |
-| **OPTIONAL** - Requests | | |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
-| **OPTIONAL** - Basic auth | | |
-| `basic_auth.password` | `string` | The basic authentication password.<br />`required` `example: "password"` |
-| `basic_auth.user` | `string` | The basic authentication user name.<br />`required` `example: "username"` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
-| **OPTIONAL** - Headers | | |
-| `headers.*` | `string` | A custom header to be added to each outgoing Elasticsearch request.<br />`required` `example: (see above)` |
-| **OPTIONAL** - Query | | |
-| `query.*` | `string` | A custom parameter to be added to each Elasticsearch request.<br />`required` `example: (see above)` |
-
 ## Examples
 
 The `elasticsearch` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:
@@ -531,20 +408,15 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data_model]: ../../../about/data-model
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
-[url.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [url.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
 [url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22

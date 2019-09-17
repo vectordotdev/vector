@@ -27,7 +27,7 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -36,52 +36,13 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
   host = "http://localhost:8123"
   table = "mytable"
   
-  # OPTIONAL - General
-  database = "mydatabase" # no default
-  healthcheck = true # default
-  
-  # OPTIONAL - Batching
-  batch_size = 1049000 # default, bytes
-  batch_timeout = 1 # default, seconds
-  
   # OPTIONAL - Requests
   compression = "gzip" # no default, must be: "gzip" (if supplied)
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 5 # default
-  request_in_flight_limit = 5 # default
-  request_timeout_secs = 30 # default, seconds
-  retry_attempts = 9223372036854775807 # default
-  retry_backoff_secs = 9223372036854775807 # default, seconds
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "clickhouse"
-  inputs = ["<string>", ...]
-  host = "<string>"
-  table = "<string>"
-
-  # OPTIONAL - General
-  database = "<string>"
-  healthcheck = <bool>
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Requests
-  compression = "gzip"
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.clickhouse_sink]
   #
@@ -198,30 +159,6 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.log_event] ev
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "clickhouse"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `host` | `string` | The host url of the [Clickhouse][url.clickhouse] server.<br />`required` `example: "http://localhost:8123"` |
-| `table` | `string` | The table that data will be inserted into.<br />`required` `example: "mytable"` |
-| **OPTIONAL** - General | | |
-| `database` | `string` | The database that contains the stable that data will be inserted into.<br />`no default` `example: "mydatabase"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 1049000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: seconds` |
-| **OPTIONAL** - Requests | | |
-| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 9223372036854775807` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 9223372036854775807` `unit: seconds` |
-
 ## How It Works
 
 ### Compression
@@ -316,12 +253,9 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.clickhouse_sink]: ../../../assets/clickhouse-sink.svg
 [url.clickhouse]: https://clickhouse.yandex/

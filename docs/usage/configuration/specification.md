@@ -72,13 +72,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * must be: "file"
   type = "file"
 
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
-  # over the `include` option.*
-  # 
-  # * required
-  # * no default
-  exclude = ["/var/log/nginx/access.log"]
-
   # Array of file patterns to include. Globbing is supported.
   # 
   # * required
@@ -92,6 +85,13 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * optional
   # * no default
   data_dir = "/var/lib/vector"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
+  # 
+  # * optional
+  # * no default
+  exclude = ["/var/log/nginx/access.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -1523,13 +1523,6 @@ end
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
   encoding = "text"
-
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
 
   # The window used for the `request_rate_limit_num` option
   # 

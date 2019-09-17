@@ -65,11 +65,19 @@ class Component
   end
 
   def context_options
-    options.to_h.values.sort.select(&:context?)
+    options_list.select(&:context?)
+  end
+
+  def options_list
+    @options_list ||= options.to_h.values.sort
   end
 
   def partition_options
-    options.to_h.values.sort.select(&:partition_key?)
+    options_list.select(&:partition_key?)
+  end
+
+  def simple_options
+    options_list.select(&:simple?)
   end
 
   def sink?
@@ -81,7 +89,7 @@ class Component
   end
 
   def templateable_options
-    options.to_h.values.sort.select(&:templateable?)
+    options_list.select(&:templateable?)
   end
 
   def transform?

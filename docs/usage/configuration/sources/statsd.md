@@ -27,21 +27,16 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "statsd" # must be: "statsd"
   address = "127.0.0.1:8126"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  type = "statsd"
-  address = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.statsd_source]
   # The component type
@@ -59,14 +54,6 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
-| `address` | `string` | UDP socket address to bind to.<br />`required` `example: "127.0.0.1:8126"` |
 
 ## Examples
 

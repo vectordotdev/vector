@@ -27,7 +27,7 @@ The `lua` transform accepts [`log`][docs.log_event] events and allows you to tra
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "lua" # must be: "lua"
@@ -44,20 +44,10 @@ if event["host"] == nil then
 end
 """
 
-  
-  search_dirs = ["/etc/vector/lua"] # no default
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "lua"
-  inputs = ["<string>", ...]
-  source = "<string>"
-  search_dirs = ["<string>", ...]
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.lua_transform]
   # The component type
@@ -100,17 +90,6 @@ end
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "lua"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `source` | `string` | The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
-| `search_dirs` | `[string]` | A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.<br />`no default` `example: ["/etc/vector/lua"]` |
 
 ## Examples
 
@@ -233,15 +212,12 @@ Finally, consider the following alternatives:
 * [**Lua Reference Manual**][url.lua_manual]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model
 [docs.default_schema]: ../../../about/data-model/log.md#default-schema
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.lua_transform]: ../../../assets/lua-transform.svg
 [url.lua]: https://www.lua.org/

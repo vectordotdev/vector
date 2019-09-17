@@ -27,7 +27,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -36,82 +36,21 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   bucket = "my-bucket"
   region = "us-east-1"
   
-  # OPTIONAL - General
-  healthcheck = true # default
-  hostname = "127.0.0.0:5000"
-  
   # OPTIONAL - Batching
   batch_size = 10490000 # default, bytes
   batch_timeout = 300 # default, seconds
   
   # OPTIONAL - Object Names
-  filename_append_uuid = true # default
-  filename_extension = "log" # default
-  filename_time_format = "%s" # default
   key_prefix = "date=%F/"
   
   # OPTIONAL - Requests
   compression = "gzip" # no default, must be: "gzip" (if supplied)
   encoding = "ndjson" # no default, enum: "ndjson" or "text"
-  gzip = false # default
-  rate_limit_duration = 1 # default, seconds
-  rate_limit_num = 5 # default
-  request_in_flight_limit = 5 # default
-  request_timeout_secs = 30 # default, seconds
-  retry_attempts = 5 # default
-  retry_backoff_secs = 5 # default, seconds
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "aws_s3"
-  inputs = ["<string>", ...]
-  bucket = "<string>"
-  region = "<string>"
-
-  # OPTIONAL - General
-  healthcheck = <bool>
-  hostname = "<string>"
-
-  # OPTIONAL - Batching
-  batch_size = <int>
-  batch_timeout = <int>
-
-  # OPTIONAL - Object Names
-  filename_append_uuid = <bool>
-  filename_extension = <bool>
-  filename_time_format = "<string>"
-  key_prefix = "<string>"
-
-  # OPTIONAL - Requests
-  compression = "gzip"
-  encoding = {"ndjson" | "text"}
-  gzip = <bool>
-  rate_limit_duration = <int>
-  rate_limit_num = <int>
-  request_in_flight_limit = <int>
-  request_timeout_secs = <int>
-  retry_attempts = <int>
-  retry_backoff_secs = <int>
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.aws_s3_sink]
   #
@@ -229,13 +168,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
   encoding = "ndjson"
   encoding = "text"
 
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
-
   # The window used for the `request_rate_limit_num` option
   # 
   # * optional
@@ -314,42 +246,6 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "aws_s3"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `bucket` | `string` | The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.<br />`required` `example: "my-bucket"` |
-| `region` | `string` | The [AWS region][url.aws_s3_regions] of the target S3 bucket.<br />`required` `example: "us-east-1"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `hostname` | `string` | Custom hostname to send requests to. Useful for testing.<br />`default: "<aws-service-hostname>"` |
-| **OPTIONAL** - Batching | | |
-| `batch_size` | `int` | The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 10490000` `unit: bytes` |
-| `batch_timeout` | `int` | The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.<br />`default: 300` `unit: seconds` |
-| **OPTIONAL** - Object Names | | |
-| `filename_append_uuid` | `bool` | Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.<br />`default: true` |
-| `filename_extension` | `bool` | The extension to use in the object name.<br />`default: "log"` |
-| `filename_time_format` | `string` | The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.<br />`default: "%s"` |
-| `key_prefix` | `string` | A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.<br />`default: "date=%F"` |
-| **OPTIONAL** - Requests | | |
-| `compression` | `string` | The compression type to use before writing data. See [Compression](#compression) for more info.<br />`no default` `must be: "gzip"` |
-| `encoding` | `string` | The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.<br />`no default` `enum: "ndjson" or "text"` |
-| `gzip` | `bool` | Whether to Gzip the content before writing or not. Please note, enabling this has a slight performance cost but significantly reduces bandwidth. See [Compression](#compression) for more info.<br />`default: false` |
-| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
-| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
-| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 30` `unit: seconds` |
-| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
-| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
 
 ## Examples
 
@@ -678,16 +574,12 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
-[docs.event]: ../../../about/data-model/README.md#event
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
 [images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
@@ -697,7 +589,6 @@ issue, please:
 [url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [url.aws_s3]: https://aws.amazon.com/s3/
-[url.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [url.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 [url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+bug%22
 [url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+enhancement%22

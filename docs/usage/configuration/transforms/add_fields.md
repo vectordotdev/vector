@@ -20,7 +20,7 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -37,21 +37,11 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
     my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "add_fields"
-  inputs = ["<string>", ...]
 
-  # REQUIRED - Fields
-  [transforms.<transform-id>.fields]
-    * = {"<string>" | <int> | <float> | <bool> | <timestamp>}
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.add_fields_transform]
   #
@@ -93,16 +83,6 @@ The `add_fields` transform accepts [`log`][docs.log_event] events and allows you
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "add_fields"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **REQUIRED** - Fields | | |
-| `fields.*` | `*` | A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.config_value_types]. Use `.` for adding nested fields.<br />`required` `example: (see above)` |
 
 ## Examples
 
@@ -270,7 +250,6 @@ Finally, consider the following alternatives:
 * [**Source code**][url.add_fields_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
 [docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data_model]: ../../../about/data-model
@@ -280,8 +259,6 @@ Finally, consider the following alternatives:
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.add_fields_transform]: ../../../assets/add_fields-transform.svg
 [url.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
