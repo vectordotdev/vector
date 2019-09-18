@@ -31,7 +31,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ```coffeescript
 [sources.my_source_id]
   type = "file" # must be: "file"
-  include = ["/var/log/nginx/*.log"]
+  include = ["/var/log/nginx/*.log", "/var/log/nginx/*.gz"]
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -50,11 +50,12 @@ The `file` source ingests data through one or more local files and outputs [`log
   # * must be: "file"
   type = "file"
 
-  # Array of file patterns to include. Globbing is supported.
+  # Array of file patterns to include. Globbing is supported. Gzip and zip files
+  # are extracted automatically.
   # 
   # * required
   # * no default
-  include = ["/var/log/nginx/*.log"]
+  include = ["/var/log/nginx/*.log", "/var/log/nginx/*.gz"]
 
   # The directory used to persist file checkpoint positions. By default, the
   # global `data_dir` is used. Please make sure the Vector project has write
@@ -129,7 +130,8 @@ The `file` source ingests data through one or more local files and outputs [`log
   oldest_first = false
 
   # When `true` Vector will read from the beginning of new files, when `false`
-  # Vector will only read new data added to the file.
+  # Vector will only read new data added to the file. Note that this option has
+  # no impact on compressed files.
   # 
   # * optional
   # * default: false

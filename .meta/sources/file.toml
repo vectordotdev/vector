@@ -18,10 +18,11 @@ permissions to this dir.\
 
 [sources.file.options.include]
 type = "[string]"
-examples = [["/var/log/nginx/*.log"]]
+examples = [["/var/log/nginx/*.log", "/var/log/nginx/*.gz"]]
 null = false
 description = """\
-Array of file patterns to include. [Globbing](#globbing) is supported.\
+Array of file patterns to include. [Globbing](#globbing) is supported. \
+Gzip and zip files are extracted automatically.\
 """
 
 [sources.file.options.exclude]
@@ -90,7 +91,8 @@ null = false
 default = false
 description = """\
 When `true` Vector will read from the beginning of new files, when \
-`false` Vector will only read new data added to the file.\
+`false` Vector will only read new data added to the file. \
+Note that this option has no impact on compressed files.\
 """
 
 [sources.file.options.fingerprinting]
