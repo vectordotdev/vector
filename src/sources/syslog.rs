@@ -59,7 +59,7 @@ impl SourceConfig for SyslogConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.to_string());
 
         match self.mode.clone() {

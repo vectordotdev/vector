@@ -60,7 +60,7 @@ fn default_host_field() -> Atom {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_host(&self.host)?;
         let sink = hec(self.clone(), acker)?;
         let healthcheck = healthcheck(self.token.clone(), self.host.clone())?;
@@ -73,7 +73,7 @@ impl SinkConfig for HecSinkConfig {
     }
 }
 
-pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
+pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let token = config.token.clone();
     let host_field = config.host_field;
@@ -146,7 +146,7 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, crate::Error> {
+pub fn healthcheck(token: String, host: String) -> crate::Result<super::Healthcheck> {
     let uri = format!("{}/services/collector/health/1.0", host)
         .parse::<Uri>()
         .context(super::UriParseError)?;
@@ -172,7 +172,7 @@ pub fn healthcheck(token: String, host: String) -> Result<super::Healthcheck, cr
     Ok(Box::new(healthcheck))
 }
 
-pub fn validate_host(host: &String) -> Result<(), crate::Error> {
+pub fn validate_host(host: &String) -> crate::Result<()> {
     let uri = Uri::try_from(host).context(super::UriParseError)?;
 
     match uri.scheme_part() {

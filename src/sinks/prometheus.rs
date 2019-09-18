@@ -67,7 +67,7 @@ pub fn default_flush_period() -> Duration {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         // Checks
         if self.flush_period < Duration::from_millis(MIN_FLUSH_PERIOD_MS) {
             return Err(Box::new(BuildError::FlushPeriodTooShort {

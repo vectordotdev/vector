@@ -88,7 +88,7 @@ pub struct BasicAuth {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
         let sink = http(self.clone(), acker)?;
 
@@ -105,7 +105,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
+fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -197,7 +197,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> Result<super::RouterSink, crate
     Ok(Box::new(sink))
 }
 
-fn healthcheck(uri: String, auth: Option<BasicAuth>) -> Result<super::Healthcheck, crate::Error> {
+fn healthcheck(uri: String, auth: Option<BasicAuth>) -> crate::Result<super::Healthcheck> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -230,7 +230,7 @@ impl BasicAuth {
     }
 }
 
-fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), crate::Error> {
+fn validate_headers(headers: &Option<IndexMap<String, String>>) -> crate::Result<()> {
     if let Some(map) = headers {
         for (name, value) in map {
             HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
@@ -241,7 +241,7 @@ fn validate_headers(headers: &Option<IndexMap<String, String>>) -> Result<(), cr
     Ok(())
 }
 
-fn build_uri(raw: &str) -> Result<Uri, crate::Error> {
+fn build_uri(raw: &str) -> crate::Result<Uri> {
     let base: Uri = raw.parse().context(super::UriParseError)?;
     Ok(Uri::builder()
         .scheme(base.scheme_str().unwrap_or("http"))

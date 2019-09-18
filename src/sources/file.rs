@@ -125,7 +125,7 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each

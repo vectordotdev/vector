@@ -17,7 +17,7 @@ pub struct SamplerConfig {
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| Box::new(Sampler::new(self.rate, regex_set)))
             .context(super::InvalidRegex)?)

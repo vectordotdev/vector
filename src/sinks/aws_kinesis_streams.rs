@@ -57,7 +57,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
         let sink = KinesisService::new(config, acker)?;
         let healthcheck = healthcheck(self.clone())?;
@@ -73,7 +73,7 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, crate::Error> {
+    ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
@@ -177,7 +177,7 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, crate::Error> {
+fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
     let client = KinesisClient::new(config.region.try_into()?);
     let stream_name = config.stream_name;
 

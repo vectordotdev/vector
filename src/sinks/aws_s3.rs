@@ -82,7 +82,7 @@ impl Default for Compression {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
@@ -105,7 +105,7 @@ enum HealthcheckError {
 }
 
 impl S3Sink {
-    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
+    pub fn new(config: &S3SinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -162,7 +162,7 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, crate::Error> {
+    pub fn healthcheck(config: &S3SinkConfig) -> crate::Result<super::Healthcheck> {
         let client = Self::create_client(config.region.clone().try_into()?);
 
         let request = HeadBucketRequest {

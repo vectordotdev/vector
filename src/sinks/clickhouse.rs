@@ -39,7 +39,7 @@ pub struct ClickhouseConfig {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = clickhouse(self.clone(), acker)?;
         let healtcheck = healthcheck(self.host.clone());
 
@@ -51,7 +51,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
-fn clickhouse(config: ClickhouseConfig, acker: Acker) -> Result<super::RouterSink, crate::Error> {
+fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::RouterSink> {
     let host = config.host.clone();
     let database = config.database.clone().unwrap_or("default".into());
     let table = config.table.clone();
@@ -136,7 +136,7 @@ fn healthcheck(host: String) -> super::Healthcheck {
     Box::new(healthcheck)
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> Result<Uri, crate::Error> {
+fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",

@@ -109,7 +109,7 @@ impl TcpSinkConfig {
 
 #[typetag::serde(name = "tcp")]
 impl SinkConfig for TcpSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let addr = self
             .address
             .to_socket_addrs()
@@ -171,7 +171,7 @@ impl SinkConfig for TcpSinkConfig {
     }
 }
 
-fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, crate::Error> {
+fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<Certificate> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate authority")?;
     Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
@@ -180,7 +180,7 @@ fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> Result<Certificate, 
 fn load_key<T: AsRef<Path> + Debug>(
     filename: T,
     pass_phrase: &Option<String>,
-) -> Result<PKey<Private>, crate::Error> {
+) -> crate::Result<PKey<Private>> {
     let filename = filename.as_ref();
     let data = open_read(filename, "key")?;
     match pass_phrase {
@@ -195,16 +195,13 @@ fn load_key<T: AsRef<Path> + Debug>(
     }
 }
 
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> Result<X509, crate::Error> {
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<X509> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate")?;
     Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
 }
 
-fn open_read<F: AsRef<Path> + Debug>(
-    filename: F,
-    note: &'static str,
-) -> Result<Vec<u8>, crate::Error> {
+fn open_read<F: AsRef<Path> + Debug>(filename: F, note: &'static str) -> crate::Result<Vec<u8>> {
     let mut text = Vec::<u8>::new();
     let filename = filename.as_ref();
 
@@ -245,7 +242,7 @@ pub struct TcpSinkTls {
 }
 
 impl TcpSinkTls {
-    fn make_connector(&self) -> Result<TlsConnector, crate::Error> {
+    fn make_connector(&self) -> crate::Result<TlsConnector> {
         let mut connector = native_tls::TlsConnector::builder();
         connector.danger_accept_invalid_certs(!self.verify);
         if let Some(ref certificate) = self.add_ca {

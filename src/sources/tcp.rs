@@ -48,7 +48,7 @@ impl SourceConfig for TcpConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         let tcp = RawTcpSource {
             config: self.clone(),
         };

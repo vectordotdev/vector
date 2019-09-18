@@ -58,7 +58,7 @@ impl GlobalOptions {
     pub fn resolve_and_validate_data_dir(
         &self,
         local_data_dir: Option<&PathBuf>,
-    ) -> Result<PathBuf, crate::Error> {
+    ) -> crate::Result<PathBuf> {
         let data_dir = local_data_dir
             .or(self.data_dir.as_ref())
             .ok_or_else(|| DataDirError::MissingDataDir)
@@ -83,7 +83,7 @@ impl GlobalOptions {
         &self,
         local: Option<&PathBuf>,
         subdir: &str,
-    ) -> Result<PathBuf, crate::Error> {
+    ) -> crate::Result<PathBuf> {
         let data_dir = self.resolve_and_validate_data_dir(local)?;
 
         let mut data_subdir = data_dir.clone();
@@ -111,7 +111,7 @@ pub trait SourceConfig: core::fmt::Debug {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, crate::Error>;
+    ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
 }
@@ -132,7 +132,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(
         &self,
         acker: crate::buffers::Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), crate::Error>;
+    ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 }
@@ -146,7 +146,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> Result<Box<dyn transforms::Transform>, crate::Error>;
+    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 

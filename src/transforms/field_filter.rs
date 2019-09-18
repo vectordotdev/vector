@@ -15,7 +15,7 @@ pub struct FieldFilterConfig {
 
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),

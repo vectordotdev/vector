@@ -24,7 +24,7 @@ pub struct RegexParserConfig {
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let regex = Regex::new(&self.regex).context(super::InvalidRegex)?;

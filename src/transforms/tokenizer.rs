@@ -28,7 +28,7 @@ pub struct TokenizerConfig {
 
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self.field.as_ref().unwrap_or(&event::MESSAGE);
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;

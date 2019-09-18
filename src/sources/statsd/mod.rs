@@ -24,7 +24,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         Ok(statsd(self.address, out))
     }
 
