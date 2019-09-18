@@ -1,5 +1,7 @@
 use crate::FilePosition;
-use std::fs;
+use flate2::bufread::{MultiGzDecoder, ZlibDecoder};
+use std::ffi::OsStr;
+use std::fs::{self, File};
 use std::io::{self, BufRead, Seek};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
@@ -15,7 +17,7 @@ use std::time;
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: io::BufReader<fs::File>,
+    reader: Box<dyn BufRead>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -51,10 +53,12 @@ impl FileWatcher {
             rdr.seek(io::SeekFrom::Start(file_position)).unwrap()
         };
 
+        let reader = Self::wrap_reader_for_filetype(rdr, &path);
+
         Ok(FileWatcher {
             path: path,
             findable: true,
-            reader: rdr,
+            reader: reader,
             file_position: file_position,
             devno: metadata.dev(),
             inode: metadata.ino(),
@@ -62,12 +66,22 @@ impl FileWatcher {
         })
     }
 
+    // Depending on the file type we create a different type of reader.
+    // This allows us to handle compressed files as well as uncompressed files.
+    fn wrap_reader_for_filetype(reader: io::BufReader<File>, path: &PathBuf) -> Box<dyn BufRead> {
+        match path.extension().and_then(OsStr::to_str) {
+            Some("gzip") => Box::new(io::BufReader::new(MultiGzDecoder::new(reader))),
+            Some("zip") => Box::new(io::BufReader::new(ZlibDecoder::new(reader))),
+            _ => Box::new(reader),
+        }
+    }
+
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let metadata = fs::metadata(&path)?;
         if (metadata.dev(), metadata.ino()) != (self.devno, self.inode) {
             let mut new_reader = io::BufReader::new(fs::File::open(&path)?);
             new_reader.seek(io::SeekFrom::Start(self.file_position))?;
-            self.reader = new_reader;
+            self.reader = Box::new(new_reader);
             self.devno = metadata.dev();
             self.inode = metadata.ino();
         }
