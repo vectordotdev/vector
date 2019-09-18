@@ -243,6 +243,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
 
@@ -251,6 +252,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "moonbase-alpha"
@@ -260,6 +262,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
@@ -270,6 +273,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         endpoint = "this shoudlnt work"

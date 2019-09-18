@@ -46,10 +46,10 @@ pub struct S3SinkConfig {
     pub filename_extension: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub encoding: Encoding,
     pub batch_size: Option<usize>,
     pub compression: Compression,
     pub batch_timeout: Option<u64>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -60,24 +60,22 @@ pub struct S3SinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Ndjson,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Compression {
+    #[derivative(Default)]
     Gzip,
     None,
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::Gzip
-    }
 }
 
 #[typetag::serde(name = "aws_s3")]
@@ -298,7 +296,7 @@ fn generate_key(
 fn encode_event(
     event: Event,
     key_prefix: &Template,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
@@ -311,14 +309,14 @@ fn encode_event(
         .ok()?;
 
     let log = event.into_log();
-    let bytes = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.unflatten())
+    let bytes = match encoding {
+        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        (&Some(Encoding::Text), _) | (_, false) => {
+        &Encoding::Text => {
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
@@ -339,10 +337,11 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn s3_encode_event_non_structured() {
+    fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
+        let bytes =
+            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -350,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn s3_encode_event_structured() {
+    fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
@@ -358,7 +357,7 @@ mod tests {
             .insert_explicit("key".into(), "value".into());
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &None).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
