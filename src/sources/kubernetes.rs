@@ -24,7 +24,9 @@ const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesConfig {}
+pub struct KubernetesConfig {
+    include_namespace: Vec<String>,
+}
 
 #[typetag::serde(name = "kubernetes")]
 impl SourceConfig for KubernetesConfig {
@@ -50,7 +52,7 @@ impl SourceConfig for KubernetesConfig {
         // after now.
 
         // File source
-        let (file_recv, file_source) = file_source(name, globals)?;
+        let (file_recv, file_source) = file_source(self, name, globals)?;
 
         // Transforms
         let mut transform_message = transform_message();
@@ -100,10 +102,6 @@ impl SourceConfig for KubernetesConfig {
                 None
             })
             .filter_map(move |event| transform_file.transform(event))
-            .map(|e| {
-                println!("Event_out: {:?}", e);
-                e
-            })
             .forward(out.sink_map_err(|_| ()))
             .map(|_| ())
             .join(file_source)
@@ -118,14 +116,15 @@ impl SourceConfig for KubernetesConfig {
 }
 
 fn file_source(
+    kube_config: &KubernetesConfig,
     kube_name: &str,
     globals: &GlobalOptions,
 ) -> Result<(mpsc::Receiver<Event>, super::Source), String> {
     let mut config = FileConfig::default();
-    config
-        .include
-        .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
-    // TODO: Make this a configurable option for excluding namespaces
+
+    // TODO: Having a configurable option for excluding namespaces, seams to be usefull.
+    // TODO: Find out if there are some guarantee from Kubernetes that current build of
+    // TODO  pod_uid as namespace_pod-name_some-number is a somewhat lasting decision.
     // Exclude whole kube-system namespace
     config
         .exclude
@@ -134,6 +133,18 @@ fn file_source(
     config
         .exclude
         .push((LOG_DIRECTORY.to_owned() + r"logging_*/**").into());
+    // Include
+    if kube_config.include_namespace.is_empty() {
+        config
+            .include
+            .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
+    } else {
+        for namespace in kube_config.include_namespace.iter() {
+            config
+                .include
+                .push((LOG_DIRECTORY.to_owned() + namespace + r"_*/*/*.log").into());
+        }
+    }
 
     config.start_at_beginning = true;
 

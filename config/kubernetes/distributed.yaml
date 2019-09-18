@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
    name: logging
+   
 ---
 # ConfigMap which contains vector.toml configuration for pods.
 apiVersion: v1
@@ -21,6 +22,10 @@ data:
     # Ingest logs from Kubernetes
     [sources.kubernetes_logs]
       type = "kubernetes"
+
+    ######
+    # NOTE: Here, vector can be configured  
+    ######
 
   # This line is not in VECTOR.TOML       
 
@@ -47,6 +52,7 @@ spec:
         hostPath:
           path: /var/log/
       # Docker log files in Kubernetes are symlinks to this folder.
+      #
       # Vector can persist local data in here. Having that, updated
       # Vector could continue where the last one stopped, if all the
       # used sources have that capability.
@@ -62,9 +68,7 @@ spec:
              path: vector.toml
       containers:
       - name: vector
-        # TODO: replace this with kubernetes version
-        # TODO: can be done by merging first implementation and then tests
-        image: timberio/vector:0.4.0
+        image: timberio/vector:latest
         imagePullPolicy: Always
         args: ["-c","/etc/vector/vector.toml"]
         volumeMounts:
