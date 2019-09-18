@@ -271,7 +271,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         assert_downcast_matches, sinks,
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{random_lines_with_stream, random_string, runtime},
         Event,
     };
     use futures::Sink;
@@ -282,7 +282,7 @@ mod integration_tests {
 
     #[test]
     fn splunk_insert_message() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
@@ -313,7 +313,7 @@ mod integration_tests {
 
     #[test]
     fn splunk_insert_many() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
@@ -345,7 +345,7 @@ mod integration_tests {
 
     #[test]
     fn splunk_custom_fields() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
@@ -378,7 +378,7 @@ mod integration_tests {
 
     #[test]
     fn splunk_hostname() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
 
@@ -531,6 +531,7 @@ mod integration_tests {
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
+            encoding: Encoding::Json,
             batch_size: Some(1),
             ..Default::default()
         }
