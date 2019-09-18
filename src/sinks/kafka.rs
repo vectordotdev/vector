@@ -30,7 +30,7 @@ pub struct KafkaSinkConfig {
     bootstrap_servers: Vec<String>,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -44,7 +44,7 @@ pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
@@ -186,7 +186,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 fn encode_event(
     event: &Event,
     key_field: &Option<Atom>,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
         .as_ref()
@@ -194,11 +194,9 @@ fn encode_event(
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or(Vec::new());
 
-    let body = match (encoding, event.as_log().is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap()
-        }
-        (&Some(Encoding::Text), _) | (_, false) => event
+    let body = match encoding {
+        &Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        &Encoding::Text => event
             .as_log()
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
@@ -215,17 +213,17 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn kafka_encode_event_non_structured() {
+    fn kafka_encode_event_text() {
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &None);
+        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &Encoding::Text);
 
         assert_eq!(&key_bytes[..], key.as_bytes());
         assert_eq!(&bytes[..], message.as_bytes());
     }
 
     #[test]
-    fn kafka_encode_event_structured() {
+    fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
@@ -235,7 +233,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
 
-        let (key, bytes) = encode_event(&event, &Some("key".into()), &None);
+        let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -249,7 +247,7 @@ mod tests {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{KafkaSink, KafkaSinkConfig};
+    use super::*;
     use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
@@ -268,7 +266,7 @@ mod integration_test {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
             key_field: None,
-            encoding: None,
+            encoding: Encoding::Text,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
