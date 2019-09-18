@@ -9,7 +9,7 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
-use futures::{Future, Sink};
+use futures::{stream::iter_ok, Future, Sink};
 use http::{HttpTryFrom, Method, Request, StatusCode, Uri};
 use hyper::{Body, Client};
 use hyper_tls::HttpsConnector;
@@ -33,10 +33,10 @@ pub struct HecSinkConfig {
     pub host: String,
     #[serde(default = "default_host_field")]
     pub host_field: Atom,
+    pub encoding: Encoding,
+    pub compression: Option<Compression>,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
-    pub compression: Option<Compression>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -47,9 +47,11 @@ pub struct HecSinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
@@ -133,7 +135,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> Result<super::RouterSink, cra
             batch_size,
             Duration::from_secs(batch_timeout),
         )
-        .with(move |e| encode_event(&host_field, e, &encoding));
+        .with_flat_map(move |e| iter_ok(encode_event(&host_field, e, &encoding)));
 
     Ok(Box::new(sink))
 }
@@ -181,11 +183,7 @@ pub fn validate_host(host: &String) -> Result<(), crate::Error> {
     }
 }
 
-fn encode_event(
-    host_field: &Atom,
-    event: Event,
-    encoding: &Option<Encoding>,
-) -> Result<Vec<u8>, ()> {
+fn encode_event(host_field: &Atom, event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let mut event = event.into_log();
 
     let host = event.get(&host_field).map(|h| h.clone());
@@ -195,13 +193,13 @@ fn encode_event(
         chrono::Utc::now().timestamp()
     };
 
-    let mut body = match (encoding, event.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => json!({
+    let mut body = match encoding {
+        &Encoding::Json => json!({
             "fields": event.explicit_fields(),
             "event": event.unflatten(),
             "time": timestamp,
         }),
-        (&Some(Encoding::Text), _) | (_, false) => json!({
+        &Encoding::Text => json!({
             "event": event.get(&event::MESSAGE).map(|v| v.to_string_lossy()).unwrap_or_else(|| "".into()),
             "time": timestamp,
         }),
@@ -212,7 +210,9 @@ fn encode_event(
         body["host"] = json!(host);
     }
 
-    serde_json::to_vec(&body).map_err(|e| panic!("Error encoding json body: {}", e))
+    serde_json::to_vec(&body)
+        .map_err(|e| error!("Error encoding json body: {}", e))
+        .ok()
 }
 
 #[cfg(test)]
@@ -230,14 +230,14 @@ mod tests {
     }
 
     #[test]
-    fn splunk_encode_event_structured() {
+    fn splunk_encode_event_json() {
         let host = "host".into();
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
 
-        let bytes = encode_event(&host, event, &None).unwrap();
+        let bytes = encode_event(&host, event, &Encoding::Json).unwrap();
 
         let hec_event = serde_json::from_slice::<HecEvent>(&bytes[..]).unwrap();
 
