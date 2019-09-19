@@ -23,6 +23,7 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::path::PathBuf;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -51,6 +52,8 @@ pub struct ElasticSearchConfig {
 
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
+
+    pub tls: Option<ElasticSearchTlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -65,6 +68,14 @@ pub struct ElasticSearchBasicAuthConfig {
 pub enum Provider {
     Default,
     Aws,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ElasticSearchTlsConfig {
+    ca_path: Option<PathBuf>,
+    crt_path: Option<PathBuf>,
+    key_path: Option<PathBuf>,
+    key_phrase: Option<String>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -205,7 +216,14 @@ fn es(
         gzip = false;
     }
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
+    let mut builder = HttpService::builder();
+    if let Some(ref tls) = config.tls {
+        builder.ca_path(tls.ca_path.clone());
+        builder.crt_path(tls.crt_path.clone());
+        builder.key_path(tls.key_path.clone());
+        builder.key_pass(tls.key_phrase.clone());
+    }
+    let http_service = builder.build(move |body: Vec<u8>| {
         let (uri, mut builder) = common.builder(Method::POST, &path_query);
 
         match common.credentials {
@@ -485,12 +503,27 @@ mod integration_tests {
     }
 
     #[test]
-    fn insert_events() {
+    fn insert_events_over_http() {
         run_insert_tests(ElasticSearchConfig {
             host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
+            ..Default::default()
+        });
+    }
+
+    #[test]
+    fn insert_events_over_https() {
+        run_insert_tests(ElasticSearchConfig {
+            host: "https://localhost:9201".into(),
+            doc_type: Some("log_lines".into()),
+            compression: Some(Compression::None),
+            batch_size: Some(1),
+            tls: Some(ElasticSearchTlsConfig {
+                ca_path: Some("tests/data/Vector_CA.crt".into()),
+                ..Default::default()
+            }),
             ..Default::default()
         });
     }
