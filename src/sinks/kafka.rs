@@ -44,6 +44,10 @@ pub enum Encoding {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct KafkaSinkTlsConfig {
     enabled: Option<bool>,
+    ca_path: Option<String>,
+    crt_path: Option<String>,
+    key_path: Option<String>,
+    key_phrase: Option<String>,
 }
 
 pub struct KafkaSink {
@@ -83,6 +87,18 @@ impl KafkaSinkConfig {
                 "security.protocol",
                 if enabled { "ssl" } else { "plaintext" },
             );
+            if let Some(ref path) = tls.ca_path {
+                client_config.set("ssl.ca.location", path);
+            }
+            if let Some(ref path) = tls.crt_path {
+                client_config.set("ssl.certificate.location", path);
+            }
+            if let Some(ref path) = tls.key_path {
+                client_config.set("ssl.keystore.location", path);
+            }
+            if let Some(ref phrase) = tls.key_phrase {
+                client_config.set("ssl.keystore.password", phrase);
+            }
         }
         client_config
     }
