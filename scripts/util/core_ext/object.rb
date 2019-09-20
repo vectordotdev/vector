@@ -14,15 +14,24 @@ class Object
       "{" + values.join(", ") + "}"
     elsif is_a?(Array)
       values = collect { |value| value.to_toml }
-      "[" + values.join(", ") + "]"
+      if any? { |v| v.is_a?(Hash) }
+        "[\n" + values.join(",\n") + "\n]"
+      else
+        "[" + values.join(", ") + "]"
+      end
+    elsif is_a?(Date)
+      iso8601()
     elsif is_a?(Time)
       iso8601(6)
     elsif is_a?(String) && include?("\n")
-      <<~EOF
-      """
-      #{self}
-      """
-      EOF
+      result =
+        <<~EOF
+        """
+        #{self}
+        """
+        EOF
+
+      result.chomp
     elsif is_primitive_type?
       inspect
     else
