@@ -83,6 +83,10 @@ release-github: ## Release to Github
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
 
+release-meta: ## Prepares the release metadata
+	@bundle install --gemfile=scripts/release-meta/Gemfile > /dev/null
+	@scripts/release-meta.rb
+
 release-rpm: ## Release .rpm via Package Cloud
 	@scripts/release-rpm.sh
 

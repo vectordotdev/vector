@@ -23,9 +23,10 @@ require "rubygems"
 require "bundler"
 Bundler.require(:default)
 
+require_relative "util/core_ext/object"
+
 require_relative "generate/context"
 require_relative "generate/core_ext/hash"
-require_relative "generate/core_ext/object"
 require_relative "generate/core_ext/string"
 require_relative "generate/post_processors/component_presence_checker"
 require_relative "generate/post_processors/link_checker"
