@@ -251,8 +251,8 @@ Finally, consider the following alternatives:
 
 
 [docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[docs.data_model]: ../../../about/data-model/README.md
 [docs.event_key_special_characters]: ../../../about/data-model/log.md#special-characters
 [docs.log]: ../../../about/data-model/log.md
 [docs.log_event]: ../../../about/data-model/log.md

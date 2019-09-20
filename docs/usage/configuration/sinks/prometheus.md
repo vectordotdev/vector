@@ -358,7 +358,7 @@ discussion with your use case if you find this to be a problem.
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.metric_event.counter]: ../../../about/data-model/metric.md#counter
 [docs.metric_event.gauge]: ../../../about/data-model/metric.md#gauge
 [docs.metric_event.histogram]: ../../../about/data-model/metric.md#histogram

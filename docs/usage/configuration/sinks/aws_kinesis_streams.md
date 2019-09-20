@@ -431,7 +431,7 @@ issue, please:
 
 [docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring.logs]: ../../../usage/administration/monitoring.md#logs

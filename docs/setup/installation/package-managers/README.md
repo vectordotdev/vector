@@ -27,4 +27,4 @@ If you do not see your package manager you can consider:
 {% page-ref page="../manual/README.md" %}
 
 
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.platforms]: ../../../setup/installation/platforms/README.md

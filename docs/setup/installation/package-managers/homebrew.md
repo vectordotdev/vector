@@ -55,6 +55,6 @@ brew update && brew upgrade vector
 ```
 
 
-[docs.configuration]: ../../../usage/configuration
+[docs.configuration]: ../../../usage/configuration/README.md
 [url.homebrew]: https://brew.sh/
 [url.homebrew_services]: https://github.com/Homebrew/homebrew-services

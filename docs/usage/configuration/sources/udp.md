@@ -145,11 +145,11 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms
+[docs.transforms]: ../../../usage/configuration/transforms/README.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.udp_source]: ../../../assets/udp-source.svg
 [url.new_udp_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+bug

@@ -80,7 +80,6 @@ if event["host"] == nil then
 end
 """
 
-
   # A list of directories search when loading a Lua file via the `require`
   # function.
   # 
@@ -212,8 +211,8 @@ Finally, consider the following alternatives:
 * [**Lua Reference Manual**][url.lua_manual]
 
 
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[docs.data_model]: ../../../about/data-model/README.md
 [docs.default_schema]: ../../../about/data-model/log.md#default-schema
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md

@@ -365,13 +365,13 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.data-directory]: ../../../usage/configuration#data-directory
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.data-directory]: ../../../usage/configuration/README.md#data-directory
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms
+[docs.transforms]: ../../../usage/configuration/transforms/README.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.file_source]: ../../../assets/file-source.svg
 [url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check

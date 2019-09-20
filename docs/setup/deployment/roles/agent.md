@@ -114,10 +114,10 @@ where it left off.
 [docs.docker]: ../../../setup/installation/platforms/docker.md
 [docs.file_source]: ../../../usage/configuration/sources/file.md
 [docs.performance]: ../../../performance.md
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.platforms]: ../../../setup/installation/platforms/README.md
 [docs.reloading]: ../../../usage/administration/reloading.md
 [docs.service_role]: ../../../setup/deployment/roles/service.md
-[docs.sinks]: ../../../usage/configuration/sinks
+[docs.sinks]: ../../../usage/configuration/sinks/README.md
 [docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
 [docs.topologies.centralized]: ../../../setup/deployment/topologies.md#centralized
 [docs.topologies.stream-based]: ../../../setup/deployment/topologies.md#stream-based

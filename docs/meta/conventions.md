@@ -262,8 +262,8 @@ Here a few examples to help illustrate this point:
 
 
 [docs.administration]: ../usage/administration
-[docs.guides]: ../usage/guides
-[docs.sinks]: ../usage/configuration/sinks
-[docs.sources]: ../usage/configuration/sources
+[docs.guides]: ../usage/guides/README.md
+[docs.sinks]: ../usage/configuration/sinks/README.md
+[docs.sources]: ../usage/configuration/sources/README.md
 [docs.summary]: ../SUMMARY.md
-[docs.transforms]: ../usage/configuration/transforms
+[docs.transforms]: ../usage/configuration/transforms/README.md

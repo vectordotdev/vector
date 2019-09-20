@@ -1,4 +1,4 @@
-class Context
+class Templates
   class OptionsTable
     attr_reader :options
 

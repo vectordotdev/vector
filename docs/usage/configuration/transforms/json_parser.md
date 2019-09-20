@@ -222,7 +222,7 @@ Finally, consider the following alternatives:
 * [**Source code**][url.json_parser_transform_source]
 
 
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md

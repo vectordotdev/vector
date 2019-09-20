@@ -40,8 +40,8 @@ For clarify, Vector validates the following:
 7. All [sink][docs.sinks] health check if the `--require-healthy` option is supplied.
 
 
-[docs.configuration.composition]: ../../usage/configuration#composition
-[docs.configuration.types]: ../../usage/configuration#types
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources]: ../../usage/configuration/sources
-[docs.transforms]: ../../usage/configuration/transforms
+[docs.configuration.composition]: ../../usage/configuration/README.md#composition
+[docs.configuration.types]: ../../usage/configuration/README.md#types
+[docs.sinks]: ../../usage/configuration/sinks/README.md
+[docs.sources]: ../../usage/configuration/sources/README.md
+[docs.transforms]: ../../usage/configuration/transforms/README.md
