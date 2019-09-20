@@ -181,12 +181,12 @@ cp -a etc/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration]: ../../../usage/configuration
+[docs.configuration]: ../../../usage/configuration/README.md
 [docs.data_directory]: ../../../usage/configuration/README.md#data-directory
 [docs.from_source]: ../../../setup/installation/manual/from-source.md
 [docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
-[docs.operating_systems]: ../../../setup/installation/operating-systems
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.operating_systems]: ../../../setup/installation/operating-systems/README.md
+[docs.platforms]: ../../../setup/installation/platforms/README.md
 [url.issue_661]: https://github.com/timberio/vector/issues/661
 [url.releases]: https://github.com/timberio/vector/releases
 [url.rust_target_triples]: https://forge.rust-lang.org/platform-support.html

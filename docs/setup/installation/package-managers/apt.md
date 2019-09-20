@@ -62,6 +62,6 @@ sudo apt-get install vector
 ```
 
 
-[docs.configuration]: ../../../usage/configuration
+[docs.configuration]: ../../../usage/configuration/README.md
 [url.apt]: https://wiki.debian.org/Apt
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/

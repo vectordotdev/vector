@@ -1,4 +1,4 @@
-class Context
+class Templates
   class ConfigSchema
     TYPES = ["string", "int", "float", "bool", "timestamp"]
     

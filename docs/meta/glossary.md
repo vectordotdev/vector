@@ -143,19 +143,19 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
-[docs.configuration]: ../usage/configuration
-[docs.data_model]: ../about/data-model
+[docs.configuration]: ../usage/configuration/README.md
+[docs.data_model]: ../about/data-model/README.md
 [docs.docker]: ../setup/installation/platforms/docker.md
-[docs.guides]: ../usage/guides
+[docs.guides]: ../usage/guides/README.md
 [docs.log]: ../about/data-model/log.md
 [docs.metric_event]: ../about/data-model/metric.md
 [docs.performance]: ../performance.md
-[docs.platforms]: ../setup/installation/platforms
-[docs.roles]: ../setup/deployment/roles
-[docs.sinks]: ../usage/configuration/sinks
-[docs.sources]: ../usage/configuration/sources
+[docs.platforms]: ../setup/installation/platforms/README.md
+[docs.roles]: ../setup/deployment/roles/README.md
+[docs.sinks]: ../usage/configuration/sinks/README.md
+[docs.sources]: ../usage/configuration/sources/README.md
 [docs.topologies]: ../setup/deployment/topologies.md
-[docs.transforms]: ../usage/configuration/transforms
+[docs.transforms]: ../usage/configuration/transforms/README.md
 [url.rust]: https://www.rust-lang.org/
 [url.toml]: https://github.com/toml-lang/toml
 [url.toml_table]: https://github.com/toml-lang/toml#table

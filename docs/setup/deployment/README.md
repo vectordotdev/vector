@@ -12,6 +12,6 @@ Start by becoming familiar with the possible [topologies][docs.topologies] and t
 
 
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
-[docs.roles]: ../../setup/deployment/roles
+[docs.roles]: ../../setup/deployment/roles/README.md
 [docs.service_role]: ../../setup/deployment/roles/service.md
 [docs.topologies]: ../../setup/deployment/topologies.md

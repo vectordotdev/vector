@@ -33,13 +33,12 @@ check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/generate/Gemfile
+	@bundle install --gemfile=scripts/generate/Gemfile > /dev/null
 	@scripts/check-generate.sh
 
-check_urls ?= true
 generate: ## Generates files across the repo using the data in /.meta
-	@bundle install --gemfile=scripts/generate/Gemfile
-	@export VERSION=$(_latest_version); scripts/generate.rb --check-urls=$(check_urls)
+	@bundle install --gemfile=scripts/generate/Gemfile > /dev/null
+	@export VERSION=$(_latest_version); scripts/generate.rb
 
 fmt: ## Format code
 	@cargo fmt

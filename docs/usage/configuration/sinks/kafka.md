@@ -212,7 +212,7 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.tcp_source]: ../../../usage/configuration/sources/tcp.md

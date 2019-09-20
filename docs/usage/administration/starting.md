@@ -66,7 +66,7 @@ are:
 
 [docs.agent_role.limiting-resources]: ../../setup/deployment/roles/agent.md#limiting-resources
 [docs.agent_role]: ../../setup/deployment/roles/agent.md
-[docs.configuration]: ../../usage/configuration
+[docs.configuration]: ../../usage/configuration/README.md
 [docs.validating]: ../../usage/administration/validating.md
 [url.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/

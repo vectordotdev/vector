@@ -36,7 +36,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# https://docs.vector.dev/usage/configuration
+# https://docs.vector.dev/usage/configuration/README
 
 # ------------------------------------------------------------------------------
 # Global
@@ -58,7 +58,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 #
-# Documentation: https://docs.vector.dev/usage/configuration/sources
+# Documentation: https://docs.vector.dev/usage/configuration/sources/README
 
 [sources.file]
   #
@@ -495,7 +495,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
 #
-# Documentation: https://docs.vector.dev/usage/configuration/transforms
+# Documentation: https://docs.vector.dev/usage/configuration/transforms/README
 
 [transforms.add_fields]
   #
@@ -812,7 +812,6 @@ if event["host"] == nil then
 end
 """
 
-
   # A list of directories search when loading a Lua file via the `require`
   # function.
   # 
@@ -1076,7 +1075,7 @@ end
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
 #
-# Documentation: https://docs.vector.dev/usage/configuration/sinks
+# Documentation: https://docs.vector.dev/usage/configuration/sinks/README
 
 [sinks.aws_cloudwatch_logs]
   #

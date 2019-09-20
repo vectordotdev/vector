@@ -475,7 +475,7 @@ issue, please:
 * [**Source code**][url.log_to_metric_transform_source]
 
 
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.metric_event]: ../../../about/data-model/metric.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

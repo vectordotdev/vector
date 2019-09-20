@@ -167,11 +167,11 @@ issue, please:
 
 
 [docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms
+[docs.transforms]: ../../../usage/configuration/transforms/README.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [images.kafka_source]: ../../../assets/kafka-source.svg
 [url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22

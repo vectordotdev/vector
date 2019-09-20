@@ -408,9 +408,9 @@ issue, please:
 
 
 [docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.configuration.template-syntax]: ../../../usage/configuration#template-syntax
-[docs.data_model]: ../../../about/data-model
+[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[docs.configuration.template-syntax]: ../../../usage/configuration/README.md#template-syntax
+[docs.data_model]: ../../../about/data-model/README.md
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.log_event]: ../../../about/data-model/log.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs

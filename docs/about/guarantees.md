@@ -126,8 +126,8 @@ keep you in the loop if this ever changes.
 [docs.kafka_sink]: ../usage/configuration/sinks/kafka.md
 [docs.kafka_source]: ../usage/configuration/sources/kafka.md
 [docs.prometheus_sink]: ../usage/configuration/sinks/prometheus.md
-[docs.sinks]: ../usage/configuration/sinks
-[docs.sources]: ../usage/configuration/sources
+[docs.sinks]: ../usage/configuration/sinks/README.md
+[docs.sources]: ../usage/configuration/sources/README.md
 [docs.splunk_hec_sink]: ../usage/configuration/sinks/splunk_hec.md
 [docs.statsd_source]: ../usage/configuration/sources/statsd.md
 [docs.stdin_source]: ../usage/configuration/sources/stdin.md

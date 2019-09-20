@@ -31,4 +31,4 @@ If you do not see your operating system you can consider:
 {% page-ref page="../manual/from-source.md" %}
 
 
-[docs.platforms]: ../../../setup/installation/platforms
+[docs.platforms]: ../../../setup/installation/platforms/README.md

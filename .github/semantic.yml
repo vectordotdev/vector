@@ -1,14 +1,6 @@
 # Always validate the PR title, and ignore the commits
 titleOnly: true
 
-types:
-  - chore
-  - docs
-  - feat
-  - fix
-  - improvement
-  - perf
-
 scopes:
   - cli
   - config

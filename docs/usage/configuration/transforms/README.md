@@ -54,8 +54,8 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.remove_tags_transform]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
-[docs.sinks]: ../../../usage/configuration/sinks
-[docs.sources]: ../../../usage/configuration/sources
+[docs.sinks]: ../../../usage/configuration/sinks/README.md
+[docs.sources]: ../../../usage/configuration/sources/README.md
 [docs.split_transform]: ../../../usage/configuration/transforms/split.md
 [docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
 [images.transforms]: ../../../assets/transforms.svg

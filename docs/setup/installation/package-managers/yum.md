@@ -60,6 +60,6 @@ sudo yum upgrade vector
 ```
 
 
-[docs.configuration]: ../../../usage/configuration
+[docs.configuration]: ../../../usage/configuration/README.md
 [url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [url.yum]: http://yum.baseurl.org/

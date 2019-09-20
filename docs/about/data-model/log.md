@@ -257,11 +257,11 @@ remove, or rename fields as desired.
 {% endcode-tabs-item %}
 
 
-[docs.configuration]: ../../usage/configuration
-[docs.data-model]: ../../about/data-model
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources]: ../../usage/configuration/sources
-[docs.transforms]: ../../usage/configuration/transforms
+[docs.configuration]: ../../usage/configuration/README.md
+[docs.data-model]: ../../about/data-model/README.md
+[docs.sinks]: ../../usage/configuration/sinks/README.md
+[docs.sources]: ../../usage/configuration/sources/README.md
+[docs.transforms]: ../../usage/configuration/transforms/README.md
 [images.data-model-log]: ../../assets/data-model-log.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
 [url.issue_551]: https://github.com/timberio/vector/issues/551

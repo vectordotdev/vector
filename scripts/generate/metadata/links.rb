@@ -74,11 +74,15 @@ require 'net/http'
 # directory.=
 class Links
   VECTOR_ROOT = "https://github.com/timberio/vector"
+  VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
+  VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull"
+  VECTOR_RELEASE_ROOT = "#{VECTOR_ROOT}/releases/tag"
   TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness"
 
-  def initialize(links)    
+  def initialize(links, check_urls: true)    
     @links = links
+    @check_urls = check_urls
     @checked_urls = {}
 
     @docs_files =
@@ -123,7 +127,7 @@ class Links
       path_or_url = normalize_path(path_or_url, opts[:current_file])
     end
 
-    if CHECK_URLS
+    if check_urls?
       check!(path_or_url)
     end
 
@@ -206,6 +210,10 @@ class Links
       end
     end
 
+    def check_urls?
+      @check_urls == true
+    end
+
     def find_doc!(name)
       docs = find(@docs_files, name)
 
@@ -213,7 +221,7 @@ class Links
         docs.first
       elsif docs.length >= 2
         raise <<~EOF
-        #{name.inspect} is ambiguous and matches multiple doc.
+        #{name.inspect} is ambiguous and matches multiple docs.
 
         * #{docs.join("\n* ")}
         EOF
@@ -245,8 +253,8 @@ class Links
     def find(files, name)
       exact_matches =
         files.select do |file|
-          normalized_file = file.downcase
-          
+          normalized_file = file.downcase.gsub(/\/readme\.md$/, ".md")
+
           [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
             !(file_name =~ /\/#{name}(\..*)$/).nil?
           end
@@ -300,8 +308,18 @@ class Links
         name = $1
         find_image!(name)
 
+      when /^url\.commit_([a-z0-9]+)$/
+        "#{VECTOR_COMMIT_ROOT}/#{$1}"
+
       when /^url\.issue_([0-9]+)$/
         "#{VECTOR_ISSUES_ROOT}/#{$1}"
+
+      when /^url\.pr_([0-9]+)$/
+        "#{VECTOR_PRS_ROOT}/#{$1}"
+
+      when /^url\.v([a-z0-9-]+)$/
+        version = $1.gsub("-", ".")
+        "#{VECTOR_RELEASE_ROOT}/#{version}"
 
       when /^url\.(.*)_(sink|source|transform)_issues$/
         name = $1

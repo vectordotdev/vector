@@ -189,9 +189,9 @@ key/value pairs represented as single-level strings.
 {% endcode-tabs}
 
 
-[docs.configuration]: ../../usage/configuration
-[docs.data-model]: ../../about/data-model
+[docs.configuration]: ../../usage/configuration/README.md
+[docs.data-model]: ../../about/data-model/README.md
 [docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
-[docs.sinks]: ../../usage/configuration/sinks
+[docs.sinks]: ../../usage/configuration/sinks/README.md
 [images.data-model-metric]: ../../assets/data-model-metric.svg
 [url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto

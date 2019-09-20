@@ -82,8 +82,8 @@ Please refer to our troubleshooting guide:
 {% page-ref page="../usage/guides/troubleshooting.md" %}
 
 
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources]: ../../usage/configuration/sources
+[docs.sinks]: ../../usage/configuration/sinks/README.md
+[docs.sources]: ../../usage/configuration/sources/README.md
 [docs.starting.flags]: ../../usage/administration/starting.md#flags
 [docs.troubleshooting]: ../../usage/guides/troubleshooting.md
 [url.issue_230]: https://github.com/timberio/vector/issues/230

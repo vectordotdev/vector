@@ -112,12 +112,12 @@ you'll need to combine to create your pipelines.
 
 
 [docs.concepts]: ../../about/concepts.md
-[docs.configuration]: ../../usage/configuration
+[docs.configuration]: ../../usage/configuration/README.md
 [docs.console_sink]: ../../usage/configuration/sinks/console.md
 [docs.event]: ../../about/data-model/README.md#event
-[docs.installation]: ../../setup/installation
+[docs.installation]: ../../setup/installation/README.md
 [docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
-[docs.sinks]: ../../usage/configuration/sinks
-[docs.sources]: ../../usage/configuration/sources
+[docs.sinks]: ../../usage/configuration/sinks/README.md
+[docs.sources]: ../../usage/configuration/sources/README.md
 [docs.stdin_source]: ../../usage/configuration/sources/stdin.md
-[docs.transforms]: ../../usage/configuration/transforms
+[docs.transforms]: ../../usage/configuration/transforms/README.md

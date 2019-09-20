@@ -27,4 +27,4 @@ A sink is a destination for [events][docs.data_model.event]. Each sink's design 
 {% page-ref page="../usage/configuration/sinks/" %}
 
 
-[docs.data_model.event]: ../about/data-model#event
+[docs.data_model.event]: ../about/data-model/README.md#event

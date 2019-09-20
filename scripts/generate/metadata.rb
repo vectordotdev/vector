@@ -14,7 +14,7 @@ require_relative "metadata/transform"
 # each sub-component.
 class Metadata
   class << self
-    def load(meta_dir)
+    def load(meta_dir, opts = {})
       metadata = {}
 
       Dir.glob("#{meta_dir}/**/*.toml").each do |file|
@@ -22,21 +22,19 @@ class Metadata
         metadata.deep_merge!(hash)
       end
 
-      new(metadata)
+      new(metadata, opts)
     end
   end
 
   attr_reader :companies,
-    :enums,
     :links,
     :options,
     :sinks,
     :sources,
     :transforms
 
-  def initialize(hash)
+  def initialize(hash, check_urls: true)
     @companies = hash.fetch("companies")
-    @enums = OpenStruct.new(hash.fetch("enums"))
     @options = OpenStruct.new()
     @sinks = OpenStruct.new()
     @sources = OpenStruct.new()
@@ -102,6 +100,10 @@ class Metadata
 
     # links
 
-    @links = Links.new(hash.fetch("links"))
+    @links = Links.new(hash.fetch("links"), check_urls: check_urls)
+  end
+
+  def components
+    @components ||= sources.to_h.values + transforms.to_h.values + sinks.to_h.values
   end
 end
