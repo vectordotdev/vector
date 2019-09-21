@@ -8,7 +8,7 @@
 
 ## Examples
 
-The `aws_kinesis_streams` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
+The `aws_kinesis_streams` sink batches [`log`][docs.data-model.log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
 
 ```http
 POST / HTTP/1.1
@@ -43,19 +43,19 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 ### Partitioning
 
 By default, Vector issues random 16 byte values for each
-[Kinesis record's partition key][url.aws_kinesis_partition_key], evenly
+[Kinesis record's partition key][urls.aws_kinesis_partition_key], evenly
 distributing records across your Kinesis partitions. Depending on your use case
 this might not be sufficient since random distribution does not preserve order.
 To override this, you can supply the `partition_key_field` option. This option
 represents a field on your event to use for the partition key value instead.
 This is useful if you have a field already on your event, and it also pairs
-nicely with the [`add_fields` transform][docs.add_fields_transform].
+nicely with the [`add_fields` transform][docs.transforms.add_fields].
 
 #### Missing keys or blank values
 
 Kenisis requires a value for the partition key and therefore if the key is
 missing or the value is blank the event will be dropped and a
-[`warning` level log event][docs.monitoring.logs] will be logged. As such,
+[`warning` level log event][docs.monitoring#logs] will be logged. As such,
 the field specified in the `partition_key_field` option should always contain
 a value.
 
@@ -74,7 +74,7 @@ This is generally outside the scope of Vector but worth touching on. When you
 supply your own partition key it opens up the possibility for "hot spots",
 and you should be aware of your data distribution for the key you're providing.
 Kinesis provides the ability to
-[manually split shards][url.aws_kinesis_split_shards] to accomodate this.
+[manually split shards][urls.aws_kinesis_split_shards] to accomodate this.
 If they key you're using is dynamic and unpredictable we highly recommend
 recondsidering your ordering policy to allow for even and random distribution.
 

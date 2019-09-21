@@ -50,10 +50,10 @@ a variety of methods:
 
 | Method | Description |
 | :----- | :---------- |
-| [`-v` flag][docs.starting.flags] | Drops the log level to `debug`. |
-| [`-vv` flag][docs.starting.flags] | Drops the log level to `trace`. |
-| [`-q` flag][docs.starting.flags] | Raises the log level to `warn`. |
-| [`-qq` flag][docs.starting.flags] | Raises the log level to `error`. |
+| [`-v` flag][docs.starting#flags] | Drops the log level to `debug`. |
+| [`-vv` flag][docs.starting#flags] | Drops the log level to `trace`. |
+| [`-q` flag][docs.starting#flags] | Raises the log level to `warn`. |
+| [`-qq` flag][docs.starting#flags] | Raises the log level to `error`. |
 | `LOG=<level>` env var | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`. |
 
 ### Full Backtraces
@@ -69,7 +69,7 @@ and disrupting service. The tradeoff is that repetitive logs will not be logged.
 
 ## Metrics
 
-Currently, Vector does not expose Metrics. [Issue #230][url.issue_230]
+Currently, Vector does not expose Metrics. [Issue #230][urls.issue_230]
 represents work to run internal Vector metrics through Vector's pipeline.
 Allowing you to define internal metrocs as a [source][docs.sources] and
 then define one of many metrics [sinks][docs.sinks] to collect those metrics,
@@ -82,8 +82,8 @@ Please refer to our troubleshooting guide:
 {% page-ref page="../usage/guides/troubleshooting.md" %}
 
 
-[docs.sinks]: ../../usage/configuration/sinks/README.md
-[docs.sources]: ../../usage/configuration/sources/README.md
-[docs.starting.flags]: ../../usage/administration/starting.md#flags
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources]: ../../usage/configuration/sources
+[docs.starting#flags]: ../../usage/administration/starting.md#flags
 [docs.troubleshooting]: ../../usage/guides/troubleshooting.md
-[url.issue_230]: https://github.com/timberio/vector/issues/230
+[urls.issue_230]: https://github.com/timberio/vector/issues/230

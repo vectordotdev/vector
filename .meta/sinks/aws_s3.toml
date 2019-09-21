@@ -16,7 +16,7 @@ request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_s3_service_limits"
 service_provider = "AWS"
-write_to_description = "[AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
+write_to_description = "[AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)"
 
 [sinks.aws_s3.options.bucket]
 type = "string"
@@ -62,7 +62,7 @@ type = "string"
 category = "Object Names"
 default = "%s"
 null = false
-description = "The format of the resulting object file name. [`strftime` specifiers][url.strftime_specifiers] are supported."
+description = "The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported."
 
 [sinks.aws_s3.options.key_prefix]
 type = "string"
@@ -84,4 +84,4 @@ description = "A prefix to apply to all object key names. This should be used to
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][url.aws_s3_regions] of the target S3 bucket."
+description = "The [AWS region][urls.aws_s3_regions] of the target S3 bucket."

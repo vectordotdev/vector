@@ -12,10 +12,10 @@ description: Streams `log` events to Apache Kafka via the Kafka protocol.
 
 # kafka sink
 
-![][images.kafka_sink]
+![][assets.kafka_sink]
 
 
-The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol].
+The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
 ## Config File
 
@@ -133,8 +133,8 @@ The `kafka` sink [streams](#streaming) [`log`][docs.log_event] events to [Apache
 
 ### Delivery Guarantee
 
-This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
-if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Encodings
 
@@ -155,7 +155,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `kafka` sink. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -166,7 +166,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -193,37 +193,37 @@ event-by-event basis. It does not batch data.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `kafka_sink` issues][url.kafka_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_kafka_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_kafka_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `kafka_sink` issues][urls.kafka_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_kafka_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_kafka_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.kafka_sink_issues] - [enhancements][url.kafka_sink_enhancements] - [bugs][url.kafka_sink_bugs]
-* [**Source code**][url.kafka_sink_source]
+* [**Issues**][urls.kafka_sink_issues] - [enhancements][urls.kafka_sink_enhancements] - [bugs][urls.kafka_sink_bugs]
+* [**Source code**][urls.kafka_sink_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[assets.kafka_sink]: ../../../assets/kafka-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.kafka_sink]: ../../../assets/kafka-sink.svg
-[url.kafka]: https://kafka.apache.org/
-[url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+bug%22
-[url.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+enhancement%22
-[url.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
-[url.kafka_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
-[url.new_kafka_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+bug
-[url.new_kafka_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+enhancement
-[url.vector_chat]: https://chat.vector.dev
+[urls.kafka]: https://kafka.apache.org/
+[urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.kafka_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+bug%22
+[urls.kafka_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22+label%3A%22Type%3A+enhancement%22
+[urls.kafka_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+kafka%22
+[urls.kafka_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/kafka.rs
+[urls.new_kafka_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+bug
+[urls.new_kafka_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+kafka&labels=Type%3A+enhancement
+[urls.vector_chat]: https://chat.vector.dev

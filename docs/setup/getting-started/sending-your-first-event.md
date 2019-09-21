@@ -7,8 +7,8 @@ description: A "Hello World" getting started guide
 This is a "Hello World" style guide that walks through sending your first
 [event][docs.event] through Vector. It's designed to be followed locally,
 making it quick and easy. We'll start with the simplest of examples: accepting
-an event via the [`stdin` source][docs.stdin_source], and then printing it out
-via the [`console` sink][docs.console_sink].
+an event via the [`stdin` source][docs.sources.stdin], and then printing it out
+via the [`console` sink][docs.sinks.console].
 
 ![](../../assets/getting-started-guide.svg)
 
@@ -65,7 +65,7 @@ brings us to parsing...
 
 In most cases you'll want to parse your event into a structured format. Vector
 makes this easy with [transforms][docs.transforms]. In this case, we'll use
-the [`regex_parser`][docs.regex_parser_transform]. Let's update your existing
+the [`regex_parser`][docs.transforms.regex_parser]. Let's update your existing
 Vector configuration file:
 
 ```bash
@@ -103,7 +103,7 @@ Exit `vector` by pressing `ctrl+c`.
 You'll notice this time the event is structured. Vector knows when an event
 is structured or not and defaults to JSON encoding for outputs that support
 it. You can change the encoding in the
-[`console` sink options][docs.console_sink].
+[`console` sink options][docs.sinks.console].
 
 That's it! This tutorial demonstrates the _very_ basic [concepts][docs.concepts]
 of Vector. From here, you can start to think about the various
@@ -112,12 +112,12 @@ you'll need to combine to create your pipelines.
 
 
 [docs.concepts]: ../../about/concepts.md
-[docs.configuration]: ../../usage/configuration/README.md
-[docs.console_sink]: ../../usage/configuration/sinks/console.md
-[docs.event]: ../../about/data-model/README.md#event
-[docs.installation]: ../../setup/installation/README.md
-[docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
-[docs.sinks]: ../../usage/configuration/sinks/README.md
-[docs.sources]: ../../usage/configuration/sources/README.md
-[docs.stdin_source]: ../../usage/configuration/sources/stdin.md
-[docs.transforms]: ../../usage/configuration/transforms/README.md
+[docs.configuration]: ../../usage/configuration
+[docs.event]: ../../setup/getting-started/sending-your-first-event.md
+[docs.installation]: ../../setup/installation
+[docs.sinks.console]: ../../usage/configuration/sinks/console.md
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources.stdin]: ../../usage/configuration/sources/stdin.md
+[docs.sources]: ../../usage/configuration/sources
+[docs.transforms.regex_parser]: ../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../usage/configuration/transforms

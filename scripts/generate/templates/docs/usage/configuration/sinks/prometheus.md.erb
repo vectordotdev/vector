@@ -11,8 +11,8 @@
 {% tabs %}
 {% tab title="Histograms" %}
 This example demonstrates how Vector's internal [`histogram` metric \
-type][docs.metric_event.histogram] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#histograms] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector histograms:
 
@@ -34,7 +34,7 @@ For example, given the following internal Vector histograms:
 ````
 
 The `<%= component.name %>` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP response_time_s response_time_s
@@ -67,8 +67,8 @@ your units.
 {% endtab %}
 {% tab title="Counters" %}
 This example demonstrates how Vector's internal [`counter` metric \
-type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#counters] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector gauges:
 
@@ -90,7 +90,7 @@ For example, given the following internal Vector gauges:
 ````
 
 The `<%= component.name %>` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP logins logins
@@ -102,8 +102,8 @@ Notice that Vector aggregates the metric and exposes the final value.
 {% endtab %}
 {% tab title="Gauges" %}
 This example demonstrates how Vector's internal [`gauge` metric \
-type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#gauges] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector gauges:
 
@@ -127,7 +127,7 @@ For example, given the following internal Vector gauges:
 ````
 
 The `<%= component.name %>` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP memory_rss memory_rss
@@ -152,7 +152,7 @@ aggregation](#in-memory-aggregation) section.
 ### High Cardinality Names
 
 High cardinality metric names and labels are [discouraged by \
-Prometheus][url.prometheus_high_cardinality] and you should consider alternative
+Prometheus][urls.prometheus_high_cardinality] and you should consider alternative
 strategies to reduce the cardinality as this can provide performance and
 operation problems. In general, high cardinality analysis should be left logs
 and storages designed for this use case (not Promtheus).
@@ -161,7 +161,7 @@ and storages designed for this use case (not Promtheus).
 
 Choosing the appropriate buckets for Prometheus histgorams is a complicated
 point of discussion. The [Histograms and Summaries Prometheus \
-guide][url.prometheus_histograms_guide] provides a good overview of histograms,
+guide][urls.prometheus_histograms_guide] provides a good overview of histograms,
 buckets, summaries, and how you should think about configuring them. The buckets
 you choose should align with your known range and distribution of values as
 well as how you plan to report on them. The aforementioned guide provides
@@ -203,29 +203,29 @@ see examples of this in the [examples section](#examples).
 
 ### Metric Types
 
-As described in the [metric data model][docs.metric_event] page, Vector offers
+As described in the [metric data model][docs.data-model.metric] page, Vector offers
 a variety of metric types. Their support, as as well as their mappings, are
 described below:
 
-| Vector Metric Type                     | Prometheus Metric Type              |
-|:---------------------------------------|:------------------------------------|
-| [`counter`][docs.metric_event.counter] | ['counter'][url.prometheus_counter] |
-| [`gauge`][docs.metric_event.gauge]     | ['gauge'][url.prometheus_gauge]     |
-| [`histogram`][docs.metric_event.gauge] | ['histogram'][url.prometheus_gauge] |
-| [`set`][docs.metric_event.gauge]       | ⚠️ not supported                    |
-| -                                      | ['summary'][url.prometheus_summary] |
+| Vector Metric Type                               | Prometheus Metric Type               |
+|:-------------------------------------------------|:-------------------------------------|
+| [`counter`][docs.data-model.metric#counters]     | ['counter'][urls.prometheus_counter] |
+| [`gauge`][docs.data-model.metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
+| [`histogram`][docs.data-model.metric#histograms] | ['histogram'][urls.prometheus_gauge] |
+| [`set`][docs.data-model.metric#sets]             | ⚠️ not supported                     |
+| -                                                | ['summary'][urls.prometheus_summary] |
 
 #### Sets
 
-Prometheus does not have a [`set`][docs.metric_event.set] type. Sets are
-generally specific to [Statsd][url.statsd_set], and if a set is received in the
+Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
+generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `<%= component.name %>` sink it will be dropped, and a rate limited warning
 level log will be emitted.
 
 #### Summaries
 
 Summaries are a Prometheus specific type and Vector does not default to them
-by default. [issue #710][url.issue_710] addresses the ability to define metrics,
+by default. [issue #710][urls.issue_710] addresses the ability to define metrics,
 including the ability change their types (such as changing them to `summary`
 types).
 
@@ -237,9 +237,9 @@ types).
 
 If you experience out of memory (OOM) errors it's likely you're using extremely
 [high cardinality](#high-cardinality) metric names or labels. This is
-[discouraged by Prometheus][url.prometheus_high_cardinality] and you should
+[discouraged by Prometheus][urls.prometheus_high_cardinality] and you should
 consider alternative strategies to reduce the cardinality. Such as leveraging
-logs for high cardinality analysis. [Issue #387][url.issue_387] discusses the
+logs for high cardinality analysis. [Issue #387][urls.issue_387] discusses the
 ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
 

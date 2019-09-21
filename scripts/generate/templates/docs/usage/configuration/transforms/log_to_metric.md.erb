@@ -43,7 +43,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -62,7 +62,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 {% endtab %}
 {% tab title="Counting" %}
@@ -100,7 +100,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -118,7 +118,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Summing" %}
 In this example we'll demonstrate computing a sum. The scenario we've chosen
@@ -157,7 +157,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -174,7 +174,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Gauges" %}
 In this example we'll demonstrate creating a gauge that represents the current
@@ -222,7 +222,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.metric_event] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -259,7 +259,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Sets" %}
 In this example we'll demonstrate how to use sets. Sets are primarly a Statsd
@@ -297,7 +297,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -314,7 +314,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% endtabs %}
 
@@ -340,7 +340,7 @@ It's important to understand that this transform does not reduce multiple logs
 into a single metric. Instead, this transform converts logs into granular
 individual metrics that can then be reduced at the edge. Where the reduction
 happens depends on your metrics storage. For example, the
-[`prometheus` sink][docs.prometheus_sink] will reduce logs in the sink itself
+[`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
 for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
 

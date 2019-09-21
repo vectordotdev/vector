@@ -4,7 +4,7 @@ description: 'A deeper look into Vector''s internal metric event data model.'
 
 # Metric Event
 
-![][images.data-model-metric]
+![][assets.data-model-metric]
 
 As mentioned in the [data model page][docs.data-model], Vector's events must
 be one of 2 types: a `log` or a `metric`. This page provides a deeper dive into
@@ -67,7 +67,7 @@ message Set {
 {% endcode-tabs %}
 
 You can view a complete definition in the [event proto \
-definition][url.event_proto].
+definition][urls.event_proto].
 
 ### Counters
 
@@ -88,7 +88,7 @@ value. This is commonly used for timings, helping to understand quantiles, max,
 min, and other aggregations.
 
 Depending on the downstream service Vector will aggregate histograms internally
-(such is the case for the [`prometheus` sink][docs.prometheus_sink]) or forward
+(such is the case for the [`prometheus` sink][docs.sinks.prometheus]) or forward
 them immediately to the service for aggregation.
 
 | Name          | Type        | Description                                      |
@@ -189,9 +189,9 @@ key/value pairs represented as single-level strings.
 {% endcode-tabs}
 
 
-[docs.configuration]: ../../usage/configuration/README.md
-[docs.data-model]: ../../about/data-model/README.md
-[docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
-[docs.sinks]: ../../usage/configuration/sinks/README.md
-[images.data-model-metric]: ../../assets/data-model-metric.svg
-[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[assets.data-model-metric]: ../../assets/data-model-metric.svg
+[docs.configuration]: ../../usage/configuration
+[docs.data-model]: ../../about/data-model
+[docs.sinks.prometheus]: ../../usage/configuration/sinks/prometheus.md
+[docs.sinks]: ../../usage/configuration/sinks
+[urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto

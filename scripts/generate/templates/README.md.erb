@@ -16,12 +16,12 @@ makes [collecting][docs.sources], [transforming][docs.transforms], and
 collection & routing from your services, giving you control and data ownership,
 among [many other benefits][docs.use_cases].
 
-Built in [Rust][url.rust], Vector places high-value on
+Built in [Rust][urls.rust], Vector places high-value on
 [performance][docs.performance], [correctness][docs.correctness], and [operator
 friendliness][docs.administration]. It compiles to a single static binary and is
 designed to be [deployed][docs.deployment] across your entire infrastructure,
-serving both as a light-weight [agent][docs.agent_role] and a highly efficient
-[service][docs.service_role], making the process of getting data from A to B
+serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
+[service][docs.roles.service], making the process of getting data from A to B
 simple and unified.
 
 
@@ -31,7 +31,7 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log][docs.log_event], [metric][docs.metric_event]
+* [**Data model**][docs.data_model] - [log][docs.data-model.log], [metric][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
@@ -48,18 +48,18 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][url.community] - [chat/forum][url.vector_chat], [mailing list][url.mailing_list]
-* [**Roadmap**][url.roadmap] - [vote on new features][url.vote_feature]
+* [**Community**][urls.community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
+* [**Roadmap**][urls.roadmap] - [vote on new features][urls.vote_feature]
 
 
 ## Features
 
-* ***Fast*** - Built in [Rust][url.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
+* ***Fast*** - Built in [Rust][urls.rust], Vector is [fast and memory efficient][docs.performance]. No runtime. No garbage collector.
 * **Correct** - Obsessed with [getting the details right][docs.correctness].
 * **Vendor Neutral** - Does not favor a specific storage. Fair, open, with the user's best interest in mind.
-* **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.agent_role] or [service][docs.service_role].
-* **Logs, Metrics, or Events** - [Logs][docs.log], [metrics][docs.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
-* **Correlate Logs & Metrics** - [Derive metrics from logs][docs.log_to_metric_transform], add shared context with [transforms][docs.transforms].
+* **Agent or Service** - One simple tool to get data from A to B. Deploys as an [agent][docs.roles.agent] or [service][docs.roles.service].
+* **Logs, Metrics, or Events** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and [events][docs.data_model]. Collect, unify, and ship all observability data.
+* **Correlate Logs & Metrics** - [Derive metrics from logs][docs.transforms.log_to_metric], add shared context with [transforms][docs.transforms].
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you understand your tradeoffs.
 * **Easy To Deploy** - Cross-compiles to [a single static binary][docs.archives] with no runtime.
 * **Hot Reload** - [Reload configuration on the fly][docs.reloading], without skipping a beat.
@@ -75,7 +75,7 @@ simple and unified.
 | [TCP to HTTP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_http_performance) | _**26.7mib/s**_ | n/a | 19.6mib/s | <1mib/s | 2.7mib/s | n/a | n/a |
 | [TCP to TCP](https://github.com/timberio/vector-test-harness/tree/master/cases/tcp_to_tcp_performance) | 69.9mib/s | 5mib/s | 67.1mib/s | 3.9mib/s | 10mib/s | _**70.4mib/s**_ | 7.6mib/s |
 
-To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
+To learn more about our performance tests, please see the [Vector test harness][urls.test_harness].
 
 
 ## Correctness
@@ -89,7 +89,7 @@ To learn more about our performance tests, please see the [Vector test harness][
 | [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | ✅ | ❌ | ❌ | ❌ | ⚠️ | ✅ | ✅ |
 | [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-To learn more about our performance tests, please see the [Vector test harness][url.test_harness].
+To learn more about our performance tests, please see the [Vector test harness][urls.test_harness].
 
 
 ## Installation
@@ -107,21 +107,21 @@ Or view [platform specific installation instructions][docs.installation].
 
 <%= components_table(metadata.sources.to_h.values.sort) %>
 
-[+ request a new source][url.new_source]
+[+ request a new source][urls.new_source]
 
 
 ## Transforms
 
 <%= components_table(metadata.transforms.to_h.values.sort) %>
 
-[+ request a new transform][url.new_transform]
+[+ request a new transform][urls.new_transform]
 
 
 ## Sinks
 
 <%= components_table(metadata.sinks.to_h.values.sort) %>
 
-[+ request a new sink][url.new_sink]
+[+ request a new sink][urls.new_sink]
 
 
 ## License

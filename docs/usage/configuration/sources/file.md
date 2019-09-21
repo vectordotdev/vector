@@ -12,17 +12,17 @@ description: Ingests data through one or more local files and outputs `log` even
 
 # file source
 
-![][images.file_source]
+![][assets.file_source]
 
 {% hint style="warning" %}
 The `file` source is in beta. Please see the current
-[enhancements][url.file_source_enhancements] and
-[bugs][url.file_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_file_source_issue]
+[enhancements][urls.file_source_enhancements] and
+[bugs][urls.file_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_file_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `file` source ingests data through one or more local files and outputs [`log`][docs.log_event] events.
+The `file` source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
@@ -197,7 +197,7 @@ Given the following input:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -215,7 +215,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as
 context. You can further parse the `"message"` key with a
 [transform][docs.transforms], such as the
-[`regex` transform][docs.regex_parser_transform].
+[`regex_parser` transform][docs.transforms.regex_parser].
 
 ## How It Works
 
@@ -235,7 +235,7 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global `data_dir` option][docs.configuration.data-directory] but can be
+[global `data_dir` option][docs.configuration#data-directory] but can be
 overridden via the `data_dir` option in the `file` sink directly.
 
 ### Context
@@ -247,7 +247,7 @@ options.
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -255,7 +255,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### File Deletion
@@ -267,7 +267,7 @@ continue reading until it reaches EOF. When a file is no longer findable in the
 ### File Identification
 
 By default, Vector identifies files by creating a [cyclic redundancy check
-(CRC)][url.crc] on the first 256 bytes of the file. This serves as a
+(CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
 fingerprint to uniquely identify the file. The amount of bytes read can be
 controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
 
@@ -326,7 +326,7 @@ between Vector's last read and the actual rotation event.
 
 ### Globbing
 
-[Globbing][url.globbing] is supported in all provided file paths, files will
+[Globbing][urls.globbing] is supported in all provided file paths, files will
 be [autodiscovered](#auto-discovery) continually at a rate defined by the
 `glob_minimum_cooldown` option.
 
@@ -346,41 +346,41 @@ read position will resume from the last checkpoint.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `file_source` issues][url.file_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_file_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_file_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `file_source` issues][urls.file_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_file_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_file_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.file_source_issues] - [enhancements][url.file_source_enhancements] - [bugs][url.file_source_bugs]
-* [**Source code**][url.file_source_source]
+* [**Issues**][urls.file_source_issues] - [enhancements][urls.file_source_enhancements] - [bugs][urls.file_source_bugs]
+* [**Source code**][urls.file_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.data-directory]: ../../../usage/configuration/README.md#data-directory
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[assets.file_source]: ../../../assets/file-source.svg
+[docs.configuration#data-directory]: ../../../usage/configuration#data-directory
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms/README.md
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.file_source]: ../../../assets/file-source.svg
-[url.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
-[url.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+bug%22
-[url.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+enhancement%22
-[url.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
-[url.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
-[url.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
-[url.new_file_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+bug
-[url.new_file_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+enhancement
-[url.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+file
-[url.vector_chat]: https://chat.vector.dev
+[urls.crc]: https://en.wikipedia.org/wiki/Cyclic_redundancy_check
+[urls.file_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+bug%22
+[urls.file_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22+label%3A%22Type%3A+enhancement%22
+[urls.file_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+file%22
+[urls.file_source_source]: https://github.com/timberio/vector/tree/master/src/sources/file.rs
+[urls.globbing]: https://en.wikipedia.org/wiki/Glob_(programming)
+[urls.new_file_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+bug
+[urls.new_file_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+file&labels=Type%3A+enhancement
+[urls.new_file_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+file
+[urls.vector_chat]: https://chat.vector.dev

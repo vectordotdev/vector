@@ -55,5 +55,5 @@ examples = [
 null = false
 description = """\
 A definition of mapped field types. They key is the field name and the value \
-is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.\
+is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.\
 """

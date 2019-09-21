@@ -12,10 +12,10 @@ description: Accepts `log` events and allows you to parse a log field value as J
 
 # json_parser transform
 
-![][images.json_parser_transform]
+![][assets.json_parser_transform]
 
 
-The `json_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a log field value as JSON.
+The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 
 ## Config File
 
@@ -149,7 +149,7 @@ Please see the [I/O section](#i-o) for an example of chaining and unwrapping JSO
 
 The `json_parser` source has been involved in the following correctness tests:
 
-* [`wrapped_json_correctness`][url.wrapped_json_correctness_test]
+* [`wrapped_json_correctness`][urls.wrapped_json_correctness_test]
 
 Learn more in the [Correctness][docs.correctness] sections.
 
@@ -159,7 +159,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Invalid JSON
@@ -197,43 +197,43 @@ Parsing the `"message"` field would result the following structure:
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `json_parser_transform` issues][url.json_parser_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_json_parser_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_json_parser_transform_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `json_parser_transform` issues][urls.json_parser_transform_issues].
+2. If encountered a bug, please [file a bug report][urls.new_json_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_json_parser_transform_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`lua` transform][docs.lua_transform]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
-* [**Issues**][url.json_parser_transform_issues] - [enhancements][url.json_parser_transform_enhancements] - [bugs][url.json_parser_transform_bugs]
-* [**Source code**][url.json_parser_transform_source]
+* [**Issues**][urls.json_parser_transform_issues] - [enhancements][urls.json_parser_transform_enhancements] - [bugs][urls.json_parser_transform_bugs]
+* [**Source code**][urls.json_parser_transform_source]
 
 
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[assets.json_parser_transform]: ../../../assets/json_parser-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.json_parser_transform]: ../../../assets/json_parser-transform.svg
-[url.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22
-[url.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+enhancement%22
-[url.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
-[url.json_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
-[url.new_json_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+bug
-[url.new_json_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+enhancement
-[url.vector_chat]: https://chat.vector.dev
-[url.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness
+[urls.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22
+[urls.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+enhancement%22
+[urls.json_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22
+[urls.json_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/json_parser.rs
+[urls.new_json_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+bug
+[urls.new_json_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+json_parser&labels=Type%3A+enhancement
+[urls.vector_chat]: https://chat.vector.dev
+[urls.wrapped_json_correctness_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness

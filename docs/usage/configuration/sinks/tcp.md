@@ -12,10 +12,10 @@ description: Streams `log` events to a TCP connection.
 
 # tcp sink
 
-![][images.tcp_sink]
+![][assets.tcp_sink]
 
 
-The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP connection.
+The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection.
 
 ## Config File
 
@@ -165,7 +165,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.log_event] events to a TCP con
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Encodings
 
@@ -186,7 +186,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `tcp` sink. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -197,7 +197,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -224,35 +224,35 @@ event-by-event basis. It does not batch data.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `tcp_sink` issues][url.tcp_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_tcp_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_tcp_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `tcp_sink` issues][urls.tcp_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_tcp_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_tcp_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.tcp_sink_issues] - [enhancements][url.tcp_sink_enhancements] - [bugs][url.tcp_sink_bugs]
-* [**Source code**][url.tcp_sink_source]
+* [**Issues**][urls.tcp_sink_issues] - [enhancements][urls.tcp_sink_enhancements] - [bugs][urls.tcp_sink_bugs]
+* [**Source code**][urls.tcp_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[assets.tcp_sink]: ../../../assets/tcp-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.tcp_sink]: ../../../assets/tcp-sink.svg
-[url.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug
-[url.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+enhancement
-[url.tcp_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+bug%22
-[url.tcp_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+enhancement%22
-[url.tcp_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22
-[url.tcp_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/tcp.rs
-[url.vector_chat]: https://chat.vector.dev
+[urls.new_tcp_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+bug
+[urls.new_tcp_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+tcp&labels=Type%3A+enhancement
+[urls.tcp_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+bug%22
+[urls.tcp_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22+label%3A%22Type%3A+enhancement%22
+[urls.tcp_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+tcp%22
+[urls.tcp_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/tcp.rs
+[urls.vector_chat]: https://chat.vector.dev

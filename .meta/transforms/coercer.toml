@@ -26,6 +26,6 @@ examples = [
 null = false
 description = """\
 A definition of log field type conversions. They key is the log field name and \
-the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are \
 supported for the `timestamp` type.\
 """

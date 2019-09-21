@@ -12,21 +12,21 @@
 
 ### Available Patterns
 
-Vector uses the Rust [`grok` library][url.rust_grok_library]. All patterns
-[listed here][url.grok_patterns] are supported. It is recommended to use
+Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
+[listed here][urls.grok_patterns] are supported. It is recommended to use
 maintained patterns when possible since they can be improved over time by
 the community.
 
 ### Debugging
 
-We recommend the [Grok debugger][url.grok_debugger] for Grok testing.
+We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
 
 ### Performance
 
-Grok is approximately 50% slower than the [`regex_parser` transform][docs.regex_parser_transform].
+Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
 We plan to add a [performance test][docs.performance] for this in the future.
 While this is still plenty fast for most use cases we recommend using the
-[`regex_parser` transform][docs.regex_parser_transform] if you are experiencing
+[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
 performance issues.
 
 ## Troubleshooting

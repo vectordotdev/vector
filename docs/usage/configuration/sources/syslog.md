@@ -12,10 +12,10 @@ description: Ingests data through the Syslog 5424 protocol and outputs `log` eve
 
 # syslog source
 
-![][images.syslog_source]
+![][assets.syslog_source]
 
 
-The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events.
+The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
@@ -98,7 +98,7 @@ Given the following input
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -111,7 +111,10 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-Vector only extracts the `"timestamp"` and `"host"` fields and leaves the `"message"` in-tact. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+Vector only extracts the `"timestamp"` and `"host"` fields and leaves the
+`"message"` in-tact. You can further parse the `"message"` key with a
+[transform][docs.transforms], such as the
+[`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
@@ -126,7 +129,7 @@ options.
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -134,7 +137,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Line Delimiters
@@ -143,7 +146,7 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 
 ### Parsing
 
-Vector will parse messages in the [Syslog 5424][url.syslog_5424] format.
+Vector will parse messages in the [Syslog 5424][urls.syslog_5424] format.
 
 #### Successful parsing
 
@@ -170,37 +173,37 @@ Anyone with Syslog experience knows there are often deviations from the Syslog s
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `syslog_source` issues][url.syslog_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_syslog_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_syslog_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `syslog_source` issues][urls.syslog_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_syslog_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_syslog_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.syslog_source_issues] - [enhancements][url.syslog_source_enhancements] - [bugs][url.syslog_source_bugs]
-* [**Source code**][url.syslog_source_source]
+* [**Issues**][urls.syslog_source_issues] - [enhancements][urls.syslog_source_enhancements] - [bugs][urls.syslog_source_bugs]
+* [**Source code**][urls.syslog_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms/README.md
+[assets.syslog_source]: ../../../assets/syslog-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.syslog_source]: ../../../assets/syslog-source.svg
-[url.new_syslog_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+bug
-[url.new_syslog_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+enhancement
-[url.syslog_5424]: https://tools.ietf.org/html/rfc5424
-[url.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+bug%22
-[url.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+enhancement%22
-[url.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
-[url.syslog_source_source]: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
-[url.vector_chat]: https://chat.vector.dev
+[urls.new_syslog_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+bug
+[urls.new_syslog_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+syslog&labels=Type%3A+enhancement
+[urls.syslog_5424]: https://tools.ietf.org/html/rfc5424
+[urls.syslog_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+bug%22
+[urls.syslog_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22+label%3A%22Type%3A+enhancement%22
+[urls.syslog_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+syslog%22
+[urls.syslog_source_source]: https://github.com/timberio/vector/tree/master/src/sources/syslog.rs
+[urls.vector_chat]: https://chat.vector.dev

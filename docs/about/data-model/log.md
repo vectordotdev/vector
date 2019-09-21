@@ -4,7 +4,7 @@ description: 'A deeper look into Vector''s internal log event data model.'
 
 # Log Event
 
-![][images.data-model-log]
+![][assets.data-model-log]
 
 As mentioned in the [data model page][docs.data-model], Vector's events must
 be one of 2 types: a `log` or a `metric`. This page provides a deeper dive
@@ -37,7 +37,7 @@ message Value {
 {% endcode-tabs %}
 
 You can view a complete definition in the [event proto \
-definition][url.event_proto].
+definition][urls.event_proto].
 
 You'll notice that Vector does not restrict your schema in any way, you are
 free to use whatever fields and shape you like. In places where Vector must
@@ -81,7 +81,7 @@ Booleans represent binary true/false values.
 
 ##### Timestamps
 
-Timestamps are represented as [`DateTime` Rust structs][url.rust_date_time]
+Timestamps are represented as [`DateTime` Rust structs][urls.rust_date_time]
 stored as UTC.
 
 {% hint style="warning" %}
@@ -91,7 +91,7 @@ If Vector receives a timestamp that does not contain timezone information
 Vector assumes the timestamp is in local time, and will convert the timestamp
 to UTC from the local time. It is important that the host system contain
 time zone data files to properly determine the local time zone. This is
-typically installed through the `tzdata` package. See [issue 551][url.issue_551]
+typically installed through the `tzdata` package. See [issue 551][urls.issue_551]
 for more info.
 {% endhint %}
 
@@ -231,7 +231,7 @@ override the fields used, if relevant.
 
 | Name        | Type                      | Description                                                                                                                                                                     |
 |:------------|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `timestamp` | [`timestamp`](#timestamp) | A normalized [Rust DateTime struct][url.rust_date_time] in UTC.                                                                                                                 |
+| `timestamp` | [`timestamp`](#timestamp) | A normalized [Rust DateTime struct][urls.rust_date_time] in UTC.                                                                                                                 |
 | `message`   | [`string`](#string)       | A string representing the log message. This is the key used when ingesting raw string data.                                                                                     |
 | `host`      | [`string`](#string)       | A string representing the originating host of the log. This is commonly used in [sources][docs.sources] but can be overridden via the `host_field` option for relevant sources. |
 
@@ -257,12 +257,12 @@ remove, or rename fields as desired.
 {% endcode-tabs-item %}
 
 
-[docs.configuration]: ../../usage/configuration/README.md
-[docs.data-model]: ../../about/data-model/README.md
-[docs.sinks]: ../../usage/configuration/sinks/README.md
-[docs.sources]: ../../usage/configuration/sources/README.md
-[docs.transforms]: ../../usage/configuration/transforms/README.md
-[images.data-model-log]: ../../assets/data-model-log.svg
-[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.issue_551]: https://github.com/timberio/vector/issues/551
-[url.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html
+[assets.data-model-log]: ../../assets/data-model-log.svg
+[docs.configuration]: ../../usage/configuration
+[docs.data-model]: ../../about/data-model
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources]: ../../usage/configuration/sources
+[docs.transforms]: ../../usage/configuration/transforms
+[urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[urls.issue_551]: https://github.com/timberio/vector/issues/551
+[urls.rust_date_time]: https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html

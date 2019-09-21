@@ -12,10 +12,10 @@ description: Batches `log` events to a generic HTTP endpoint.
 
 # http sink
 
-![][images.http_sink]
+![][assets.http_sink]
 
 
-The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint.
+The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint.
 
 ## Config File
 
@@ -235,7 +235,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events t
 
 ## Examples
 
-The `http` sink batches [`log`][docs.log_event] up to the `batch_size` or
+The `http` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to a generic HTTP
 endpoint. The encoding is dictated by the `encoding` option. For example:
 
@@ -261,12 +261,12 @@ HTTP authentication is controlled via the `Authorization` header which you can
 set with the `headers` option. For convenience, Vector also supports the
 `basic_auth.username` and `basic_auth.password` options which handle setting the
 `Authorization` header for the [base access authentication
-scheme][url.basic_auth].
+scheme][urls.basic_auth].
 
 
 ### Buffers & Batches
 
-![][images.sink-flow-serial]
+![][assets.sink-flow-serial]
 
 The `http` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
@@ -309,12 +309,12 @@ type is described in more detail below:
 
 | Compression | Description |
 |:------------|:------------|
-| `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
+| `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
-This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
-if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Encodings
 
@@ -335,7 +335,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `http` sink. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -346,7 +346,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -378,7 +378,7 @@ more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_http_sink_issue].
+with the Vector team by [opening an issie][urls.new_http_sink_issue].
 
 ### Retry Policy
 
@@ -399,40 +399,40 @@ and result in deuplicate data downstream.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `http_sink` issues][url.http_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_http_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_http_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `http_sink` issues][urls.http_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_http_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_http_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.http_sink_issues] - [enhancements][url.http_sink_enhancements] - [bugs][url.http_sink_bugs]
-* [**Source code**][url.http_sink_source]
+* [**Issues**][urls.http_sink_issues] - [enhancements][urls.http_sink_enhancements] - [bugs][urls.http_sink_bugs]
+* [**Source code**][urls.http_sink_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
+[assets.http_sink]: ../../../assets/http-sink.svg
+[assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.http_sink]: ../../../assets/http-sink.svg
-[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
-[url.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
-[url.gzip]: https://www.gzip.org/
-[url.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+bug%22
-[url.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+enhancement%22
-[url.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
-[url.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
-[url.new_http_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+bug
-[url.new_http_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+enhancement
-[url.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http
-[url.vector_chat]: https://chat.vector.dev
+[urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
+[urls.gzip]: https://www.gzip.org/
+[urls.http_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+bug%22
+[urls.http_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22+label%3A%22Type%3A+enhancement%22
+[urls.http_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+http%22
+[urls.http_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/http.rs
+[urls.new_http_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+bug
+[urls.new_http_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http&labels=Type%3A+enhancement
+[urls.new_http_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+http
+[urls.vector_chat]: https://chat.vector.dev

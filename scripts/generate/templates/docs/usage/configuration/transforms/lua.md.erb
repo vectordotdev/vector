@@ -65,10 +65,10 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][url.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.default_schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
-[Lua types][url.lua_types] in the [Lua docs][url.lua_docs].
+[Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
 
 ### Nested Fields
 
@@ -89,7 +89,7 @@ event["parent.child"] = nil
 
 Vector provides a `search_dirs` option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
-function][url.lua_require].
+function][urls.lua_require].
 
 ## Troubleshooting
 

@@ -30,7 +30,7 @@ Bundler.require(:default)
 
 require_relative "util/core_ext/object"
 require_relative "util/printer"
-require_relative "generate/post_processors/link_checker"
+require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/post_processors/toml_syntax_switcher"
@@ -46,18 +46,6 @@ require_relative "generate/core_ext/string"
 include Printer
 
 #
-# Functions
-#
-
-def post_process(content, doc, links)
-  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
-  content = PostProcessors::SectionSorter.sort!(content)
-  content = PostProcessors::OptionReferencer.reference!(content)
-  content = PostProcessors::LinkChecker.check!(content, doc, links)
-  content
-end
-
-#
 # Constants
 #
 
@@ -67,6 +55,63 @@ DOCS_ROOT = File.join(VECTOR_ROOT, "docs")
 META_ROOT = File.join(VECTOR_ROOT, ".meta")
 TEMPLATES_DIR = "#{Dir.pwd}/templates"
 VECTOR_DOCS_HOST = "https://docs.vector.dev"
+
+#
+# Functions
+#
+
+def doc_valid?(file_or_dir)
+  parts = file_or_dir.split("#", 2)
+  path = DOCS_ROOT + parts[0]
+  anchor = parts[1]
+
+  if File.exists?(path)
+    if !anchor.nil?
+      file_path = File.directory?(path) ? "#{path}/README.md" : path
+      content = File.read(file_path)
+      headings = content.scan(/\n###?#?#? (.*)\n/).flatten.uniq
+      anchors = headings.collect(&:parameterize)
+      anchors.include?(anchor)
+    else
+      true
+    end
+  else
+    false
+  end
+end
+
+def link_valid?(value)
+  if value.start_with?("/")
+    doc_valid?(value)
+  else
+    url_valid?(value)
+  end
+end
+
+def post_process(content, doc, links)
+  content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
+  content = PostProcessors::SectionSorter.sort!(content)
+  content = PostProcessors::OptionReferencer.reference!(content)
+  content = PostProcessors::LinkDefiner.define!(content, doc, links)
+  content
+end
+
+def url_valid?(url)
+  uri = URI.parse(url)
+  req = Net::HTTP.new(uri.host, uri.port)
+  req.open_timeout = 500
+  req.read_timeout = 1000
+  req.ssl_timeout = 1000
+  req.use_ssl = true if uri.scheme == 'https'
+  path = uri.path == "" ? "/" : uri.path
+
+  begin
+    res = req.request_head(path)
+    res.code.to_i != 404
+  rescue Errno::ECONNREFUSED
+    return false
+  end
+end
 
 #
 # Header
@@ -84,7 +129,7 @@ check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
 # Setup
 #
 
-metadata = Metadata.load(META_ROOT, check_urls: check_urls)
+metadata = Metadata.load(META_ROOT)
 templates = Templates.new(metadata)
 
 #
@@ -147,5 +192,29 @@ docs.each do |doc|
     content = post_process(content, doc, metadata.links)
     File.write(doc, content)
     say("Processed - #{doc}", color: :green)
+  end
+end
+
+#
+# Check URLs
+#
+
+if check_urls
+  title("Checking URLs...")
+
+  metadata.links.values.to_a.sort.each do |id, value|
+    if !link_valid?(value)
+      error!(
+        <<~EOF
+        Link invalid!
+
+          #{value}
+
+        Please make sure this path or URL exists.
+        EOF
+      )
+    else
+      say("Valid - #{id} - #{value}", color: :green)
+    end
   end
 end

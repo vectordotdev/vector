@@ -82,7 +82,7 @@ class Templates
   def compression_description(compression)
     case compression
     when "gzip"
-      "The payload will be compressed in [Gzip][url.gzip] format before being sent."
+      "The payload will be compressed in [Gzip][urls.gzip] format before being sent."
     when "none"
       "The payload will not compressed at all."
     else
@@ -120,7 +120,13 @@ class Templates
     opts[:titles] = true unless opts.key?(:titles)
 
     spec = ConfigSpec.new(options)
-    render("_partials/_config_spec.toml", binding).strip
+    content = render("_partials/_config_spec.toml", binding).strip
+
+    if opts[:path]
+      content
+    else
+      content.gsub("\n  ", "\n")
+    end
   end
 
   def encoding_description(encoding)
@@ -140,7 +146,7 @@ class Templates
 
   def event_type_links(types)
     types.collect do |type|
-      "[`#{type}`][docs.#{type}_event]"
+      "[`#{type}`][docs.data-model.#{type}]"
     end
   end
 

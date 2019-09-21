@@ -12,17 +12,17 @@ description: Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 
 # aws_s3 sink
 
-![][images.aws_s3_sink]
+![][assets.aws_s3_sink]
 
 {% hint style="warning" %}
 The `aws_s3` sink is in beta. Please see the current
-[enhancements][url.aws_s3_sink_enhancements] and
-[bugs][url.aws_s3_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_aws_s3_sink_issue]
+[enhancements][urls.aws_s3_sink_enhancements] and
+[bugs][urls.aws_s3_sink_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_aws_s3_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
+The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
 ## Config File
 
@@ -249,8 +249,8 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events
 
 ## Examples
 
-The `aws_s3` sink batches [`log`][docs.log_event] up to the `batch_size` or
-`batch_timeout` options. When flushed, Vector will write to [AWS S3][url.aws_s3]
+The `aws_s3` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
+`batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]
 via the [`PutObject` API
 endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 The encoding is dictated by the `encoding` option. For example:
@@ -288,24 +288,24 @@ X-Amz-Target: Kinesis_20131202.PutRecords
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The [IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring_logs].
+error will be [logged][docs.monitoring#logs].
 
 #### Obtaining an access key
 
 In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
-within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 
 ### Buffers & Batches
 
  
-![][images.sink-flow-partitioned]
+![][assets.sink-flow-partitioned]
 
 The `aws_s3` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
@@ -342,7 +342,7 @@ Batches are flushed when 1 of 2 conditions are met:
 ### Columnar Formats
 
 Vector has plans to support column formats, such as ORC and Parquet, in
-[`v0.6`][url.roadmap].
+[`v0.6`][urls.roadmap].
 
 ### Compression
 
@@ -353,12 +353,12 @@ type is described in more detail below:
 
 | Compression | Description |
 |:------------|:------------|
-| `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
+| `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
-This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
-if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Encodings
 
@@ -379,7 +379,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `aws_s3` sink. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -390,7 +390,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -441,7 +441,7 @@ date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Vector appends a [UUIDV4][url.uuidv4] token to ensure there are no name
+Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
 conflicts in the unlikely event 2 Vector instances are writing data at the same
 time.
 
@@ -466,7 +466,7 @@ more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_aws_s3_sink_issue].
+with the Vector team by [opening an issie][urls.new_aws_s3_sink_issue].
 
 ### Retry Policy
 
@@ -477,12 +477,12 @@ attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` opt
 ### Searching
 
 Storing log data in S3 is a powerful strategy for persisting log data. Mainly
-because data on S3 is searchable. And [AWS Athena][url.aws_athena] makes this
+because data on S3 is searchable. And [AWS Athena][urls.aws_athena] makes this
 easier than ever.
 
 #### Athena
 
-1. Head over to the [Athena console][url.aws_athena_console].
+1. Head over to the [Athena console][urls.aws_athena_console].
 
 2. Create a new table, replace the `<...>` variables as needed:
 
@@ -513,15 +513,15 @@ easier than ever.
     ```
 
 Vector has plans to support [columnar formats](#columnar-formats) in
-[`v0.6`][url.roadmap] which will allows for very fast and efficient querying on
+[`v0.6`][urls.roadmap] which will allows for very fast and efficient querying on
 S3.
 
 ### Template Syntax
 
 The `key_prefix` options
-support [Vector's template syntax][docs.configuration.template-syntax],
+support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][url.strftime_specifiers] as well as the
+[strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 {% code-tabs %}
@@ -539,7 +539,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 {% endcode-tabs %}
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration.template-syntax].
+[template syntax section][docs.configuration#template-syntax].
 
 ### Timeouts
 
@@ -554,52 +554,52 @@ and result in deuplicate data downstream.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `aws_s3_sink` issues][url.aws_s3_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_aws_s3_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_aws_s3_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `aws_s3_sink` issues][urls.aws_s3_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_aws_s3_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_aws_s3_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.aws_s3_sink_issues] - [enhancements][url.aws_s3_sink_enhancements] - [bugs][url.aws_s3_sink_bugs]
-* [**Source code**][url.aws_s3_sink_source]
-* [**Service Limits**][url.aws_s3_service_limits]
+* [**Issues**][urls.aws_s3_sink_issues] - [enhancements][urls.aws_s3_sink_enhancements] - [bugs][urls.aws_s3_sink_bugs]
+* [**Source code**][urls.aws_s3_sink_source]
+* [**Service Limits**][urls.aws_s3_service_limits]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.configuration.template-syntax]: ../../../usage/configuration/README.md#template-syntax
+[assets.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
+[assets.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
-[images.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
-[url.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
-[url.aws_athena]: https://aws.amazon.com/athena/
-[url.aws_athena_console]: https://console.aws.amazon.com/athena/home
-[url.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
-[url.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
-[url.aws_s3]: https://aws.amazon.com/s3/
-[url.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
-[url.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+bug%22
-[url.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+enhancement%22
-[url.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
-[url.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
-[url.gzip]: https://www.gzip.org/
-[url.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
-[url.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+bug
-[url.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+enhancement
-[url.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[url.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
-[url.vector_chat]: https://chat.vector.dev
+[urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
+[urls.aws_athena]: https://aws.amazon.com/athena/
+[urls.aws_athena_console]: https://console.aws.amazon.com/athena/home
+[urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
+[urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
+[urls.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+bug%22
+[urls.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+enhancement%22
+[urls.aws_s3_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22
+[urls.aws_s3_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/aws_s3.rs
+[urls.gzip]: https://www.gzip.org/
+[urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+[urls.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+bug
+[urls.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+enhancement
+[urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
+[urls.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
+[urls.vector_chat]: https://chat.vector.dev
