@@ -12,17 +12,17 @@ description: Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 
 # elasticsearch sink
 
-![][images.elasticsearch_sink]
+![][assets.elasticsearch_sink]
 
 {% hint style="warning" %}
 The `elasticsearch` sink is in beta. Please see the current
-[enhancements][url.elasticsearch_sink_enhancements] and
-[bugs][url.elasticsearch_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_elasticsearch_sink_issue]
+[enhancements][urls.elasticsearch_sink_enhancements] and
+[bugs][urls.elasticsearch_sink_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_elasticsearch_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
+The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
 ## Config File
 
@@ -243,7 +243,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.log_event]
 
 ## Examples
 
-The `elasticsearch` sink batches [`log`][docs.log_event] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:
+The `elasticsearch` sink batches [`log`][docs.data-model.log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:
 
 ```http
 POST <host>/_bulk HTTP/1.1
@@ -263,7 +263,7 @@ Content-Length: 654
 
 ### Buffers & Batches
 
-![][images.sink-flow-serial]
+![][assets.sink-flow-serial]
 
 The `elasticsearch` sink buffers & batches data as
 shown in the diagram above. You'll notice that Vector treats these concepts
@@ -300,7 +300,7 @@ Batches are flushed when 1 of 2 conditions are met:
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -308,7 +308,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -345,7 +345,7 @@ more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_elasticsearch_sink_issue].
+with the Vector team by [opening an issie][urls.new_elasticsearch_sink_issue].
 
 ### Retry Policy
 
@@ -356,9 +356,9 @@ attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` opt
 ### Template Syntax
 
 The `index` options
-support [Vector's template syntax][docs.configuration.template-syntax],
+support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][url.strftime_specifiers] as well as the
+[strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 {% code-tabs %}
@@ -374,7 +374,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 {% endcode-tabs %}
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration.template-syntax].
+[template syntax section][docs.configuration#template-syntax].
 
 ### Timeouts
 
@@ -389,41 +389,41 @@ and result in deuplicate data downstream.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `elasticsearch_sink` issues][url.elasticsearch_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_elasticsearch_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_elasticsearch_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `elasticsearch_sink` issues][urls.elasticsearch_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_elasticsearch_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_elasticsearch_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.elasticsearch_sink_issues] - [enhancements][url.elasticsearch_sink_enhancements] - [bugs][url.elasticsearch_sink_bugs]
-* [**Source code**][url.elasticsearch_sink_source]
+* [**Issues**][urls.elasticsearch_sink_issues] - [enhancements][urls.elasticsearch_sink_enhancements] - [bugs][urls.elasticsearch_sink_bugs]
+* [**Source code**][urls.elasticsearch_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.configuration.template-syntax]: ../../../usage/configuration/README.md#template-syntax
-[docs.data_model]: ../../../about/data-model/README.md
+[assets.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
+[assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data_model]: ../../../about/data-model
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.guarantees]: ../../../about/guarantees.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
-[images.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
-[url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
-[url.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
-[url.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
-[url.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
-[url.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+bug
-[url.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+enhancement
-[url.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.vector_chat]: https://chat.vector.dev
+[urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
+[urls.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22
+[urls.elasticsearch_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22
+[urls.elasticsearch_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/elasticsearch.rs
+[urls.new_elasticsearch_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+bug
+[urls.new_elasticsearch_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch&labels=Type%3A+enhancement
+[urls.new_elasticsearch_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+elasticsearch
+[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_chat]: https://chat.vector.dev

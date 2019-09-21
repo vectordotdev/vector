@@ -12,17 +12,17 @@ description: Ingests data through Kafka 0.9 or later and outputs `log` events.
 
 # kafka source
 
-![][images.kafka_source]
+![][assets.kafka_source]
 
 {% hint style="warning" %}
 The `kafka` source is in beta. Please see the current
-[enhancements][url.kafka_source_enhancements] and
-[bugs][url.kafka_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_kafka_source_issue]
+[enhancements][urls.kafka_source_enhancements] and
+[bugs][urls.kafka_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_kafka_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events.
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
@@ -113,7 +113,7 @@ Given the following message in a Kafka topic:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -125,7 +125,9 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
@@ -133,8 +135,8 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Delivery Guarantee
 
-This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
-if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Environment Variables
 
@@ -142,43 +144,43 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `kafka_source` issues][url.kafka_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_kafka_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_kafka_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `kafka_source` issues][urls.kafka_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_kafka_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_kafka_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.kafka_source_issues] - [enhancements][url.kafka_source_enhancements] - [bugs][url.kafka_source_bugs]
-* [**Source code**][url.kafka_source_source]
+* [**Issues**][urls.kafka_source_issues] - [enhancements][urls.kafka_source_enhancements] - [bugs][urls.kafka_source_bugs]
+* [**Source code**][urls.kafka_source_source]
 
 
-[docs.at_least_once_delivery]: ../../../about/guarantees.md#at-least-once-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms/README.md
+[assets.kafka_source]: ../../../assets/kafka-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.kafka_source]: ../../../assets/kafka-source.svg
-[url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
-[url.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
-[url.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
-[url.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
-[url.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
-[url.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
-[url.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka
-[url.vector_chat]: https://chat.vector.dev
+[urls.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
+[urls.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
+[urls.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
+[urls.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
+[urls.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
+[urls.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
+[urls.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka
+[urls.vector_chat]: https://chat.vector.dev

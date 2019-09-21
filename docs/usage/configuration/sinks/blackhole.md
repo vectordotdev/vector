@@ -12,10 +12,10 @@ description: Streams `log` and `metric` events to a blackhole that simply discar
 
 # blackhole sink
 
-![][images.blackhole_sink]
+![][assets.blackhole_sink]
 
 
-The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
+The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 
 ## Config File
 
@@ -68,7 +68,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.log_event] and [`metric`
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -76,7 +76,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -103,35 +103,35 @@ event-by-event basis. It does not batch data.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `blackhole_sink` issues][url.blackhole_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_blackhole_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_blackhole_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `blackhole_sink` issues][urls.blackhole_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_blackhole_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_blackhole_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.blackhole_sink_issues] - [enhancements][url.blackhole_sink_enhancements] - [bugs][url.blackhole_sink_bugs]
-* [**Source code**][url.blackhole_sink_source]
+* [**Issues**][urls.blackhole_sink_issues] - [enhancements][urls.blackhole_sink_enhancements] - [bugs][urls.blackhole_sink_bugs]
+* [**Source code**][urls.blackhole_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.blackhole_sink]: ../../../assets/blackhole-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.blackhole_sink]: ../../../assets/blackhole-sink.svg
-[url.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+bug%22
-[url.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+enhancement%22
-[url.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
-[url.blackhole_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
-[url.new_blackhole_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+bug
-[url.new_blackhole_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+enhancement
-[url.vector_chat]: https://chat.vector.dev
+[urls.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+bug%22
+[urls.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+enhancement%22
+[urls.blackhole_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22
+[urls.blackhole_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/blackhole.rs
+[urls.new_blackhole_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+bug
+[urls.new_blackhole_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+blackhole&labels=Type%3A+enhancement
+[urls.vector_chat]: https://chat.vector.dev

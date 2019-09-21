@@ -12,17 +12,17 @@ description: Ingests data through log records from journald and outputs `log` ev
 
 # journald source
 
-![][images.journald_source]
+![][assets.journald_source]
 
 {% hint style="warning" %}
 The `journald` source is in beta. Please see the current
-[enhancements][url.journald_source_enhancements] and
-[bugs][url.journald_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_journald_source_issue]
+[enhancements][urls.journald_source_enhancements] and
+[bugs][urls.journald_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_journald_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `journald` source ingests data through log records from journald and outputs [`log`][docs.log_event] events.
+The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
@@ -114,7 +114,7 @@ MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -146,7 +146,11 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as `"host"`, and parses `"_SOURCE_REALTIME_TIMESTAMP"` into `"timestamp"`. All other fields from journald are kept intact from the source record. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as
+`"host"`, and parses `"_SOURCE_REALTIME_TIMESTAMP"` into `"timestamp"`. All
+other fields from journald are kept intact from the source record. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
@@ -155,7 +159,7 @@ Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as `"host"`,
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -163,43 +167,43 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `journald_source` issues][url.journald_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_journald_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_journald_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `journald_source` issues][urls.journald_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_journald_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_journald_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.journald_source_issues] - [enhancements][url.journald_source_enhancements] - [bugs][url.journald_source_bugs]
-* [**Source code**][url.journald_source_source]
+* [**Issues**][urls.journald_source_issues] - [enhancements][urls.journald_source_enhancements] - [bugs][urls.journald_source_bugs]
+* [**Source code**][urls.journald_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.transforms]: ../../../usage/configuration/transforms/README.md
+[assets.journald_source]: ../../../assets/journald-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.journald_source]: ../../../assets/journald-source.svg
-[url.journald_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+bug%22
-[url.journald_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+enhancement%22
-[url.journald_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
-[url.journald_source_source]: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
-[url.new_journald_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+bug
-[url.new_journald_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+enhancement
-[url.new_journald_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald
-[url.vector_chat]: https://chat.vector.dev
+[urls.journald_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+bug%22
+[urls.journald_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22+label%3A%22Type%3A+enhancement%22
+[urls.journald_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+journald%22
+[urls.journald_source_source]: https://github.com/timberio/vector/tree/master/src/sources/journald.rs
+[urls.new_journald_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+bug
+[urls.new_journald_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald&labels=Type%3A+enhancement
+[urls.new_journald_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+journald
+[urls.vector_chat]: https://chat.vector.dev

@@ -2,76 +2,28 @@
 
 require 'net/http'
 
-# Makes links available through methods
+# Links
 #
 # This class implements reader methods for statically and dynamically defined
 # links.
-#
-# == Validation
-#
-# All links are validated as a post-processing step via the `LinkPostProcessor`.
 #
 # == Link categories
 #
 # Links must be nested under 1 of 3 categories:
 #
-# 1. `docs` - signals an internal documentation link.
-# 2. `url` - signals an external URL.
-# 3. `images` - signals a link to an image asset.
+# 1. `assets` - signals a link to a file in the docs/assets folder.
+# 2. `docs` - signals an internal documentation link.
+# 3. `url` - signals an external URL.
 #
 # == Statically defined linked
 #
-# Links can be statically defined in the ./meta/links.toml file. At the bottom
-# of the file is a `[links]` table comprosied of the categories above.
+# Links can be statically defined in the ./meta/links.toml file.
 #
 # == Dynamically defined linked
 #
 # To reduce the burden of having to manually define every link this class
-# implement dynamic readers:
-#
-# === /^docs\.(.*)_(sink|source|transform)$/
-#
-# Links to the documentation file for the specific component.
-#
-# === /^docs\.(.*)$/
-#
-# Links to the documentation with the matching name. For example, `regex-parser`
-# will match the `docs/usage/configuration/transforms/regex-parser.md` file.
-#
-# A few things to note about this logic:
-#
-# 1. It is case insensitive.
-# 2. It can match directories, this is useful when you want to link to an
-#    entire section.
-#
-# === /^images\.(.*)$/
-#
-# Links to the image in the docs/assets folder.
-#
-# === /^url\.issue_([0-9]+)$/
-#
-# Links to the specified issue.
-#
-# === /^url\.(.*)_(sink|source|transform)_issues$/
-#
-# Links to component issues.
-#
-# === /^url\.(.*)_(sink|source|transform)_(bugs|enhancements)$/
-#
-# Links to either bug or enhancement issues for the component.
-#
-# === /^url\.(.*)_(sink|source|transform)_source$/
-#
-# Links to the source file for the component.
-#
-# === /^url\.new_(.*)_(sink|source|transform)_issue$/
-#
-# Links to the form to create a new issue for the component.
-#
-# === /^url\.(.*)_test$/
-#
-# Links to a test in the https://github.com/timberio/vector-test-harness/cases
-# directory.=
+# implement dynamic readers that can be found in the `#fetch_dynamic_url`
+# method.
 class Links
   VECTOR_ROOT = "https://github.com/timberio/vector"
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
@@ -80,261 +32,171 @@ class Links
   VECTOR_RELEASE_ROOT = "#{VECTOR_ROOT}/releases/tag"
   TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness"
 
-  def initialize(links, check_urls: true)    
-    @links = links
-    @check_urls = check_urls
-    @checked_urls = {}
+  attr_reader :values
 
-    @docs_files =
+  def initialize(links)    
+    @links = links
+    @values = {}
+
+    @docs =
       Dir.glob("#{DOCS_ROOT}/**/*").
       to_a.
       collect { |f| f.gsub(DOCS_ROOT, "") }.
-      select { |f| !f.start_with?("/assets/") }
-
-    @image_files =
-      Dir.glob("#{DOCS_ROOT}/assets/*").
-      to_a.
-      collect { |f| f.gsub(DOCS_ROOT, "") }
+      select { |f| !f.end_with?("README.md") }
   end
 
-  def fetch(id, opts = {})
-    parts = id.split(".")
-    category = parts[0]
-    name = parts[1]
-    section = parts[2]
-    full_name = "#{category}.#{name}"
+  def []=(id)
+    fetch(id)
+  rescue KeyError
+    nil
+  end
 
-    if parts.length < 2
-      raise KeyError.new(
-        <<~EOF
-        #{full_name.inspect} is not a valid link. Links must start with
-        `docs.`, `images.`, or `url.` to signal if the link is internal or
-        external. Please fix this link.
+  def fetch(id)
+    id_parts = id.split(".", 2)
+    category = id_parts[0]
+    suffix = id_parts[1]
+    suffix_parts = suffix.split("#", 2)
+    name = suffix_parts[0]
+    section = suffix_parts[1]
 
-        For example: `docs.platforms` or `url.vector_repo` are both valid.
-        EOF
-      )
-    end
+    base_value =
+      case category
+      when "assets"
+        fetch_asset(name)
+      when "docs"
+        fetch_doc(name)
+      when "urls"
+        fetch_url(name)
+      else
+        raise ArgumentError.new(
+          <<~EOF
+          Invalid link category!
 
-    category_links = @links[category] || {}
-    path_or_url = category_links[name] || parse(full_name)
+            #{category.inspect}
 
-    if path_or_url.nil?
-      raise KeyError.new("#{full_name} link is not defined")
-    end
+          Links must start with `docs.`, `images.`, or `urls.`
+          EOF
+        )
+      end
 
-    if !path_or_url.start_with?("http")
-      path_or_url = normalize_path(path_or_url, opts[:current_file])
-    end
-
-    if check_urls?
-      check!(path_or_url)
-    end
-
-    if section
-      "#{path_or_url}##{section}"
-    else
-      path_or_url
-    end
+    value = [base_value, section].compact.join("#")
+    @values[id] ||= value
+    value
   end
 
   private
-    def check!(path_or_url)
-      parts = path_or_url.split("#")
-      raw_path_or_url = parts.first
-      section = parts.length > 1 ? parts.last : nil
+    def fetch_asset(name)
+      normalized_name = name.downcase.gsub(".", "/").gsub("-", "_")
 
-      if raw_path_or_url.start_with?(".")
-        path_parts = raw_path_or_url.split(File::SEPARATOR).select { |part| part != ".." && part != "." }
-        raw_path_or_url = "/" + File.join(path_parts)
-      end
+      assets =
+        @docs.
+          select { |doc| doc.start_with?("/assets/") }.
+          select do |doc|
+            basename = File.basename(doc, ".*").downcase.gsub("-", "_")
+            basename == normalized_name
+          end
 
-      if raw_path_or_url.start_with?("/")
-        check_file!(raw_path_or_url, section)
-      else
-        check_url!(raw_path_or_url)
-      end
-    end
+      if assets.length == 1
+        assets.first
+      elsif assets.length == 0
+        raise KeyError.new(
+          <<~EOF
+          Unkknown asset name!
 
-    def check_file!(path, section)
-      if !File.exists?("#{DOCS_ROOT}/#{path}")
-        raise <<~EOF
-        #{path.inspect} references a documentation file that does not exist!
+            assets.#{name}
 
-        #{path.inspect}
-        EOF
-      elsif section
-        content = File.read("#{DOCS_ROOT}/#{path}")
-        normalized_content = content.gsub("-", " ")
-        normalized_section = section.gsub("-", " ")
-        if !normalized_content.match(/# #{normalized_section}/i)
-          raise <<~EOF
-          #{path.inspect} references a section that does not exist!
-
-          #{path.inspect}##{section}
+          This link does not match any assets.
           EOF
-        end
-      end
-    end
-
-    def check_url(url)
-      return @checked_urls[url] if @checked_urls.key?(url)
-
-      uri = URI.parse(url)
-      req = Net::HTTP.new(uri.host, uri.port)
-      req.open_timeout = 500
-      req.read_timeout = 1000
-      req.ssl_timeout = 1000
-      req.use_ssl = true if uri.scheme == 'https'
-      path = uri.path == "" ? "/" : uri.path
-
-      begin
-        res = req.request_head(path)
-        result = res.code.to_i != 404
-        @checked_urls[url] = result
-        result
-      rescue Errno::ECONNREFUSED
-        return false
-      end
-    end
-
-    def check_url!(url)
-      if !check_url(url)
-        raise <<~EOF
-        #{url.inspect} references a dead link!
-
-        #{url.inspect}
-        EOF
+        )
       else
-        true
-      end
+        raise KeyError.new(
+          <<~EOF
+          Ambiguous asset name!
+
+            assets.#{name}
+
+          This link matches more than 1 asset:
+
+            * #{assets.join("\n  * ")}
+
+          Please use something more specific that will match only a single asset.
+          EOF
+        )
+      end 
     end
 
-    def check_urls?
-      @check_urls == true
-    end
+    def fetch_doc(name)
+      normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
 
-    def find_doc!(name)
-      docs = find(@docs_files, name)
+      docs =
+        @docs.
+          select { |doc| !doc.start_with?("/assets/") }.
+          select do |doc|
+            doc.downcase.gsub(/\.md$/, "").gsub("-", "_").end_with?(normalized_name)
+          end
 
       if docs.length == 1
         docs.first
-      elsif docs.length >= 2
-        raise <<~EOF
-        #{name.inspect} is ambiguous and matches multiple docs.
+      elsif docs.length == 0
+        raise KeyError.new(
+          <<~EOF
+          Unknown link name!
 
-        * #{docs.join("\n* ")}
-        EOF
+            docs.#{name}
+
+          This link does not match any documents.
+          EOF
+        )
       else
-        raise <<~EOF
-        #{name.inspect} doc could not be found.
-        EOF
+        raise KeyError.new(
+          <<~EOF
+          Ambiguous link name!
+
+            docs.#{name}
+
+          This link matches more than 1 doc:
+
+            * #{docs.join("\n  * ")}
+
+          Please use something more specific that will match only a single document.
+          EOF
+        )
       end
     end
 
-    def find_image!(name)
-      images = find(@image_files, name)
-
-      if images.length == 1
-        images.first
-      elsif images.length >= 2
-        raise <<~EOF
-        #{name.inspect} is ambiguous and matches multiple images.
-
-        * #{images.join("\n* ")}
-        EOF
-      else
-        raise <<~EOF
-        #{name.inspect} image could not be found.
-        EOF
-      end
+    def fetch_url(name)
+      @links.fetch("urls")[name] || fetch_dynamic_url(name)
     end
 
-    def find(files, name)
-      exact_matches =
-        files.select do |file|
-          normalized_file = file.downcase.gsub(/\/readme\.md$/, ".md")
-
-          [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
-            !(file_name =~ /\/#{name}(\..*)$/).nil?
-          end
-        end
-
-      if exact_matches.any?
-        return exact_matches
-      end
-
-      files.select do |file|
-        normalized_file = file.downcase
-        
-        [normalized_file, normalized_file.gsub("-", "_")].any? do |file_name|
-          !(file_name =~ /#{name}(\..*)?$/).nil?
-        end
-      end
-    end
-
-    def normalize_path(path, current_file)
-      if current_file && current_file.start_with?(DOCS_ROOT)
-        relative_root =
-          current_file.
-            gsub(/^#{DOCS_ROOT}/, "").
-            split("/")[0..-3].
-            collect { |_| ".." }.
-            join("/")
-
-        if relative_root == ""
-          relative_root = "."
-        end
-
-        "#{relative_root}#{path}"
-      else
-        path = path.gsub(/^docs\//, "/").gsub(".md", "").gsub("/README.md", "")
-        "#{VECTOR_DOCS_HOST}#{path}"
-      end
-    end
-
-    def parse(full_name)
-      case full_name
-      when /^docs\.(.*)_(sink|source|transform)$/
-        name = $1
-        type = $2.pluralize
-        "/usage/configuration/#{type}/#{name}.md"
-
-      when /^docs\.(.*)$/
-        name = $1
-        find_doc!(name)
-
-      when /^images\.(.*)$/
-        name = $1
-        find_image!(name)
-
-      when /^url\.commit_([a-z0-9]+)$/
+    def fetch_dynamic_url(name)
+      case name
+      when /^commit_([a-z0-9]+)$/
         "#{VECTOR_COMMIT_ROOT}/#{$1}"
 
-      when /^url\.issue_([0-9]+)$/
+      when /^issue_([0-9]+)$/
         "#{VECTOR_ISSUES_ROOT}/#{$1}"
 
-      when /^url\.pr_([0-9]+)$/
+      when /^pr_([0-9]+)$/
         "#{VECTOR_PRS_ROOT}/#{$1}"
 
-      when /^url\.v([a-z0-9-]+)$/
+      when /^v([a-z0-9-]+)$/
         version = $1.gsub("-", ".")
         "#{VECTOR_RELEASE_ROOT}/#{version}"
 
-      when /^url\.(.*)_(sink|source|transform)_issues$/
+      when /^(.*)_(sink|source|transform)_issues$/
         name = $1
         type = $2
         query = "is:open is:issue label:\"#{type}: #{name}\""
         VECTOR_ISSUES_ROOT + "?" + {"q" => query}.to_query
 
-      when /^url\.(.*)_(sink|source|transform)_(bugs|enhancements)$/
+      when /^(.*)_(sink|source|transform)_(bugs|enhancements)$/
         name = $1
         type = $2
         issue_type = $3.singularize
         query = "is:open is:issue label:\"#{type}: #{name}\" label:\"Type: #{issue_type}\""
         VECTOR_ISSUES_ROOT + "?" + {"q" => query}.to_query
 
-      when /^url\.(.*)_(sink|source|transform)_source$/
+      when /^(.*)_(sink|source|transform)_source$/
         name = $1
         type = $2.pluralize
         source_file_url =
@@ -344,13 +206,13 @@ class Links
             "#{VECTOR_ROOT}/tree/master/src/#{type}/#{name}.rs"
           end
 
-      when /^url\.new_(.*)_(sink|source|transform)_issue$/
+      when /^new_(.*)_(sink|source|transform)_issue$/
         name = $1
         type = $2
         label = "#{type}: #{name}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [label]}.to_query
 
-      when /^url\.new_(.*)_(sink|source|transform)_(bug|enhancement)$/
+      when /^new_(.*)_(sink|source|transform)_(bug|enhancement)$/
         name = $1
         type = $2
         issue_type = $3.singularize
@@ -358,15 +220,26 @@ class Links
         type_label = "Type: #{issue_type}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
 
-      when /^url\.vector_latest_(release|nightly)_(.*)/
+      when /^vector_latest_(release|nightly)_(.*)/
         channel = $1 == "release" ? "latest" : $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
         
-      when /^url\.(.*)_test$/
+      when /^(.*)_test$/
         name = $1
         "#{TEST_HARNESS_ROOT}/tree/master/cases/#{name}"
 
+      else
+        raise KeyError.new(
+          <<~EOF
+          Unknown link!
+
+            urls.#{name}
+
+          URL links must match a link defined in ./meta/links.toml or it
+          must match a supported dynamic link, such as `urls.issue_541`.
+          EOF
+        )
       end
     end
 end

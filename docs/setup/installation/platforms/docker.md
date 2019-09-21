@@ -4,12 +4,12 @@ description: Using Vector on Docker
 
 # Docker
 
-Vector maintains the [`timberio/vector` Docker image][url.docker_hub_vector]
-available on [Docker Hub][url.docker_hub_vector].
+Vector maintains the [`timberio/vector` Docker image][urls.docker_hub_vector]
+available on [Docker Hub][urls.docker_hub_vector].
 
 ## Installation
 
-Vector ships with a [default `vector.toml` file][url.default_configuration]
+Vector ships with a [default `vector.toml` file][urls.default_configuration]
 as a proof of concept. This is used to test Vector and ensure it is installed
 and working:
 
@@ -75,7 +75,7 @@ You can learn more about configuring Vector in the
 
 ### timberio/vector:&lt;version&gt;-alpine
 
-This image is based on [`alpine:latest`][url.docker_alpine] which is a Linux
+This image is based on [`alpine:latest`][urls.docker_alpine] which is a Linux
 distribution built around musl libc and BusyBox. It is considerably smaller in
 size than other Docker images and statically links libraries. This is the image
 we recommend due to it's small size and reliability.
@@ -100,7 +100,7 @@ as well as the base to build other images off of.
 ## Versions
 
 Timber's Docker images include a special `latest` version that will be updated
-whenever Timber is [released][url.releases]. All other [releases][url.releases]
+whenever Timber is [released][urls.releases]. All other [releases][urls.releases]
 are available via the `X.X.X` tag:
 
 ```bash
@@ -117,8 +117,8 @@ docker run timberio/vector:latest-alpine
 ```
 
 
-[docs.configuration]: ../../../usage/configuration/README.md
-[url.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
-[url.docker_alpine]: https://hub.docker.com/_/alpine
-[url.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
-[url.releases]: https://github.com/timberio/vector/releases
+[docs.configuration]: ../../../usage/configuration
+[urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
+[urls.docker_alpine]: https://hub.docker.com/_/alpine
+[urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
+[urls.releases]: https://github.com/timberio/vector/releases

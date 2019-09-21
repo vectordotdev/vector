@@ -18,7 +18,7 @@ Given the following input:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -36,7 +36,7 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 The `"timestamp"`, `"file"`, and `"host"` keys were automatically added as
 context. You can further parse the `"message"` key with a
 [transform][docs.transforms], such as the
-[`regex` transform][docs.regex_parser_transform].
+[`regex_parser` transform][docs.transforms.regex_parser].
 
 ## How It Works [[sort]]
 
@@ -58,7 +58,7 @@ Vector checkpoints the current read position in the file after each successful
 read. This ensures that Vector resumes where it left off if restarted,
 preventing data from being read twice. The checkpoint positions are stored in
 the data directory which is specified via the
-[global `data_dir` option][docs.configuration.data-directory] but can be
+[global `data_dir` option][docs.configuration#data-directory] but can be
 overridden via the `data_dir` option in the `file` sink directly.
 
 ### File Rotation
@@ -82,7 +82,7 @@ between Vector's last read and the actual rotation event.
 ### File Identification
 
 By default, Vector identifies files by creating a [cyclic redundancy check
-(CRC)][url.crc] on the first 256 bytes of the file. This serves as a
+(CRC)][urls.crc] on the first 256 bytes of the file. This serves as a
 fingerprint to uniquely identify the file. The amount of bytes read can be
 controlled via the `fingerprint_bytes` and `ignored_header_bytes` options.
 
@@ -98,7 +98,7 @@ continue reading until it reaches EOF. When a file is no longer findable in the
 
 ### Globbing
 
-[Globbing][url.globbing] is supported in all provided file paths, files will
+[Globbing][urls.globbing] is supported in all provided file paths, files will
 be [autodiscovered](#auto-discovery) continually at a rate defined by the
 `glob_minimum_cooldown` option.
 

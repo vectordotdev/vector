@@ -20,18 +20,18 @@ source][docs.from_source].
 
 {% tabs %}
 {% tab title="Releases" %}
-Vector retains archives for all [releases][url.releases].
+Vector retains archives for all [releases][urls.releases].
 
 #### Latest
 
-"Latest" archive URLs point to the latest [release][url.releases]:
+"Latest" archive URLs point to the latest [release][urls.releases]:
 
 | Architecture                                                                                         | Notes                                                                            |
 |:-----------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
-| [`latest-x86_64-apple-darwin`][url.vector_latest_release_x86_64-apple-darwin]                        | 64-bit OSX (10.7+, Lion+)                                                        |
-| [`latest-unknown-linux-musl`][url.vector_latest_release_x86_64-unknown-linux-musl]            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
-| [`latest-x86_64-unknown-linux-gnu`][url.vector_latest_release_x86_64-unknown-linux-gnu]              | 64-bit Linux (2.6.18+)                                                           |
-| [`latest-armv7-unknown-linux-gnueabihf`][url.vector_latest_release_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
+| [`latest-x86_64-apple-darwin`][urls.vector_latest_release_x86_64-apple-darwin]                        | 64-bit OSX (10.7+, Lion+)                                                        |
+| [`latest-unknown-linux-musl`][urls.vector_latest_release_x86_64-unknown-linux-musl]            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
+| [`latest-x86_64-unknown-linux-gnu`][urls.vector_latest_release_x86_64-unknown-linux-gnu]              | 64-bit Linux (2.6.18+)                                                           |
+| [`latest-armv7-unknown-linux-gnueabihf`][urls.vector_latest_release_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
 #### Historical
 
@@ -45,20 +45,20 @@ Replace:
 
 * `X.X.X` => your desired version. Ex: `0.3.0`
 * `ARCH` => your desired architecture. Ex: `x86_64`
-* `TRIPLE` => your desired [target triple][url.rust_target_triples]. Ex: `unknown-linux-musl`
+* `TRIPLE` => your desired [target triple][urls.rust_target_triples]. Ex: `unknown-linux-musl`
 {% endtab %}
 {% tab title="Nightly" %}
-"Nightly" builds are built from the [`master` repo branch][url.vector_repo]
+"Nightly" builds are built from the [`master` repo branch][urls.vector_repo]
 every night. They contain the latest features but may be less stable.
 
 #### Latest
 
 | Architecture                                                                                                          | Notes                                                                            |
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
-| [`nightly-x86_64-apple-darwin`][url.vector_latest_nightly_x86_64-apple-darwin]                                        | 64-bit OSX (10.7+, Lion+)                                                        |
-| [`nightly-x86_64-unknown-linux-musl`][url.vector_latest_nightly_x86_64-unknown-linux-musl]                            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
-| [`nightly-x86_64-unknown-linux-gnu`][url.vector_latest_nightly_x86_64-unknown-linux-gnu]                              | 64-bit Linux (2.6.18+)                                                           |
-| [`nightly-armv7-unknown-linux-gnueabihf`][url.vector_latest_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
+| [`nightly-x86_64-apple-darwin`][urls.vector_latest_nightly_x86_64-apple-darwin]                                        | 64-bit OSX (10.7+, Lion+)                                                        |
+| [`nightly-x86_64-unknown-linux-musl`][urls.vector_latest_nightly_x86_64-unknown-linux-musl]                            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
+| [`nightly-x86_64-unknown-linux-gnu`][urls.vector_latest_nightly_x86_64-unknown-linux-gnu]                              | 64-bit Linux (2.6.18+)                                                           |
+| [`nightly-armv7-unknown-linux-gnueabihf`][urls.vector_latest_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
 #### Historical
 
@@ -72,11 +72,11 @@ Replace:
 
 * `YYY-MM-DD` => your desired date. Ex: `2019-08-19`
 * `ARCH` => your desired architecture. Ex: `x86_64`
-* `TRIPLE` => your desired [target triple][url.rust_target_triples]. Ex: `unknown-linux-musl`
+* `TRIPLE` => your desired [target triple][urls.rust_target_triples]. Ex: `unknown-linux-musl`
 {% endtab %}
 {% endtabs %}
 
-⚠️ = This release is limited, it does not support on-disk buffers or the [`kafka` sink][docs.kafka_sink]. See issue [issue 546][url.issue_661] for more details.
+⚠️ = This release is limited, it does not support on-disk buffers or the [`kafka` sink][docs.sinks.kafka]. See issue [issue 546][urls.issue_661] for more details.
 
 ### 2. Unpack The Archive
 
@@ -138,8 +138,8 @@ Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
 
-We highly recommend creating a [data directory][docs.data_directory] that Vector
-can use:
+We highly recommend creating a [data directory][docs.configuration#data-directory]
+that Vector can use:
 
 ```
 mkdir /var/lib/vector
@@ -181,21 +181,21 @@ cp -a etc/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration]: ../../../usage/configuration/README.md
-[docs.data_directory]: ../../../usage/configuration/README.md#data-directory
+[docs.configuration#data-directory]: ../../../usage/configuration#data-directory
+[docs.configuration]: ../../../usage/configuration
 [docs.from_source]: ../../../setup/installation/manual/from-source.md
-[docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
-[docs.operating_systems]: ../../../setup/installation/operating-systems/README.md
-[docs.platforms]: ../../../setup/installation/platforms/README.md
-[url.issue_661]: https://github.com/timberio/vector/issues/661
-[url.releases]: https://github.com/timberio/vector/releases
-[url.rust_target_triples]: https://forge.rust-lang.org/platform-support.html
-[url.vector_latest_nightly_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/nightly/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz
-[url.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
-[url.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
-[url.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
-[url.vector_latest_release_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-gnueabihf.tar.gz
-[url.vector_latest_release_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
-[url.vector_latest_release_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
-[url.vector_latest_release_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
-[url.vector_repo]: https://github.com/timberio/vector
+[docs.operating_systems]: ../../../setup/installation/operating-systems
+[docs.platforms]: ../../../setup/installation/platforms
+[docs.sinks.kafka]: ../../../usage/configuration/sinks/kafka.md
+[urls.issue_661]: https://github.com/timberio/vector/issues/661
+[urls.releases]: https://github.com/timberio/vector/releases
+[urls.rust_target_triples]: https://forge.rust-lang.org/platform-support.html
+[urls.vector_latest_nightly_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/nightly/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz
+[urls.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
+[urls.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
+[urls.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
+[urls.vector_latest_release_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-gnueabihf.tar.gz
+[urls.vector_latest_release_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
+[urls.vector_latest_release_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
+[urls.vector_latest_release_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
+[urls.vector_repo]: https://github.com/timberio/vector

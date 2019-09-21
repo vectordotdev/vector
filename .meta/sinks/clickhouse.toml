@@ -13,7 +13,7 @@ retry_attempts = 9223372036854775807
 retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
-write_to_description = "[Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]"
+write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
 
 [sinks.clickhouse.options.compression]
 type = "string"
@@ -27,7 +27,7 @@ description = "The compression type to use before writing data."
 type = "string"
 examples = ["http://localhost:8123"]
 null = false
-description = "The host url of the [Clickhouse][url.clickhouse] server."
+description = "The host url of the [Clickhouse][urls.clickhouse] server."
 
 [sinks.clickhouse.options.table]
 type = "string"

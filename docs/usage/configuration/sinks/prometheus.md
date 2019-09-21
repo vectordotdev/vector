@@ -12,17 +12,17 @@ description: Exposes `metric` events to Prometheus metrics service.
 
 # prometheus sink
 
-![][images.prometheus_sink]
+![][assets.prometheus_sink]
 
 {% hint style="warning" %}
 The `prometheus` sink is in beta. Please see the current
-[enhancements][url.prometheus_sink_enhancements] and
-[bugs][url.prometheus_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_prometheus_sink_issue]
+[enhancements][urls.prometheus_sink_enhancements] and
+[bugs][urls.prometheus_sink_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_prometheus_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service.
+The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 
 ## Config File
 
@@ -89,8 +89,8 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.metric_e
 {% tabs %}
 {% tab title="Histograms" %}
 This example demonstrates how Vector's internal [`histogram` metric \
-type][docs.metric_event.histogram] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#histograms] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector histograms:
 
@@ -112,7 +112,7 @@ For example, given the following internal Vector histograms:
 ````
 
 The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP response_time_s response_time_s
@@ -145,8 +145,8 @@ your units.
 {% endtab %}
 {% tab title="Counters" %}
 This example demonstrates how Vector's internal [`counter` metric \
-type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#counters] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector gauges:
 
@@ -168,7 +168,7 @@ For example, given the following internal Vector gauges:
 ````
 
 The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP logins logins
@@ -180,8 +180,8 @@ Notice that Vector aggregates the metric and exposes the final value.
 {% endtab %}
 {% tab title="Gauges" %}
 This example demonstrates how Vector's internal [`gauge` metric \
-type][docs.metric_event.gauge] is exposed via Prometheus' [text-based \
-exposition format][url.prometheus_text_based_exposition_format].
+type][docs.data-model.metric#gauges] is exposed via Prometheus' [text-based \
+exposition format][urls.prometheus_text_based_exposition_format].
 
 For example, given the following internal Vector gauges:
 
@@ -205,7 +205,7 @@ For example, given the following internal Vector gauges:
 ````
 
 The `prometheus` sink will expose this data in Prometheus'
-[text-based exposition format][url.prometheus_text_based_exposition_format]:
+[text-based exposition format][urls.prometheus_text_based_exposition_format]:
 
 ```text
 # HELP memory_rss memory_rss
@@ -228,7 +228,7 @@ aggregation](#in-memory-aggregation) section.
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -236,7 +236,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Exposing & Scraping
@@ -249,7 +249,7 @@ accessible by the downstream service doing the scraping.
 ### High Cardinality Names
 
 High cardinality metric names and labels are [discouraged by \
-Prometheus][url.prometheus_high_cardinality] and you should consider alternative
+Prometheus][urls.prometheus_high_cardinality] and you should consider alternative
 strategies to reduce the cardinality as this can provide performance and
 operation problems. In general, high cardinality analysis should be left logs
 and storages designed for this use case (not Promtheus).
@@ -258,7 +258,7 @@ and storages designed for this use case (not Promtheus).
 
 Choosing the appropriate buckets for Prometheus histgorams is a complicated
 point of discussion. The [Histograms and Summaries Prometheus \
-guide][url.prometheus_histograms_guide] provides a good overview of histograms,
+guide][urls.prometheus_histograms_guide] provides a good overview of histograms,
 buckets, summaries, and how you should think about configuring them. The buckets
 you choose should align with your known range and distribution of values as
 well as how you plan to report on them. The aforementioned guide provides
@@ -300,88 +300,88 @@ see examples of this in the [examples section](#examples).
 
 ### Metric Types
 
-As described in the [metric data model][docs.metric_event] page, Vector offers
+As described in the [metric data model][docs.data-model.metric] page, Vector offers
 a variety of metric types. Their support, as as well as their mappings, are
 described below:
 
-| Vector Metric Type                     | Prometheus Metric Type              |
-|:---------------------------------------|:------------------------------------|
-| [`counter`][docs.metric_event.counter] | ['counter'][url.prometheus_counter] |
-| [`gauge`][docs.metric_event.gauge]     | ['gauge'][url.prometheus_gauge]     |
-| [`histogram`][docs.metric_event.gauge] | ['histogram'][url.prometheus_gauge] |
-| [`set`][docs.metric_event.gauge]       | ⚠️ not supported                    |
-| -                                      | ['summary'][url.prometheus_summary] |
+| Vector Metric Type                               | Prometheus Metric Type               |
+|:-------------------------------------------------|:-------------------------------------|
+| [`counter`][docs.data-model.metric#counters]     | ['counter'][urls.prometheus_counter] |
+| [`gauge`][docs.data-model.metric#gauges]         | ['gauge'][urls.prometheus_gauge]     |
+| [`histogram`][docs.data-model.metric#histograms] | ['histogram'][urls.prometheus_gauge] |
+| [`set`][docs.data-model.metric#sets]             | ⚠️ not supported                     |
+| -                                                | ['summary'][urls.prometheus_summary] |
 
 #### Sets
 
-Prometheus does not have a [`set`][docs.metric_event.set] type. Sets are
-generally specific to [Statsd][url.statsd_set], and if a set is received in the
+Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
+generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `prometheus` sink it will be dropped, and a rate limited warning
 level log will be emitted.
 
 #### Summaries
 
 Summaries are a Prometheus specific type and Vector does not default to them
-by default. [issue #710][url.issue_710] addresses the ability to define metrics,
+by default. [issue #710][urls.issue_710] addresses the ability to define metrics,
 including the ability change their types (such as changing them to `summary`
 types).
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `prometheus_sink` issues][url.prometheus_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_prometheus_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_prometheus_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `prometheus_sink` issues][urls.prometheus_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_prometheus_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_prometheus_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ### OOM Errors
 
 If you experience out of memory (OOM) errors it's likely you're using extremely
 [high cardinality](#high-cardinality) metric names or labels. This is
-[discouraged by Prometheus][url.prometheus_high_cardinality] and you should
+[discouraged by Prometheus][urls.prometheus_high_cardinality] and you should
 consider alternative strategies to reduce the cardinality. Such as leveraging
-logs for high cardinality analysis. [Issue #387][url.issue_387] discusses the
+logs for high cardinality analysis. [Issue #387][urls.issue_387] discusses the
 ability to provide safeguards around this. We encourage you to add to that
 discussion with your use case if you find this to be a problem.
 
 ## Resources
 
-* [**Issues**][url.prometheus_sink_issues] - [enhancements][url.prometheus_sink_enhancements] - [bugs][url.prometheus_sink_bugs]
-* [**Source code**][url.prometheus_sink_source]
+* [**Issues**][urls.prometheus_sink_issues] - [enhancements][urls.prometheus_sink_enhancements] - [bugs][urls.prometheus_sink_bugs]
+* [**Source code**][urls.prometheus_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.metric_event.counter]: ../../../about/data-model/metric.md#counter
-[docs.metric_event.gauge]: ../../../about/data-model/metric.md#gauge
-[docs.metric_event.histogram]: ../../../about/data-model/metric.md#histogram
-[docs.metric_event.set]: ../../../about/data-model/metric.md#set
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.prometheus_sink]: ../../../assets/prometheus-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.metric#counters]: ../../../about/data-model/metric.md#counters
+[docs.data-model.metric#gauges]: ../../../about/data-model/metric.md#gauges
+[docs.data-model.metric#histograms]: ../../../about/data-model/metric.md#histograms
+[docs.data-model.metric#sets]: ../../../about/data-model/metric.md#sets
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.prometheus_sink]: ../../../assets/prometheus-sink.svg
-[url.issue_387]: https://github.com/timberio/vector/issues/387
-[url.issue_710]: https://github.com/timberio/vector/issues/710
-[url.new_prometheus_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+bug
-[url.new_prometheus_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+enhancement
-[url.new_prometheus_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus
-[url.prometheus]: https://prometheus.io/
-[url.prometheus_counter]: https://prometheus.io/docs/concepts/metric_types/#counter
-[url.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
-[url.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
-[url.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
-[url.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+bug%22
-[url.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+enhancement%22
-[url.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
-[url.prometheus_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
-[url.prometheus_summary]: https://prometheus.io/docs/concepts/metric_types/#summary
-[url.prometheus_text_based_exposition_format]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format
-[url.statsd_set]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets
-[url.vector_chat]: https://chat.vector.dev
+[urls.issue_387]: https://github.com/timberio/vector/issues/387
+[urls.issue_710]: https://github.com/timberio/vector/issues/710
+[urls.new_prometheus_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+bug
+[urls.new_prometheus_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus&labels=Type%3A+enhancement
+[urls.new_prometheus_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+prometheus
+[urls.prometheus]: https://prometheus.io/
+[urls.prometheus_counter]: https://prometheus.io/docs/concepts/metric_types/#counter
+[urls.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
+[urls.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
+[urls.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
+[urls.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+bug%22
+[urls.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+enhancement%22
+[urls.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22
+[urls.prometheus_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/prometheus.rs
+[urls.prometheus_summary]: https://prometheus.io/docs/concepts/metric_types/#summary
+[urls.prometheus_text_based_exposition_format]: https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format
+[urls.statsd_set]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#sets
+[urls.vector_chat]: https://chat.vector.dev
