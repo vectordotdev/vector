@@ -1,0 +1,19 @@
+<%- if commits.any? -%>
+### <%= type_name.capitalize.pluralize %>
+
+<%- if grouped -%>
+<%- commits.group_by(&:category).each do |category, category_commits| -%>
+#### <%= commit_type_category(type_name, category).capitalize.pluralize %>
+
+<%- category_commits.each do |commit| -%>
+* <%= commit(commit) %>
+<%- end -%>
+
+<%- end -%>
+<%- else -%>
+<%- commits.each do |commit| -%>
+* <%= commit(commit) %>
+<%- end -%>
+
+<%- end -%>
+<%- end -%>

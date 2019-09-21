@@ -43,6 +43,50 @@ class Templates
     @metadata = metadata
   end
 
+  def commit(commit)
+    render("_partials/_commit.md", binding).gsub("\n", "")
+  end
+
+  def commit_scope(scope)
+    text =
+      if scope.existing_component?
+        "`#{scope.component_name}` #{scope.component_type}"
+      else
+         scope.name
+      end
+
+    if scope.short_link
+      "[#{text}][#{scope.short_link}]"
+    else
+      text
+    end
+  end
+
+  def commit_type_category(type_name, category)
+    if type_name == "new feature"
+      "new #{category}"
+    else
+      "#{category} #{type_name}"
+    end
+  end
+
+  def commit_type_commits(type_name, commits, grouped: false)
+    commits =
+      commits.sort_by do |commit|
+        if grouped
+          [commit.scope.category, commit.scope.name, commit.date]
+        else
+          [commit.scope.name, commit.date]
+        end
+      end
+
+    render("_partials/_commit_type_commits.md", binding)
+  end
+
+  def commit_type_toc_item(type_name, commits)
+    render("_partials/_commit_type_toc_item.md", binding).gsub(/,$/, "")
+  end
+
   def component_config_example(component)
     render("_partials/_component_config_example.md", binding).strip
   end
@@ -175,8 +219,18 @@ class Templates
     basename.start_with?("_")
   end
 
+  def installation_target_links(targets)
+    targets.collect do |target|
+      "[#{target.name}][docs.#{target.id}]"
+    end
+  end
+
   def pluralize(count, word)
     count != 1 ? "#{count} #{word.pluralize}" : "#{count} #{word}"
+  end
+
+  def release_changes(release, grouped: false)
+    render("_partials/_release_changes.md", binding)
   end
 
   def render(template_path, template_binding = nil)

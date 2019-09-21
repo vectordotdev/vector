@@ -1,0 +1,17 @@
+[installation]
+platforms = [
+  {name = "Docker", id = "docker"}
+]
+operating_systems = [
+  {name = "Amazon Linux", id = "amazon-linux"},
+  {name = "CentOS", id = "centos"},
+  {name = "Debian", id = "debian"},
+  {name = "MacOS", id = "macos"},
+  {name = "RHEL", id = "rhel"},
+  {name = "Ubuntu", id = "ubuntu"}
+]
+package_managers = [
+  {name = "APT", id = "apt"},
+  {name = "Homebrew", id = "homebrew"},
+  {name = "YUM", id = "yum"},
+]

@@ -10,10 +10,10 @@ class Object
 
   def to_toml
     if is_a?(Hash)
-      values = collect { |key, value| "#{key} = #{value.to_toml}" }
+      values = select { |_k, v| !v.nil? }.collect { |k, v| "#{k} = #{v.to_toml}" }
       "{" + values.join(", ") + "}"
     elsif is_a?(Array)
-      values = collect { |value| value.to_toml }
+      values = select { |v| !v.nil? }.collect { |v| v.to_toml }
       if any? { |v| v.is_a?(Hash) }
         "[\n" + values.join(",\n") + "\n]"
       else
@@ -22,7 +22,7 @@ class Object
     elsif is_a?(Date)
       iso8601()
     elsif is_a?(Time)
-      iso8601(6)
+      strftime('%Y-%m-%dT%H:%M:%SZ')
     elsif is_a?(String) && include?("\n")
       result =
         <<~EOF

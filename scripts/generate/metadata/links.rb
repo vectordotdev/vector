@@ -26,10 +26,10 @@ require 'net/http'
 # method.
 class Links
   VECTOR_ROOT = "https://github.com/timberio/vector"
+  VECTOR_BRANCH_ROOT = "https://github.com/timberio/vector/tree/v0.3"
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
   VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull"
-  VECTOR_RELEASE_ROOT = "#{VECTOR_ROOT}/releases/tag"
   TEST_HARNESS_ROOT = "https://github.com/timberio/vector-test-harness"
 
   attr_reader :values
@@ -49,6 +49,13 @@ class Links
     fetch(id)
   rescue KeyError
     nil
+  end
+
+  def exists?(id)
+    fetch(id)
+    true
+  rescue KeyError
+    false
   end
 
   def fetch(id)
@@ -170,19 +177,6 @@ class Links
 
     def fetch_dynamic_url(name)
       case name
-      when /^commit_([a-z0-9]+)$/
-        "#{VECTOR_COMMIT_ROOT}/#{$1}"
-
-      when /^issue_([0-9]+)$/
-        "#{VECTOR_ISSUES_ROOT}/#{$1}"
-
-      when /^pr_([0-9]+)$/
-        "#{VECTOR_PRS_ROOT}/#{$1}"
-
-      when /^v([a-z0-9-]+)$/
-        version = $1.gsub("-", ".")
-        "#{VECTOR_RELEASE_ROOT}/#{version}"
-
       when /^(.*)_(sink|source|transform)_issues$/
         name = $1
         type = $2
@@ -206,6 +200,18 @@ class Links
             "#{VECTOR_ROOT}/tree/master/src/#{type}/#{name}.rs"
           end
 
+      when /^(.*)_test$/
+        "#{TEST_HARNESS_ROOT}/tree/master/cases/#{$1}"
+
+      when /^commit_([a-z0-9]+)$/
+        "#{VECTOR_COMMIT_ROOT}/#{$1}"
+
+      when /^compare_([a-z0-9_\.]*)\.\.\.([a-z0-9_\.]*)$/
+        "https://github.com/timberio/vector/compare/#{$1}...#{$2}"
+
+      when /^issue_([0-9]+)$/
+        "#{VECTOR_ISSUES_ROOT}/#{$1}"
+
       when /^new_(.*)_(sink|source|transform)_issue$/
         name = $1
         type = $2
@@ -220,15 +226,20 @@ class Links
         type_label = "Type: #{issue_type}"
         VECTOR_ISSUES_ROOT + "/new?" + {"labels" => [component_label, type_label]}.to_query
 
+      when /^pr_([0-9]+)$/
+        "#{VECTOR_PRS_ROOT}/#{$1}"
+
+      when /^v([a-z0-9\-\.]+)$/
+        "#{VECTOR_ROOT}/releases/tag/#{$1}"
+
+      when /^v([a-z0-9\-\.]+)_branch$/
+        "#{VECTOR_ROOT}/tree/v#{$1}"
+
       when /^vector_latest_(release|nightly)_(.*)/
         channel = $1 == "release" ? "latest" : $1
         target = $2
         "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
         
-      when /^(.*)_test$/
-        name = $1
-        "#{TEST_HARNESS_ROOT}/tree/master/cases/#{name}"
-
       else
         raise KeyError.new(
           <<~EOF
