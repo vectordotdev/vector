@@ -217,6 +217,9 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/c++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
+# Use stdatomic.h header provided by Clang because it is not present in musl.
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+
 # Some build systems hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
 # we can just provide dummy libstdc++ to be compatible with GNU systems.
