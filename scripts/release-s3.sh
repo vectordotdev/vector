@@ -9,8 +9,6 @@
 set -eu
 
 CHANNEL=$(scripts/util/release-channel.sh)
-escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
-today=$(date +"%F")
 
 #
 # Setup
@@ -25,6 +23,8 @@ ls $td
 #
 
 if [[ "$CHANNEL" == "nightly" ]]; then
+  today=$(date +"%F")
+  
   # Add nightly files with today's date for posterity
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$today"
   aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive
