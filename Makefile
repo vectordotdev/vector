@@ -43,6 +43,10 @@ generate: ## Generates files across the repo using the data in /.meta
 fmt: ## Format code
 	@cargo fmt
 
+release: ## Release a new Vector version
+	@$(MAKE) release-meta
+	@$(MAKE) generate
+
 run: ## Starts Vector in development mode
 	@cargo run
 

@@ -10,7 +10,7 @@ set -eu
 
 CHANNEL=$(scripts/util/release-channel.sh)
 escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
-today=$(echo date +"%F")
+today=$(date +"%F")
 
 #
 # Upload version triple (ex: 0.3.0-121-gdf3df71)
