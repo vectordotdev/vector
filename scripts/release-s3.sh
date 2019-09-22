@@ -13,13 +13,6 @@ escaped_version=$(echo $VERSION | sed "s/\./\\\./g")
 today=$(date +"%F")
 
 #
-# Upload version triple (ex: 0.3.0-121-gdf3df71)
-#
-
-echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
-aws s3 cp "target/artifacts/" "s3://packages.timber.io/vector/$VERSION/" --recursive
-
-#
 # Nightly
 #
 

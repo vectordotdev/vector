@@ -46,6 +46,7 @@ fmt: ## Format code
 release: ## Release a new Vector version
 	@$(MAKE) release-meta
 	@$(MAKE) generate
+	@$(MAKE) release-commit
 
 run: ## Starts Vector in development mode
 	@cargo run
