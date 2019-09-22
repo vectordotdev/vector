@@ -1,0 +1,44 @@
+# v<%= metadata.latest_version.major %>.<%= metadata.latest_version.minor %> Changelog
+
+#### [Releases][urls.releases]
+
+* [**Unreleased**](#unreleased) - [download][urls.vector_nightly_builds], [compare][urls.compare_v<%= metadata.latest_version %>...master]
+<%- metadata.latest_patch_releases.each do |release| -%>
+* [**<%= release.version %>**](#<%= "#{release.version.to_s.gsub(".", "")}---#{release.human_date.downcase.gsub(" ", "-").gsub(",", "")}" %>) - [download][urls.v<%= release.version %>], [compare][<%= release.compare_short_link %>]
+<%- end -%>
+<%- if metadata.previous_minor_releases(metadata.latest_release).any? -%>
+* [**Previous releases**](#previous-releases)
+<%- end -%>
+
+#### [Installation][docs.installation]
+
+* [**Platforms**][docs.platforms] - <%= installation_target_links(metadata.installation.platforms).join(", ") %>
+* [**Operating systems**][docs.operating_systems] - <%= installation_target_links(metadata.installation.operating_systems).join(", ") %>
+* [**Package managers**][docs.package_managers] - <%= installation_target_links(metadata.installation.package_managers).join(", ") %>
+* [**Manual**][docs.manual] - [From archives][docs.from_archives], [From source][docs.from_source]
+
+## Unreleased
+
+Vector follows the [conventional commits specification][urls.conventional_commits] and unrelease changes are rolled up into a changelog when they are released:
+
+* [Compare `v<%= metadata.latest_version %>` to `master`][urls.compare_v<%= metadata.latest_version %>...master]
+* [Download nightly builds][urls.vector_nightly_builds]
+
+<%- metadata.latest_patch_releases.each do |release| -%>
+## [<%= release.version %>][urls.v<%= release.version %>] - <%= release.human_date %>
+
+<%= release_changes(release) -%>
+<%- end -%>
+
+<%- if metadata.previous_minor_releases(metadata.latest_release).any? -%>
+## Previous releases
+
+Vector maintains [branches][urls.vector_version_branches] for all previous major
+and minor releases. The changelogs and docs can be found in their respective
+branches.
+
+<%- metadata.previous_minor_releases(metadata.latest_release)[0..4].each do |release| %>
+* [**<%= release.version %>**][urls.v<%= release.version %>_branch]
+<%- end -%>
+[view all...][urls.vector_version_branches]
+<%- end -%>

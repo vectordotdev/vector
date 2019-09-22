@@ -31,12 +31,16 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log][docs.data-model.log], [metric][docs.data-model.metric]
+* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
 
-* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [download archives][docs.archives], and [more][docs.installation]
+* [**Installation**][docs.installation]
+  * [**Platforms**][docs.platforms] - [Docker][docs.docker]
+  * [**Operating systems**][docs.operating_systems] - [Amazon Linux][docs.amazon-linux], [CentOS][docs.centos], [Debian][docs.debian], [MacOS][docs.macos], [RHEL][docs.rhel], [Ubuntu][docs.ubuntu]
+  * [**Package managers**][docs.package_managers] - [APT][docs.apt], [Homebrew][docs.homebrew], [YUM][docs.yum]
+  * [**Manual**][docs.manual] - [from archives][docs.from_archives], [from source][docs.from_source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -188,23 +192,34 @@ the License.
 
 
 [docs.administration]: https://docs.vector.dev/usage/administration
+[docs.amazon-linux]: https://docs.vector.dev/setup/installation/operating-systems/amazon-linux
 [docs.apt]: https://docs.vector.dev/setup/installation/package-managers/apt
 [docs.archives]: https://docs.vector.dev/setup/installation/manual/from-archives
+[docs.centos]: https://docs.vector.dev/setup/installation/operating-systems/centos
 [docs.concepts]: https://docs.vector.dev/about/concepts
 [docs.configuration]: https://docs.vector.dev/usage/configuration
 [docs.correctness]: https://docs.vector.dev/correctness
 [docs.data-model.log]: https://docs.vector.dev/about/data-model/log
 [docs.data-model.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.data_model]: https://docs.vector.dev/about/data-model
+[docs.debian]: https://docs.vector.dev/setup/installation/operating-systems/debian
 [docs.deployment]: https://docs.vector.dev/setup/deployment
 [docs.docker]: https://docs.vector.dev/setup/installation/platforms/docker
+[docs.from_archives]: https://docs.vector.dev/setup/installation/manual/from-archives
+[docs.from_source]: https://docs.vector.dev/setup/installation/manual/from-source
 [docs.getting_started]: https://docs.vector.dev/setup/getting-started
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
 [docs.homebrew]: https://docs.vector.dev/setup/installation/package-managers/homebrew
 [docs.installation]: https://docs.vector.dev/setup/installation
+[docs.macos]: https://docs.vector.dev/setup/installation/operating-systems/macos
+[docs.manual]: https://docs.vector.dev/setup/installation/manual
+[docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
+[docs.package_managers]: https://docs.vector.dev/setup/installation/package-managers
 [docs.performance]: https://docs.vector.dev/performance
+[docs.platforms]: https://docs.vector.dev/setup/installation/platforms
 [docs.reloading]: https://docs.vector.dev/usage/administration/reloading
+[docs.rhel]: https://docs.vector.dev/setup/installation/operating-systems/rhel
 [docs.roles.agent]: https://docs.vector.dev/setup/deployment/roles/agent
 [docs.roles.service]: https://docs.vector.dev/setup/deployment/roles/service
 [docs.roles]: https://docs.vector.dev/setup/deployment/roles
@@ -251,6 +266,7 @@ the License.
 [docs.transforms.split]: https://docs.vector.dev/usage/configuration/transforms/split
 [docs.transforms.tokenizer]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
 [docs.transforms]: https://docs.vector.dev/usage/configuration/transforms
+[docs.ubuntu]: https://docs.vector.dev/setup/installation/operating-systems/ubuntu
 [docs.updating]: https://docs.vector.dev/usage/administration/updating
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [docs.yum]: https://docs.vector.dev/setup/installation/package-managers/yum

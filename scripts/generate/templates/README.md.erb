@@ -31,12 +31,16 @@ simple and unified.
 
 * [**Use cases**][docs.use_cases]
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log][docs.data-model.log], [metric][docs.data-model.metric]
+* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
 
 #### Setup
 
-* [**Installation**][docs.installation] - [docker][docs.docker], [apt][docs.apt], [homebrew][docs.homebrew], [yum][docs.yum], [download archives][docs.archives], and [more][docs.installation]
+* [**Installation**][docs.installation]
+  * [**Platforms**][docs.platforms] - <%= installation_target_links(metadata.installation.platforms).join(", ") %>
+  * [**Operating systems**][docs.operating_systems] - <%= installation_target_links(metadata.installation.operating_systems).join(", ") %>
+  * [**Package managers**][docs.package_managers] - <%= installation_target_links(metadata.installation.package_managers).join(", ") %>
+  * [**Manual**][docs.manual] - [from archives][docs.from_archives], [from source][docs.from_source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 

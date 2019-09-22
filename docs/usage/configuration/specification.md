@@ -536,7 +536,7 @@ data_dir = "/var/lib/vector"
     my_int_field = 1
     my_float_field = 1.2
     my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_timestamp_field = 1979-05-27T00:32:00Z
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
 

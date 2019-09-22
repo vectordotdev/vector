@@ -50,7 +50,7 @@ TYPES_THAT_REQUIRE_SCOPES = ["feat", "improvement", "fix"]
 #
 
 def create_release_meta_file!(last_version, new_version)
-  release_meta_path = "#{RELEASE_META_DIR}/v#{new_version}.toml"
+  release_meta_path = "#{RELEASE_META_DIR}/#{new_version}.toml"
 
   existing_release =
     if File.exists?(release_meta_path)
@@ -59,7 +59,17 @@ def create_release_meta_file!(last_version, new_version)
       {"commits" => []}
     end
 
-  existing_commits = existing_release.fetch("commits")
+  existing_commits = existing_release.fetch("commits").collect do |c|
+  	{
+  		"sha" => c.fetch("sha"),
+  		"message" => c.fetch("message"),
+  		"author" => c.fetch("author"),
+  		"date" => c.fetch("date"),
+  		"files_count" => c["files_count"],
+  		"insertions_count" => c["insertions_count"],
+  		"deletions_count" => c["deletions_count"]
+  	}
+  end
   current_commits = get_commits(last_version, new_version)
 
   new_commits =
