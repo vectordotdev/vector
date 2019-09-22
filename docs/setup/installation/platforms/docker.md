@@ -100,7 +100,7 @@ as well as the base to build other images off of.
 ## Versions
 
 Timber's Docker images include a special `latest` version that will be updated
-whenever Timber is [released][urls.releases]. All other [releases][urls.releases]
+whenever Timber is [released][urls.vector_releases]. All other [releases][urls.vector_releases]
 are available via the `X.X.X` tag:
 
 ```bash

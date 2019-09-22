@@ -20,11 +20,11 @@ source][docs.from_source].
 
 {% tabs %}
 {% tab title="Releases" %}
-Vector retains archives for all [releases][urls.releases].
+Vector retains archives for all [releases][urls.vector_releases].
 
 #### Latest
 
-"Latest" archive URLs point to the latest [release][urls.releases]:
+"Latest" archive URLs point to the latest [release][urls.vector_releases]:
 
 | Architecture                                                                                         | Notes                                                                            |
 |:-----------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------|
