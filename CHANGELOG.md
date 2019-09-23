@@ -29,6 +29,7 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * *[`kafka` sink][docs.sinks.kafka]*: Add support for tls (ssl) ([#912][urls.pr_912])
 * *[`kafka` sink][docs.sinks.kafka]*: Use pkcs#12 keys instead of jks ([#934][urls.pr_934])
 * *new sink*: Initial `statsd` implementation ([#821][urls.pr_821])
+* *new sink*: New `aws_kinesis_firehose` sink
 * *new source*: Initial [`docker` source][docs.sources.docker] implementation ([#787][urls.pr_787])
 * *[observability][docs.monitoring]*: Add rate limited debug messages ([#971][urls.pr_971])
 

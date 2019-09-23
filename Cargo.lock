@@ -2599,6 +2599,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_firehose"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto_core 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rusoto_kinesis"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3951,6 +3963,7 @@ dependencies = [
  "rusoto_cloudwatch 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_core 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_credential 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto_firehose 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_kinesis 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_logs 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_s3 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4410,6 +4423,7 @@ dependencies = [
 "checksum rusoto_cloudwatch 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "df33c962e9624149eb51a10c0737964b6a62eb160434c7c3bcc07be1bd677080"
 "checksum rusoto_core 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5b03958c1f00c85d038f7c3532f33381cf3cda93e88ad745cc5dcdb3d9675bb6"
 "checksum rusoto_credential 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)" = "00d75d9360c522cc29d80eaa5ecdd8fa56d811578118d6cf8ec083c035343baa"
+"checksum rusoto_firehose 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3fdecb16b661e919eb8e9467d6ae68a22e8c9a5bbe4d02189b2011043d9d1b7b"
 "checksum rusoto_kinesis 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "230b3b8eda2d8f5b82c14d7f1e9e40fb7a496b847f95cdb6ebf0dfdce4efa143"
 "checksum rusoto_logs 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1df7f6acf01ffcfd8ecde1fdd4a568d179e7ef5d42b398679e2af54e08cbed3b"
 "checksum rusoto_s3 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)" = "deec58d788a92ea7a5711815dba59e80e4f58b870707f3892e6904c0f9f07023"

@@ -1,0 +1,34 @@
+# `aws_kinesis_streams` Sink Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `aws_kinesis_streams` sink
+# Docs: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
+
+[sinks.my_aws_kinesis_firehose_sink]
+  # REQUIRED - General
+  type = "aws_kinesis_firehose" # must be: aws_kinesis_streams
+  inputs = ["my-source-id"]
+  region = "us-east-1"
+  delivery_stream_name = "my-stream"
+
+  # OPTIONAL - General
+  encoding = "json" # no default, enum: json, text
+
+  # OPTIONAL - Batching
+  batch_size = 1049000 # default, bytes
+  batch_timeout = 1 # default, seconds
+
+  # OPTIONAL - Requests
+  [sinks.my_aws_kinesis_firehose_sink.request]
+    rate_limit_duration_secs = 1 # default, seconds
+    rate_limit_num = 5 # default
+    in_flight_limit = 5 # default
+    timeout_secs = 30 # default, seconds
+    retry_attempts = 5 # default
+    retry_backoff_secs = 5 # default, seconds
+
+  # OPTIONAL - Buffer
+  [sinks.my_aws_kinesis_firehose_sink.buffer]
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default

@@ -3,7 +3,7 @@ use snafu::Snafu;
 
 pub mod aws_cloudwatch_logs;
 pub mod aws_cloudwatch_metrics;
-pub mod aws_kinesis_streams;
+pub mod aws_kinesis;
 pub mod aws_s3;
 pub mod blackhole;
 pub mod clickhouse;
