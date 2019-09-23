@@ -468,6 +468,26 @@ workflows:
           <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
           <<: *require-checks-and-tests
+      - package-rpm:
+          <<: *require-builds
+      - verify-amazon-linux-1:
+          <<: *require-packages
+      - verify-amazon-linux-2:
+          <<: *require-packages
+      - verify-centos-7:
+          <<: *require-packages
+      - verify-deb-8:
+          <<: *require-packages
+      - verify-deb-9:
+          <<: *require-packages
+      - verify-deb-10:
+          <<: *require-packages
+      - verify-ubuntu-16-04:
+          <<: *require-packages
+      - verify-ubuntu-18-04:
+          <<: *require-packages
+      - verify-ubuntu-19-04:
+          <<: *require-packages
 
   nightly:
     triggers:
