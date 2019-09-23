@@ -12,10 +12,10 @@
 # Setup
 #
 
-# Changes into the release-meta directory so that we can load the
-# Bundler dependencies. Unfortunately, Bundler does not provide a way
-# load a Gemfile outside of the cwd.
-Dir.chdir "scripts/release-meta"
+# Changes into the scripts directory so that we can load the Bundler
+# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
+# outside of the cwd.
+Dir.chdir "scripts"
 
 #
 # Requires
@@ -40,7 +40,7 @@ include Printer
 # Constants
 #
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/../..").cleanpath
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 TYPES = ["chore", "docs", "feat", "fix", "improvement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "improvement", "fix"]

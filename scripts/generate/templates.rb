@@ -1,7 +1,5 @@
 require "erb"
 
-require "active_support/core_ext/array/conversions"
-require "active_support/core_ext/string/indent"
 require "active_support/core_ext/string/output_safety"
 require "action_view/helpers/number_helper"
 
@@ -37,9 +35,10 @@ require_relative "templates/options_table"
 class Templates
   include ActionView::Helpers::NumberHelper
 
-  attr_reader :metadata
+  attr_reader :metadata, :dir
 
-  def initialize(metadata)
+  def initialize(dir, metadata)
+    @dir = dir
     @metadata = metadata
   end
 
@@ -92,7 +91,7 @@ class Templates
   end
 
   def component_default(component)
-    render("_defaults/component.md.erb", binding).strip
+    render("_partials/_component_default.md.erb", binding).strip
   end
 
   def component_description(component)
@@ -235,7 +234,7 @@ class Templates
 
   def render(template_path, template_binding = nil)
     template_binding = binding if template_binding.nil?
-    content = File.read("templates/#{template_path}.erb")
+    content = File.read("#{dir}/#{template_path}.erb")
     renderer = ERB.new(content, nil, '-')
     content = renderer.result(template_binding)
 

@@ -121,4 +121,4 @@ docker run timberio/vector:latest-alpine
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_hub_vector]: https://hub.docker.com/r/timberio/vector
-[urls.releases]: https://github.com/timberio/vector/releases
+[urls.vector_releases]: https://github.com/timberio/vector/releases

@@ -19,13 +19,12 @@ cp -a "target/artifacts/." "$td"
 ls $td
 
 #
-# Nightly
+# Upload
 #
 
 if [[ "$CHANNEL" == "nightly" ]]; then
-  today=$(date +"%F")
-  
   # Add nightly files with today's date for posterity
+  today=$(date +"%F")
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$today"
   aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive
   echo "Uploaded archives"
@@ -35,13 +34,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/latest"
   aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/latest" --recursive
   echo "Uploaded archives"
-fi
-
-#
-# Latest
-#
-
-if [[ "$CHANNEL" == "latest" ]]; then
+elif [[ "$CHANNEL" == "latest" ]]; then
   # Upload the specific version
   echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
   aws s3 cp "$td" "s3://packages.timber.io/vector/$VERSION/" --recursive

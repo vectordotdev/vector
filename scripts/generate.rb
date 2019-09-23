@@ -15,10 +15,10 @@
 # Setup
 #
 
-# Changes into the release-prepare directory so that we can load the
-# Bundler dependencies. Unfortunately, Bundler does not provide a way
-# load a Gemfile outside of the cwd.
-Dir.chdir "scripts/generate"
+# Changes into the scripts directory so that we can load the Bundler
+# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
+# outside of the cwd.
+Dir.chdir "scripts"
 
 #
 # Requires
@@ -28,8 +28,7 @@ require "rubygems"
 require "bundler"
 Bundler.require(:default)
 
-require_relative "util/core_ext/object"
-require_relative "util/printer"
+require_relative "util"
 require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_referencer"
 require_relative "generate/post_processors/section_sorter"
@@ -49,11 +48,11 @@ include Printer
 # Constants
 #
 
-VECTOR_ROOT = File.join(Dir.pwd.split(File::SEPARATOR)[0..-3])
+ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
 
-DOCS_ROOT = File.join(VECTOR_ROOT, "docs")
-META_ROOT = File.join(VECTOR_ROOT, ".meta")
-TEMPLATES_DIR = "#{Dir.pwd}/templates"
+DOCS_ROOT = File.join(ROOT_DIR, "docs")
+META_ROOT = File.join(ROOT_DIR, ".meta")
+TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
 VECTOR_DOCS_HOST = "https://docs.vector.dev"
 
 #
@@ -120,17 +119,17 @@ end
 title("Generating files...")
 
 #
-# Options
-#
-
-check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
-
-#
 # Setup
 #
 
-metadata = Metadata.load(META_ROOT)
-templates = Templates.new(metadata)
+metadata =
+  begin
+    Metadata.load(META_ROOT, DOCS_ROOT)
+  rescue Exception => e
+    error!(e.message)
+  end
+
+templates = Templates.new(TEMPLATES_DIR, metadata)
 
 #
 # Create missing component templates
@@ -150,28 +149,30 @@ end
 # Render templates
 #
 
-Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).
+Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
   select { |path| !templates.partial?(path) }.
   each do |template_path|
-    content = templates.render(template_path.gsub(/^templates\//, "").gsub(/\.erb$/, ""))
-    target = template_path.gsub(/^templates\//, "#{VECTOR_ROOT}/").gsub(/\.erb$/, "")
-    content = post_process(content, target, metadata.links)
+    target_file = template_path.gsub(/^#{TEMPLATES_DIR}\//, "").gsub(/\.erb$/, "")
+    target_path = "#{ROOT_DIR}/#{target_file}"
+    content = templates.render(target_file)
+    content = post_process(content, target_path, metadata.links)
+
 
     # Create the file if it does not exist
-    if !File.exists?(target)
-      File.open(target, "w") {}
+    if !File.exists?(target_path)
+      File.open(target_path, "w") {}
     end
 
-    current_content = File.read(target)
+    current_content = File.read(target_path)
 
     if current_content != content
       action = false ? "Will be changed" : "Changed"
-      say("#{action} - #{target.gsub("../../", "")}", color: :green)
-      File.write(target, content)
+      say("#{action} - #{target_file}", color: :green)
+      File.write(target_path, content)
     else
       action = false ? "Will not be changed" : "Not changed"
-      say("#{action} - #{target.gsub("../../", "")}", color: :blue)
+      say("#{action} - #{target_file}", color: :blue)
     end
   end
 
@@ -182,7 +183,7 @@ Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).
 title("Post processing generated files...")
 
 docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
-docs = docs + ["#{VECTOR_ROOT}/README.md"]
+docs = docs + ["#{ROOT_DIR}/README.md"]
 docs = docs - ["#{DOCS_ROOT}/SUMMARY.md"]
 docs.each do |doc|
   content = File.read(doc)
@@ -199,9 +200,11 @@ end
 # Check URLs
 #
 
-if check_urls
-  title("Checking URLs...")
+title("Checking URLs...")
 
+check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+
+if check_urls
   metadata.links.values.to_a.sort.each do |id, value|
     if !link_valid?(value)
       error!(

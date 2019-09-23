@@ -34,14 +34,14 @@ class Links
 
   attr_reader :values
 
-  def initialize(links)    
+  def initialize(links, docs_root)    
     @links = links
     @values = {}
 
     @docs =
-      Dir.glob("#{DOCS_ROOT}/**/*").
+      Dir.glob("#{docs_root}/**/*").
       to_a.
-      collect { |f| f.gsub(DOCS_ROOT, "") }.
+      collect { |f| f.gsub(docs_root, "") }.
       select { |f| !f.end_with?("README.md") }
   end
 

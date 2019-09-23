@@ -139,7 +139,7 @@ class Commit
 
           #{message}
 
-        Please correct and retry.
+        Please correct in the release /.meta file and retry.
         EOF
       end
 
@@ -168,7 +168,7 @@ class Commit
 
           #{type.inspect}
         
-        Please correct and retry.
+        Please correct in the release /.meta file and retry.
         EOF
       end
 
@@ -180,7 +180,7 @@ class Commit
 
           #{description}
 
-        Please correct and retry.
+        Please correct in the release /.meta file and retry.
         EOF
       end
 
