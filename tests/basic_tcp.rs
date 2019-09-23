@@ -363,11 +363,13 @@ fn test_merge_and_fork_json() {
             "out1": {
                 "type": "tcp",
                 "address": out_addr1,
+                "encoding": "text",
                 "inputs": ["in1", "in2"],
             },
             "out2": {
                 "type": "tcp",
                 "address": out_addr2,
+                "encoding": "text",
                 "inputs": ["in2"],
             },
         },
