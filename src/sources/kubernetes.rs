@@ -8,13 +8,15 @@ use crate::{
         Transform,
     },
 };
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
-
 // ?NOTE
 // Original proposal: https://github.com/kubernetes/kubernetes/blob/release-1.5/docs/proposals/kubelet-cri-logging.md#proposed-solution
+// Intermediate version: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution
 // Current version: https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2
 // LogDirectory = `/var/log/pods/<podUID>/`
 // LogPath = `containerName/Instance#.log`
@@ -36,70 +38,26 @@ impl SourceConfig for KubernetesConfig {
     ) -> Result<super::Source, String> {
         // Kubernetes source uses 'file source' and various transforms to implement
         // gathering of logs over Kubernetes CRI supported container runtimes.
-        // Usability/generality is the goal of this implementation. Performance will
-        // be solved with per container runtime specialized source.
 
         // Side goal is to make kubernetes source behave as simillarly to docker source
         // as possible to set a default behavior for all container related sources.
         // This will help with interchangeability.
 
         // Only logs created at, or after this moment are logged.
-        let now = Utc::now();
-
-        // Tailling logs are limited to those that can have logs created during or
-        // after now.
+        let now = TimeFilter::new();
 
         // File source
         let (file_recv, file_source) = file_source(name, globals)?;
 
         // Transforms
-        let mut transform_message = transform_message();
         let mut transform_file = transform_file()?;
+        let mut parse_message = parse_message()?;
 
         // Kubernetes source
-        let atom_time = Atom::from("time");
-        let atom_log = Atom::from("log");
         let source = file_recv
-            .filter_map(move |event| transform_message.transform(event))
-            .map(move |mut event| {
-                // Rename fields
-                let log = event.as_mut_log();
-
-                // time -> timestamp
-                if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&atom_time) {
-                    match DateTime::parse_from_rfc3339(
-                        String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
-                    ) {
-                        Ok(timestamp) => log.insert_explicit(
-                            event::TIMESTAMP.clone(),
-                            timestamp.with_timezone(&Utc).into(),
-                        ),
-                        Err(error) => warn!(message="Non rfc3339 timestamp",error=%error),
-                    }
-                } else {
-                    warn!(message = "Missing field", field = %atom_time);
-                }
-
-                // log -> message
-                if let Some(message) = log.remove(&atom_log) {
-                    log.insert_explicit(event::MESSAGE.clone(), message);
-                } else {
-                    warn!(message = "Missing field", field = %atom_log);
-                }
-
-                event
-            })
-            .filter_map(move |event| {
-                // Only logs created at, or after now are logged.
-                if let Some(ValueKind::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
-                    if ts >= &now {
-                        return Some(event);
-                    }
-                    trace!(message = "Recieved older log", from = %ts.to_rfc3339());
-                }
-                None
-            })
             .filter_map(move |event| transform_file.transform(event))
+            .filter_map(move |event| parse_message(event))
+            .filter_map(move |event| now.filter(event))
             .forward(out.sink_map_err(|_| ()))
             .map(|_| ())
             .join(file_source)
@@ -110,6 +68,48 @@ impl SourceConfig for KubernetesConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+}
+
+/// In what format are logs
+#[derive(Clone, Copy, Debug)]
+enum LogFormat {
+    /// As defined by Docker
+    Json,
+    /// As defined by CRI
+    CRI,
+    /// None of the above
+    Unknown,
+}
+
+/// Data known about Kubernetes Pod
+#[derive(Default)]
+struct PodData {
+    /// This exists because Docker is still a special entity in Kubernetes as it can write in Json
+    /// despite CRI defining it's own format.
+    log_format: Option<LogFormat>,
+}
+
+struct TimeFilter {
+    start: DateTime<Utc>,
+}
+
+impl TimeFilter {
+    fn new() -> Self {
+        // Only logs created at, or after this moment are logged.
+        let now = Utc::now();
+        TimeFilter { start: now }
+    }
+
+    fn filter(&self, event: Event) -> Option<Event> {
+        // Only logs created at, or after now are logged.
+        if let Some(ValueKind::Timestamp(ts)) = event.as_log().get(&event::TIMESTAMP) {
+            if ts >= &self.start {
+                return Some(event);
+            }
+            trace!(message = "Recieved older log", from = %ts.to_rfc3339());
+        }
+        None
     }
 }
 
@@ -126,12 +126,15 @@ fn file_source(
     // NOTE: as such excluding/including using path is hacky, instead, more proper source of
     // NOTE: information should be used.
     // NOTE: At best, excluding/including using path can be an optimization
-    // TODO: Exclude whole kube-system namespace
+    // TODO: Exclude whole kube-system namespace properly
+    config
+        .exclude
+        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/**").into());
     // TODO: Add exclude_namspace option, and with it in config exclude namespace used by vector.
     // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
     config
         .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"*/vector/*").into());
+        .push((LOG_DIRECTORY.to_owned() + r"*/vector*/*").into());
 
     config
         .include
@@ -159,18 +162,114 @@ fn file_source(
     Ok((file_recv, file_source))
 }
 
-fn transform_message() -> JsonParser {
+fn parse_message() -> Result<impl FnMut(Event) -> Option<Event> + Send, String> {
+    // Transforms
+    let mut transform_json_message = transform_json_message();
+    let mut transform_cri_message = transform_cri_message()?;
+
+    // Kubernetes source
+    let atom_pod_uid = Atom::from("pod_uid");
+    let mut pod_data = HashMap::<Bytes, PodData>::new();
+    Ok(move |event: Event| {
+        let log = event.as_log();
+        if let Some(ValueKind::Bytes(pod_uid)) = log.get(&atom_pod_uid) {
+            // Fetch pod data
+            let data = pod_data.entry(pod_uid.clone()).or_default();
+
+            // Get/determine log format
+            let log_format = if let Some(log_format) = data.log_format {
+                log_format
+            } else {
+                // Detect log format
+                let log_format = if transform_json_message(event.clone()).is_some() {
+                    LogFormat::Json
+                } else if transform_cri_message.transform(event.clone()).is_some() {
+                    LogFormat::CRI
+                } else {
+                    error!(message = "Unknown message format");
+                    // Return untouched message so that user has some options
+                    // in how to deal with it.
+                    LogFormat::Unknown
+                };
+                // Save log format
+                data.log_format = Some(log_format);
+                log_format
+            };
+
+            // Parse message
+            match log_format {
+                LogFormat::Json => transform_json_message(event),
+                LogFormat::CRI => transform_cri_message.transform(event),
+                LogFormat::Unknown => Some(event),
+            }
+        } else {
+            None
+        }
+    })
+}
+
+fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
     let mut config = JsonParserConfig::default();
 
-    // Don't drop if this is not json to allow user to have some options.
-    config.drop_invalid = false;
+    // Drop so that it's possible to detect if message is in json format
+    config.drop_invalid = true;
 
-    // In case this is json, message will be overwritten with log field.
-    // In other cases it's better to retain the field. This will allow
-    // the user to have some options in how to deal with this.
-    config.drop_field = false;
+    // Drop field
 
-    config.into()
+    let mut json_parser: JsonParser = config.into();
+
+    let atom_time = Atom::from("time");
+    let atom_log = Atom::from("log");
+    move |event| {
+        let mut event = json_parser.transform(event)?;
+
+        // Rename fields
+        let log = event.as_mut_log();
+
+        // time -> timestamp
+        if let Some(ValueKind::Bytes(timestamp_bytes)) = log.remove(&atom_time) {
+            match DateTime::parse_from_rfc3339(
+                String::from_utf8_lossy(timestamp_bytes.as_ref()).as_ref(),
+            ) {
+                Ok(timestamp) => log.insert_explicit(
+                    event::TIMESTAMP.clone(),
+                    timestamp.with_timezone(&Utc).into(),
+                ),
+                Err(error) => warn!(message="Non rfc3339 timestamp",error=%error),
+            }
+        } else {
+            warn!(message = "Missing field", field = %atom_time);
+        }
+
+        // log -> message
+        if let Some(message) = log.remove(&atom_log) {
+            log.insert_explicit(event::MESSAGE.clone(), message);
+        } else {
+            warn!(message = "Missing field", field = %atom_log);
+        }
+
+        Some(event)
+    }
+}
+
+fn transform_cri_message() -> Result<Box<dyn Transform>, String> {
+    let mut rp_config = RegexParserConfig::default();
+    // message field
+    rp_config.regex =
+        r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$"
+            .to_owned();
+    // drop field
+    rp_config
+        .types
+        .insert(event::TIMESTAMP.clone(), "timestamp|%+".to_owned());
+    // stream is a string
+    // message is a string
+    rp_config.build().map_err(|e| {
+        format!(
+            "Failed in creating message regex transform with error: {:?}",
+            e
+        )
+    })
 }
 
 fn transform_file() -> Result<Box<dyn Transform>, String> {

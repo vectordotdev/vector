@@ -17,11 +17,14 @@ use kube::{
 };
 use serde::de::DeserializeOwned;
 use std::borrow::Borrow;
+use std::thread;
+use std::time::Duration;
 use vector::test_util::trace_init;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
 static ARGS_MARKER: &'static str = "$(ARGS_MARKER)";
+static ECHO_NAME: &'static str = "$(ECHO_NAME)";
 static WAIT_LIMIT: usize = 60; //s
 
 // ******************************* CONFIG ***********************************//
@@ -129,7 +132,7 @@ static ECHO_YAML: &'static str = r#"
 apiVersion: v1
 kind: Pod
 metadata:
-  name: busybox-echo
+  name: $(ECHO_NAME)
   namespace: $(TEST_NAMESPACE)
 spec:
   containers:
@@ -283,8 +286,51 @@ fn user_namespace(namespace: &str) -> String {
     "user-".to_owned() + namespace
 }
 
+#[must_use]
+fn echo(kube: &Kube, name: &str, message: &str) -> KubePod {
+    // Start echo
+    let echo = kube.create(
+        Api::v1Pod,
+        ECHO_YAML
+            .replace(ECHO_NAME, name)
+            .replace(ARGS_MARKER, format!("[{:?}]", message).as_str()),
+    );
+
+    // Wait for success state
+    kube.wait_for_success(echo.clone())
+        .expect("Running echo failed");
+
+    echo
+}
+
+fn start_vector(kube: &Kube, user_namespace: &str) -> KubeDaemon {
+    // Start vector
+    kube.create(
+        Api::v1ConfigMap,
+        CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace),
+    );
+    let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
+
+    // Wait for running state
+    kube.wait_for_running(vector.clone())
+        .expect("Running Vector failed");
+
+    vector
+}
+
+fn logs(kube: &Kube, vector: &KubeDaemon) -> Vec<String> {
+    // Wait for logs to propagate
+    thread::sleep(Duration::from_secs(4));
+    let mut logs = Vec::new();
+    for daemon_instance in kube.list(&vector) {
+        debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
+        logs.append(&mut kube.logs(daemon_instance.metadata.name.as_str()));
+    }
+    logs
+}
+
 #[test]
-fn one_log() {
+fn kube_one_log() {
     let namespace = "vector-test-one-log";
     let message = "12";
     let user_namespace = user_namespace(namespace);
@@ -293,38 +339,90 @@ fn one_log() {
     let user = Kube::new(user_namespace.clone());
 
     // Start vector
-    kube.create(
-        Api::v1ConfigMap,
-        CONFIG_MAP_YAML.replace(USER_NAMESPACE_MARKER, user_namespace.as_str()),
-    );
-    let vector = kube.create(Api::v1DaemonSet, VECTOR_YAML);
-
-    // Wait for running state
-    kube.wait_for_running(vector.clone())
-        .expect("Running Vector failed");
+    let vector = start_vector(&kube, user_namespace.as_str());
 
     // Start echo
-    let echo = user.create(
-        Api::v1Pod,
-        ECHO_YAML.replace(ARGS_MARKER, format!("[{:?}]", message).as_str()),
-    );
-
-    // Wait for success state
-    user.wait_for_success(echo.clone())
-        .expect("Running echo failed");
+    let _echo = echo(&user, "echo", message);
 
     // Verify logs
     // If any daemon logged message, done.
-    for daemon_instance in kube.list(&vector) {
-        debug!(message="daemon_instance",name=%daemon_instance.metadata.name);
-        for line in kube.logs(daemon_instance.metadata.name.as_str()) {
-            if line == message {
-                // DONE
-                return;
-            } else {
-                debug!(from="vector",log=%line);
-            }
+    for line in logs(&kube, &vector) {
+        if line == message {
+            // DONE
+            return;
+        } else {
+            debug!(namespace,log=%line);
         }
     }
-    panic!("Vector didn't logged message: {:?}", message);
+    panic!("Vector didn't log message: {:?}", message);
+}
+
+#[test]
+fn kube_old_log() {
+    let namespace = "vector-test-old-log";
+    let message_old = "13";
+    let message_new = "14";
+    let user_namespace = user_namespace(namespace);
+
+    let user = Kube::new(user_namespace.clone());
+    let kube = Kube::new(namespace);
+
+    // echo old
+    let _echo_old = echo(&user, "echo-old", message_old);
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str());
+
+    // echo new
+    let _echo_new = echo(&user, "echo-new", message_new);
+
+    // Verify logs
+    // If any daemon logged message, done.
+    let mut logged = false;
+    for line in logs(&kube, &vector) {
+        if line == message_old {
+            panic!("Old message logged");
+        } else if line == message_new {
+            // OK
+            logged = true;
+        } else {
+            debug!(namespace,log=%line);
+        }
+    }
+    if logged {
+        // Done
+    } else {
+        panic!("Vector didn't log message: {:?}", message_new);
+    }
+}
+
+#[test]
+fn kube_multi_log() {
+    let namespace = "vector-test-multi-log";
+    let mut messages = vec!["15", "16", "17", "18"];
+    let user_namespace = user_namespace(namespace);
+
+    let kube = Kube::new(namespace);
+    let user = Kube::new(user_namespace.clone());
+
+    // Start vector
+    let vector = start_vector(&kube, user_namespace.as_str());
+
+    // Start echo
+    let _echo = echo(&user, "echo", messages.join("\n").as_str());
+
+    // Verify logs
+    // If any daemon logged message, done.
+    for line in logs(&kube, &vector) {
+        if Some(&line.as_str()) == messages.first() {
+            messages.remove(0);
+        } else {
+            debug!(namespace,log=%line);
+        }
+    }
+    if messages.is_empty() {
+        //Done
+    } else {
+        panic!("Vector didn't log messages: {:?}", messages);
+    }
 }
