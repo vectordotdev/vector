@@ -9,7 +9,7 @@
 set -eu
 
 project_root=$(pwd)
-archive_name="vector-$VERSION-$TARGET.tar.gz"
+archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 absolute_archive_path="$project_root/$archive_path"
 
