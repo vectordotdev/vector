@@ -1,3 +1,0 @@
-source 'https://rubygems.org'
-gem 'paint', '~> 2.1'
-gem 'toml-rb', '~> 1.1'
