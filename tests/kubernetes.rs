@@ -59,7 +59,6 @@ data:
     # Ingest logs from Kubernetes
     [sources.kubernetes_logs]
       type = "kubernetes"
-      include_namespace = ["$(USER_TEST_NAMESPACE)"]
 
     [sinks.out]
       type = "console"

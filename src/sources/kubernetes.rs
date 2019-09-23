@@ -24,9 +24,7 @@ const LOG_DIRECTORY: &'static str = r"/var/log/pods/";
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct KubernetesConfig {
-    include_namespace: Vec<String>,
-}
+pub struct KubernetesConfig {}
 
 #[typetag::serde(name = "kubernetes")]
 impl SourceConfig for KubernetesConfig {
@@ -52,7 +50,7 @@ impl SourceConfig for KubernetesConfig {
         // after now.
 
         // File source
-        let (file_recv, file_source) = file_source(self, name, globals)?;
+        let (file_recv, file_source) = file_source(name, globals)?;
 
         // Transforms
         let mut transform_message = transform_message();
@@ -116,35 +114,28 @@ impl SourceConfig for KubernetesConfig {
 }
 
 fn file_source(
-    kube_config: &KubernetesConfig,
     kube_name: &str,
     globals: &GlobalOptions,
 ) -> Result<(mpsc::Receiver<Event>, super::Source), String> {
     let mut config = FileConfig::default();
 
     // TODO: Having a configurable option for excluding namespaces, seams to be usefull.
-    // TODO: Find out if there are some guarantee from Kubernetes that current build of
-    // TODO  pod_uid as namespace_pod-name_some-number is a somewhat lasting decision.
-    // Exclude whole kube-system namespace
+    // // TODO: Find out if there are some guarantee from Kubernetes that current build of
+    // // TODO  pod_uid as namespace_pod-name_some-number is a somewhat lasting decision.
+    // NOTE: pod_uid is unspecified and it has been found that on EKS it has different scheme.
+    // NOTE: as such excluding/including using path is hacky, instead, more proper source of
+    // NOTE: information should be used.
+    // NOTE: At best, excluding/including using path can be an optimization
+    // TODO: Exclude whole kube-system namespace
+    // TODO: Add exclude_namspace option, and with it in config exclude namespace used by vector.
+    // NOTE: for now exclude images with name vector, it's a rough solution, but necessary for now
     config
         .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"kube-system_*/**").into());
-    // Exclude whole logging namespace
+        .push((LOG_DIRECTORY.to_owned() + r"*/vector/*").into());
+
     config
-        .exclude
-        .push((LOG_DIRECTORY.to_owned() + r"logging_*/**").into());
-    // Include
-    if kube_config.include_namespace.is_empty() {
-        config
-            .include
-            .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
-    } else {
-        for namespace in kube_config.include_namespace.iter() {
-            config
-                .include
-                .push((LOG_DIRECTORY.to_owned() + namespace + r"_*/*/*.log").into());
-        }
-    }
+        .include
+        .push((LOG_DIRECTORY.to_owned() + r"*/*/*.log").into());
 
     config.start_at_beginning = true;
 
