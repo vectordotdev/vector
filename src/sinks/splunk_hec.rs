@@ -284,7 +284,7 @@ mod integration_tests {
     fn splunk_insert_message() {
         let mut rt = runtime();
 
-        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -315,7 +315,7 @@ mod integration_tests {
     fn splunk_insert_many() {
         let mut rt = runtime();
 
-        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Text), Acker::Null).unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
 
@@ -347,7 +347,7 @@ mod integration_tests {
     fn splunk_custom_fields() {
         let mut rt = runtime();
 
-        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -380,7 +380,7 @@ mod integration_tests {
     fn splunk_hostname() {
         let mut rt = runtime();
 
-        let sink = sinks::splunk_hec::hec(config(), Acker::Null).unwrap();
+        let sink = sinks::splunk_hec::hec(config(Encoding::Json), Acker::Null).unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -416,11 +416,11 @@ mod integration_tests {
 
     #[test]
     fn splunk_configure_hostname() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         let config = super::HecSinkConfig {
             host_field: "roast".into(),
-            ..config()
+            ..config(Encoding::Json)
         };
 
         let sink = sinks::splunk_hec::hec(config, Acker::Null).unwrap();
@@ -462,7 +462,7 @@ mod integration_tests {
 
     #[test]
     fn splunk_healthcheck() {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let mut rt = runtime();
 
         // OK
         {
@@ -525,13 +525,13 @@ mod integration_tests {
         json["results"].as_array().unwrap().clone()
     }
 
-    fn config() -> super::HecSinkConfig {
+    fn config(encoding: Encoding) -> super::HecSinkConfig {
         super::HecSinkConfig {
             host: "http://localhost:8088/".into(),
             token: get_token(),
             host_field: "host".into(),
             compression: Some(Compression::None),
-            encoding: Encoding::Json,
+            encoding,
             batch_size: Some(1),
             ..Default::default()
         }
@@ -557,8 +557,6 @@ mod integration_tests {
             panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
         }
 
-        let token = entries[0]["content"]["token"].as_str().unwrap().to_owned();
-
-        token
+        entries[0]["content"]["token"].as_str().unwrap().to_owned()
     }
 }
