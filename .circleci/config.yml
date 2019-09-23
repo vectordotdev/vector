@@ -98,41 +98,6 @@ jobs:
   # Building - Archives
   #
 
-  build-armv7-unknown-linux-gnueabihf-archive:
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-gnueabihf:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export VERSION=$(make version)
-            export FEATURES="jemallocator"
-            export STRIP=false
-            make build-archive
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-armv7-unknown-linux-gnueabihf.tar.gz"
-
-  # build-armv7-unknown-linux-musleabihf-archive:
-  #   docker:
-  #     - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
-  #   resource_class: xlarge
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Build archive
-  #         command: |
-  #           export VERSION=$(make version)
-  #           export FEATURES="jemallocator"
-  #           make build-archive
-  #     - persist_to_workspace:
-  #         root: target/artifacts
-  #         paths:
-  #           - "*-armv7-unknown-linux-musleabihf.tar.gz"
-
   build-x86_64-apple-darwin-archive:
     resource_class: large
     macos:
@@ -463,8 +428,6 @@ require-checks-and-tests: &require-checks-and-tests
 
 require-builds: &require-builds
   requires:
-    - build-armv7-unknown-linux-gnueabihf-archive
-    # - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -522,11 +485,6 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
-      - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *require-checks-and-tests
-      # - build-armv7-unknown-linux-musleabihf-archive:
-      #     <<: *tag-workflow-filters
-      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
@@ -550,12 +508,6 @@ workflows:
           <<: *tag-workflow-filters
       - test-stable:
           <<: *tag-workflow-filters
-      - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *tag-workflow-filters
-          <<: *require-checks-and-tests
-      # - build-armv7-unknown-linux-musleabihf-archive:
-      #     <<: *tag-workflow-filters
-      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *tag-workflow-filters
           <<: *require-checks-and-tests

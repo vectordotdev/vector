@@ -45,8 +45,6 @@ function extend_cross_base_image() {
 # The following images are basic Docker images that do not extend a
 # cross base image.
 all_images=(
-	builder-armv7-unknown-linux-gnueabihf
-	builder-armv7-unknown-linux-musleabihf
 	builder-x86_64-unknown-linux-gnu
 	builder-x86_64-unknown-linux-musl
 	checker

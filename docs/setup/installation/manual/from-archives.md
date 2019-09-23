@@ -31,7 +31,6 @@ Vector retains archives for all [releases][urls.vector_releases].
 | [`latest-x86_64-apple-darwin`][urls.vector_latest_release_x86_64-apple-darwin]                        | 64-bit OSX (10.7+, Lion+)                                                        |
 | [`latest-unknown-linux-musl`][urls.vector_latest_release_x86_64-unknown-linux-musl]            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`latest-x86_64-unknown-linux-gnu`][urls.vector_latest_release_x86_64-unknown-linux-gnu]              | 64-bit Linux (2.6.18+)                                                           |
-| [`latest-armv7-unknown-linux-gnueabihf`][urls.vector_latest_release_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
 #### Historical
 
@@ -58,7 +57,6 @@ every night. They contain the latest features but may be less stable.
 | [`nightly-x86_64-apple-darwin`][urls.vector_latest_nightly_x86_64-apple-darwin]                                        | 64-bit OSX (10.7+, Lion+)                                                        |
 | [`nightly-x86_64-unknown-linux-musl`][urls.vector_latest_nightly_x86_64-unknown-linux-musl]                            | 64-bit Linux with MUSL. Fully static, stripped, and LTO. (Recommended for Linux) |
 | [`nightly-x86_64-unknown-linux-gnu`][urls.vector_latest_nightly_x86_64-unknown-linux-gnu]                              | 64-bit Linux (2.6.18+)                                                           |
-| [`nightly-armv7-unknown-linux-gnueabihf`][urls.vector_latest_nightly_armv7-unknown-linux-gnueabihf] ⚠️ | ARMv7 Linux                                                                      |
 
 #### Historical
 
@@ -189,11 +187,9 @@ Simply follow the same [installation instructions above](#installation).
 [docs.sinks.kafka]: ../../../usage/configuration/sinks/kafka.md
 [urls.issue_661]: https://github.com/timberio/vector/issues/661
 [urls.rust_target_triples]: https://forge.rust-lang.org/platform-support.html
-[urls.vector_latest_nightly_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/nightly/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz
 [urls.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
 [urls.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
 [urls.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
-[urls.vector_latest_release_armv7-unknown-linux-gnueabihf]: https://packages.timber.io/vector/latest/vector-latest-armv7-unknown-linux-gnueabihf.tar.gz
 [urls.vector_latest_release_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
 [urls.vector_latest_release_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
 [urls.vector_latest_release_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
