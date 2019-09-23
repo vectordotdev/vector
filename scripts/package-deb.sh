@@ -20,7 +20,7 @@ td=$(mktemp -d)
 pushd $td
 tar -xvf $absolute_archive_path
 mkdir -p $project_root/target/$TARGET/release
-mv vector-$VERSION/bin/vector $project_root/target/$TARGET/release
+mv vector/bin/vector $project_root/target/$TARGET/release
 popd
 rm -rf $td
 
