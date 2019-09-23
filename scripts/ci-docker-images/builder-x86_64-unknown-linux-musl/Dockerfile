@@ -14,9 +14,6 @@ ARG LLVM_GIT_COMMIT=48818e9f5d0f2d5978a9b43ad1a2e8d0b83f6aa0
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
 ARG LINUX_HEADERS_VERSION=5.2.9
-# LibreSSL uses more modern build system than OpenSSL, which makes it better
-# suited for use with musl.
-ARG LIBRESSL_VERSION=2.9.2
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
@@ -81,12 +78,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
     https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$LINUX_HEADERS_VERSION.tar.xz | \
     tar xJf -
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
-
-ARG LIBRESSL_VERSION
-RUN curl --proto '=https' --tlsv1.2 -sSf \
-    https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-$LIBRESSL_VERSION.tar.gz | \
-    tar xzf -
-ENV LIBRESSL_DIR=$SRC_DIR/libressl-$LIBRESSL_VERSION
 
 # Install build dependencies.
 RUN apt-get update && apt-get -y install curl ninja-build cmake python3-distutils
@@ -226,6 +217,9 @@ RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/c++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/g++
 RUN ln -s $LIBS_PREFIX/bin/musl-c++ $LIBS_PREFIX/bin/musl-g++
 
+# Use stdatomic.h header provided by Clang because it is not present in musl.
+RUN ln -s $CLANG_PREFIX/lib/clang/9.0.0/include/stdatomic.h $LIBS_PREFIX/include/stdatomic.h
+
 # Some build systems hardcode -lstdc++ linker flag on all Linux systems.
 # Because our linker is already configured to link with libc++ instead,
 # we can just provide dummy libstdc++ to be compatible with GNU systems.
@@ -235,31 +229,6 @@ RUN echo > dummy.c && \
   $CLANG_PREFIX/bin/clang -c dummy.c && \
   $CLANG_PREFIX/bin/ar cr $LIBS_PREFIX/lib/libstdc++.a dummy.o && \
   rm dummy.c dummy.o
-
-# Install LibreSSL.
-WORKDIR $LIBRESSL_DIR
-# Rust crate openssl-sys supports only released versions of LibreSSL.
-# In order to be able to use the latest stable release with musl,
-# we need to backport unreleased changes from this PR:
-# https://github.com/libressl-portable/portable/pull/529/files.
-RUN sed -i \
-  's/#error "Cannot emulate getprogname"/return program_invocation_short_name;/g' \
-  crypto/compat/getprogname_linux.c
-ENV CC=$LIBS_PREFIX/bin/musl-cc
-ENV CXX=$LIBS_PREFIX/bin/musl-c++
-ENV CFLAGS=""
-ENV CXXFLAGS=""
-ENV LDFLAGS=""
-RUN mkdir build && \
-  cd build && \
-  cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DCMAKE_INSTALL_PREFIX=$LIBS_PREFIX \
-    -DLIBRESSL_APPS=OFF \
-    -DLIBRESSL_TESTS=OFF \
-    -G Ninja \
-    .. && \
-  ninja install
 
 # The actual builder.
 FROM ubuntu:18.04

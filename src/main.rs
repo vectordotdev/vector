@@ -90,6 +90,7 @@ impl std::str::FromStr for Color {
 }
 
 fn main() {
+    openssl_probe::init_ssl_cert_env_vars();
     let opts = Opts::from_args();
 
     let level = match opts.quiet {
