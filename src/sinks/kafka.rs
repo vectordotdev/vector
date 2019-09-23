@@ -293,12 +293,15 @@ mod integration_test {
         kafka_happy_path("localhost:9092", None);
     }
 
+    const TEST_CA: &str = "tests/data/Vector_CA.crt";
+
     #[test]
     fn kafka_happy_path_tls() {
         kafka_happy_path(
             "localhost:9091",
             Some(KafkaSinkTlsConfig {
                 enabled: Some(true),
+                ca_path: Some(TEST_CA.into()),
                 ..Default::default()
             }),
         );
@@ -308,6 +311,10 @@ mod integration_test {
         let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
+        let tls_enabled = tls
+            .as_ref()
+            .map(|tls| tls.enabled.unwrap_or(false))
+            .unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
@@ -329,6 +336,10 @@ mod integration_test {
         client_config.set("bootstrap.servers", &bs);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
+        if tls_enabled {
+            client_config.set("security.protocol", "ssl");
+            client_config.set("ssl.ca.location", TEST_CA);
+        }
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
