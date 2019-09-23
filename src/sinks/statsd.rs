@@ -6,10 +6,17 @@ use crate::{
 };
 use futures::{future, sink::Sink, Future, Poll};
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
+    SocketBindError { source: std::io::Error },
+}
 
 pub struct StatsdSvc {
     client: Client,
@@ -21,10 +28,9 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(address: SocketAddr) -> Result<Self, String> {
+    pub fn new(address: SocketAddr) -> crate::Result<Self> {
         let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
-        let socket = UdpSocket::bind(&from)
-            .map_err(|e| format!("failed to bind to udp listener socket, error = {:?}", e))?;
+        let socket = UdpSocket::bind(&from).context(SocketBindError)?;
         Ok(Client { socket, address })
     }
 
@@ -52,7 +58,7 @@ pub fn default_address() -> SocketAddr {
 
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), acker)?;
         let healthcheck = StatsdSvc::healthcheck(self.clone())?;
         Ok((sink, healthcheck))
@@ -64,7 +70,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 impl StatsdSvc {
-    pub fn new(config: StatsdSinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
         // 1432 bytes is a safe default to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
         // also one might keep an eye on server side limitations, like
@@ -89,7 +95,7 @@ impl StatsdSvc {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(_config: StatsdSinkConfig) -> Result<super::Healthcheck, String> {
+    fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<super::Healthcheck> {
         Ok(Box::new(future::ok(())))
     }
 }

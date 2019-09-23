@@ -132,6 +132,7 @@ data_dir = "/var/lib/vector"
 | [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
 | [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
 | [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
@@ -308,6 +309,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks.kafka]: ../../usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ../../usage/configuration/sinks/prometheus.md
 [docs.sinks.splunk_hec]: ../../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ../../usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ../../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../../usage/configuration/sinks/vector.md
 [docs.sinks]: ../../usage/configuration/sinks
@@ -355,5 +357,6 @@ All TOML values types are supported. For convenience this includes:
 [urls.prometheus]: https://prometheus.io/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.toml]: https://github.com/toml-lang/toml

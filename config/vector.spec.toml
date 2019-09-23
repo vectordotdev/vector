@@ -2518,6 +2518,40 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `metric` events to StatsD metrics service.
+[sinks.statsd]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "statsd"
+  type = "statsd"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # A prefix that will be added to all metric names.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # The UDP socket address to send stats to.
+  # 
+  # * optional
+  # * default: "127.0.0.1:8125"
+  address = "127.0.0.1:8125"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 # Streams `log` events to a TCP connection.
 [sinks.tcp]
   #

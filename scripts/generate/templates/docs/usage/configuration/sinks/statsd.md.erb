@@ -12,7 +12,7 @@
 
 ## Examples
 
-The `statsd` sink batches [`metric`][docs.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][url.statsd_multi]. For example:
+The `statsd` sink batches [`metric`][docs.data-model.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
 
 ```
 gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s

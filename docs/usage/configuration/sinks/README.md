@@ -35,6 +35,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 | [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
 | [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
 | [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
@@ -59,6 +60,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [docs.sinks.kafka]: ../../../usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
 [docs.sinks.splunk_hec]: ../../../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ../../../usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ../../../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../../../usage/configuration/sinks/vector.md
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
@@ -73,3 +75,4 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [urls.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [urls.prometheus]: https://prometheus.io/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.statsd]: https://github.com/statsd/statsd

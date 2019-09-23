@@ -12,43 +12,32 @@ description: Streams `metric` events to StatsD metrics service.
 
 # statsd sink
 
-![][images.statsd_sink]
+![][assets.statsd_sink]
 
 {% hint style="warning" %}
 The `statsd` sink is in beta. Please see the current
-[enhancements][url.statsd_sink_enhancements] and
-[bugs][url.statsd_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_statsd_sink_issue]
+[enhancements][urls.statsd_sink_enhancements] and
+[bugs][urls.statsd_sink_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_statsd_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `statsd` sink [streams](#streaming) [`metric`][docs.metric_event] events to [StatsD][url.statsd] metrics service.
+The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
   namespace = "service"
-  
-  address = "127.0.0.1:8125" # default
-  healthcheck = true # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  type = "statsd"
-  inputs = ["<string>", ...]
-  namespace = "<string>"
-  address = "<string>"
-  healthcheck = <bool>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.statsd_sink]
   # The component type
@@ -92,7 +81,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.metric_event] events to 
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "statsd"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
 | **OPTIONAL** | | |
 | `address` | `string` | The UDP socket address to send stats to.<br />`default: "127.0.0.1:8125"` |
@@ -100,7 +89,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.metric_event] events to 
 
 ## Examples
 
-The `statsd` sink batches [`metric`][docs.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][url.statsd_multi]. For example:
+The `statsd` sink batches [`metric`][docs.data-model.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
 
 ```
 gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
@@ -111,7 +100,7 @@ gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -119,7 +108,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Streaming
@@ -130,41 +119,40 @@ event-by-event basis. It does not batch data.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `statsd_sink` issues][url.statsd_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_statsd_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_statsd_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `statsd_sink` issues][urls.statsd_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_statsd_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_statsd_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.statsd_sink_issues] - [enhancements][url.statsd_sink_enhancements] - [bugs][url.statsd_sink_bugs]
-* [**Source code**][url.statsd_sink_source]
+* [**Issues**][urls.statsd_sink_issues] - [enhancements][urls.statsd_sink_enhancements] - [bugs][urls.statsd_sink_bugs]
+* [**Source code**][urls.statsd_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.metric]: ../../../about/data-model/metric.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.statsd_sink]: ../../../assets/statsd-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.statsd_sink]: ../../../assets/statsd-sink.svg
-[url.new_statsd_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+bug
-[url.new_statsd_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+enhancement
-[url.new_statsd_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd
-[url.statsd]: https://github.com/statsd/statsd
-[url.statsd_multi]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
-[url.statsd_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+bug%22
-[url.statsd_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+enhancement%22
-[url.statsd_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
-[url.statsd_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/statsd/mod.rs
-[url.vector_chat]: https://chat.vector.dev
+[urls.new_statsd_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+bug
+[urls.new_statsd_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd&labels=Type%3A+enhancement
+[urls.new_statsd_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+statsd
+[urls.statsd]: https://github.com/statsd/statsd
+[urls.statsd_multi]: https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
+[urls.statsd_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+bug%22
+[urls.statsd_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+enhancement%22
+[urls.statsd_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
+[urls.statsd_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/statsd/mod.rs
+[urls.vector_chat]: https://chat.vector.dev
