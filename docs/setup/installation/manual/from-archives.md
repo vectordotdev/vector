@@ -187,11 +187,11 @@ Simply follow the same [installation instructions above](#installation).
 [docs.sinks.kafka]: ../../../usage/configuration/sinks/kafka.md
 [urls.issue_661]: https://github.com/timberio/vector/issues/661
 [urls.rust_target_triples]: https://forge.rust-lang.org/platform-support.html
-[urls.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-apple-darwin.tar.gz
-[urls.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz
-[urls.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz
-[urls.vector_latest_release_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-latest-x86_64-apple-darwin.tar.gz
-[urls.vector_latest_release_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz
-[urls.vector_latest_release_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-musl.tar.gz
+[urls.vector_latest_nightly_x86_64-apple-darwin]: https://packages.timber.io/vector/nightly/latest/vector-x86_64-apple-darwin.tar.gz
+[urls.vector_latest_nightly_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz
+[urls.vector_latest_nightly_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz
+[urls.vector_latest_release_x86_64-apple-darwin]: https://packages.timber.io/vector/latest/vector-x86_64-apple-darwin.tar.gz
+[urls.vector_latest_release_x86_64-unknown-linux-gnu]: https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz
+[urls.vector_latest_release_x86_64-unknown-linux-musl]: https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz
 [urls.vector_releases]: https://github.com/timberio/vector/releases
 [urls.vector_repo]: https://github.com/timberio/vector
