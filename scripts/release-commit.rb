@@ -114,5 +114,6 @@ else
           #{$?.inspect}
         EOF
       )
+    end
   end
 end
