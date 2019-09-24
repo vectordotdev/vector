@@ -152,6 +152,7 @@ jobs:
           command: |
             export RUST_LTO="lto"
             export TARGET="x86_64-unknown-linux-musl"
+            export FEATURES="default openssl/vendored"
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
