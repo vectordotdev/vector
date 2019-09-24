@@ -4,7 +4,7 @@
 #
 # SUMMARY
 #
-#   Used to build a tar.gz archive for the specified $TARGET and $VERSION
+#   Used to build a tar.gz archive for the specified $TARGET
 #
 # ENV VARS
 #
@@ -13,7 +13,6 @@
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
-#   $VERSION - the version of Vector, can be obtained via `make version`
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
@@ -27,7 +26,6 @@ fi
 set -eu
 
 echo "Building Vector archive"
-echo "Version: $VERSION"
 echo "Target: $TARGET"
 echo "Native build: $NATIVE_BUILD"
 echo "Features: $FEATURES"
