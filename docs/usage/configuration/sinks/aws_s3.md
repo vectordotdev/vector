@@ -344,7 +344,7 @@ Batches are flushed when 1 of 2 conditions are met:
 ### Columnar Formats
 
 Vector has plans to support column formats, such as ORC and Parquet, in
-[`v0.6`][urls.roadmap].
+[`v0.6`][urls.vector_roadmap].
 
 ### Compression
 
@@ -516,7 +516,7 @@ easier than ever.
     ```
 
 Vector has plans to support [columnar formats](#columnar-formats) in
-[`v0.6`][urls.roadmap] which will allows for very fast and efficient querying on
+[`v0.6`][urls.vector_roadmap] which will allows for very fast and efficient querying on
 S3.
 
 ### Template Syntax
@@ -602,7 +602,7 @@ issue, please:
 [urls.new_aws_s3_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+bug
 [urls.new_aws_s3_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3&labels=Type%3A+enhancement
 [urls.new_aws_s3_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_s3
-[urls.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
 [urls.uuidv4]: https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

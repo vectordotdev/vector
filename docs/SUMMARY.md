@@ -35,21 +35,21 @@
     * [MacOS](setup/installation/operating-systems/macos.md)
     * [RHEL](setup/installation/operating-systems/rhel.md)
     * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
-  * [Manual](setup/installation/manual/README.md)
-    * [From Archives](setup/installation/manual/from-archives.md)
-    * [From Source](setup/installation/manual/from-source.md)
-* [Getting Started](setup/getting-started/README.md)
-  * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
-* [Deployment](setup/deployment/README.md)
-  * [Topologies](setup/deployment/topologies.md)
-  * [Roles](setup/deployment/roles/README.md)
-    * [Agent Role](setup/deployment/roles/agent.md)
-    * [Service Role](setup/deployment/roles/service.md)
+  * [Manual][docs.installation.manual]
+    * [From Archives][docs.from-archives]
+    * [From Source][docs.from-source]
+* [Getting Started][docs.getting-started]
+  * [Sending Your First Event][docs.sending-your-first-event]
+* [Deployment][docs.deployment]
+  * [Topologies][docs.deployment.topologies]
+  * [Roles][docs.roles]
+    * [Agent Role][docs.roles.agent]
+    * [Service Role][docs.roles.service]
 
 ## Usage
 
-* [Configuration](usage/configuration/README.md)
-  * [Sources](usage/configuration/sources/README.md)
+* [Configuration][docs.configuration]
+  * [Sources][docs.sources]
     * [file source][docs.sources.file]
     * [journald source][docs.sources.journald]
     * [kafka source][docs.sources.kafka]
@@ -59,7 +59,7 @@
     * [tcp source][docs.sources.tcp]
     * [udp source][docs.sources.udp]
     * [vector source][docs.sources.vector]
-  * [Transforms](usage/configuration/transforms/README.md)
+  * [Transforms][docs.transforms]
     * [add_fields transform][docs.transforms.add_fields]
     * [add_tags transform][docs.transforms.add_tags]
     * [coercer transform][docs.transforms.coercer]
@@ -74,7 +74,7 @@
     * [sampler transform][docs.transforms.sampler]
     * [split transform][docs.transforms.split]
     * [tokenizer transform][docs.transforms.tokenizer]
-  * [Sinks](usage/configuration/sinks/README.md)
+  * [Sinks][docs.sinks]
     * [aws_cloudwatch_logs sink][docs.sinks.aws_cloudwatch_logs]
     * [aws_kinesis_streams sink][docs.sinks.aws_kinesis_streams]
     * [aws_s3 sink][docs.sinks.aws_s3]
@@ -89,32 +89,58 @@
     * [splunk_hec sink][docs.sinks.splunk_hec]
     * [tcp sink][docs.sinks.tcp]
     * [vector sink][docs.sinks.vector]
-  * [Specification](usage/configuration/specification.md)
-* [Administration](usage/administration/README.md)
-  * [Starting](usage/administration/starting.md)
-  * [Reloading](usage/administration/reloading.md)
-  * [Stopping](usage/administration/stopping.md)
-  * [Monitoring](usage/administration/monitoring.md)
-  * [Tuning](usage/administration/tuning.md)
-  * [Updating](usage/administration/updating.md)
-  * [Validating](usage/administration/validating.md)
-  * [Env Vars](usage/administration/env-vars.md)
-* [Guides](usage/guides/README.md)
-  * [Troubleshooting Guide](usage/guides/troubleshooting.md)
+  * [Specification][docs.configuration.specification]
+* [Administration][docs.administration]
+  * [Starting][docs.administration.starting]
+  * [Reloading][docs.administration.reloading]
+  * [Stopping][docs.administration.stopping]
+  * [Monitoring][docs.administration.monitoring]
+  * [Tuning][docs.administration.tuning]
+  * [Updating][docs.administration.updating]
+  * [Validating][docs.administration.validating]
+  * [Env Vars][docs.administration.env-vars]
+* [Guides][docs.guides]
+  * [Troubleshooting Guide][docs.guides.troubleshooting]
 
 ## Resources
 
-* [Community](https://vector.dev/community/)
-* [Download](https://github.com/timberio/vector/releases)
-* [Github Repo](https://github.com/timberio/vector)
-* [Roadmap](https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open)
+* [Changelog][urls.vector_changelog]
+* [Community][urls.vector_community]
+* [Github Repo][urls.vector_repo]
+* [Releases][urls.vector_releases]
+* [Roadmap][urls.vector_roadmap]
 
 ## Meta
 
-* [Conventions](meta/conventions.md)
-* [Glossary](meta/glossary.md)
+* [Conventions][docs.conventions]
+* [Glossary][docs.glossary]
 
 
+[docs.administration.env-vars]: ./usage/administration/env-vars.md
+[docs.administration.monitoring]: ./usage/administration/monitoring.md
+[docs.administration.reloading]: ./usage/administration/reloading.md
+[docs.administration.starting]: ./usage/administration/starting.md
+[docs.administration.stopping]: ./usage/administration/stopping.md
+[docs.administration.tuning]: ./usage/administration/tuning.md
+[docs.administration.updating]: ./usage/administration/updating.md
+[docs.administration.validating]: ./usage/administration/validating.md
+[docs.administration]: ./usage/administration
+[docs.configuration.specification]: ./usage/configuration/specification.md
+[docs.configuration]: ./usage/configuration
+[docs.conventions]: ./meta/conventions.md
+[docs.deployment.topologies]: ./setup/deployment/topologies.md
+[docs.deployment]: ./setup/deployment
+[docs.from-archives]: ./setup/installation/manual/from-archives.md
+[docs.from-source]: ./setup/installation/manual/from-source.md
+[docs.getting-started]: ./setup/getting-started
+[docs.glossary]: ./meta/glossary.md
+[docs.guides.troubleshooting]: ./usage/guides/troubleshooting.md
+[docs.guides]: ./usage/guides
+[docs.installation.manual]: ./setup/installation/manual
+[docs.roles.agent]: ./setup/deployment/roles/agent.md
+[docs.roles.service]: ./setup/deployment/roles/service.md
+[docs.roles]: ./setup/deployment/roles
+[docs.sending-your-first-event]: ./setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
 [docs.sinks.aws_kinesis_streams]: ./usage/configuration/sinks/aws_kinesis_streams.md
 [docs.sinks.aws_s3]: ./usage/configuration/sinks/aws_s3.md
@@ -129,6 +155,7 @@
 [docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
 [docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ./usage/configuration/sinks/vector.md
+[docs.sinks]: ./usage/configuration/sinks
 [docs.sources.file]: ./usage/configuration/sources/file.md
 [docs.sources.journald]: ./usage/configuration/sources/journald.md
 [docs.sources.kafka]: ./usage/configuration/sources/kafka.md
@@ -138,6 +165,7 @@
 [docs.sources.tcp]: ./usage/configuration/sources/tcp.md
 [docs.sources.udp]: ./usage/configuration/sources/udp.md
 [docs.sources.vector]: ./usage/configuration/sources/vector.md
+[docs.sources]: ./usage/configuration/sources
 [docs.transforms.add_fields]: ./usage/configuration/transforms/add_fields.md
 [docs.transforms.add_tags]: ./usage/configuration/transforms/add_tags.md
 [docs.transforms.coercer]: ./usage/configuration/transforms/coercer.md
@@ -152,3 +180,9 @@
 [docs.transforms.sampler]: ./usage/configuration/transforms/sampler.md
 [docs.transforms.split]: ./usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ./usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ./usage/configuration/transforms
+[urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
+[urls.vector_community]: https://vector.dev/community
+[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_repo]: https://github.com/timberio/vector
+[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
