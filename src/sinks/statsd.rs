@@ -71,11 +71,12 @@ impl SinkConfig for StatsdSinkConfig {
 
 impl StatsdSvc {
     pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
-        // 1432 bytes is a safe default to fit into MTU
+        // 1432 bytes is a recommended packet size to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
-        // also one might keep an eye on server side limitations, like
-        // https://github.com/DataDog/dd-agent/issues/2638
-        let batch_size = config.batch_size.unwrap_or(1432);
+        // However we need to leave some space for +1 extra trailing event in the buffer.
+        // Also one might keep an eye on server side limitations, like
+        // mentioned here https://github.com/DataDog/dd-agent/issues/2638
+        let batch_size = config.batch_size.unwrap_or(1300);
         let batch_timeout = config.batch_timeout.unwrap_or(1);
         let namespace = config.namespace.clone();
 
