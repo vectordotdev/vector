@@ -21,11 +21,8 @@ write_to_description = "[AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLog
 type = "string"
 category = "Requests"
 enum = ["json", "text"]
-null = true
-description = """\
-The encoding format used to serialize the events before flushing. The default \
-is dynamic based on if the event is structured or not.\
-"""
+null = false
+description = "The encoding format used to serialize the events as before flushing."
 
 [sinks.aws_cloudwatch_logs.options.group_name]
 type = "string"

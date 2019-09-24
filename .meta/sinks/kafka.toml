@@ -20,11 +20,8 @@ to initially to bootstrap itself\
 [sinks.kafka.options.encoding]
 type = "string"
 enum = ["json", "text"]
-null = true
-description = """\
-The encoding format used to serialize the events before flushing. The default \
-is dynamic based on if the event is structured or not.\
-"""
+null = false
+description = "The encoding format used to serialize the events before flushing."
 
 [sinks.kafka.options.key_field]
 type = "string"
