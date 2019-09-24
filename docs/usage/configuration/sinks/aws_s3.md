@@ -44,7 +44,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
   key_prefix = "date=%F/"
   
   # OPTIONAL - Requests
-  compression = "gzip" # no default, must be: "gzip" (if supplied)
+  compression = "gzip" # default, enum: "gzip" or "none"
   encoding = "ndjson" # no default, enum: "ndjson" or "text"
 
   # For a complete list of options see the "advanced" tab above.
@@ -83,17 +83,17 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
   # * no default
   region = "us-east-1"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   #
   # Batching
@@ -155,9 +155,10 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
   # The compression type to use before writing data.
   # 
   # * optional
-  # * no default
-  # * must be: "gzip" (if supplied)
+  # * default: "gzip"
+  # * enum: "gzip" or "none"
   compression = "gzip"
+  compression = "none"
 
   # The encoding format used to serialize the events before flushing. The default
   # is dynamic based on if the event is structured or not.
@@ -354,6 +355,7 @@ type is described in more detail below:
 | Compression | Description |
 |:------------|:------------|
 | `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
+| `none` | The payload will not compressed at all. |
 
 ### Delivery Guarantee
 
