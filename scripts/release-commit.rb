@@ -75,9 +75,9 @@ else
 
   commands =
     <<~EOF
-    git add docs/*
+    git add . -A
     git commit -sam 'chore: Prepare v#{release.version} release'
-    git push origin master
+    git push origin master --force
     git tag -a v#{release.version} -m "v#{release.version}"
     git push origin v#{release.version}
     git branch v#{branch_name}
@@ -86,11 +86,17 @@ else
 
   commands.chomp!
 
+  status = `git status --short`.chomp!
+
   words =
     <<~EOF
     We'll be releasing v#{release.version} with the following commands:
 
     #{commands.indent(2)}
+
+    Your current `git status` is:
+
+    #{status.indent(2)}
 
     Proceed to execute the above commands?
     EOF
