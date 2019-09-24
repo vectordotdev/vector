@@ -2,16 +2,20 @@
 titleOnly: true
 
 scopes:
+  - buffers
   - cli
   - config
-  - data model
+  - log data model
+  - metric data model
+  - networking
   - new source
   - new transform
   - new sink
   - observability
+  - operations
+  - security
   - testing
   - topology
-  - workflow
   # sources
   - file source
   - journald source

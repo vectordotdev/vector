@@ -9,16 +9,20 @@ types:
   - perf
 
 scopes:
+  - buffers
   - cli
   - config
-  - data model
+  - log data model
+  - metric data model
+  - networking
   - new source
   - new transform
   - new sink
   - observability
+  - operations
+  - security
   - testing
   - topology
-  - workflow
   # sources
   <%- metadata.sources.to_h.values.sort.each do |source| -%>
   - <%= source.name %> source
