@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [download v0.4.0][urls.vector_releases], [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [manual][docs.manual]
+* [**Installation**][docs.installation] - [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -197,11 +197,12 @@ the License.
 [docs.data-model.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.data_model]: https://docs.vector.dev/about/data-model
 [docs.deployment]: https://docs.vector.dev/setup/deployment
+[docs.from-archives]: https://docs.vector.dev/setup/installation/manual/from-archives
+[docs.from-source]: https://docs.vector.dev/setup/installation/manual/from-source
 [docs.getting_started]: https://docs.vector.dev/setup/getting-started
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
 [docs.installation]: https://docs.vector.dev/setup/installation
-[docs.manual]: https://docs.vector.dev/setup/installation/manual
 [docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
 [docs.package_managers]: https://docs.vector.dev/setup/installation/package-managers
 [docs.performance]: https://docs.vector.dev/performance
