@@ -35,7 +35,9 @@ release = metadata.releases.to_h.fetch(:"#{VERSION}")
 # Release
 #
 
-flags = ["--assets 'target/artifacts/*'"]
+title("Releasing artifacts to Github")
+
+flags = ["--debug", "--assets 'target/artifacts/*'"]
 
 notes = templates.release_notes(release)
 notes = PostProcessors::LinkDefiner.define!(notes.clone, "", metadata.links)
@@ -46,4 +48,19 @@ if release.pre?
   flags << "--pre"
 end
 
-`grease create-release timberio/vector v#{VERSION} $#{SHA1} #{flags.join(" ")}`
+puts "\n\n\n\n"
+puts notes
+puts "\n\n\n\n"
+raise "fds"
+
+command = "grease create-release timberio/vector v#{VERSION} $#{SHA1} #{flags.join(" ")}"
+
+say(
+  <<~EOF
+  Running command:
+
+    #{command}
+  EOF
+)
+
+`#{command}`
