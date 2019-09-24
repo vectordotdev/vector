@@ -45,7 +45,7 @@ else
     <<~EOF
     git add . -A
     git commit -sam 'chore: Prepare v#{release.version} release'
-    git push origin master --force
+    git push origin master
     git tag -a v#{release.version} -m "v#{release.version}"
     git push origin v#{release.version}
     git branch v#{branch_name}
