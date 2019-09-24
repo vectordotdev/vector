@@ -27,7 +27,8 @@ description = "The S3 bucket name. Do not include a leading `s3://` or a trailin
 [sinks.aws_s3.options.compression]
 type = "string"
 category = "Requests"
-enum = ["gzip"]
+enum = ["gzip", "none"]
+default = "gzip"
 null = true
 simple = true
 description = "The compression type to use before writing data."

@@ -1149,17 +1149,17 @@ end
   # * default: true
   create_missing_stream = true
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   #
   # Batching
@@ -1300,17 +1300,17 @@ end
   # * no default
   stream_name = "my-stream"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   # The log field used as the Kinesis record's partition key value.
   # 
@@ -1457,17 +1457,17 @@ end
   # * no default
   region = "us-east-1"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   #
   # Batching
@@ -1529,9 +1529,10 @@ end
   # The compression type to use before writing data.
   # 
   # * optional
-  # * no default
-  # * must be: "gzip" (if supplied)
+  # * default: "gzip"
+  # * enum: "gzip" or "none"
   compression = "gzip"
+  compression = "none"
 
   # The encoding format used to serialize the events before flushing. The default
   # is dynamic based on if the event is structured or not.
