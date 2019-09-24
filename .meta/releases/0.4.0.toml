@@ -304,5 +304,9 @@ commits = [
 {sha = "027836100a44874fc1989296f49777203f0a722a", message = "chore(operations): Use vendored OpenSSL for x86_64-unknown-linux-musl CI build (#919)", author = "Alexander Rodin", date = 2019-09-24T16:21:20Z, files_count = 1, insertions_count = 1},
 {sha = "4e256e2d3e9bd6aa91484f093b5b7fae894b9bf5", message = "docs: add types to semantic.yml", author = "Ben Johnson", date = 2019-09-24T09:59:45Z, files_count = 2, insertions_count = 20, deletions_count = 6},
 {sha = "230f3250cb1e109446ef017f82794466e3e070c2", message = "chore(operations): verify builds by default (#914)", author = "Binary Logic", date = 2019-09-24T10:05:23Z, files_count = 3, insertions_count = 32, deletions_count = 4},
-{sha = "f6b0739ebcabce1c768a2e3a97f2e6ee30119e4c", message = "docs: use enhancement not improvement", author = "Ben Johnson", date = 2019-09-24T10:11:23Z, files_count = 3, insertions_count = 11, deletions_count = 3}
+{sha = "f6b0739ebcabce1c768a2e3a97f2e6ee30119e4c", message = "docs: use enhancement not improvement", author = "Ben Johnson", date = 2019-09-24T10:11:23Z, files_count = 3, insertions_count = 11, deletions_count = 3},
+{sha = "3450767465c7a58bb46631a8b922bb33d0b585c2", message = "chore: Prepare v0.4.0 release", author = "Ben Johnson", date = 2019-09-24T11:03:56Z, files_count = 5, insertions_count = 671, deletions_count = 2},
+{sha = "c512e286e6a864911683bde5cdec4744f154966d", message = "docs: fix s3 compression and endpoint options (#921)", author = "Luke Steensen", date = 2019-09-24T10:39:24Z, files_count = 7, insertions_count = 73, deletions_count = 69},
+{sha = "ced248773ab9a04d862a22dd4b80dfde5c9e8de3", message = "chore(operations): update release-github to include release notes", author = "Ben Johnson", date = 2019-09-24T12:21:29Z, files_count = 4, insertions_count = 106},
+{sha = "3ea589a0d8ddc58d9b4caa167b0ef84fab99c84e", message = "chore(operations): use common setup.rb script for boiler plate setup", author = "Ben Johnson", date = 2019-09-24T12:24:53Z, files_count = 6, insertions_count = 7, deletions_count = 116}
 ]
