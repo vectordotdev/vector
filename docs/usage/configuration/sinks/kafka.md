@@ -25,7 +25,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 [sinks.my_sink_id]
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
   encoding = "json" # enum: "json" or "text"
   key_field = "user_id"
   topic = "topic-1234"
@@ -54,13 +54,12 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
   # * no default
   inputs = ["my-source-id"]
 
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself
+  # A list of host and port pairs that the Kafka client should contact to
+  # bootstrap its cluster metadata.
   # 
   # * required
   # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
 
   # The encoding format used to serialize the events before flushing.
   # 
