@@ -22,7 +22,7 @@ pub struct LuaConfig {
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
             let b: Box<dyn Transform> = Box::new(l);
             b
@@ -43,7 +43,7 @@ pub struct Lua {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> Result<Self, crate::Error> {
+    pub fn new(source: &str, search_dirs: Vec<String>) -> crate::Result<Self> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs

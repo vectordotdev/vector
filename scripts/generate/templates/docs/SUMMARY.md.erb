@@ -51,15 +51,15 @@
 * [Configuration](usage/configuration/README.md)
   * [Sources](usage/configuration/sources/README.md)
     <%- metadata.sources.to_h.values.sort.each do |source| -%>
-    * [<%= source.name %> source][docs.<%= source.name %>_source]
+    * [<%= source.name %> source][docs.sources.<%= source.name %>]
     <%- end -%>
   * [Transforms](usage/configuration/transforms/README.md)
     <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
-    * [<%= transform.name %> transform][docs.<%= transform.name %>_transform]
+    * [<%= transform.name %> transform][docs.transforms.<%= transform.name %>]
     <%- end -%>
   * [Sinks](usage/configuration/sinks/README.md)
     <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
-    * [<%= sink.name %> sink][docs.<%= sink.name %>_sink]
+    * [<%= sink.name %> sink][docs.sinks.<%= sink.name %>]
     <%- end -%>
   * [Specification](usage/configuration/specification.md)
 * [Administration](usage/administration/README.md)

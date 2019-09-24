@@ -49,15 +49,14 @@ class Sink < Component
       "type" => "bool"
     })
 
-    # Hostname option
+    # Endpoint option
 
     if service_provider == "AWS"
       @options.hostname = Option.new({
-        "name" => "hostname",
+        "name" => "endpoint",
         "examples" => ["127.0.0.0:5000"],
-        "default" => "<aws-service-hostname>",
-        "description" => "Custom hostname to send requests to. Useful for testing.",
-        "null" => false,
+        "description" => "Custom endpoint for use with AWS-compatible services.",
+        "null" => true,
         "type" => "string"
       })
     end

@@ -28,7 +28,7 @@ impl VectorSinkConfig {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let addr = self
             .address
             .to_socket_addrs()

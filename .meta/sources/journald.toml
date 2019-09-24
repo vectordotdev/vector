@@ -33,6 +33,7 @@ type = "[string]"
 null = true
 default = []
 examples = [["ntpd", "sysinit.target"]]
+simple = true
 description = """\
 The list of units names to monitor. \
 If empty or not present, all units are accepted. \

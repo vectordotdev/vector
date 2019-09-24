@@ -1,5 +1,5 @@
 [transforms.grok_parser]
-allow_you_to_description = "parse a log field value with [Grok][url.grok]"
+allow_you_to_description = "parse a log field value with [Grok][urls.grok]"
 function_categories = ["parse"]
 guides = []
 input_types = ["log"]
@@ -29,7 +29,7 @@ The log field to execute the `pattern` against. Must be a `string` value.\
 type = "string"
 examples = ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 null = false
-description = "The [Grok pattern][url.grok_patterns]"
+description = "The [Grok pattern][urls.grok_patterns]"
 
 [transforms.grok_parser.options.types]
 type = "table"
@@ -51,6 +51,6 @@ examples = [
 null = false
 description = """\
 A definition of mapped log field types. They key is the log field name and \
-the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are \
 supported for the `timestamp` type.\
 """

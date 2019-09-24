@@ -6,10 +6,6 @@
 
 <%= component_config_example(component) %>
 
-## Options
-
-<%= options_table(component.options.to_h.values.sort) %>
-
 ## Examples
 
 Given the following log line:
@@ -40,7 +36,7 @@ fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 ```javascript
 {

@@ -12,15 +12,15 @@ description: Accepts `log` events and allows you to convert logs into one or mor
 
 # log_to_metric transform
 
-![][images.log_to_metric_transform]
+![][assets.log_to_metric_transform]
 
 
-The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics.
+The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -29,31 +29,19 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
   
   # REQUIRED - Metrics
   [[transforms.my_transform_id.metrics]]
+    # REQUIRED
     type = "counter" # enum: "counter", "gauge", "histogram", and "set"
     field = "duration"
     name = "duration_total"
     
+    # OPTIONAL
     increment_by_value = false # default, relevant when type = "counter"
     tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "log_to_metric"
-  inputs = ["<string>", ...]
 
-  # REQUIRED - Metrics
-  [[transforms.<transform-id>.metrics]]
-    type = {"counter" | "gauge" | "histogram" | "set"}
-    field = "<string>"
-    name = "<string>"
-    increment_by_value = <bool>
-    tags = {* = "<string>"}
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.log_to_metric_transform]
   #
@@ -121,20 +109,6 @@ The `log_to_metric` transform accepts [`log`][docs.log_event] events and allows 
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "log_to_metric"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| **REQUIRED** - Metrics | | |
-| `metrics.type` | `string` | The metric type.<br />`required` `enum: "counter", "gauge", "histogram", and "set"` |
-| `metrics.field` | `string` | The log field to use as the metric. See [Null Fields](#null-fields) for more info.<br />`required` `example: "duration"` |
-| `metrics.name` | `string` | The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.<br />`required` `example: "duration_total"` |
-| `metrics.increment_by_value` | `bool` | If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"<br />`default: false` |
-| `metrics.tags.*` | `string` | Key/value pairs representing the metric tags.<br />`required` `example: (see above)` |
-
 ## Examples
 
 {% tabs %}
@@ -172,7 +146,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -191,7 +165,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 
 {% endtab %}
 {% tab title="Counting" %}
@@ -229,7 +203,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -247,7 +221,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Summing" %}
 In this example we'll demonstrate computing a sum. The scenario we've chosen
@@ -286,7 +260,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -303,7 +277,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Gauges" %}
 In this example we'll demonstrate creating a gauge that represents the current
@@ -351,7 +325,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.metric_event] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -388,7 +362,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% tab title="Sets" %}
 In this example we'll demonstrate how to use sets. Sets are primarly a Statsd
@@ -426,7 +400,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.metric_event] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be emitted with the following
 structure:
 
 ```javascript
@@ -443,7 +417,7 @@ structure:
 
 This metric will then proceed down the pipeline, and depending on the sink,
 will be aggregated in Vector (such is the case for the [`prometheus` \
-sink][docs.prometheus_sink]) or will be aggregated in the store itself.
+sink][docs.sinks.prometheus]) or will be aggregated in the store itself.
 {% endtab %}
 {% endtabs %}
 
@@ -455,7 +429,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Multiple Metrics
@@ -476,45 +450,42 @@ It's important to understand that this transform does not reduce multiple logs
 into a single metric. Instead, this transform converts logs into granular
 individual metrics that can then be reduced at the edge. Where the reduction
 happens depends on your metrics storage. For example, the
-[`prometheus` sink][docs.prometheus_sink] will reduce logs in the sink itself
+[`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
 for the next scrape, while other metrics sinks will proceed to forward the
 individual metrics for reduction in the metrics storage itself.
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `log_to_metric_transform` issues][url.log_to_metric_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_log_to_metric_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_log_to_metric_transform_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `log_to_metric_transform` issues][urls.log_to_metric_transform_issues].
+2. If encountered a bug, please [file a bug report][urls.new_log_to_metric_transform_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_log_to_metric_transform_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.log_to_metric_transform_issues] - [enhancements][url.log_to_metric_transform_enhancements] - [bugs][url.log_to_metric_transform_bugs]
-* [**Source code**][url.log_to_metric_transform_source]
+* [**Issues**][urls.log_to_metric_transform_issues] - [enhancements][urls.log_to_metric_transform_enhancements] - [bugs][urls.log_to_metric_transform_bugs]
+* [**Source code**][urls.log_to_metric_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[assets.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
-[url.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
-[url.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22
-[url.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
-[url.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
-[url.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+bug
-[url.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+enhancement
-[url.vector_chat]: https://chat.vector.dev
+[urls.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
+[urls.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22
+[urls.log_to_metric_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22
+[urls.log_to_metric_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/log_to_metric.rs
+[urls.new_log_to_metric_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+bug
+[urls.new_log_to_metric_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+log_to_metric&labels=Type%3A+enhancement
+[urls.vector_chat]: https://chat.vector.dev

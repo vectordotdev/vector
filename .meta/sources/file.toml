@@ -27,7 +27,7 @@ Array of file patterns to include. [Globbing](#globbing) is supported.\
 [sources.file.options.exclude]
 type = "[string]"
 examples = [["/var/log/nginx/access.log"]]
-null = false
+null = true
 description = """\
 Array of file patterns to exclude. [Globbing](#globbing) is supported. \
 *Takes precedence over the `include` option.*\

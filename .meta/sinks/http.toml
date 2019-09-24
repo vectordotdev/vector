@@ -1,4 +1,5 @@
 [sinks.http]
+batch_is_simple = true
 batch_size = 1049000
 batch_timeout = 5
 buffer = true
@@ -36,12 +37,14 @@ description = "The basic authentication user name."
 type = "string"
 enum = ["gzip"]
 null = true
+simple = true
 description = "The compression strategy used to compress the payload before sending."
 
 [sinks.http.options.encoding]
 type = "string"
 enum = ["ndjson", "text"]
 null = false
+simple = true
 description = """\
 The encoding format used to serialize the events before flushing. The default \
 is dynamic based on if the event is structured or not.\

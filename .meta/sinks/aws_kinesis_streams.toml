@@ -15,7 +15,7 @@ request_in_flight_limit = 5
 request_timeout_secs = 30
 service_limits_short_link = "aws_kinesis_service_limits"
 service_provider = "AWS"
-write_to_description = "[AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
+write_to_description = "[AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)"
 
 [sinks.aws_kinesis_streams.options.encoding]
 type = "string"
@@ -37,10 +37,10 @@ description = "The log field used as the Kinesis record's partition key value."
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][url.aws_cw_logs_regions] of the target Kinesis stream resides."
+description = "The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides."
 
 [sinks.aws_kinesis_streams.options.stream_name]
 type = "string"
 examples = ["my-stream"]
 null = false
-description = "The [stream name][url.aws_cw_logs_stream_name] of the target Kinesis Logs stream."
+description = "The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream."

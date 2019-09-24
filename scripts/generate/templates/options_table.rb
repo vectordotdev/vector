@@ -1,4 +1,4 @@
-class Context
+class Templates
   class OptionsTable
     attr_reader :options
 
@@ -66,7 +66,7 @@ class Context
       description = option.description.strip
 
       if option.templateable?
-        description << "This option supports dynamic values via [Vector's template syntax][docs.configuration.template-syntax]."
+        description << "This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
       end
 
       if option.relevant_when

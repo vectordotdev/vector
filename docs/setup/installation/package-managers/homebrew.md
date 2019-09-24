@@ -4,7 +4,7 @@ description: Install Vector through the Homebrew package manager
 
 # Homebrew Package Manager
 
-Vector can be installed through [Homebrew][url.homebrew] which is generally
+Vector can be installed through [Homebrew][urls.homebrew] which is generally
 used on MacOS systems.
 
 ## Install
@@ -37,7 +37,7 @@ configuring Vector in the [Configuration][docs.configuration] section.
 
 ## Administering
 
-Vector can be managed through the [Homebrew services][url.homebrew_services]
+Vector can be managed through the [Homebrew services][urls.homebrew_services]
 manager:
 
 {% page-ref page="../../../usage/administration" %}
@@ -56,5 +56,5 @@ brew update && brew upgrade vector
 
 
 [docs.configuration]: ../../../usage/configuration
-[url.homebrew]: https://brew.sh/
-[url.homebrew_services]: https://github.com/Homebrew/homebrew-services
+[urls.homebrew]: https://brew.sh/
+[urls.homebrew_services]: https://github.com/Homebrew/homebrew-services

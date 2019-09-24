@@ -34,7 +34,7 @@ impl SourceConfig for UdpConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, crate::Error> {
+    ) -> crate::Result<super::Source> {
         let host_key = self.host_key.clone().unwrap_or(event::HOST.clone());
         Ok(udp(self.address, host_key, out))
     }

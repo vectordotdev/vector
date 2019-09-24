@@ -19,9 +19,9 @@ pub struct AddFields {
     fields: IndexMap<Atom, ValueKind>,
 }
 
-#[typetag::serde(name = "augmenter")]
+#[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(self.fields.clone())))
     }
 

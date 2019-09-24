@@ -55,7 +55,7 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), crate::Error> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -76,7 +76,7 @@ impl KafkaSinkConfig {
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, crate::Error> {
+    fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
         let producer = config.to_rdkafka().create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,

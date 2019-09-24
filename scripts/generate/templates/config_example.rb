@@ -1,5 +1,5 @@
-class Context
-  class ConfigSpec
+class Templates
+  class ConfigExample
     attr_reader :options
 
     def initialize(options)
@@ -11,22 +11,29 @@ class Context
     end
 
     def grouped
-      @grouped ||= options.group_by(&:category)
+      @grouped ||=
+        options.group_by do |option|
+          title = "#{option.required? && option.default.nil? ? "REQUIRED" : "OPTIONAL"}"
+
+          if categories.length > 1
+           "#{title} - #{option.category}"
+          else
+            title
+          end
+        end
     end
 
     def tags(option)
       tags = []
 
-      tags << (option.required? && option.default.nil? ? "required" : "optional")
-
       if option.examples.first == option.default
-        tags << "default: #{option.default.to_toml}"
-      else
+        tags << "default"
+      elsif option.default.nil? && option.optional?
         tags << "no default"
       end
 
       if option.unit
-        tags << "unit: #{option.unit}"
+        tags << option.unit
       end
 
       if option.enum
@@ -39,6 +46,12 @@ class Context
           end
           tags << tag
         end
+      end
+
+      if option.relevant_when
+        conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }.to_sentence
+        tag = "relevant when #{conditions}"
+        tags << tag
       end
 
       tags

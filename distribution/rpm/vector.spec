@@ -3,8 +3,8 @@
 %define _release %{getenv:RELEASE}
 %define _url https://vector.dev
 %define _version %{getenv:VERSION}
-%define _source %{_name}-%{_version}-%{_arch}.tar.gz
-%define _sourceroot %{_name}-%{_version}
+%define _source %{_name}-%{_arch}.tar.gz
+%define _sourceroot %{_name}-%{_arch}
 %define _buildname %{name}-%{version}-%{release}.%{_arch}
 
 Name: %{_name}

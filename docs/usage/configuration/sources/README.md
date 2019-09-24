@@ -12,44 +12,44 @@ description: Receive and pull log and metric events into Vector
 
 # Sources
 
-![][images.sources]
+![][assets.sources]
 
 Sources are responsible for ingesting [events][docs.event] into Vector, they can
 both receive and pull in data. If you're deploying Vector in an [agent
-role][docs.agent_role], you'll want to look at local data sources like a
-[`file`][docs.file_source] and [`stdin`][docs.stdin_source]. If you're deploying
-Vector in a [service role][docs.service_role], you'll want to look at sources
-that receive data over the network, like the [`vector`][docs.vector_source],
-[`tcp`][docs.tcp_source], and [`syslog`][docs.syslog_source] sources.
+role][docs.roles.agent], you'll want to look at local data sources like a
+[`file`][docs.sources.file] and [`stdin`][docs.sources.stdin]. If you're deploying
+Vector in a [service role][docs.roles.service], you'll want to look at sources
+that receive data over the network, like the [`vector`][docs.sources.vector],
+[`tcp`][docs.sources.tcp], and [`syslog`][docs.sources.syslog] sources.
 
 | Name  | Description |
 |:------|:------------|
-| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`journald`**][docs.journald_source] | Ingests data through log records from journald and outputs [`log`][docs.log_event] events. |
-| [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
-| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
-| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
-| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
-| [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
+| [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
+| [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
+| [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
+| [**`statsd`**][docs.sources.statsd] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events. |
+| [**`stdin`**][docs.sources.stdin] | Ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events. |
+| [**`syslog`**][docs.sources.syslog] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`tcp`**][docs.sources.tcp] | Ingests data through the TCP protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`udp`**][docs.sources.udp] | Ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`vector`**][docs.sources.vector] | Ingests data through another upstream Vector instance and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events. |
 
-[+ request a new source][url.new_source]
+[+ request a new source][urls.new_source]
 
 
-[docs.agent_role]: ../../../setup/deployment/roles/agent.md
-[docs.event]: ../../../about/data-model/README.md#event
-[docs.file_source]: ../../../usage/configuration/sources/file.md
-[docs.journald_source]: ../../../usage/configuration/sources/journald.md
-[docs.kafka_source]: ../../../usage/configuration/sources/kafka.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.service_role]: ../../../setup/deployment/roles/service.md
-[docs.statsd_source]: ../../../usage/configuration/sources/statsd.md
-[docs.stdin_source]: ../../../usage/configuration/sources/stdin.md
-[docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
-[docs.udp_source]: ../../../usage/configuration/sources/udp.md
-[docs.vector_source]: ../../../usage/configuration/sources/vector.md
-[images.sources]: ../../../assets/sources.svg
-[url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[assets.sources]: ../../../assets/sources.svg
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
+[docs.roles.agent]: ../../../setup/deployment/roles/agent.md
+[docs.roles.service]: ../../../setup/deployment/roles/service.md
+[docs.sources.file]: ../../../usage/configuration/sources/file.md
+[docs.sources.journald]: ../../../usage/configuration/sources/journald.md
+[docs.sources.kafka]: ../../../usage/configuration/sources/kafka.md
+[docs.sources.statsd]: ../../../usage/configuration/sources/statsd.md
+[docs.sources.stdin]: ../../../usage/configuration/sources/stdin.md
+[docs.sources.syslog]: ../../../usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources.udp]: ../../../usage/configuration/sources/udp.md
+[docs.sources.vector]: ../../../usage/configuration/sources/vector.md
+[urls.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
