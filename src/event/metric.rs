@@ -38,3 +38,23 @@ pub enum Direction {
     Plus,
     Minus,
 }
+
+impl Metric {
+    pub fn tags(&self) -> &Option<HashMap<String, String>> {
+        match self {
+            Metric::Counter { tags, .. } => tags,
+            Metric::Gauge { tags, .. } => tags,
+            Metric::Histogram { tags, .. } => tags,
+            Metric::Set { tags, .. } => tags,
+        }
+    }
+
+    pub fn tags_mut(&mut self) -> &mut Option<HashMap<String, String>> {
+        match self {
+            Metric::Counter { tags, .. } => tags,
+            Metric::Gauge { tags, .. } => tags,
+            Metric::Histogram { tags, .. } => tags,
+            Metric::Set { tags, .. } => tags,
+        }
+    }
+}

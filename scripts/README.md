@@ -14,4 +14,10 @@ rbenv install 2.6.3
 rbenv global 2.6.3
 ```
 
-This is currently the only requirement.
+We also need bundler
+
+```
+gem install bundler
+```
+
+These are currently the only requirements.

@@ -14,14 +14,33 @@ use leveldb::database::{
     Database,
 };
 use prost::Message;
+use snafu::{ResultExt, Snafu};
 use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+    #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", data_dir))]
+    DataDirNotFound { data_dir: PathBuf },
+    #[snafu(display("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", data_dir))]
+    DataDirNotWritable { data_dir: PathBuf },
+    #[snafu(display("Unable to look up data_dir {:?}", data_dir))]
+    DataDirMetadataError {
+        data_dir: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("Unable to open data_dir {:?}", data_dir))]
+    DataDirOpenError {
+        data_dir: PathBuf,
+        source: leveldb::database::error::Error,
+    },
+}
 
 #[derive(Copy, Clone, Debug)]
 struct Key(usize);
@@ -243,23 +262,39 @@ pub fn open(
     data_dir: &Path,
     buffer_dir: &Path,
     max_size: usize,
-) -> Result<(Writer, Reader, super::Acker), String> {
+) -> Result<(Writer, Reader, super::Acker), Error> {
     let path = data_dir.join(buffer_dir);
 
     // Check data dir
-    std::fs::metadata(&data_dir).map_err(|e| match e.kind() {
-            io::ErrorKind::PermissionDenied => format!("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", path),
-            io::ErrorKind::NotFound => format!("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", path),
-            _ => format!("{}", e),
-        }).and_then(|m| if m.permissions().readonly() {
-        Err(format!("The configured data_dir {:?} is not writable by the vector process, please ensure vector can write to that directory", path))
-    } else { Ok(()) })?;
+    std::fs::metadata(&data_dir)
+        .map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => Error::DataDirNotWritable {
+                data_dir: data_dir.into(),
+            },
+            io::ErrorKind::NotFound => Error::DataDirNotFound {
+                data_dir: data_dir.into(),
+            },
+            _ => Error::DataDirMetadataError {
+                data_dir: data_dir.into(),
+                source: e,
+            },
+        })
+        .and_then(|m| {
+            if m.permissions().readonly() {
+                Err(Error::DataDirNotWritable {
+                    data_dir: data_dir.into(),
+                })
+            } else {
+                Ok(())
+            }
+        })?;
 
     let mut options = Options::new();
     options.create_if_missing = true;
 
-    let db: Database<Key> = Database::open(&path, options)
-        .map_err(|e| format!("Unable to open `data_dir`: {:?} because: {}", path, e))?;
+    let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
+        data_dir: data_dir.to_path_buf(),
+    })?;
     let db = Arc::new(db);
 
     let head;

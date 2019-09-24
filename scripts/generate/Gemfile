@@ -1,8 +1,0 @@
-source 'https://rubygems.org'
-gem 'activesupport'
-gem 'differ'
-gem 'front_matter_parser'
-gem 'paint'
-gem 'toml-rb'
-gem 'unindent'
-gem 'word_wrap'

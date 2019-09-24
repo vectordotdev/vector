@@ -7,9 +7,9 @@
 #                            Configuration Specification
 #
 # ------------------------------------------------------------------------------
-# Website: <%= metadata.links.fetch("url.website") %>
-# Docs: <%= metadata.links.fetch("url.docs") %>
-# Community: <%= metadata.links.fetch("url.community") %>
+# Website: <%= metadata.links.fetch("urls.website") %>
+# Docs: <%= metadata.links.fetch("urls.docs") %>
+# Community: <%= metadata.links.fetch("urls.community") %>
 # ------------------------------------------------------------------------------
 # The file contains a full specification for the `vector.toml` configuration
 # file. It follows the TOML format and includes all options, types, and
@@ -22,8 +22,7 @@
 # Global
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
-#
-# Documentation: <%= metadata.links.fetch("url.configuration") %>
+
 <%= config_spec(metadata.options.to_h.values.sort) %>
 
 # ------------------------------------------------------------------------------
@@ -31,9 +30,8 @@
 # ------------------------------------------------------------------------------
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
-#
-# Documentation: <%= metadata.links.fetch("docs.sources") %>
 <% metadata.sources.to_h.values.sort.each do |source| %>
+# <%= component_description(source).remove_markdown_links %>
 <%= config_spec(source.options.to_h.values.sort, path: "sources.#{source.name}") %>
 <% end %>
 
@@ -41,9 +39,8 @@
 # Transforms
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
-#
-# Documentation: <%= metadata.links.fetch("docs.transforms") %>
 <% metadata.transforms.to_h.values.sort.each do |transform| %>
+# <%= component_description(transform).remove_markdown_links %>
 <%= config_spec(transform.options.to_h.values.sort, path: "transforms.#{transform.name}") %>
 <% end %>
 
@@ -51,8 +48,7 @@
 # Sinks
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
-#
-# Documentation: <%= metadata.links.fetch("docs.sinks") %>
 <% metadata.sinks.to_h.values.sort.each do |sink| %>
+# <%= component_description(sink).remove_markdown_links %>
 <%= config_spec(sink.options.to_h.values.sort, path: "sinks.#{sink.name}") %>
 <% end %>

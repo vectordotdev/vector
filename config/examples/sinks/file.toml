@@ -1,0 +1,24 @@
+# `console` Sink Example
+# ------------------------------------------------------------------------------
+# A simple example demonstrating the `console` sink
+# Docs: https://docs.vector.dev/usage/configuration/sinks/console
+
+[sinks.my_file_sink]
+  # REQUIRED - General
+  type = "file" # must be: file
+  path = "./sample.out" # allows templates like "/some/path/{{host}}.log"
+
+  close_timeout_secs = 60 # optional; good for releasing unused partitions,
+                          # but can a bit slow down performance
+
+  inputs = ["my-source-id"]
+
+  # OPTIONAL - General
+  encoding = "json" # no default, enum: json, text
+
+  # OPTIONAL - Buffer
+  [sinks.my_file_sink.buffer]
+    type = "memory" # default, enum: memory, disk
+    when_full = "block" # default, enum: block, drop_newest
+    max_size = 104900000 # no default
+    num_items = 500 # default

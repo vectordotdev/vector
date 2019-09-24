@@ -18,11 +18,11 @@ and [source][docs.sources].
 |:-----|:------------|
 | **Sources** | |
 <%- metadata.sources.to_h.values.sort.each do |source| -%>
-| [`<%= source.name %>` source][docs.<%= source.id %>] | `<%= source.delivery_guarantee %>` |
+| [`<%= source.name %>` source][docs.<%= source.type.pluralize %>.<%= source.name %>] | `<%= source.delivery_guarantee %>` |
 <%- end -%>
 | **Sinks** | |
 <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
-| [`<%= sink.name %>` sink][docs.<%= sink.id %>] | `<%= sink.delivery_guarantee %>` |
+| [`<%= sink.name %>` sink][docs.<%= sink.type.pluralize %>.<%= sink.name %>] | `<%= sink.delivery_guarantee %>` |
 <%- end -%>
 
 ## At Least Once Delivery

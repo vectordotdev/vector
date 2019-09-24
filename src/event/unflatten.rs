@@ -198,6 +198,95 @@ impl Serialize for MapValue {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct TestMapValue {
+    value: MapValue,
+}
+
+#[cfg(test)]
+pub type ShallowMatch<V> = Option<Vec<(TestMapValue, V)>>;
+
+#[cfg(test)]
+impl TestMapValue {
+    pub fn equals<V>(&self, theirs: V) -> bool
+    where
+        ValueKind: From<V>,
+    {
+        match &self.value {
+            MapValue::Value(ours) => *ours == ValueKind::from(theirs),
+            _ => false,
+        }
+    }
+
+    pub fn match_against_map<K, V>(&self, theirs: HashMap<K, V>) -> ShallowMatch<V>
+    where
+        Atom: From<K>,
+    {
+        match &self.value {
+            MapValue::Map(ours) => Self::match_map_against_map(ours, theirs),
+            _ => None,
+        }
+    }
+
+    pub fn to_vec<V>(&self) -> Option<Vec<TestMapValue>> {
+        match &self.value {
+            MapValue::Array(elems) => {
+                let wrapped = elems
+                    .iter()
+                    .map(|e| TestMapValue { value: e.clone() })
+                    .collect();
+                Some(wrapped)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match &self.value {
+            MapValue::Null => true,
+            _ => false,
+        }
+    }
+
+    fn match_map_against_map<K, V>(
+        this: &HashMap<Atom, MapValue>,
+        other: HashMap<K, V>,
+    ) -> ShallowMatch<V>
+    where
+        Atom: From<K>,
+    {
+        if this.len() != other.len() {
+            return None;
+        }
+
+        let mut result = vec![];
+        for (key, theirs) in other {
+            let key = Atom::from(key);
+            match this.get(&key) {
+                Some(ours) => result.push((
+                    TestMapValue {
+                        value: ours.clone(),
+                    },
+                    theirs,
+                )),
+                None => return None,
+            }
+        }
+        Some(result)
+    }
+}
+
+#[cfg(test)]
+impl Unflatten {
+    pub fn match_against<K, V>(&self, other: HashMap<K, V>) -> ShallowMatch<V>
+    where
+        Atom: From<K>,
+    {
+        TestMapValue::match_map_against_map(&self.map, other)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{

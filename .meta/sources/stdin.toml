@@ -1,0 +1,23 @@
+[sources.stdin]
+delivery_guarantee = "at_least_once"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "standard input (STDIN)"
+
+[sources.stdin.options.max_length]
+type = "int"
+default = 102400
+null = true
+unit = "bytes"
+description = "The maxiumum bytes size of a message before it is discarded."
+
+[sources.stdin.options.host_key]
+type = "string"
+category = "Context"
+null = false
+default = "host"
+section = "context"
+description = """\
+The key name added to each event representing the current host.\
+"""

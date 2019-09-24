@@ -16,8 +16,8 @@ service on the host and should take full advantage of all resources.
 
 When Vector is deployed as a service it receives data over the network from
 upstream clients or services. Relevant sources include the
-[`vector`][docs.vector_source], [`syslog`][docs.syslog_source], and
-[`tcp`][docs.tcp_source] sources.
+[`vector`][docs.sources.vector], [`syslog`][docs.sources.syslog], and
+[`tcp`][docs.sources.tcp] sources.
 
 ### Performance Tuning
 
@@ -69,7 +69,7 @@ configuration steps necessary to improve performance.
 
 The hardware needed is highly dependent on your configuration and data volume.
 Typically, Vector is CPU bound and not memory bound, especially if all buffers
-are [configured to use the disk][docs.service_role.on-disk-buffering]. Our
+are [configured to use the disk][docs.roles.service#on-disk-buffering]. Our
 [benchmarks][docs.performance] should give you a general idea of resource usage
 in relation to specific pipelines and data volume.
 
@@ -82,7 +82,7 @@ they include a fast NVME drive for on-disk buffers.
 
 #### Memory
 
-If you've configured [on-disk buffers][docs.service_role.on-disk-buffering],
+If you've configured [on-disk buffers][docs.roles.service#on-disk-buffering],
 then memory should not be your bottleneck. If you opted to keep buffers
 in-memory, then you'll want to make sure you have at least 2X your cumulative
 buffer size. For example, if you have an `elasticsearch` and `s3` sink
@@ -103,12 +103,12 @@ TODO: make this better
 
 If you've configured Vector to receive data over the network then you'll
 benefit from load balancing. Select sinks offer built-in load balancing,
-such as the [`http`][docs.http_sink], [`tcp`][docs.tcp_sink], and
-[`vector`][docs.vector_sink] sinks. This is a very rudimentary form of load
+such as the [`http`][docs.sinks.http], [`tcp`][docs.sinks.tcp], and
+[`vector`][docs.sinks.vector] sinks. This is a very rudimentary form of load
 balancing that requires all clients to know about the available downstream
 hosts. A more formal load balancing strategy is outside of the scope of this
 document, but is typically achieved by services such as
-[AWS' ELB][url.aws_elb], [Haproxy][url.haproxy], [Nginx][url.nginx], and more.
+[AWS' ELB][urls.aws_elb], [Haproxy][urls.haproxy], [Nginx][urls.nginx], and more.
 
 ## Administration
 
@@ -122,20 +122,20 @@ possible.
 
 To [update][docs.updating] Vector you'll need to restart the process. Like any
 service, restarting without disruption is achieved by higher level design
-decisions, such as [load balancing][docs.service_role.load-balancing].
+decisions, such as [load balancing][docs.roles.service#load-balancing].
 
 
-[docs.http_sink]: ../../../usage/configuration/sinks/http.md
 [docs.performance]: ../../../performance.md
 [docs.reloading]: ../../../usage/administration/reloading.md
-[docs.service_role.load-balancing]: ../../../setup/deployment/roles/service.md#load-balancing
-[docs.service_role.on-disk-buffering]: ../../../setup/deployment/roles/service.md#on-disk-buffering
-[docs.syslog_source]: ../../../usage/configuration/sources/syslog.md
-[docs.tcp_sink]: ../../../usage/configuration/sinks/tcp.md
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[docs.roles.service#load-balancing]: ../../../setup/deployment/roles/service.md#load-balancing
+[docs.roles.service#on-disk-buffering]: ../../../setup/deployment/roles/service.md#on-disk-buffering
+[docs.sinks.http]: ../../../usage/configuration/sinks/http.md
+[docs.sinks.tcp]: ../../../usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ../../../usage/configuration/sinks/vector.md
+[docs.sources.syslog]: ../../../usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources.vector]: ../../../usage/configuration/sources/vector.md
 [docs.updating]: ../../../usage/administration/updating.md
-[docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
-[docs.vector_source]: ../../../usage/configuration/sources/vector.md
-[url.aws_elb]: https://aws.amazon.com/elasticloadbalancing/
-[url.haproxy]: https://www.haproxy.org/
-[url.nginx]: https://www.nginx.com/
+[urls.aws_elb]: https://aws.amazon.com/elasticloadbalancing/
+[urls.haproxy]: https://www.haproxy.org/
+[urls.nginx]: https://www.nginx.com/

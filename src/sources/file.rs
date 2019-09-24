@@ -7,13 +7,42 @@ use file_source::{FileServer, Fingerprinter};
 use futures::{future, sync::mpsc, Async, Future, Poll, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, VecDeque};
-use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::timer::DelayQueue;
 use tracing::dispatcher;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("data_dir option required, but not given here or globally"))]
+    NoDataDir,
+    #[snafu(display(
+        "could not create subdirectory {:?} inside of data_dir {:?}",
+        subdir,
+        data_dir
+    ))]
+    MakeSubdirectoryError {
+        subdir: PathBuf,
+        data_dir: PathBuf,
+        source: std::io::Error,
+    },
+    #[snafu(display("data_dir {:?} does not exist", data_dir))]
+    MissingDataDir { data_dir: PathBuf },
+    #[snafu(display("data_dir {:?} is not writable", data_dir))]
+    DataDirNotWritable { data_dir: PathBuf },
+    #[snafu(display(
+        "message_start_indicator {:?} is not a valid regex: {}",
+        indicator,
+        source
+    ))]
+    InvalidMessageStartIndicator {
+        indicator: String,
+        source: regex::Error,
+    },
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields, default)]
@@ -31,6 +60,8 @@ pub struct FileConfig {
     pub fingerprinting: FingerprintingConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
+    pub max_read_bytes: usize,
+    pub oldest_first: bool,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -81,6 +112,8 @@ impl Default for FileConfig {
             glob_minimum_cooldown: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
+            max_read_bytes: 2048,
+            oldest_first: false,
         }
     }
 }
@@ -92,26 +125,15 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
-        let mut data_dir = resolve_and_validate_data_dir(&self, globals)?;
-        // now before passing on the validated data_dir, we add the source_name as a subdir,
-        // so that multiple sources can operate within the same given data_dir (e.g. the global one)
-        // without the file servers' checkpointers interfering with each other
-        data_dir.push(name);
-        if let Err(e) = DirBuilder::new().recursive(true).create(&data_dir) {
-            return Err(format!(
-                "could not create subdirectory '{}' inside of data_dir '{}': {}",
-                name,
-                data_dir.parent().unwrap().display(),
-                e
-            ));
-        };
+    ) -> crate::Result<super::Source> {
+        // add the source name as a subdir, so that multiple sources can
+        // operate within the same given data_dir (e.g. the global one)
+        // without the file servers' checkpointers interfering with each
+        // other
+        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
-        if let Some(Err(err)) = self.message_start_indicator.as_ref().map(|s| Regex::new(s)) {
-            return Err(format!(
-                "message_start_indicator is not a valid regex: {}",
-                err
-            ));
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
         }
 
         Ok(file_source(self, data_dir, out))
@@ -120,32 +142,6 @@ impl SourceConfig for FileConfig {
     fn output_type(&self) -> DataType {
         DataType::Log
     }
-}
-
-fn resolve_and_validate_data_dir(
-    config: &FileConfig,
-    globals: &GlobalOptions,
-) -> Result<PathBuf, String> {
-    let data_dir = match config.data_dir.as_ref().or(globals.data_dir.as_ref()) {
-        Some(v) => v.clone(),
-        None => return Err("data_dir option required, but not given here or globally".into()),
-    };
-    if !data_dir.exists() {
-        return Err(format!(
-            "data_dir '{}' does not exist",
-            data_dir.to_string_lossy()
-        ));
-    }
-    let readonly = std::fs::metadata(&data_dir)
-        .map(|meta| meta.permissions().readonly())
-        .unwrap_or(true);
-    if readonly {
-        return Err(format!(
-            "data_dir '{}' is not writable",
-            data_dir.to_string_lossy()
-        ));
-    }
-    Ok(data_dir)
 }
 
 pub fn file_source(
@@ -163,13 +159,14 @@ pub fn file_source(
     let file_server = FileServer {
         include: config.include.clone(),
         exclude: config.exclude.clone(),
-        max_read_bytes: 2048,
+        max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown: glob_minimum_cooldown,
         fingerprinter: config.fingerprinting.clone().into(),
+        oldest_first: config.oldest_first,
     };
 
     let file_key = config.file_key.clone();
@@ -435,19 +432,15 @@ mod tests {
         config.data_dir = global_dir.into_path().into();
 
         // local path given -- local should win
-        let res = super::resolve_and_validate_data_dir(
-            &test_default_file_config(&local_dir),
-            &GlobalOptions::from(&config),
-        )
-        .unwrap();
+        let res = GlobalOptions::from(&config)
+            .resolve_and_validate_data_dir(test_default_file_config(&local_dir).data_dir.as_ref())
+            .unwrap();
         assert_eq!(res, local_dir.path());
 
         // no local path given -- global fallback should be in effect
-        let res = super::resolve_and_validate_data_dir(
-            &Default::default(),
-            &GlobalOptions::from(&config),
-        )
-        .unwrap();
+        let res = GlobalOptions::from(&config)
+            .resolve_and_validate_data_dir(None)
+            .unwrap();
         assert_eq!(res, config.data_dir.unwrap());
     }
 
@@ -1188,6 +1181,124 @@ mod tests {
                 "too slow".into(),
                 "INFO doesn't have".into(),
                 "to be INFO in\nthe middle".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_fair_reads() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            oldest_first: false,
+            ..test_default_file_config(&dir)
+        };
+
+        let older_path = dir.path().join("z_older_file");
+        let mut older = File::create(&older_path).unwrap();
+
+        sleep();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).unwrap();
+
+        writeln!(&mut older, "hello i am the old file").unwrap();
+        writeln!(&mut older, "i have been around a while").unwrap();
+        writeln!(&mut older, "you can read newer files at the same time").unwrap();
+
+        writeln!(&mut newer, "and i am the new file").unwrap();
+        writeln!(&mut newer, "this should be interleaved with the old one").unwrap();
+        writeln!(&mut newer, "which is fine because we want fairness").unwrap();
+
+        sleep();
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am the old file".into(),
+                "and i am the new file".into(),
+                "i have been around a while".into(),
+                "this should be interleaved with the old one".into(),
+                "you can read newer files at the same time".into(),
+                "which is fine because we want fairness".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_oldest_first() {
+        let (tx, rx) = futures::sync::mpsc::channel(10);
+        let (trigger, tripwire) = Tripwire::new();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            oldest_first: true,
+            ..test_default_file_config(&dir)
+        };
+
+        let older_path = dir.path().join("z_older_file");
+        let mut older = File::create(&older_path).unwrap();
+
+        sleep();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).unwrap();
+
+        writeln!(&mut older, "hello i am the old file").unwrap();
+        writeln!(&mut older, "i have been around a while").unwrap();
+        writeln!(&mut older, "you should definitely read all of me first").unwrap();
+
+        writeln!(&mut newer, "i'm new").unwrap();
+        writeln!(&mut newer, "hopefully you read all the old stuff first").unwrap();
+        writeln!(&mut newer, "because otherwise i'm not going to make sense").unwrap();
+
+        sleep();
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), tx);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(source.select(tripwire).map(|_| ()).map_err(|_| ()));
+
+        sleep();
+
+        drop(trigger);
+        shutdown_on_idle(rt);
+
+        let received = wait_with_timeout(
+            rx.map(|event| event.as_log().get(&event::MESSAGE).unwrap().clone())
+                .collect(),
+        );
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am the old file".into(),
+                "i have been around a while".into(),
+                "you should definitely read all of me first".into(),
+                "i'm new".into(),
+                "hopefully you read all the old stuff first".into(),
+                "because otherwise i'm not going to make sense".into(),
             ]
         );
     }

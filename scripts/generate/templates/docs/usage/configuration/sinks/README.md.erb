@@ -4,14 +4,14 @@ description: Push or expose events in Vector to external systems
 
 # Sinks
 
-![][images.sinks]
+![][assets.sinks]
 
-Sinks are last in the [pipeline][docs.pipelines], responsible for sending
+Sinks are last in the [pipeline][docs.configuration#composition], responsible for sending
 [events][docs.event] downstream. These can be service specific sinks, such as
-[`vector`][docs.vector_sink], [`elasticsearch`][docs.elasticsearch_sink], and
-[`s3`][docs.aws_s3_sink], or generic protocol sinks like
-[`http`][docs.http_sink] or [`tcp`][docs.tcp_sink].
+[`vector`][docs.sinks.vector], [`elasticsearch`][docs.sinks.elasticsearch], and
+[`s3`][docs.sinks.aws_s3], or generic protocol sinks like
+[`http`][docs.sinks.http] or [`tcp`][docs.sinks.tcp].
 
 <%= components_table(metadata.sinks.to_h.values.sort) %>
 
-[+ request a new sink][url.new_sink]
+[+ request a new sink][urls.new_sink]

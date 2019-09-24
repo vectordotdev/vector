@@ -1,0 +1,28 @@
+[transforms.sampler]
+allow_you_to_description = "sample events with a configurable rate"
+beta = true
+function_categories = ["sample"]
+input_types = ["log"]
+output_types = ["log"]
+
+[transforms.sampler.options.pass_list]
+type = "[string]"
+examples = [["[error]", "field2"]]
+null = true
+description = """\
+A list of regular expression patterns to exclude events from sampling. \
+If an event's `"message"` key matches _any_ of these patterns it will \
+_not_ be sampled.\
+"""
+
+[transforms.sampler.options.rate]
+type = "int"
+examples = [10]
+null = false
+description = """\
+The rate at which events will be forwarded, expressed as 1/N. For example, \
+`rate = 10` means 1 out of every 10 events will be forwarded and the rest \
+will be dropped.\
+"""
+
+## TODO: Add regex synax docs?

@@ -50,40 +50,45 @@
 
 * [Configuration](usage/configuration/README.md)
   * [Sources](usage/configuration/sources/README.md)
-    * [file source](usage/configuration/sources/file.md)
-    * [journald source](usage/configuration/sources/journald.md)
-    * [statsd source](usage/configuration/sources/statsd.md)
-    * [stdin source](usage/configuration/sources/stdin.md)
-    * [syslog source](usage/configuration/sources/syslog.md)
-    * [tcp source](usage/configuration/sources/tcp.md)
-    * [udp source](usage/configuration/sources/udp.md)
-    * [vector source](usage/configuration/sources/vector.md)
+    * [file source][docs.sources.file]
+    * [journald source][docs.sources.journald]
+    * [kafka source][docs.sources.kafka]
+    * [statsd source][docs.sources.statsd]
+    * [stdin source][docs.sources.stdin]
+    * [syslog source][docs.sources.syslog]
+    * [tcp source][docs.sources.tcp]
+    * [udp source][docs.sources.udp]
+    * [vector source][docs.sources.vector]
   * [Transforms](usage/configuration/transforms/README.md)
-    * [add\_fields transform](usage/configuration/transforms/add_fields.md)
-    * [coercer transform](usage/configuration/transforms/coercer.md)
-    * [field\_filter transform](usage/configuration/transforms/field_filter.md)
-    * [grok\_parser transform](usage/configuration/transforms/grok_parser.md)
-    * [json\_parser transform](usage/configuration/transforms/json_parser.md)
-    * [log\_to\_metric transform](usage/configuration/transforms/log_to_metric.md)
-    * [lua transform](usage/configuration/transforms/lua.md)
-    * [regex\_parser transform](usage/configuration/transforms/regex_parser.md)
-    * [remove\_fields transform](usage/configuration/transforms/remove_fields.md)
-    * [sampler transform](usage/configuration/transforms/sampler.md)
-    * [tokenizer transform](usage/configuration/transforms/tokenizer.md)
+    * [add_fields transform][docs.transforms.add_fields]
+    * [add_tags transform][docs.transforms.add_tags]
+    * [coercer transform][docs.transforms.coercer]
+    * [field_filter transform][docs.transforms.field_filter]
+    * [grok_parser transform][docs.transforms.grok_parser]
+    * [json_parser transform][docs.transforms.json_parser]
+    * [log_to_metric transform][docs.transforms.log_to_metric]
+    * [lua transform][docs.transforms.lua]
+    * [regex_parser transform][docs.transforms.regex_parser]
+    * [remove_fields transform][docs.transforms.remove_fields]
+    * [remove_tags transform][docs.transforms.remove_tags]
+    * [sampler transform][docs.transforms.sampler]
+    * [split transform][docs.transforms.split]
+    * [tokenizer transform][docs.transforms.tokenizer]
   * [Sinks](usage/configuration/sinks/README.md)
-    * [aws\_cloudwatch\_logs sink](usage/configuration/sinks/aws_cloudwatch_logs.md)
-    * [aws\_kinesis\_streams sink](usage/configuration/sinks/aws_kinesis_streams.md)
-    * [aws\_s3 sink](usage/configuration/sinks/aws_s3.md)
-    * [blackhole sink](usage/configuration/sinks/blackhole.md)
-    * [clickhouse sink](usage/configuration/sinks/clickhouse.md)
-    * [console sink](usage/configuration/sinks/console.md)
-    * [elasticsearch sink](usage/configuration/sinks/elasticsearch.md)
-    * [http sink](usage/configuration/sinks/http.md)
-    * [kafka sink](usage/configuration/sinks/kafka.md)
-    * [prometheus sink](usage/configuration/sinks/prometheus.md)
-    * [splunk\_hec sink](usage/configuration/sinks/splunk_hec.md)
-    * [tcp sink](usage/configuration/sinks/tcp.md)
-    * [vector sink](usage/configuration/sinks/vector.md)
+    * [aws_cloudwatch_logs sink][docs.sinks.aws_cloudwatch_logs]
+    * [aws_kinesis_streams sink][docs.sinks.aws_kinesis_streams]
+    * [aws_s3 sink][docs.sinks.aws_s3]
+    * [blackhole sink][docs.sinks.blackhole]
+    * [clickhouse sink][docs.sinks.clickhouse]
+    * [console sink][docs.sinks.console]
+    * [elasticsearch sink][docs.sinks.elasticsearch]
+    * [file sink][docs.sinks.file]
+    * [http sink][docs.sinks.http]
+    * [kafka sink][docs.sinks.kafka]
+    * [prometheus sink][docs.sinks.prometheus]
+    * [splunk_hec sink][docs.sinks.splunk_hec]
+    * [tcp sink][docs.sinks.tcp]
+    * [vector sink][docs.sinks.vector]
   * [Specification](usage/configuration/specification.md)
 * [Administration](usage/administration/README.md)
   * [Starting](usage/administration/starting.md)
@@ -110,4 +115,40 @@
 * [Glossary](meta/glossary.md)
 
 
-
+[docs.sinks.aws_cloudwatch_logs]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_kinesis_streams]: ./usage/configuration/sinks/aws_kinesis_streams.md
+[docs.sinks.aws_s3]: ./usage/configuration/sinks/aws_s3.md
+[docs.sinks.blackhole]: ./usage/configuration/sinks/blackhole.md
+[docs.sinks.clickhouse]: ./usage/configuration/sinks/clickhouse.md
+[docs.sinks.console]: ./usage/configuration/sinks/console.md
+[docs.sinks.elasticsearch]: ./usage/configuration/sinks/elasticsearch.md
+[docs.sinks.file]: ./usage/configuration/sinks/file.md
+[docs.sinks.http]: ./usage/configuration/sinks/http.md
+[docs.sinks.kafka]: ./usage/configuration/sinks/kafka.md
+[docs.sinks.prometheus]: ./usage/configuration/sinks/prometheus.md
+[docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
+[docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ./usage/configuration/sinks/vector.md
+[docs.sources.file]: ./usage/configuration/sources/file.md
+[docs.sources.journald]: ./usage/configuration/sources/journald.md
+[docs.sources.kafka]: ./usage/configuration/sources/kafka.md
+[docs.sources.statsd]: ./usage/configuration/sources/statsd.md
+[docs.sources.stdin]: ./usage/configuration/sources/stdin.md
+[docs.sources.syslog]: ./usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ./usage/configuration/sources/tcp.md
+[docs.sources.udp]: ./usage/configuration/sources/udp.md
+[docs.sources.vector]: ./usage/configuration/sources/vector.md
+[docs.transforms.add_fields]: ./usage/configuration/transforms/add_fields.md
+[docs.transforms.add_tags]: ./usage/configuration/transforms/add_tags.md
+[docs.transforms.coercer]: ./usage/configuration/transforms/coercer.md
+[docs.transforms.field_filter]: ./usage/configuration/transforms/field_filter.md
+[docs.transforms.grok_parser]: ./usage/configuration/transforms/grok_parser.md
+[docs.transforms.json_parser]: ./usage/configuration/transforms/json_parser.md
+[docs.transforms.log_to_metric]: ./usage/configuration/transforms/log_to_metric.md
+[docs.transforms.lua]: ./usage/configuration/transforms/lua.md
+[docs.transforms.regex_parser]: ./usage/configuration/transforms/regex_parser.md
+[docs.transforms.remove_fields]: ./usage/configuration/transforms/remove_fields.md
+[docs.transforms.remove_tags]: ./usage/configuration/transforms/remove_tags.md
+[docs.transforms.sampler]: ./usage/configuration/transforms/sampler.md
+[docs.transforms.split]: ./usage/configuration/transforms/split.md
+[docs.transforms.tokenizer]: ./usage/configuration/transforms/tokenizer.md

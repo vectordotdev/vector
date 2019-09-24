@@ -4,16 +4,16 @@ description: Receive and pull log and metric events into Vector
 
 # Sources
 
-![][images.sources]
+![][assets.sources]
 
 Sources are responsible for ingesting [events][docs.event] into Vector, they can
 both receive and pull in data. If you're deploying Vector in an [agent
-role][docs.agent_role], you'll want to look at local data sources like a
-[`file`][docs.file_source] and [`stdin`][docs.stdin_source]. If you're deploying
-Vector in a [service role][docs.service_role], you'll want to look at sources
-that receive data over the network, like the [`vector`][docs.vector_source],
-[`tcp`][docs.tcp_source], and [`syslog`][docs.syslog_source] sources.
+role][docs.roles.agent], you'll want to look at local data sources like a
+[`file`][docs.sources.file] and [`stdin`][docs.sources.stdin]. If you're deploying
+Vector in a [service role][docs.roles.service], you'll want to look at sources
+that receive data over the network, like the [`vector`][docs.sources.vector],
+[`tcp`][docs.sources.tcp], and [`syslog`][docs.sources.syslog] sources.
 
 <%= components_table(metadata.sources.to_h.values.sort) %>
 
-[+ request a new source][url.new_source]
+[+ request a new source][urls.new_source]
