@@ -226,6 +226,6 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [urls.pr_900]: https://github.com/timberio/vector/pull/900
 [urls.pr_902]: https://github.com/timberio/vector/pull/902
 [urls.pr_904]: https://github.com/timberio/vector/pull/904
-[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/0.4.0
+[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
 [urls.vector_nightly_builds]: http://google.com
 [urls.vector_releases]: https://github.com/timberio/vector/releases

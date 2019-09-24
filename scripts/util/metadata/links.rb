@@ -230,16 +230,23 @@ class Links
         "#{VECTOR_PRS_ROOT}/#{$1}"
 
       when /^v([a-z0-9\-\.]+)$/
-        "#{VECTOR_ROOT}/releases/tag/#{$1}"
+        "#{VECTOR_ROOT}/releases/tag/v#{$1}"
 
       when /^v([a-z0-9\-\.]+)_branch$/
         "#{VECTOR_ROOT}/tree/v#{$1}"
 
       when /^vector_latest_(release|nightly)_(.*)/
-        channel = $1 == "release" ? "latest" : $1
+        channel = $1
         target = $2
-        "https://packages.timber.io/vector/#{channel}/vector-#{channel}-#{target}.tar.gz"
-        
+
+        case channel
+        when "release"
+          "https://packages.timber.io/vector/latest/vector-#{target}.tar.gz"
+        when "nightly"
+          "https://packages.timber.io/vector/nightly/latest/vector-#{target}.tar.gz"
+        else
+          raise("Unknown release channel: #{channel}")
+        end
       else
         raise KeyError.new(
           <<~EOF
