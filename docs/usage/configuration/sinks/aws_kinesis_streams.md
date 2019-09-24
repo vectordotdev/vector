@@ -71,17 +71,17 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data
   # * no default
   stream_name = "my-stream"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   # The log field used as the Kinesis record's partition key value.
   # 
