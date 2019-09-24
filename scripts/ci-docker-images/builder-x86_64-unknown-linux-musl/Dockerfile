@@ -43,17 +43,17 @@ WORKDIR $LLVM_DIR
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
-    -DLLVM_TARGETS_TO_BUILD="X86" \
-    -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
-    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-    -DCOMPILER_RT_BUILD_XRAY=OFF \
-    -DCOMPILER_RT_BUILD_PROFILE=OFF \
-    -DCMAKE_BUILD_TYPE=release \
-    -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
-    -G Ninja \
-    ../llvm && \
+  -DLLVM_ENABLE_PROJECTS="clang;compiler-rt" \
+  -DLLVM_TARGETS_TO_BUILD="X86" \
+  -DLLVM_INSTALL_BINUTILS_SYMLINKS=ON \
+  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+  -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+  -DCOMPILER_RT_BUILD_XRAY=OFF \
+  -DCOMPILER_RT_BUILD_PROFILE=OFF \
+  -DCMAKE_BUILD_TYPE=release \
+  -DCMAKE_INSTALL_PREFIX=$CLANG_PREFIX \
+  -G Ninja \
+  ../llvm && \
   ninja install
 
 # Libs
@@ -69,14 +69,14 @@ RUN apt-get update && apt-get -y install curl xz-utils
 
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
-    https://www.musl-libc.org/releases/musl-$MUSL_VERSION.tar.gz | \
-    tar xzf -
+  https://www.musl-libc.org/releases/musl-$MUSL_VERSION.tar.gz | \
+  tar xzf -
 ENV MUSL_DIR $SRC_DIR/musl-$MUSL_VERSION
 
 ARG LINUX_HEADERS_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
-    https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$LINUX_HEADERS_VERSION.tar.xz | \
-    tar xJf -
+  https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$LINUX_HEADERS_VERSION.tar.xz | \
+  tar xJf -
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
 
 # Install build dependencies.
@@ -92,10 +92,10 @@ ENV LDFLAGS="-static -nostdlib -nostartfiles"
 RUN cd $MUSL_DIR && \
   mkdir build && \
   cd build && \
-    ../configure \
-      --prefix=$LIBS_PREFIX \
-      --disable-shared \
-      --disable-gcc-wrapper && \
+  ../configure \
+  --prefix=$LIBS_PREFIX \
+  --disable-shared \
+  --disable-gcc-wrapper && \
   make -j$(nproc) install
 
 # Install Linux headers.
@@ -127,12 +127,12 @@ ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLIBUNWIND_ENABLE_SHARED=OFF \
-    -DLIBUNWIND_INSTALL_PREFIX=$LIBS_PREFIX/ \
-    -DLLVM_PATH=$LLVM_DIR \
-    -G Ninja \
-    .. && \
+  -DCMAKE_BUILD_TYPE=release \
+  -DLIBUNWIND_ENABLE_SHARED=OFF \
+  -DLIBUNWIND_INSTALL_PREFIX=$LIBS_PREFIX/ \
+  -DLLVM_PATH=$LLVM_DIR \
+  -G Ninja \
+  .. && \
   ninja install
 
 # libc++abi
@@ -145,16 +145,16 @@ ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lunwind -lc"
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLIBCXXABI_ENABLE_SHARED=OFF \
-    -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
-    -DLIBCXXABI_LIBUNWIND_PATH=$LLVM_DIR/libunwind \
-    -DLIBCXXABI_LIBCXX_INCLUDES=$LLVM_DIR/libcxx/include \
-    -DLIBCXXABI_INSTALL_PREFIX=$LIBS_PREFIX/ \
-    -DLIBCXXABI_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/include/c++/v1 \
-    -DLLVM_PATH=$LLVM_DIR \
-    -G Ninja \
-    .. && \
+  -DCMAKE_BUILD_TYPE=release \
+  -DLIBCXXABI_ENABLE_SHARED=OFF \
+  -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+  -DLIBCXXABI_LIBUNWIND_PATH=$LLVM_DIR/libunwind \
+  -DLIBCXXABI_LIBCXX_INCLUDES=$LLVM_DIR/libcxx/include \
+  -DLIBCXXABI_INSTALL_PREFIX=$LIBS_PREFIX/ \
+  -DLIBCXXABI_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/include/c++/v1 \
+  -DLLVM_PATH=$LLVM_DIR \
+  -G Ninja \
+  .. && \
   ninja install
 
 # libc++
@@ -167,18 +167,18 @@ ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++abi -lunwin
 RUN mkdir build && \
   cd build && \
   cmake \
-    -DCMAKE_BUILD_TYPE=release \
-    -DLIBCXX_ENABLE_SHARED=OFF \
-    -DLIBCXX_HAS_MUSL_LIBC=ON \
-    -DLIBCXX_HAS_GCC_S_LIB=OFF \
-    -DLIBCXX_CXX_ABI=libcxxabi \
-    -DLIBCXX_CXX_ABI_INCLUDE_PATHS=$LLVM_DIR/libcxxabi/include \
-    -DLIBCXX_CXX_ABI_LIBRARY_PATH=$LIBS_PREFIX \
-    -DLIBCXX_INSTALL_PREFIX=$LIBS_PREFIX/ \
-    -DLIBCXX_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/ \
-    -DLLVM_PATH=$LLVM_DIR \
-    -G Ninja \
-    .. && \
+  -DCMAKE_BUILD_TYPE=release \
+  -DLIBCXX_ENABLE_SHARED=OFF \
+  -DLIBCXX_HAS_MUSL_LIBC=ON \
+  -DLIBCXX_HAS_GCC_S_LIB=OFF \
+  -DLIBCXX_CXX_ABI=libcxxabi \
+  -DLIBCXX_CXX_ABI_INCLUDE_PATHS=$LLVM_DIR/libcxxabi/include \
+  -DLIBCXX_CXX_ABI_LIBRARY_PATH=$LIBS_PREFIX \
+  -DLIBCXX_INSTALL_PREFIX=$LIBS_PREFIX/ \
+  -DLIBCXX_INSTALL_HEADER_PREFIX=$LIBS_PREFIX/ \
+  -DLLVM_PATH=$LLVM_DIR \
+  -G Ninja \
+  .. && \
   ninja install
 
 # Create wrappers for Clang that automatically use correct libraries and start files.
@@ -194,15 +194,15 @@ ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
-"#!/bin/sh\n"\
-"case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
-"$CLANG_PREFIX/bin/clang -Qunused-arguments $MUSL_CFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
-"exit \$?" > $LIBS_PREFIX/bin/musl-cc
+  "#!/bin/sh\n"\
+  "case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
+  "$CLANG_PREFIX/bin/clang -Qunused-arguments $MUSL_CFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
+  "exit \$?" > $LIBS_PREFIX/bin/musl-cc
 RUN echo \
-"#!/bin/sh\n"\
-"case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
-"$CLANG_PREFIX/bin/clang++ -Qunused-arguments $MUSL_CXXFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
-"exit \$?" > $LIBS_PREFIX/bin/musl-c++
+  "#!/bin/sh\n"\
+  "case \"\$@\" in *-shared*);; *-nostdlib*);; *) STARTFILES=\"$MUSL_STARTFILES\";; esac\n"\
+  "$CLANG_PREFIX/bin/clang++ -Qunused-arguments $MUSL_CXXFLAGS \$@ \$STARTFILES $MUSL_LDFLAGS\n"\
+  "exit \$?" > $LIBS_PREFIX/bin/musl-c++
 RUN chmod +x $LIBS_PREFIX/bin/*
 
 # At this point a fully functional C++ compiler that is able to produce
@@ -252,19 +252,19 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y build-essential pkg-config
+RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
 # compile dependencies of build scripts.
 RUN echo \
-"#!/bin/sh\n"\
-"/usr/bin/gcc -B/usr/bin \$@\n"\
-"exit \$?" > $LIBS_PREFIX/bin/gnu-cc && chmod +x $LIBS_PREFIX/bin/gnu-cc
+  "#!/bin/sh\n"\
+  "/usr/bin/gcc -B/usr/bin \$@\n"\
+  "exit \$?" > $LIBS_PREFIX/bin/gnu-cc && chmod +x $LIBS_PREFIX/bin/gnu-cc
 RUN echo \
-"#!/bin/sh\n"\
-"/usr/bin/g++ -B/usr/bin \$@\n"\
-"exit \$?" > $LIBS_PREFIX/bin/gnu-c++ && chmod +x $LIBS_PREFIX/bin/gnu-c++
+  "#!/bin/sh\n"\
+  "/usr/bin/g++ -B/usr/bin \$@\n"\
+  "exit \$?" > $LIBS_PREFIX/bin/gnu-c++ && chmod +x $LIBS_PREFIX/bin/gnu-c++
 
 ENV CC_x86_64_unknown_linux_gnu=gnu-cc
 ENV CXX_x86_64_unknown_linux_gnu=gnu-c++
