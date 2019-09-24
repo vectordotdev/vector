@@ -35,9 +35,9 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub encoding: Encoding,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -48,9 +48,11 @@ pub struct KinesisSinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
@@ -206,7 +208,7 @@ fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
 fn encode_event(
     event: Event,
     partition_key_field: &Option<Atom>,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = partition_key_field
         .as_ref()
@@ -221,12 +223,12 @@ fn encode_event(
     };
 
     let log = event.into_log();
-    let data = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
+    let data = match encoding {
+        &Encoding::Json => {
             serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
 
-        (&Some(Encoding::Text), _) | (_, false) => log
+        &Encoding::Text => log
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or(Vec::new()),
@@ -258,21 +260,21 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn kinesis_encode_event_non_structured() {
+    fn kinesis_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &None, &None).unwrap();
+        let event = encode_event(message.clone().into(), &None, &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
 
     #[test]
-    fn kinesis_encode_event_structured() {
+    fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let event = encode_event(event, &None, &None).unwrap();
+        let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
@@ -286,7 +288,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_implicit("key".into(), "some_key".into());
-        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(&event.partition_key, &"some_key".to_string());
@@ -298,7 +300,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_implicit("key".into(), random_string(300).into());
-        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(event.partition_key.len(), 256);

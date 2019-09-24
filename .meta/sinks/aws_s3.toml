@@ -37,12 +37,9 @@ description = "The compression type to use before writing data."
 type = "string"
 category = "Requests"
 enum = ["ndjson", "text"]
-null = true
+null = false
 simple = true
-description = """\
-The encoding format used to serialize the events before flushing. The default \
-is dynamic based on if the event is structured or not.\
-"""
+description = "The encoding format used to serialize the events before flushing."
 
 [sinks.aws_s3.options.filename_append_uuid]
 type = "bool"

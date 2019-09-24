@@ -23,9 +23,13 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "tcp" # must be: "tcp"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
+  
+  # REQUIRED - Requests
+  encoding = "json" # enum: "json" or "text"
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -67,10 +71,9 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
