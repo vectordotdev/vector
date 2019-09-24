@@ -16,11 +16,8 @@ description = "The TCP address."
 type = "string"
 category = "Requests"
 enum = ["json", "text"]
-null = true
-description = """\
-The encoding format used to serialize the events before flushing. The default \
-is dynamic based on if the event is structured or not.\
-"""
+null = false
+description = "The encoding format used to serialize the events before flushing."
 
 [sinks.tcp.options.tls]
 type = "table"
