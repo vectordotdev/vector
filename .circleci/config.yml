@@ -111,7 +111,6 @@ jobs:
           name: Build archive
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            export VERSION=$(make version)
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
@@ -126,9 +125,7 @@ jobs:
       - checkout
       - run:
           name: Build archive
-          command: |
-            export VERSION=$(make version)
-            make build-archive
+          command: make build-archive
       # We _must_ build the deb package on the same machine that created
       # the binary. `cargo deb` performs dependency calculation via `ldd`
       # and this process must happen on the same machine it was built in
@@ -153,7 +150,6 @@ jobs:
       - run:
           name: Build archive
           command: |
-            export VERSION=$(make version)
             export RUST_LTO="lto"
             export TARGET="x86_64-unknown-linux-musl"
             make build-archive
