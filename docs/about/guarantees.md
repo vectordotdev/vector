@@ -25,30 +25,30 @@ and [source][docs.sources].
 | Name | Description |
 |:-----|:------------|
 | **Sources** | |
-| [`file` source][docs.file_source] | `best_effort` |
-| [`journald` source][docs.journald_source] | `best_effort` |
-| [`kafka` source][docs.kafka_source] | `at_least_once` |
-| [`statsd` source][docs.statsd_source] | `best_effort` |
-| [`stdin` source][docs.stdin_source] | `at_least_once` |
-| [`syslog` source][docs.syslog_source] | `best_effort` |
-| [`tcp` source][docs.tcp_source] | `best_effort` |
-| [`udp` source][docs.udp_source] | `best_effort` |
-| [`vector` source][docs.vector_source] | `best_effort` |
+| [`file` source][docs.sources.file] | `best_effort` |
+| [`journald` source][docs.sources.journald] | `best_effort` |
+| [`kafka` source][docs.sources.kafka] | `at_least_once` |
+| [`statsd` source][docs.sources.statsd] | `best_effort` |
+| [`stdin` source][docs.sources.stdin] | `at_least_once` |
+| [`syslog` source][docs.sources.syslog] | `best_effort` |
+| [`tcp` source][docs.sources.tcp] | `best_effort` |
+| [`udp` source][docs.sources.udp] | `best_effort` |
+| [`vector` source][docs.sources.vector] | `best_effort` |
 | **Sinks** | |
-| [`aws_cloudwatch_logs` sink][docs.aws_cloudwatch_logs_sink] | `at_least_once` |
-| [`aws_kinesis_streams` sink][docs.aws_kinesis_streams_sink] | `at_least_once` |
-| [`aws_s3` sink][docs.aws_s3_sink] | `at_least_once` |
-| [`blackhole` sink][docs.blackhole_sink] | `best_effort` |
-| [`clickhouse` sink][docs.clickhouse_sink] | `best_effort` |
-| [`console` sink][docs.console_sink] | `best_effort` |
-| [`elasticsearch` sink][docs.elasticsearch_sink] | `best_effort` |
-| [`file` sink][docs.file_sink] | `best_effort` |
-| [`http` sink][docs.http_sink] | `at_least_once` |
-| [`kafka` sink][docs.kafka_sink] | `at_least_once` |
-| [`prometheus` sink][docs.prometheus_sink] | `best_effort` |
-| [`splunk_hec` sink][docs.splunk_hec_sink] | `at_least_once` |
-| [`tcp` sink][docs.tcp_sink] | `best_effort` |
-| [`vector` sink][docs.vector_sink] | `best_effort` |
+| [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs] | `at_least_once` |
+| [`aws_kinesis_streams` sink][docs.sinks.aws_kinesis_streams] | `at_least_once` |
+| [`aws_s3` sink][docs.sinks.aws_s3] | `at_least_once` |
+| [`blackhole` sink][docs.sinks.blackhole] | `best_effort` |
+| [`clickhouse` sink][docs.sinks.clickhouse] | `best_effort` |
+| [`console` sink][docs.sinks.console] | `best_effort` |
+| [`elasticsearch` sink][docs.sinks.elasticsearch] | `best_effort` |
+| [`file` sink][docs.sinks.file] | `best_effort` |
+| [`http` sink][docs.sinks.http] | `at_least_once` |
+| [`kafka` sink][docs.sinks.kafka] | `at_least_once` |
+| [`prometheus` sink][docs.sinks.prometheus] | `best_effort` |
+| [`splunk_hec` sink][docs.sinks.splunk_hec] | `at_least_once` |
+| [`tcp` sink][docs.sinks.tcp] | `best_effort` |
+| [`vector` sink][docs.sinks.vector] | `best_effort` |
 
 ## At Least Once Delivery
 
@@ -111,29 +111,29 @@ We recommend [subscribing to our mailing list](https://vector.dev), which will
 keep you in the loop if this ever changes.
 
 
-[docs.aws_cloudwatch_logs_sink]: ../usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ../usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ../usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ../usage/configuration/sinks/blackhole.md
-[docs.clickhouse_sink]: ../usage/configuration/sinks/clickhouse.md
-[docs.console_sink]: ../usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../about/data-model/README.md#event
-[docs.file_sink]: ../usage/configuration/sinks/file.md
-[docs.file_source]: ../usage/configuration/sources/file.md
-[docs.http_sink]: ../usage/configuration/sinks/http.md
-[docs.journald_source]: ../usage/configuration/sources/journald.md
-[docs.kafka_sink]: ../usage/configuration/sinks/kafka.md
-[docs.kafka_source]: ../usage/configuration/sources/kafka.md
-[docs.prometheus_sink]: ../usage/configuration/sinks/prometheus.md
-[docs.sinks]: ../usage/configuration/sinks/README.md
-[docs.sources]: ../usage/configuration/sources/README.md
-[docs.splunk_hec_sink]: ../usage/configuration/sinks/splunk_hec.md
-[docs.statsd_source]: ../usage/configuration/sources/statsd.md
-[docs.stdin_source]: ../usage/configuration/sources/stdin.md
-[docs.syslog_source]: ../usage/configuration/sources/syslog.md
-[docs.tcp_sink]: ../usage/configuration/sinks/tcp.md
-[docs.tcp_source]: ../usage/configuration/sources/tcp.md
-[docs.udp_source]: ../usage/configuration/sources/udp.md
-[docs.vector_sink]: ../usage/configuration/sinks/vector.md
-[docs.vector_source]: ../usage/configuration/sources/vector.md
+[docs.event]: ../setup/getting-started/sending-your-first-event.md
+[docs.sinks.aws_cloudwatch_logs]: ../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_kinesis_streams]: ../usage/configuration/sinks/aws_kinesis_streams.md
+[docs.sinks.aws_s3]: ../usage/configuration/sinks/aws_s3.md
+[docs.sinks.blackhole]: ../usage/configuration/sinks/blackhole.md
+[docs.sinks.clickhouse]: ../usage/configuration/sinks/clickhouse.md
+[docs.sinks.console]: ../usage/configuration/sinks/console.md
+[docs.sinks.elasticsearch]: ../usage/configuration/sinks/elasticsearch.md
+[docs.sinks.file]: ../usage/configuration/sinks/file.md
+[docs.sinks.http]: ../usage/configuration/sinks/http.md
+[docs.sinks.kafka]: ../usage/configuration/sinks/kafka.md
+[docs.sinks.prometheus]: ../usage/configuration/sinks/prometheus.md
+[docs.sinks.splunk_hec]: ../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.tcp]: ../usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ../usage/configuration/sinks/vector.md
+[docs.sinks]: ../usage/configuration/sinks
+[docs.sources.file]: ../usage/configuration/sources/file.md
+[docs.sources.journald]: ../usage/configuration/sources/journald.md
+[docs.sources.kafka]: ../usage/configuration/sources/kafka.md
+[docs.sources.statsd]: ../usage/configuration/sources/statsd.md
+[docs.sources.stdin]: ../usage/configuration/sources/stdin.md
+[docs.sources.syslog]: ../usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ../usage/configuration/sources/tcp.md
+[docs.sources.udp]: ../usage/configuration/sources/udp.md
+[docs.sources.vector]: ../usage/configuration/sources/vector.md
+[docs.sources]: ../usage/configuration/sources

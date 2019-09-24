@@ -13,7 +13,7 @@ retry_backoff_secs = 1
 request_in_flight_limit = 10
 request_timeout_secs = 60
 service_provider = "Splunk"
-write_to_description = "a [Splunk HTTP Event Collector][url.splunk_hec]"
+write_to_description = "a [Splunk HTTP Event Collector][urls.splunk_hec]"
 
 [sinks.splunk_hec.options.encoding]
 type = "string"

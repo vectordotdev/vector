@@ -4,7 +4,7 @@ description: 'A deeper look at Vector''s data model'
 
 # Data Model
 
-![][images.data-model]
+![][assets.data-model]
 
 ## Event
 
@@ -24,7 +24,7 @@ message EventWrapper {
 {% endcode-tabs %}
 
 You can view a complete definition in the [event proto\
-definition][url.event_proto]. You'll notice that each event must be one of
+definition][urls.event_proto]. You'll notice that each event must be one of
 2 types:
 
 {% page-ref page="../data-model/log.md" %}
@@ -41,5 +41,5 @@ definition][url.event_proto]. You'll notice that each event must be one of
 4. Starting with support for a little more "old school" model makes us a better tool for supporting incremental progress in existing infrastructures towards more event-based architectures.
 
 
-[images.data-model]: ../../assets/data-model.svg
-[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[assets.data-model]: ../../assets/data-model.svg
+[urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto

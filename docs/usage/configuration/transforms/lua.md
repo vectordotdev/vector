@@ -12,17 +12,17 @@ description: Accepts `log` events and allows you to transform events with a full
 
 # lua transform
 
-![][images.lua_transform]
+![][assets.lua_transform]
 
 {% hint style="warning" %}
 The `lua` transform is in beta. Please see the current
-[enhancements][url.lua_transform_enhancements] and
-[bugs][url.lua_transform_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_lua_transform_issue]
+[enhancements][urls.lua_transform_enhancements] and
+[bugs][urls.lua_transform_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_lua_transform_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `lua` transform accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine.
+The `lua` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
 
 ## Config File
 
@@ -146,7 +146,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Global Variables
@@ -156,10 +156,10 @@ variable representing the event:
 
 | Name    |           Type           | Description                                                                                                                                                                       |
 |:--------|:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `event` | [`table`][url.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.default_schema]. |
+| `event` | [`table`][urls.lua_table] | The current [`log` event]. Depending on prior processing the structure of your event will vary. Generally though, it will follow the [default event schema][docs.data-model.log#default-schema]. |
 
 Note, a Lua `table` is an associative array. You can read more about
-[Lua types][url.lua_types] in the [Lua docs][url.lua_docs].
+[Lua types][urls.lua_types] in the [Lua docs][urls.lua_docs].
 
 ### Nested Fields
 
@@ -180,56 +180,56 @@ event["parent.child"] = nil
 
 Vector provides a `search_dirs` option that allows you to specify absolute
 paths that will searched when using the [Lua `require`
-function][url.lua_require].
+function][urls.lua_require].
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `lua_transform` issues][url.lua_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_lua_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_lua_transform_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `lua_transform` issues][urls.lua_transform_issues].
+2. If encountered a bug, please [file a bug report][urls.new_lua_transform_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_lua_transform_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`lua` transform][docs.lua_transform]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
-* [**Issues**][url.lua_transform_issues] - [enhancements][url.lua_transform_enhancements] - [bugs][url.lua_transform_bugs]
-* [**Source code**][url.lua_transform_source]
-* [**Lua Reference Manual**][url.lua_manual]
+* [**Issues**][urls.lua_transform_issues] - [enhancements][urls.lua_transform_enhancements] - [bugs][urls.lua_transform_bugs]
+* [**Source code**][urls.lua_transform_source]
+* [**Lua Reference Manual**][urls.lua_manual]
 
 
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.data_model]: ../../../about/data-model/README.md
-[docs.default_schema]: ../../../about/data-model/log.md#default-schema
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.lua_transform]: ../../../assets/lua-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log#default-schema]: ../../../about/data-model/log.md#default-schema
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data_model]: ../../../about/data-model
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.lua_transform]: ../../../assets/lua-transform.svg
-[url.lua]: https://www.lua.org/
-[url.lua_docs]: https://www.lua.org/manual/5.3/
-[url.lua_manual]: http://www.lua.org/manual/5.1/manual.html
-[url.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
-[url.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
-[url.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+bug%22
-[url.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+enhancement%22
-[url.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
-[url.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
-[url.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
-[url.new_lua_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+bug
-[url.new_lua_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+enhancement
-[url.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua
-[url.vector_chat]: https://chat.vector.dev
+[urls.lua]: https://www.lua.org/
+[urls.lua_docs]: https://www.lua.org/manual/5.3/
+[urls.lua_manual]: http://www.lua.org/manual/5.1/manual.html
+[urls.lua_require]: http://www.lua.org/manual/5.1/manual.html#pdf-require
+[urls.lua_table]: https://www.lua.org/manual/2.2/section3_3.html
+[urls.lua_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+bug%22
+[urls.lua_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22+label%3A%22Type%3A+enhancement%22
+[urls.lua_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+lua%22
+[urls.lua_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/lua.rs
+[urls.lua_types]: https://www.lua.org/manual/2.2/section3_3.html
+[urls.new_lua_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+bug
+[urls.new_lua_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua&labels=Type%3A+enhancement
+[urls.new_lua_transform_issue]: https://github.com/timberio/vector/issues/new?labels=transform%3A+lua
+[urls.vector_chat]: https://chat.vector.dev

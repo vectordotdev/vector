@@ -2,7 +2,7 @@
 
 ## Batch
 
-"Batch" refers to a [batched payload][docs.log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
+"Batch" refers to a [batched payload][docs.data-model.log] within a sink. It is a batch of events encoded into a payload that the downstream service understands.
 
 ## Benchmark
 
@@ -47,7 +47,7 @@
 ## Log
 
 "Log" refers to an individual log event. This is a type of
-[Vector event][docs.metric_event].
+[Vector event][docs.data-model.metric].
 
 ## Lucio
 
@@ -56,7 +56,7 @@ A sporty Italian that bleeds Rust, is a core member of the Vector team, and does
 ## Metric
 
 "Metric" refers to an individual data unit used to represent a point in time
-measurement. This is a type of [Vector event][docs.metric_event].
+measurement. This is a type of [Vector event][docs.data-model.metric].
 
 ## Parser
 
@@ -80,7 +80,7 @@ a metric.
 ## Repo
 
 "Repo" refers to a Git respository, usually the
-[Vector Git repository][url.vector_repo].
+[Vector Git repository][urls.vector_repo].
 
 ## Role
 
@@ -94,7 +94,7 @@ this is commonly used to describe Vector.
 
 ## Rust
 
-"Rust" refers to the [Rust programming language][url.rust] that Vector is
+"Rust" refers to the [Rust programming language][urls.rust] that Vector is
 written in.
 
 ## Sampler
@@ -117,11 +117,11 @@ text string.
 
 ## Table
 
-"Table" refers to the [TOML table type][url.toml_table].
+"Table" refers to the [TOML table type][urls.toml_table].
 
 ## TOML
 
-"TOML" refers to [Tom's Obvious Markup Language][url.toml] and it is the syntax
+"TOML" refers to [Tom's Obvious Markup Language][urls.toml] and it is the syntax
 used to represent the Vector configuration.
 
 ## Topology
@@ -143,20 +143,20 @@ reducing cost, etc.
 "Vector" is the name of this project.
 
 
-[docs.configuration]: ../usage/configuration/README.md
-[docs.data_model]: ../about/data-model/README.md
+[docs.configuration]: ../usage/configuration
+[docs.data-model.log]: ../about/data-model/log.md
+[docs.data-model.metric]: ../about/data-model/metric.md
+[docs.data_model]: ../about/data-model
 [docs.docker]: ../setup/installation/platforms/docker.md
-[docs.guides]: ../usage/guides/README.md
-[docs.log]: ../about/data-model/log.md
-[docs.metric_event]: ../about/data-model/metric.md
+[docs.guides]: ../usage/guides
 [docs.performance]: ../performance.md
-[docs.platforms]: ../setup/installation/platforms/README.md
-[docs.roles]: ../setup/deployment/roles/README.md
-[docs.sinks]: ../usage/configuration/sinks/README.md
-[docs.sources]: ../usage/configuration/sources/README.md
+[docs.platforms]: ../setup/installation/platforms
+[docs.roles]: ../setup/deployment/roles
+[docs.sinks]: ../usage/configuration/sinks
+[docs.sources]: ../usage/configuration/sources
 [docs.topologies]: ../setup/deployment/topologies.md
-[docs.transforms]: ../usage/configuration/transforms/README.md
-[url.rust]: https://www.rust-lang.org/
-[url.toml]: https://github.com/toml-lang/toml
-[url.toml_table]: https://github.com/toml-lang/toml#table
-[url.vector_repo]: https://github.com/timberio/vector
+[docs.transforms]: ../usage/configuration/transforms
+[urls.rust]: https://www.rust-lang.org/
+[urls.toml]: https://github.com/toml-lang/toml
+[urls.toml_table]: https://github.com/toml-lang/toml#table
+[urls.vector_repo]: https://github.com/timberio/vector

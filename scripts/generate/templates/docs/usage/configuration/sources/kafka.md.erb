@@ -18,7 +18,7 @@ Given the following message in a Kafka topic:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -30,7 +30,9 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 

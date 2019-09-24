@@ -6,10 +6,10 @@ description: Vector configuration
 
 ![](../../assets/configure.svg)
 
-This section covers configuring Vector and creating [pipelines][docs.pipelines]
-like the one shown above. Vector requires only a _single_ [TOML][url.toml]
+This section covers configuring Vector and creating [pipelines][docs.configuration#composition]
+like the one shown above. Vector requires only a _single_ [TOML][urls.toml]
 configurable file, which you can specify via the
-[`--config` flag][docs.starting.flags] when [starting][docs.starting] vector:
+[`--config` flag][docs.starting#flags] when [starting][docs.starting] vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -71,19 +71,19 @@ data_dir = "/var/lib/vector"
 
 <%= components_table(metadata.sources.to_h.values.sort) %>
 
-[+ request a new source][url.new_source]
+[+ request a new source][urls.new_source]
 
 ## Transforms
 
 <%= components_table(metadata.transforms.to_h.values.sort) %>
 
-[+ request a new transform][url.new_transform]
+[+ request a new transform][urls.new_transform]
 
 ## Sinks
 
 <%= components_table(metadata.sinks.to_h.values.sort) %>
 
-[+ request a new sink][url.new_sink]
+[+ request a new sink][urls.new_sink]
 
 ## How It Works [[sort]]
 
@@ -137,9 +137,9 @@ variable example.
 
 ### Format
 
-The Vector configuration file requires the [TOML][url.toml] format for it's
+The Vector configuration file requires the [TOML][urls.toml] format for it's
 simplicity, explicitness, and relaxed white-space parsing. For more information,
-please refer to the excellent [TOML documentation][url.toml].
+please refer to the excellent [TOML documentation][urls.toml].
 
 ### Template Syntax
 
@@ -154,10 +154,10 @@ Each are described in more detail below.
 #### Strftime specifiers
 
 For simplicity, Vector allows you to supply [strftime \
-specifiers][url.strftime_specifiers] directly as part of the value to produce
+specifiers][urls.strftime_specifiers] directly as part of the value to produce
 formatted timestamp values based off of the event's `timestamp` field.
 
-For example, given the following [`log` event][docs.log_event]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {
@@ -185,15 +185,14 @@ Vector would produce the following value for the `key_prefix` field:
 date=2019-05-02
 ```
 
-This effectively enables time partitioning for the
-[`aws_s3` sink][docs.aws_s3_sink].
+This effectively enables time partitioning.
 
 ##### Event fields
 
 In addition to formatting the `timestamp` field, Vector allows you to directly
 access event fields with the `{{ <field-name> }}` syntax.
 
-For example, given the following [`log` event][docs.log_event]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {

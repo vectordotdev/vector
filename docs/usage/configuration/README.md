@@ -14,10 +14,10 @@ description: Vector configuration
 
 ![](../../assets/configure.svg)
 
-This section covers configuring Vector and creating [pipelines][docs.pipelines]
-like the one shown above. Vector requires only a _single_ [TOML][url.toml]
+This section covers configuring Vector and creating [pipelines][docs.configuration#composition]
+like the one shown above. Vector requires only a _single_ [TOML][urls.toml]
 configurable file, which you can specify via the
-[`--config` flag][docs.starting.flags] when [starting][docs.starting] vector:
+[`--config` flag][docs.starting#flags] when [starting][docs.starting] vector:
 
 ```bash
 vector --config /etc/vector/vector.toml
@@ -82,59 +82,59 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 |:------|:------------|
-| [**`file`**][docs.file_source] | Ingests data through one or more local files and outputs [`log`][docs.log_event] events. |
-| [**`journald`**][docs.journald_source] | Ingests data through log records from journald and outputs [`log`][docs.log_event] events. |
-| [**`kafka`**][docs.kafka_source] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events. |
-| [**`statsd`**][docs.statsd_source] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.metric_event] events. |
-| [**`stdin`**][docs.stdin_source] | Ingests data through standard input (STDIN) and outputs [`log`][docs.log_event] events. |
-| [**`syslog`**][docs.syslog_source] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.log_event] events. |
-| [**`tcp`**][docs.tcp_source] | Ingests data through the TCP protocol and outputs [`log`][docs.log_event] events. |
-| [**`udp`**][docs.udp_source] | Ingests data through the UDP protocol and outputs [`log`][docs.log_event] events. |
-| [**`vector`**][docs.vector_source] | Ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events. |
+| [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
+| [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
+| [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
+| [**`statsd`**][docs.sources.statsd] | Ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events. |
+| [**`stdin`**][docs.sources.stdin] | Ingests data through standard input (STDIN) and outputs [`log`][docs.data-model.log] events. |
+| [**`syslog`**][docs.sources.syslog] | Ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`tcp`**][docs.sources.tcp] | Ingests data through the TCP protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`udp`**][docs.sources.udp] | Ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events. |
+| [**`vector`**][docs.sources.vector] | Ingests data through another upstream Vector instance and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events. |
 
-[+ request a new source][url.new_source]
+[+ request a new source][urls.new_source]
 
 ## Transforms
 
 | Name  | Description |
 |:------|:------------|
-| [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more log fields. |
-| [**`add_tags`**][docs.add_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to add one or more metric tags. |
-| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce log fields into fixed types. |
-| [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a log field's value. |
-| [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field value with [Grok][url.grok]. |
-| [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field value as JSON. |
-| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
-| [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
-| [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a log field's value with a [Regular Expression][url.regex]. |
-| [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to remove one or more log fields. |
-| [**`remove_tags`**][docs.remove_tags_transform] | Accepts [`metric`][docs.metric_event] events and allows you to remove one or more metric tags. |
-| [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`split`**][docs.split_transform] | Accepts [`log`][docs.log_event] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
+| [**`add_fields`**][docs.transforms.add_fields] | Accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields. |
+| [**`add_tags`**][docs.transforms.add_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags. |
+| [**`coercer`**][docs.transforms.coercer] | Accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types. |
+| [**`field_filter`**][docs.transforms.field_filter] | Accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value. |
+| [**`grok_parser`**][docs.transforms.grok_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok]. |
+| [**`json_parser`**][docs.transforms.json_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON. |
+| [**`log_to_metric`**][docs.transforms.log_to_metric] | Accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics. |
+| [**`lua`**][docs.transforms.lua] | Accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine. |
+| [**`regex_parser`**][docs.transforms.regex_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex]. |
+| [**`remove_fields`**][docs.transforms.remove_fields] | Accepts [`log`][docs.data-model.log] events and allows you to remove one or more log fields. |
+| [**`remove_tags`**][docs.transforms.remove_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags. |
+| [**`sampler`**][docs.transforms.sampler] | Accepts [`log`][docs.data-model.log] events and allows you to sample events with a configurable rate. |
+| [**`split`**][docs.transforms.split] | Accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
+| [**`tokenizer`**][docs.transforms.tokenizer] | Accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
 
-[+ request a new transform][url.new_transform]
+[+ request a new transform][urls.new_transform]
 
 ## Sinks
 
 | Name  | Description |
 |:------|:------------|
-| [**`aws_cloudwatch_logs`**][docs.aws_cloudwatch_logs_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
-| [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
-| [**`aws_s3`**][docs.aws_s3_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
-| [**`blackhole`**][docs.blackhole_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
-| [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
-| [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
-| [**`file`**][docs.file_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a file. |
-| [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
-| [**`kafka`**][docs.kafka_sink] | [Streams](#streaming) [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
-| [**`prometheus`**][docs.prometheus_sink] | [Exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
-| [**`splunk_hec`**][docs.splunk_hec_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec]. |
-| [**`tcp`**][docs.tcp_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a TCP connection. |
-| [**`vector`**][docs.vector_sink] | [Streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance. |
+| [**`aws_cloudwatch_logs`**][docs.sinks.aws_cloudwatch_logs] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_kinesis_streams`**][docs.sinks.aws_kinesis_streams] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
+| [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
+| [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
+| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
+| [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
+| [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
+| [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
+| [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
+| [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
-[+ request a new sink][url.new_sink]
+[+ request a new sink][urls.new_sink]
 
 ## How It Works
 
@@ -188,9 +188,9 @@ variable example.
 
 ### Format
 
-The Vector configuration file requires the [TOML][url.toml] format for it's
+The Vector configuration file requires the [TOML][urls.toml] format for it's
 simplicity, explicitness, and relaxed white-space parsing. For more information,
-please refer to the excellent [TOML documentation][url.toml].
+please refer to the excellent [TOML documentation][urls.toml].
 
 ### Template Syntax
 
@@ -205,10 +205,10 @@ Each are described in more detail below.
 #### Strftime specifiers
 
 For simplicity, Vector allows you to supply [strftime \
-specifiers][url.strftime_specifiers] directly as part of the value to produce
+specifiers][urls.strftime_specifiers] directly as part of the value to produce
 formatted timestamp values based off of the event's `timestamp` field.
 
-For example, given the following [`log` event][docs.log_event]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {
@@ -236,15 +236,14 @@ Vector would produce the following value for the `key_prefix` field:
 date=2019-05-02
 ```
 
-This effectively enables time partitioning for the
-[`aws_s3` sink][docs.aws_s3_sink].
+This effectively enables time partitioning.
 
 ##### Event fields
 
 In addition to formatting the `timestamp` field, Vector allows you to directly
 access event fields with the `{{ <field-name> }}` syntax.
 
-For example, given the following [`log` event][docs.log_event]:
+For example, given the following [`log` event][docs.data-model.log]:
 
 ```rust
 LogEvent {
@@ -290,68 +289,68 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
-[docs.add_fields_transform]: ../../usage/configuration/transforms/add_fields.md
-[docs.add_tags_transform]: ../../usage/configuration/transforms/add_tags.md
-[docs.aws_cloudwatch_logs_sink]: ../../usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ../../usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ../../usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ../../usage/configuration/sinks/blackhole.md
-[docs.clickhouse_sink]: ../../usage/configuration/sinks/clickhouse.md
-[docs.coercer_transform]: ../../usage/configuration/transforms/coercer.md
-[docs.console_sink]: ../../usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ../../usage/configuration/sinks/elasticsearch.md
-[docs.field_filter_transform]: ../../usage/configuration/transforms/field_filter.md
-[docs.file_sink]: ../../usage/configuration/sinks/file.md
-[docs.file_source]: ../../usage/configuration/sources/file.md
-[docs.grok_parser_transform]: ../../usage/configuration/transforms/grok_parser.md
-[docs.http_sink]: ../../usage/configuration/sinks/http.md
-[docs.journald_source]: ../../usage/configuration/sources/journald.md
-[docs.json_parser_transform]: ../../usage/configuration/transforms/json_parser.md
-[docs.kafka_sink]: ../../usage/configuration/sinks/kafka.md
-[docs.kafka_source]: ../../usage/configuration/sources/kafka.md
-[docs.log_event]: ../../about/data-model/log.md
-[docs.log_to_metric_transform]: ../../usage/configuration/transforms/log_to_metric.md
-[docs.lua_transform]: ../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../about/data-model/metric.md
-[docs.operating_systems]: ../../setup/installation/operating-systems/README.md
-[docs.pipelines]: ../../usage/configuration/README.md#composition
-[docs.platforms]: ../../setup/installation/platforms/README.md
-[docs.prometheus_sink]: ../../usage/configuration/sinks/prometheus.md
-[docs.regex_parser_transform]: ../../usage/configuration/transforms/regex_parser.md
-[docs.remove_fields_transform]: ../../usage/configuration/transforms/remove_fields.md
-[docs.remove_tags_transform]: ../../usage/configuration/transforms/remove_tags.md
-[docs.sampler_transform]: ../../usage/configuration/transforms/sampler.md
-[docs.sinks]: ../../usage/configuration/sinks/README.md
-[docs.sources]: ../../usage/configuration/sources/README.md
-[docs.split_transform]: ../../usage/configuration/transforms/split.md
-[docs.splunk_hec_sink]: ../../usage/configuration/sinks/splunk_hec.md
-[docs.starting.flags]: ../../usage/administration/starting.md#flags
+[docs.configuration#composition]: ../../usage/configuration#composition
+[docs.data-model.log]: ../../about/data-model/log.md
+[docs.data-model.metric]: ../../about/data-model/metric.md
+[docs.operating_systems]: ../../setup/installation/operating-systems
+[docs.platforms]: ../../setup/installation/platforms
+[docs.sinks.aws_cloudwatch_logs]: ../../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_kinesis_streams]: ../../usage/configuration/sinks/aws_kinesis_streams.md
+[docs.sinks.aws_s3]: ../../usage/configuration/sinks/aws_s3.md
+[docs.sinks.blackhole]: ../../usage/configuration/sinks/blackhole.md
+[docs.sinks.clickhouse]: ../../usage/configuration/sinks/clickhouse.md
+[docs.sinks.console]: ../../usage/configuration/sinks/console.md
+[docs.sinks.elasticsearch]: ../../usage/configuration/sinks/elasticsearch.md
+[docs.sinks.file]: ../../usage/configuration/sinks/file.md
+[docs.sinks.http]: ../../usage/configuration/sinks/http.md
+[docs.sinks.kafka]: ../../usage/configuration/sinks/kafka.md
+[docs.sinks.prometheus]: ../../usage/configuration/sinks/prometheus.md
+[docs.sinks.splunk_hec]: ../../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.tcp]: ../../usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ../../usage/configuration/sinks/vector.md
+[docs.sinks]: ../../usage/configuration/sinks
+[docs.sources.file]: ../../usage/configuration/sources/file.md
+[docs.sources.journald]: ../../usage/configuration/sources/journald.md
+[docs.sources.kafka]: ../../usage/configuration/sources/kafka.md
+[docs.sources.statsd]: ../../usage/configuration/sources/statsd.md
+[docs.sources.stdin]: ../../usage/configuration/sources/stdin.md
+[docs.sources.syslog]: ../../usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ../../usage/configuration/sources/tcp.md
+[docs.sources.udp]: ../../usage/configuration/sources/udp.md
+[docs.sources.vector]: ../../usage/configuration/sources/vector.md
+[docs.sources]: ../../usage/configuration/sources
+[docs.starting#flags]: ../../usage/administration/starting.md#flags
 [docs.starting]: ../../usage/administration/starting.md
-[docs.statsd_source]: ../../usage/configuration/sources/statsd.md
-[docs.stdin_source]: ../../usage/configuration/sources/stdin.md
-[docs.syslog_source]: ../../usage/configuration/sources/syslog.md
-[docs.tcp_sink]: ../../usage/configuration/sinks/tcp.md
-[docs.tcp_source]: ../../usage/configuration/sources/tcp.md
-[docs.tokenizer_transform]: ../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../usage/configuration/transforms/README.md
-[docs.udp_source]: ../../usage/configuration/sources/udp.md
-[docs.vector_sink]: ../../usage/configuration/sinks/vector.md
-[docs.vector_source]: ../../usage/configuration/sources/vector.md
-[url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
-[url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
-[url.aws_s3]: https://aws.amazon.com/s3/
-[url.clickhouse]: https://clickhouse.yandex/
-[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.grok]: http://grokdebug.herokuapp.com/
-[url.kafka]: https://kafka.apache.org/
-[url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.lua]: https://www.lua.org/
-[url.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.prometheus]: https://prometheus.io/
-[url.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.toml]: https://github.com/toml-lang/toml
+[docs.transforms.add_fields]: ../../usage/configuration/transforms/add_fields.md
+[docs.transforms.add_tags]: ../../usage/configuration/transforms/add_tags.md
+[docs.transforms.coercer]: ../../usage/configuration/transforms/coercer.md
+[docs.transforms.field_filter]: ../../usage/configuration/transforms/field_filter.md
+[docs.transforms.grok_parser]: ../../usage/configuration/transforms/grok_parser.md
+[docs.transforms.json_parser]: ../../usage/configuration/transforms/json_parser.md
+[docs.transforms.log_to_metric]: ../../usage/configuration/transforms/log_to_metric.md
+[docs.transforms.lua]: ../../usage/configuration/transforms/lua.md
+[docs.transforms.regex_parser]: ../../usage/configuration/transforms/regex_parser.md
+[docs.transforms.remove_fields]: ../../usage/configuration/transforms/remove_fields.md
+[docs.transforms.remove_tags]: ../../usage/configuration/transforms/remove_tags.md
+[docs.transforms.sampler]: ../../usage/configuration/transforms/sampler.md
+[docs.transforms.split]: ../../usage/configuration/transforms/split.md
+[docs.transforms.tokenizer]: ../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../usage/configuration/transforms
+[urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
+[urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.clickhouse]: https://clickhouse.yandex/
+[urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.grok]: http://grokdebug.herokuapp.com/
+[urls.kafka]: https://kafka.apache.org/
+[urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.lua]: https://www.lua.org/
+[urls.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.new_source]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.prometheus]: https://prometheus.io/
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.toml]: https://github.com/toml-lang/toml

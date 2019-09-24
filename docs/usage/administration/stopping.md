@@ -49,4 +49,4 @@ data. To mitigate this we recommend enabling on-disk buffers and avoiding
 forceful shutdowns whenever possible.
 
 
-[docs.sources]: ../../usage/configuration/sources/README.md
+[docs.sources]: ../../usage/configuration/sources

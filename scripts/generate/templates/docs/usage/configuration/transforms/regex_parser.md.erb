@@ -39,7 +39,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 ```javascript
 {
@@ -67,7 +67,7 @@ Things to note about the output:
 ### Failed Parsing
 
 If the `field` value fails to parse against the provided `regex` then an error
-will be [logged][docs.monitoring_logs] and the event will be kept or discarded
+will be [logged][docs.monitoring#logs] and the event will be kept or discarded
 depending on the `drop_failed` value.
 
 A failure includes any event that does not successfully parse against the
@@ -78,19 +78,19 @@ specified `field`.
 
 The `regex_parser` source has been involved in the following performance tests:
 
-* [`regex_parsing_performance`][url.regex_parsing_performance_test]
+* [`regex_parsing_performance`][urls.regex_parsing_performance_test]
 
 Learn more in the [Performance][docs.performance] sections.
 
 ### Regex Debugger
 
 To test the validity of the `regex` option, we recommend the [Golang Regex
-Tester][url.regex_tester] as it's Regex syntax closely 
+Tester][urls.regex_tester] as it's Regex syntax closely 
 follows Rust's.
 
 ### Regex Syntax
 
-Vector follows the [documented Rust Regex syntax][url.rust_regex_syntax] since
+Vector follows the [documented Rust Regex syntax][urls.rust_regex_syntax] since
 Vector is written in Rust. This syntax follows a Perl-style regular expression
 syntax, but lacks a few features like look around and backreferences.
 
@@ -106,7 +106,7 @@ Will capture `timestamp`, `level`, and `message`. All values are extracted as
 `string` values and must be coerced with the `types` table.
 
 More info can be found in the [Regex grouping and flags
-documentation][url.regex_grouping_and_flags].
+documentation][urls.regex_grouping_and_flags].
 
 #### Flags
 
@@ -128,7 +128,7 @@ For example, to enable the case-insensitive flag you can write:
 ```
 
 More info can be found in the [Regex grouping and flags
-documentation][url.regex_grouping_and_flags].
+documentation][urls.regex_grouping_and_flags].
 
 
 ## Troubleshooting

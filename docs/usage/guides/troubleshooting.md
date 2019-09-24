@@ -9,7 +9,7 @@ followed in order.
 
 First, we're sorry to hear that you are having trouble with Vector. Reliability
 and operator friendliness are _very_ important to us, and we urge you to
-[open an issue][url.new_bug_report] to let us know what's going on. This helps
+[open an issue][urls.new_bug_report] to let us know what's going on. This helps
 us improve Vector.
 
 ## 1. Check Vector's logs
@@ -64,7 +64,7 @@ RUST_BACKTRACE=full vector --config=/etc/vector/vector.toml
 ```
 
 Backtraces are _critical_ for debugging errors. Once you have the backtrace
-please [open a bug report issue][url.new_bug_report].
+please [open a bug report issue][urls.new_bug_report].
 
 ## 3. Enable debug logging
 
@@ -72,7 +72,7 @@ If you do not see an error in your Vector logs, and the Vector logs appear
 to be frozen, then you'll want to drop your log level to `debug`:
 
 {% hint style="info" %}
-Vector [rate limits][docs.monitoring.rate-limiting] logs in the hot path.
+Vector [rate limits][docs.monitoring#rate-limiting] logs in the hot path.
 As a result, dropping to the `debug` level is safe for production environments.
 {% endhint %}
 
@@ -93,12 +93,12 @@ vector --verbose --config=/etc/vector/vector.toml
 
 At this point we recommend reaching out to the community for help.
 
-1. If encountered a bug, please [file a bug report][url.new_bug_report]
-2. If encountered a missing feature, please [file a feature request][url.new_feature_request].
-3. If you need help, [join our chat community][url.vector_chat]. You can post a question and search previous questions.
+1. If encountered a bug, please [file a bug report][urls.new_bug_report]
+2. If encountered a missing feature, please [file a feature request][urls.new_feature_request].
+3. If you need help, [join our chat community][urls.vector_chat]. You can post a question and search previous questions.
 
 
-[docs.monitoring.rate-limiting]: ../../usage/administration/monitoring.md#rate-limiting
-[url.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
-[url.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.vector_chat]: https://chat.vector.dev
+[docs.monitoring#rate-limiting]: ../../usage/administration/monitoring.md#rate-limiting
+[urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Bug
+[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.vector_chat]: https://chat.vector.dev

@@ -20,4 +20,4 @@ type = "string"
 defaukt = "stdout"
 enum = ["stdout", "stderr"]
 null = false
-description = "The [standard stream][url.standard_streams] to write to."
+description = "The [standard stream][urls.standard_streams] to write to."

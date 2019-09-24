@@ -5,7 +5,7 @@ delivery_guarantee = "best_effort"
 egress_method = "exposing"
 healthcheck = false
 input_types = ["metric"]
-write_to_description = "[Prometheus][url.prometheus] metrics service"
+write_to_description = "[Prometheus][urls.prometheus] metrics service"
 
 [sinks.prometheus.options.address]
 type = "string"
@@ -19,7 +19,7 @@ examples = ["service"]
 null = false
 description = """\
 A prefix that will be added to all metric names.
-It should follow Prometheus [naming conventions][url.prometheus_metric_naming].\
+It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].\
 """
 
 [sinks.prometheus.options.buckets]

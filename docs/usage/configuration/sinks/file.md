@@ -12,10 +12,10 @@ description: Streams `log` events to a file.
 
 # file sink
 
-![][images.file_sink]
+![][assets.file_sink]
 
 
-The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
+The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a file.
 
 ## Config File
 
@@ -84,7 +84,7 @@ The `file` sink [streams](#streaming) [`log`][docs.log_event] events to a file.
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Encodings
 
@@ -105,7 +105,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `file` sink. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -116,7 +116,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Streaming
@@ -127,9 +127,9 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The `path` options
-support [Vector's template syntax][docs.configuration.template-syntax],
+support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][url.strftime_specifiers] as well as the
+[strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 {% code-tabs %}
@@ -145,42 +145,42 @@ enabling dynamic values derived from the event's data. This syntax accepts
 {% endcode-tabs %}
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration.template-syntax].
+[template syntax section][docs.configuration#template-syntax].
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `file_sink` issues][url.file_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_file_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_file_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `file_sink` issues][urls.file_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_file_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_file_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.file_sink_issues] - [enhancements][url.file_sink_enhancements] - [bugs][url.file_sink_bugs]
-* [**Source code**][url.file_sink_source]
+* [**Issues**][urls.file_sink_issues] - [enhancements][urls.file_sink_enhancements] - [bugs][urls.file_sink_bugs]
+* [**Source code**][urls.file_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.configuration.template-syntax]: ../../../usage/configuration/README.md#template-syntax
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.tcp_source]: ../../../usage/configuration/sources/tcp.md
+[assets.file_sink]: ../../../assets/file-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.file_sink]: ../../../assets/file-sink.svg
-[url.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
-[url.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22
-[url.file_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
-[url.file_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
-[url.new_file_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+bug
-[url.new_file_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+enhancement
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.vector_chat]: https://chat.vector.dev
+[urls.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
+[urls.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22
+[urls.file_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22
+[urls.file_sink_source]: https://github.com/timberio/vector/blob/master/src/sinks/file/mod.rs
+[urls.new_file_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+bug
+[urls.new_file_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+file&labels=Type%3A+enhancement
+[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_chat]: https://chat.vector.dev

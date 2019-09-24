@@ -12,61 +12,61 @@ description: Push or expose events in Vector to external systems
 
 # Sinks
 
-![][images.sinks]
+![][assets.sinks]
 
-Sinks are last in the [pipeline][docs.pipelines], responsible for sending
+Sinks are last in the [pipeline][docs.configuration#composition], responsible for sending
 [events][docs.event] downstream. These can be service specific sinks, such as
-[`vector`][docs.vector_sink], [`elasticsearch`][docs.elasticsearch_sink], and
-[`s3`][docs.aws_s3_sink], or generic protocol sinks like
-[`http`][docs.http_sink] or [`tcp`][docs.tcp_sink].
+[`vector`][docs.sinks.vector], [`elasticsearch`][docs.sinks.elasticsearch], and
+[`s3`][docs.sinks.aws_s3], or generic protocol sinks like
+[`http`][docs.sinks.http] or [`tcp`][docs.sinks.tcp].
 
 | Name  | Description |
 |:------|:------------|
-| [**`aws_cloudwatch_logs`**][docs.aws_cloudwatch_logs_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS CloudWatch Logs][url.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
-| [**`aws_kinesis_streams`**][docs.aws_kinesis_streams_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS Kinesis Data Stream][url.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
-| [**`aws_s3`**][docs.aws_s3_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [AWS S3][url.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
-| [**`blackhole`**][docs.blackhole_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
-| [**`clickhouse`**][docs.clickhouse_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http]. |
-| [**`console`**][docs.console_sink] | [Streams](#streaming) [`log`][docs.log_event] and [`metric`][docs.metric_event] events to the console, `STDOUT` or `STDERR`. |
-| [**`elasticsearch`**][docs.elasticsearch_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to [Elasticsearch][url.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
-| [**`file`**][docs.file_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a file. |
-| [**`http`**][docs.http_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a generic HTTP endpoint. |
-| [**`kafka`**][docs.kafka_sink] | [Streams](#streaming) [`log`][docs.log_event] events to [Apache Kafka][url.kafka] via the [Kafka protocol][url.kafka_protocol]. |
-| [**`prometheus`**][docs.prometheus_sink] | [Exposes](#exposing-and-scraping) [`metric`][docs.metric_event] events to [Prometheus][url.prometheus] metrics service. |
-| [**`splunk_hec`**][docs.splunk_hec_sink] | [Batches](#buffers-and-batches) [`log`][docs.log_event] events to a [Splunk HTTP Event Collector][url.splunk_hec]. |
-| [**`tcp`**][docs.tcp_sink] | [Streams](#streaming) [`log`][docs.log_event] events to a TCP connection. |
-| [**`vector`**][docs.vector_sink] | [Streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance. |
+| [**`aws_cloudwatch_logs`**][docs.sinks.aws_cloudwatch_logs] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_kinesis_streams`**][docs.sinks.aws_kinesis_streams] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
+| [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
+| [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
+| [**`clickhouse`**][docs.sinks.clickhouse] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]. |
+| [**`console`**][docs.sinks.console] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`. |
+| [**`elasticsearch`**][docs.sinks.elasticsearch] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). |
+| [**`file`**][docs.sinks.file] | [Streams](#streaming) [`log`][docs.data-model.log] events to a file. |
+| [**`http`**][docs.sinks.http] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint. |
+| [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
+| [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
+| [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
+| [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
-[+ request a new sink][url.new_sink]
+[+ request a new sink][urls.new_sink]
 
 
-[docs.aws_cloudwatch_logs_sink]: ../../../usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ../../../usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ../../../usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ../../../usage/configuration/sinks/blackhole.md
-[docs.clickhouse_sink]: ../../../usage/configuration/sinks/clickhouse.md
-[docs.console_sink]: ../../../usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ../../../usage/configuration/sinks/elasticsearch.md
-[docs.event]: ../../../about/data-model/README.md#event
-[docs.file_sink]: ../../../usage/configuration/sinks/file.md
-[docs.http_sink]: ../../../usage/configuration/sinks/http.md
-[docs.kafka_sink]: ../../../usage/configuration/sinks/kafka.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.pipelines]: ../../../usage/configuration/README.md#composition
-[docs.prometheus_sink]: ../../../usage/configuration/sinks/prometheus.md
-[docs.splunk_hec_sink]: ../../../usage/configuration/sinks/splunk_hec.md
-[docs.tcp_sink]: ../../../usage/configuration/sinks/tcp.md
-[docs.vector_sink]: ../../../usage/configuration/sinks/vector.md
-[images.sinks]: ../../../assets/sinks.svg
-[url.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
-[url.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
-[url.aws_s3]: https://aws.amazon.com/s3/
-[url.clickhouse]: https://clickhouse.yandex/
-[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[url.elasticsearch]: https://www.elastic.co/products/elasticsearch
-[url.kafka]: https://kafka.apache.org/
-[url.kafka_protocol]: https://kafka.apache.org/protocol
-[url.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.prometheus]: https://prometheus.io/
-[url.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[assets.sinks]: ../../../assets/sinks.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
+[docs.sinks.aws_cloudwatch_logs]: ../../../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_kinesis_streams]: ../../../usage/configuration/sinks/aws_kinesis_streams.md
+[docs.sinks.aws_s3]: ../../../usage/configuration/sinks/aws_s3.md
+[docs.sinks.blackhole]: ../../../usage/configuration/sinks/blackhole.md
+[docs.sinks.clickhouse]: ../../../usage/configuration/sinks/clickhouse.md
+[docs.sinks.console]: ../../../usage/configuration/sinks/console.md
+[docs.sinks.elasticsearch]: ../../../usage/configuration/sinks/elasticsearch.md
+[docs.sinks.file]: ../../../usage/configuration/sinks/file.md
+[docs.sinks.http]: ../../../usage/configuration/sinks/http.md
+[docs.sinks.kafka]: ../../../usage/configuration/sinks/kafka.md
+[docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
+[docs.sinks.splunk_hec]: ../../../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.tcp]: ../../../usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ../../../usage/configuration/sinks/vector.md
+[urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
+[urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.clickhouse]: https://clickhouse.yandex/
+[urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
+[urls.kafka]: https://kafka.apache.org/
+[urls.kafka_protocol]: https://kafka.apache.org/protocol
+[urls.new_sink]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.prometheus]: https://prometheus.io/
+[urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M

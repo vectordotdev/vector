@@ -4,7 +4,7 @@ description: Install Vector through the YUM package manager
 
 # YUM Package Manager
 
-Vector can be installed through the [YUM package manager][url.yum] which is
+Vector can be installed through the [YUM package manager][urls.yum] which is
 generally used on CentOS.
 
 ## Install
@@ -43,7 +43,7 @@ Vector in the [Configuration][docs.configuration] section.
 
 ## Administering
 
-Vector can be managed through the [Systemd][url.systemd] service manager:
+Vector can be managed through the [Systemd][urls.systemd] service manager:
 
 {% page-ref page="../../../usage/administration" %}
 
@@ -60,6 +60,6 @@ sudo yum upgrade vector
 ```
 
 
-[docs.configuration]: ../../../usage/configuration/README.md
-[url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[url.yum]: http://yum.baseurl.org/
+[docs.configuration]: ../../../usage/configuration
+[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.yum]: http://yum.baseurl.org/

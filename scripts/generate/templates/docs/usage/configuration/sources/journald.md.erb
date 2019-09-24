@@ -40,7 +40,7 @@ MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -72,7 +72,11 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as `"host"`, and parses `"_SOURCE_REALTIME_TIMESTAMP"` into `"timestamp"`. All other fields from journald are kept intact from the source record. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+Vector extracts the `"MESSAGE"` field as `"message"`, `"_HOSTNAME"` as
+`"host"`, and parses `"_SOURCE_REALTIME_TIMESTAMP"` into `"timestamp"`. All
+other fields from journald are kept intact from the source record. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 

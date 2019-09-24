@@ -8,7 +8,7 @@
 
 ## Examples
 
-The `http` sink batches [`log`][docs.log_event] up to the `batch_size` or
+The `http` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to a generic HTTP
 endpoint. The encoding is dictated by the `encoding` option. For example:
 
@@ -36,7 +36,7 @@ HTTP authentication is controlled via the `Authorization` header which you can
 set with the `headers` option. For convenience, Vector also supports the
 `basic_auth.username` and `basic_auth.password` options which handle setting the
 `Authorization` header for the [base access authentication
-scheme][url.basic_auth].
+scheme][urls.basic_auth].
 
 
 ## Troubleshooting

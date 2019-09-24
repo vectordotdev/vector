@@ -12,17 +12,17 @@ description: Batches `log` events to Clickhouse via the `HTTP` Interface.
 
 # clickhouse sink
 
-![][images.clickhouse_sink]
+![][assets.clickhouse_sink]
 
 {% hint style="warning" %}
 The `clickhouse` sink is in beta. Please see the current
-[enhancements][url.clickhouse_sink_enhancements] and
-[bugs][url.clickhouse_sink_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_clickhouse_sink_issue]
+[enhancements][urls.clickhouse_sink_enhancements] and
+[bugs][urls.clickhouse_sink_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_clickhouse_sink_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.log_event] events to [Clickhouse][url.clickhouse] via the [`HTTP` Interface][url.clickhouse_http].
+The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http].
 
 ## Config File
 
@@ -170,12 +170,12 @@ type is described in more detail below:
 
 | Compression | Description |
 |:------------|:------------|
-| `gzip` | The payload will be compressed in [Gzip][url.gzip] format before being sent. |
+| `gzip` | The payload will be compressed in [Gzip][urls.gzip] format before being sent. |
 
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -183,7 +183,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -213,7 +213,7 @@ more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_clickhouse_sink_issue].
+with the Vector team by [opening an issie][urls.new_clickhouse_sink_issue].
 
 ### Retry Policy
 
@@ -234,38 +234,38 @@ and result in deuplicate data downstream.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `clickhouse_sink` issues][url.clickhouse_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_clickhouse_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_clickhouse_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `clickhouse_sink` issues][urls.clickhouse_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_clickhouse_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_clickhouse_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.clickhouse_sink_issues] - [enhancements][url.clickhouse_sink_enhancements] - [bugs][url.clickhouse_sink_bugs]
-* [**Source code**][url.clickhouse_sink_source]
+* [**Issues**][urls.clickhouse_sink_issues] - [enhancements][urls.clickhouse_sink_enhancements] - [bugs][urls.clickhouse_sink_bugs]
+* [**Source code**][urls.clickhouse_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.clickhouse_sink]: ../../../assets/clickhouse-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.clickhouse_sink]: ../../../assets/clickhouse-sink.svg
-[url.clickhouse]: https://clickhouse.yandex/
-[url.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[url.clickhouse_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+bug%22
-[url.clickhouse_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+enhancement%22
-[url.clickhouse_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
-[url.clickhouse_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
-[url.gzip]: https://www.gzip.org/
-[url.new_clickhouse_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+bug
-[url.new_clickhouse_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+enhancement
-[url.new_clickhouse_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse
-[url.vector_chat]: https://chat.vector.dev
+[urls.clickhouse]: https://clickhouse.yandex/
+[urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.clickhouse_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+bug%22
+[urls.clickhouse_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22+label%3A%22Type%3A+enhancement%22
+[urls.clickhouse_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+clickhouse%22
+[urls.clickhouse_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/clickhouse.rs
+[urls.gzip]: https://www.gzip.org/
+[urls.new_clickhouse_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+bug
+[urls.new_clickhouse_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse&labels=Type%3A+enhancement
+[urls.new_clickhouse_sink_issue]: https://github.com/timberio/vector/issues/new?labels=sink%3A+clickhouse
+[urls.vector_chat]: https://chat.vector.dev

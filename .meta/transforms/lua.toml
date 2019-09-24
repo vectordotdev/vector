@@ -1,5 +1,5 @@
 [transforms.lua]
-allow_you_to_description = "transform events with a full embedded [Lua][url.lua] engine"
+allow_you_to_description = "transform events with a full embedded [Lua][urls.lua] engine"
 beta = true
 function_categories = ["program"]
 guides = []

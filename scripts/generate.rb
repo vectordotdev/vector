@@ -15,22 +15,13 @@
 # Setup
 #
 
-# Changes into the release-prepare directory so that we can load the
-# Bundler dependencies. Unfortunately, Bundler does not provide a way
-# load a Gemfile outside of the cwd.
-Dir.chdir "scripts/generate"
+require_relative "setup"
 
 #
 # Requires
 #
 
-require "rubygems"
-require "bundler"
-Bundler.require(:default)
-
-require_relative "util/core_ext/object"
-require_relative "util/printer"
-require_relative "generate/post_processors/link_checker"
+require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_referencer"
 require_relative "generate/post_processors/section_sorter"
 require_relative "generate/post_processors/toml_syntax_switcher"
@@ -40,33 +31,61 @@ require_relative "generate/core_ext/hash"
 require_relative "generate/core_ext/string"
 
 #
-# Includes
-#
-
-include Printer
-
-#
 # Functions
 #
+
+def doc_valid?(file_or_dir)
+  parts = file_or_dir.split("#", 2)
+  path = DOCS_ROOT + parts[0]
+  anchor = parts[1]
+
+  if File.exists?(path)
+    if !anchor.nil?
+      file_path = File.directory?(path) ? "#{path}/README.md" : path
+      content = File.read(file_path)
+      headings = content.scan(/\n###?#?#? (.*)\n/).flatten.uniq
+      anchors = headings.collect(&:parameterize)
+      anchors.include?(anchor)
+    else
+      true
+    end
+  else
+    false
+  end
+end
+
+def link_valid?(value)
+  if value.start_with?("/")
+    doc_valid?(value)
+  else
+    url_valid?(value)
+  end
+end
 
 def post_process(content, doc, links)
   content = PostProcessors::TOMLSyntaxSwitcher.switch!(content)
   content = PostProcessors::SectionSorter.sort!(content)
   content = PostProcessors::OptionReferencer.reference!(content)
-  content = PostProcessors::LinkChecker.check!(content, doc, links)
+  content = PostProcessors::LinkDefiner.define!(content, doc, links)
   content
 end
 
-#
-# Constants
-#
+def url_valid?(url)
+  uri = URI.parse(url)
+  req = Net::HTTP.new(uri.host, uri.port)
+  req.open_timeout = 500
+  req.read_timeout = 1000
+  req.ssl_timeout = 1000
+  req.use_ssl = true if uri.scheme == 'https'
+  path = uri.path == "" ? "/" : uri.path
 
-VECTOR_ROOT = File.join(Dir.pwd.split(File::SEPARATOR)[0..-3])
-
-DOCS_ROOT = File.join(VECTOR_ROOT, "docs")
-META_ROOT = File.join(VECTOR_ROOT, ".meta")
-TEMPLATES_DIR = "#{Dir.pwd}/templates"
-VECTOR_DOCS_HOST = "https://docs.vector.dev"
+  begin
+    res = req.request_head(path)
+    res.code.to_i != 404
+  rescue Errno::ECONNREFUSED
+    return false
+  end
+end
 
 #
 # Header
@@ -75,17 +94,17 @@ VECTOR_DOCS_HOST = "https://docs.vector.dev"
 title("Generating files...")
 
 #
-# Options
-#
-
-check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
-
-#
 # Setup
 #
 
-metadata = Metadata.load(META_ROOT, check_urls: check_urls)
-templates = Templates.new(metadata)
+metadata =
+  begin
+    Metadata.load(META_ROOT, DOCS_ROOT)
+  rescue Exception => e
+    error!(e.message)
+  end
+
+templates = Templates.new(TEMPLATES_DIR, metadata)
 
 #
 # Create missing component templates
@@ -105,28 +124,30 @@ end
 # Render templates
 #
 
-Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).
+Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
   select { |path| !templates.partial?(path) }.
   each do |template_path|
-    content = templates.render(template_path.gsub(/^templates\//, "").gsub(/\.erb$/, ""))
-    target = template_path.gsub(/^templates\//, "#{VECTOR_ROOT}/").gsub(/\.erb$/, "")
-    content = post_process(content, target, metadata.links)
+    target_file = template_path.gsub(/^#{TEMPLATES_DIR}\//, "").gsub(/\.erb$/, "")
+    target_path = "#{ROOT_DIR}/#{target_file}"
+    content = templates.render(target_file)
+    content = post_process(content, target_path, metadata.links)
+
 
     # Create the file if it does not exist
-    if !File.exists?(target)
-      File.open(target, "w") {}
+    if !File.exists?(target_path)
+      File.open(target_path, "w") {}
     end
 
-    current_content = File.read(target)
+    current_content = File.read(target_path)
 
     if current_content != content
       action = false ? "Will be changed" : "Changed"
-      say("#{action} - #{target.gsub("../../", "")}", color: :green)
-      File.write(target, content)
+      say("#{action} - #{target_file}", color: :green)
+      File.write(target_path, content)
     else
       action = false ? "Will not be changed" : "Not changed"
-      say("#{action} - #{target.gsub("../../", "")}", color: :blue)
+      say("#{action} - #{target_file}", color: :blue)
     end
   end
 
@@ -137,7 +158,7 @@ Dir.glob("templates/**/*.erb", File::FNM_DOTMATCH).
 title("Post processing generated files...")
 
 docs = Dir.glob("#{DOCS_ROOT}/**/*.md").to_a
-docs = docs + ["#{VECTOR_ROOT}/README.md"]
+docs = docs + ["#{ROOT_DIR}/README.md"]
 docs = docs - ["#{DOCS_ROOT}/SUMMARY.md"]
 docs.each do |doc|
   content = File.read(doc)
@@ -147,5 +168,31 @@ docs.each do |doc|
     content = post_process(content, doc, metadata.links)
     File.write(doc, content)
     say("Processed - #{doc}", color: :green)
+  end
+end
+
+#
+# Check URLs
+#
+
+title("Checking URLs...")
+
+check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+
+if check_urls
+  metadata.links.values.to_a.sort.each do |id, value|
+    if !link_valid?(value)
+      error!(
+        <<~EOF
+        Link invalid!
+
+          #{value}
+
+        Please make sure this path or URL exists.
+        EOF
+      )
+    else
+      say("Valid - #{id} - #{value}", color: :green)
+    end
   end
 end

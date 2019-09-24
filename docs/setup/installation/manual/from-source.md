@@ -7,9 +7,9 @@ description: Install Vector from the Vector source code
 Installing Vector from source should be a last resort if Vector does not
 support your [platform][docs.platforms],
 [operating system][docs.operating_systems], or provide a pre-built
-[archive][docs.from_archives]. Because Vector is written in [Rust][url.rust]
+[archive][docs.from_archives]. Because Vector is written in [Rust][urls.rust]
 it can compile to a single static binary. You can view an example of this
-in the [musl builder Docker image][url.musl_builder_docker_image].
+in the [musl builder Docker image][urls.musl_builder_docker_image].
 
 ## Installation
 
@@ -95,8 +95,8 @@ Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
 
-We highly recommend creating a [data directory][docs.data_directory] that Vector
-can use:
+We highly recommend creating a [data directory][docs.configuration#data-directory]
+that Vector can use:
 
 ```
 mkdir /var/lib/vector
@@ -138,10 +138,10 @@ cp -a distribution/systemd/vector /etc/systemd/system
 Simply follow the same [installation instructions above](#installation).
 
 
-[docs.configuration]: ../../../usage/configuration/README.md
-[docs.data_directory]: ../../../usage/configuration/README.md#data-directory
+[docs.configuration#data-directory]: ../../../usage/configuration#data-directory
+[docs.configuration]: ../../../usage/configuration
 [docs.from_archives]: ../../../setup/installation/manual/from-archives.md
-[docs.operating_systems]: ../../../setup/installation/operating-systems/README.md
-[docs.platforms]: ../../../setup/installation/platforms/README.md
-[url.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-[url.rust]: https://www.rust-lang.org/
+[docs.operating_systems]: ../../../setup/installation/operating-systems
+[docs.platforms]: ../../../setup/installation/platforms
+[urls.musl_builder_docker_image]: https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
+[urls.rust]: https://www.rust-lang.org/

@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:18.04
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
@@ -13,10 +13,12 @@ RUN apt-get update && \
   build-essential \
   curl \
   git \
+  libssl-dev \
   locales \
   python3-pip \
   rename \
   ruby-full \
+  zlib1g-dev \
 	wget
 
 # AWS CLI
@@ -42,3 +44,9 @@ ENV LANG en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 RUN locale-gen "en_US.UTF-8"
 RUN dpkg-reconfigure locales
+
+# Install gems to reduce setup time
+RUN gem install bundler
+COPY checker/Gemfile Gemfile
+RUN bundle install
+RUN rm Gemfile

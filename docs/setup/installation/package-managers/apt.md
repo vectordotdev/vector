@@ -4,7 +4,7 @@ description: Install Vector through the APT package manager
 
 # APT Package Manager
 
-Vector can be installed through the [APT package manager][url.apt] which is
+Vector can be installed through the [APT package manager][urls.apt] which is
 generally used on Debian and Ubuntu systems.
 
 ## Install
@@ -43,7 +43,7 @@ Vector in the [Configuration][docs.configuration] section.
 
 ## Administering
 
-Vector can be managed through the [Systemd][url.systemd] service manager:
+Vector can be managed through the [Systemd][urls.systemd] service manager:
 
 {% page-ref page="../../../usage/administration" %}
 
@@ -62,6 +62,6 @@ sudo apt-get install vector
 ```
 
 
-[docs.configuration]: ../../../usage/configuration/README.md
-[url.apt]: https://wiki.debian.org/Apt
-[url.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[docs.configuration]: ../../../usage/configuration
+[urls.apt]: https://wiki.debian.org/Apt
+[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/

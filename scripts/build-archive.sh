@@ -4,7 +4,7 @@
 #
 # SUMMARY
 #
-#   Used to build a tar.gz archive for the specified $TARGET and $VERSION
+#   Used to build a tar.gz archive for the specified $TARGET
 #
 # ENV VARS
 #
@@ -13,7 +13,6 @@
 #   $RUST_LTO - possible values are "lto", "lto=thin", ""
 #   $STRIP - whether or not to strip the binary
 #   $TARGET - a target triple. ex: x86_64-apple-darwin
-#   $VERSION - the version of Vector, can be obtained via `make version`
 
 NATIVE_BUILD=${NATIVE_BUILD:-}
 RUST_LTO=${RUST_LTO:-}
@@ -27,7 +26,6 @@ fi
 set -eu
 
 echo "Building Vector archive"
-echo "Version: $VERSION"
 echo "Target: $TARGET"
 echo "Native build: $NATIVE_BUILD"
 echo "Features: $FEATURES"
@@ -41,7 +39,7 @@ else
   target_dir="target"
 fi
 
-archive_dir_name="vector-$VERSION"
+archive_dir_name="vector-$TARGET"
 archive_dir="$target_dir/$archive_dir_name"
 
 # Build
@@ -109,13 +107,13 @@ cp -a distribution/init.d/vector $archive_dir/etc/init.d
 # Build the release tar
 _old_dir=$(pwd)
 cd $target_dir
-tar -czvf vector-$VERSION-$TARGET.tar.gz ./$archive_dir_name
+tar -czvf vector-$TARGET.tar.gz ./$archive_dir_name
 cd $_old_dir
 
 # Move to the artifacts dir
 mkdir -p $artifacts_dir
-mv -v $target_dir/vector-$VERSION-$TARGET.tar.gz $artifacts_dir
-echo "Moved $target_dir/vector-$VERSION-$TARGET.tar.gz to $artifacts_dir"
+mv -v $target_dir/vector-$TARGET.tar.gz $artifacts_dir
+echo "Moved $target_dir/vector-$TARGET.tar.gz to $artifacts_dir"
 
 # Cleanup
 rm -rf $archive_dir

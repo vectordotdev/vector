@@ -12,17 +12,17 @@ description: Ingests data through another upstream Vector instance and outputs `
 
 # vector source
 
-![][images.vector_source]
+![][assets.vector_source]
 
 {% hint style="warning" %}
 The `vector` source is in beta. Please see the current
-[enhancements][url.vector_source_enhancements] and
-[bugs][url.vector_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_vector_source_issue]
+[enhancements][urls.vector_source_enhancements] and
+[bugs][urls.vector_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_vector_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.log_event] and [`metric`][docs.metric_event] events.
+The `vector` source ingests data through another upstream Vector instance and outputs [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events.
 
 ## Config File
 
@@ -67,11 +67,11 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Encoding
 
-Data is encoded via Vector's [event protobuf][url.event_proto] before it is sent over the wire.
+Data is encoded via Vector's [event protobuf][urls.event_proto] before it is sent over the wire.
 
 ### Environment Variables
 
@@ -79,7 +79,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Message Acking
@@ -93,37 +93,37 @@ Upstream Vector instances forward data to downstream Vector instances via the TC
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `vector_source` issues][url.vector_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_vector_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_vector_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `vector_source` issues][urls.vector_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_vector_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_vector_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.vector_source_issues] - [enhancements][url.vector_source_enhancements] - [bugs][url.vector_source_bugs]
-* [**Source code**][url.vector_source_source]
+* [**Issues**][urls.vector_source_issues] - [enhancements][urls.vector_source_enhancements] - [bugs][urls.vector_source_bugs]
+* [**Source code**][urls.vector_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration/README.md#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.vector_source]: ../../../assets/vector-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.vector_source]: ../../../assets/vector-source.svg
-[url.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
-[url.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+bug
-[url.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+enhancement
-[url.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector
-[url.vector_chat]: https://chat.vector.dev
-[url.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+bug%22
-[url.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+enhancement%22
-[url.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
-[url.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs
+[urls.event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[urls.new_vector_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+bug
+[urls.new_vector_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector&labels=Type%3A+enhancement
+[urls.new_vector_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+vector
+[urls.vector_chat]: https://chat.vector.dev
+[urls.vector_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+bug%22
+[urls.vector_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22+label%3A%22Type%3A+enhancement%22
+[urls.vector_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+vector%22
+[urls.vector_source_source]: https://github.com/timberio/vector/tree/master/src/sources/vector.rs

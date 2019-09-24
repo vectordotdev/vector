@@ -1,6 +1,6 @@
 [transforms.regex_parser]
 allow_you_to_description = """\
-parse a log field's value with a [Regular Expression][url.regex]\
+parse a log field's value with a [Regular Expression][urls.regex]\
 """
 function_categories = ["parse"]
 guides = []
@@ -52,7 +52,7 @@ examples = [
 null = false
 description = """\
 A definition of mapped log field types. They key is the log field name and \
-the value is the type. [`strftime` specifiers][url.strftime_specifiers] are \
+the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are \
 supported for the `timestamp` type.\
 """
 
