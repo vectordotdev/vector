@@ -1,5 +1,6 @@
 use super::Error;
 use futures::{try_ready, Async, Future, Poll};
+use std::borrow::Cow;
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
@@ -10,8 +11,8 @@ pub trait RetryLogic: Clone {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
-    fn should_retry_response(&self, _response: &Self::Response) -> bool {
-        false
+    fn should_retry_response(&self, _response: &Self::Response) -> Option<Cow<str>> {
+        None
     }
 }
 
@@ -65,8 +66,8 @@ where
                     return None;
                 }
 
-                if self.logic.should_retry_response(response) {
-                    warn!(message = "retrying after response.");
+                if let Some(ref reason) = self.logic.should_retry_response(response) {
+                    warn!(message = "retrying after response.", %reason);
                     Some(self.build_retry())
                 } else {
                     None
