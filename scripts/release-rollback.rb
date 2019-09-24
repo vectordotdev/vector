@@ -7,39 +7,7 @@
 #   Rolls back a fresh release. This should only be used in situations
 #   where the release process failed.
 
-#
-# Setup
-#
-
-# Changes into the scripts directory so that we can load the Bundler
-# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
-# outside of the cwd.
-Dir.chdir "scripts"
-
-#
-# Requires
-#
-
-require "rubygems"
-require "bundler"
-Bundler.require(:default)
-
-require_relative "util"
-
-#
-# Includes
-#
-
-include Printer
-
-#
-# Constants
-#
-
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
-
-DOCS_ROOT = File.join(ROOT_DIR, "docs")
-META_ROOT = File.join(ROOT_DIR, ".meta")
+require_relative "setup"
 
 #
 # Commit

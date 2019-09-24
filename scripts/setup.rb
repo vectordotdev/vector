@@ -37,4 +37,5 @@ ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
 
 DOCS_ROOT = File.join(ROOT_DIR, "docs")
 META_ROOT = File.join(ROOT_DIR, ".meta")
+RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
