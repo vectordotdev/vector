@@ -231,6 +231,28 @@ class Templates
     render("_partials/_release_changes.md", binding)
   end
 
+  def release_notes(release)
+    render("_partials/_release_notes.md", binding)
+  end
+
+  def release_summary(release)
+    parts = []
+
+    if release.new_features.any?
+      parts << pluralize(release.new_features.size, "new feature")
+    end
+
+    if release.enhancements.any?
+      parts << pluralize(release.enhancements.size, "enhancement")
+    end
+
+    if release.bug_fixes.any?
+      parts << pluralize(release.bug_fixes.size, "bug fix")
+    end
+
+    parts.join(", ")
+  end
+
   def render(template_path, template_binding = nil)
     template_binding = binding if template_binding.nil?
     content = File.read("#{dir}/#{template_path}.erb")
