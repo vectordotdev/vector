@@ -8,6 +8,8 @@ module PostProcessors
   #
   # See the `Links` class for more info on how links are resoolved.
   class LinkDefiner
+    VECTOR_DOCS_HOST = "https://docs.vector.dev"
+    
     class << self
       def define!(*args)
         new(*args).define!

@@ -12,36 +12,13 @@
 # Setup
 #
 
-# Changes into the scripts directory so that we can load the Bundler
-# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
-# outside of the cwd.
-Dir.chdir "scripts"
-
-#
-# Requires
-#
-
-require "rubygems"
-require "bundler"
-Bundler.require(:default)
-
 require "time"
-require_relative "util/core_ext/object"
-require_relative "util/printer"
-require_relative "util/version"
-
-#
-# Includes
-#
-
-include Printer
+require_relative "setup"
 
 #
 # Constants
 #
 
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
-RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 TYPES = ["chore", "docs", "feat", "fix", "improvement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "improvement", "fix"]
 
