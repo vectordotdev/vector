@@ -14,6 +14,8 @@ ARG LLVM_GIT_COMMIT=48818e9f5d0f2d5978a9b43ad1a2e8d0b83f6aa0
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
 ARG LINUX_HEADERS_VERSION=5.2.9
+# OpenSSL needs to be compiled against MUSL too, so we install it from source.
+ARG OPENSSL_VERSION=1.0.2t
 
 # Locations for produced tools and libraries.
 ARG RUST_PREFIX=/opt/rust
@@ -78,6 +80,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
   https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$LINUX_HEADERS_VERSION.tar.xz | \
   tar xJf -
 ENV LINUX_DIR $SRC_DIR/linux-$LINUX_HEADERS_VERSION
+
+ARG OPENSSL_VERSION
+RUN curl --proto '=https' --tlsv1.2 -sSf \
+  https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz| \
+  tar xzf -
+ENV OPENSSL_DIR=$SRC_DIR/openssl-$OPENSSL_VERSION
 
 # Install build dependencies.
 RUN apt-get update && apt-get -y install curl ninja-build cmake python3-distutils
@@ -181,6 +189,23 @@ RUN mkdir build && \
   .. && \
   ninja install
 
+# Install OpenSSL.
+WORKDIR $OPENSSL_DIR
+# OpenSSL tries to use secure_getenv function when compiled with MUSL here
+# https://github.com/openssl/openssl/blob/master/crypto/getenv.c. However, this
+# function was added to MUSL only in 1.23 release, while Rust still uses 1.22.
+# So until there is a Rust version using MUSL 1.23 we need to resort to patching
+# OpenSSL to disallow usage of unsupported secure_getenv function.
+COPY openssl-disable-secure-getenv.patch .
+RUN patch -p1 < openssl-disable-secure-getenv.patch
+ENV CC=clang
+ENV CXX=clang++
+ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
+ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
+ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++ -lc++abi -lunwind -lc"
+RUN ./config --prefix=$LIBS_PREFIX && \
+  make install
+
 # Create wrappers for Clang that automatically use correct libraries and start files.
 # See
 # https://blogs.gentoo.org/gsoc2016-native-clang/2016/05/31/build-gnu-free-executables-with-clang/
@@ -189,7 +214,7 @@ RUN mkdir build && \
 ENV MUSL_CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
-ENV MUSL_LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -lc"
+ENV MUSL_LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lssl -lcrypto -lc++ -lc++abi -lunwind -lc"
 ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o"
 
 RUN mkdir -p $LIBS_PREFIX/bin
@@ -252,7 +277,7 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git
+RUN apt-get update && apt-get install -y build-essential pkg-config
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to
