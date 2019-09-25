@@ -1,0 +1,7 @@
+[sources.docker]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "extract logs from the docker daemon"
