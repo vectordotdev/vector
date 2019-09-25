@@ -88,6 +88,7 @@
     * [kafka sink][docs.sinks.kafka]
     * [prometheus sink][docs.sinks.prometheus]
     * [splunk_hec sink][docs.sinks.splunk_hec]
+    * [statsd sink][docs.sinks.statsd]
     * [tcp sink][docs.sinks.tcp]
     * [vector sink][docs.sinks.vector]
   * [Specification][docs.configuration.specification]
@@ -155,6 +156,7 @@
 [docs.sinks.kafka]: ./usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ./usage/configuration/sinks/prometheus.md
 [docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ./usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ./usage/configuration/sinks/vector.md
 [docs.sinks]: ./usage/configuration/sinks

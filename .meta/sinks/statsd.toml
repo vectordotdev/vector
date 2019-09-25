@@ -1,0 +1,23 @@
+[sinks.statsd]
+batch_size = 1432
+batch_timeout = 1
+beta = true
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = false
+input_types = ["metric"]
+write_to_description = "[StatsD][urls.statsd] metrics service"
+
+[sinks.statsd.options.address]
+type = "string"
+examples = ["127.0.0.1:8125"]
+null = true
+default = "127.0.0.1:8125"
+description = "The UDP socket address to send stats to."
+
+[sinks.statsd.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = "A prefix that will be added to all metric names."

@@ -160,6 +160,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
 | [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
 | [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
@@ -225,6 +226,7 @@ the License.
 [docs.sinks.kafka]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.sinks.prometheus]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.sinks.splunk_hec]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.sinks.statsd]: https://docs.vector.dev/usage/configuration/sinks/statsd
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sinks.vector]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
@@ -277,6 +279,7 @@ the License.
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust]: https://www.rust-lang.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
