@@ -2,6 +2,8 @@ use crate::{event::Event, sinks, sources, transforms};
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
 mod validation;
@@ -23,11 +25,75 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
 }
 
+#[derive(Debug, Snafu)]
+pub enum DataDirError {
+    #[snafu(display("data_dir option required, but not given here or globally"))]
+    MissingDataDir,
+    #[snafu(display("data_dir {:?} does not exist", data_dir))]
+    DoesNotExist { data_dir: PathBuf },
+    #[snafu(display("data_dir {:?} is not writable", data_dir))]
+    NotWritable { data_dir: PathBuf },
+    #[snafu(display(
+        "Could not create subdirectory {:?} inside of data dir {:?}: {}",
+        subdir,
+        data_dir,
+        source
+    ))]
+    CouldNotCreate {
+        subdir: PathBuf,
+        data_dir: PathBuf,
+        source: std::io::Error,
+    },
+}
+
 impl GlobalOptions {
     pub fn from(config: &Config) -> Self {
         Self {
             data_dir: config.data_dir.clone(),
         }
+    }
+
+    /// Resolve the `data_dir` option in either the global or local
+    /// config, and validate that it exists and is writable.
+    pub fn resolve_and_validate_data_dir(
+        &self,
+        local_data_dir: Option<&PathBuf>,
+    ) -> crate::Result<PathBuf> {
+        let data_dir = local_data_dir
+            .or(self.data_dir.as_ref())
+            .ok_or_else(|| DataDirError::MissingDataDir)
+            .map_err(|err| Box::new(err))?
+            .to_path_buf();
+        if !data_dir.exists() {
+            return Err(DataDirError::DoesNotExist { data_dir }.into());
+        }
+        let readonly = std::fs::metadata(&data_dir)
+            .map(|meta| meta.permissions().readonly())
+            .unwrap_or(true);
+        if readonly {
+            return Err(DataDirError::NotWritable { data_dir }.into());
+        }
+        Ok(data_dir)
+    }
+
+    /// Resolve the `data_dir` option using
+    /// `resolve_and_validate_data_dir` and then ensure a named
+    /// subdirectory exists.
+    pub fn resolve_and_make_data_subdir(
+        &self,
+        local: Option<&PathBuf>,
+        subdir: &str,
+    ) -> crate::Result<PathBuf> {
+        let data_dir = self.resolve_and_validate_data_dir(local)?;
+
+        let mut data_subdir = data_dir.clone();
+        data_subdir.push(subdir);
+
+        DirBuilder::new()
+            .recursive(true)
+            .create(&data_subdir)
+            .with_context(|| CouldNotCreate { subdir, data_dir })?;
+        Ok(data_subdir)
     }
 }
 
@@ -45,7 +111,7 @@ pub trait SourceConfig: core::fmt::Debug {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<sources::Source, String>;
+    ) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
 }
@@ -66,7 +132,7 @@ pub trait SinkConfig: core::fmt::Debug {
     fn build(
         &self,
         acker: crate::buffers::Acker,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), String>;
+    ) -> crate::Result<(sinks::RouterSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 }
@@ -80,7 +146,7 @@ pub struct TransformOuter {
 
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug {
-    fn build(&self) -> Result<Box<dyn transforms::Transform>, String>;
+    fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 

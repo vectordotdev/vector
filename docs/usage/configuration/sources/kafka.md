@@ -12,47 +12,33 @@ description: Ingests data through Kafka 0.9 or later and outputs `log` events.
 
 # kafka source
 
-![][images.kafka_source]
+![][assets.kafka_source]
 
 {% hint style="warning" %}
 The `kafka` source is in beta. Please see the current
-[enhancements][url.kafka_source_enhancements] and
-[bugs][url.kafka_source_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_kafka_source_issue]
+[enhancements][urls.kafka_source_enhancements] and
+[bugs][urls.kafka_source_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_kafka_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.log_event] events.
+The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
   type = "kafka" # must be: "kafka"
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
-  topics = ["topic-1", "topic-2", "topic-3"]
-  
-  auto_offset_reset = "smallest"
-  key_field = "user_id" # no default
-  session_timeout_ms = 5000 # milliseconds
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  type = "kafka"
-  bootstrap_servers = "<string>"
-  group_id = "<string>"
-  topics = ["<string>", ...]
-  auto_offset_reset = "<string>"
-  key_field = "<string>"
-  session_timeout_ms = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.kafka_source]
   # The component type
@@ -76,11 +62,12 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   # * no default
   group_id = "consumer-group-name"
 
-  # The Kafka topics names to read events from.
+  # The Kafka topics names to read events from. Regex is supported if the topic
+  # begins with `^`.
   # 
   # * required
   # * no default
-  topics = ["topic-1", "topic-2", "topic-3"]
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
 
   # If offsets for consumer group do not exist, set them using this strategy.
   # librdkafka documentation for `auto.offset.reset` option for explanation.
@@ -95,9 +82,9 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   auto_offset_reset = "end"
   auto_offset_reset = "error"
 
-  # The field name to use for the topic key. If unspecified, the key would not be
-  # added to the events. If the message has null key, then this field would not
-  # be added to the event.
+  # The log field name to use for the topic key. If unspecified, the key would
+  # not be added to the log event. If the message has null key, then this field
+  # would not be added to the log event.
   # 
   # * optional
   # * no default
@@ -114,20 +101,6 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "kafka"` |
-| `bootstrap_servers` | `string` | A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.<br />`required` `example: (see above)` |
-| `group_id` | `string` | The consumer group name to be used to consume events from Kafka.<br />`required` `example: "consumer-group-name"` |
-| `topics` | `[string]` | The Kafka topics names to read events from.<br />`required` `example: (see above)` |
-| **OPTIONAL** | | |
-| `auto_offset_reset` | `string` | If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.<br />`default: "largest"` |
-| `key_field` | `string` | The field name to use for the topic key. If unspecified, the key would not be added to the events. If the message has null key, then this field would not be added to the event.<br />`no default` `example: "user_id"` |
-| `session_timeout_ms` | `int` | The Kafka session timeout in milliseconds.<br />`default: 10000` `unit: milliseconds` |
-
 ## Examples
 
 Given the following message in a Kafka topic:
@@ -140,7 +113,7 @@ Given the following message in a Kafka topic:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -152,7 +125,9 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
@@ -160,8 +135,8 @@ The "timestamp" and `"host"` keys were automatically added as context. You can f
 
 ### Delivery Guarantee
 
-Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 
 ### Environment Variables
 
@@ -169,43 +144,43 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `kafka_source` issues][url.kafka_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_kafka_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_kafka_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `kafka_source` issues][urls.kafka_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_kafka_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_kafka_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.kafka_source_issues] - [enhancements][url.kafka_source_enhancements] - [bugs][url.kafka_source_bugs]
-* [**Source code**][url.kafka_source_source]
+* [**Issues**][urls.kafka_source_issues] - [enhancements][urls.kafka_source_enhancements] - [bugs][urls.kafka_source_bugs]
+* [**Source code**][urls.kafka_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[assets.kafka_source]: ../../../assets/kafka-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.kafka_source]: ../../../assets/kafka-source.svg
-[url.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
-[url.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
-[url.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
-[url.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
-[url.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
-[url.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
-[url.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka
-[url.vector_chat]: https://chat.vector.dev
+[urls.kafka_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+bug%22
+[urls.kafka_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22+label%3A%22Type%3A+enhancement%22
+[urls.kafka_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+kafka%22
+[urls.kafka_source_source]: https://github.com/timberio/vector/tree/master/src/sources/kafka.rs
+[urls.new_kafka_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+bug
+[urls.new_kafka_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka&labels=Type%3A+enhancement
+[urls.new_kafka_source_issue]: https://github.com/timberio/vector/issues/new?labels=source%3A+kafka
+[urls.vector_chat]: https://chat.vector.dev

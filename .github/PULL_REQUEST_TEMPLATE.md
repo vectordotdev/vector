@@ -1,11 +1,18 @@
 <!--
-1, Describe your changes in a way that respects the time of your reviewer(s).
-2. Reference the appropriate issues via `Closes #123` or `Ref #123`.
-3. Use `make signoff` to sign your commits. See CONTRIBUTING.md for more info.
-4. Your PR title should follow the conventional commits format. See CONTRIBUTING.md for more info.
+**Your PR title must conform to the conventional commit spec!**
 
-Using Vector in production? Let us know! Add your company here:
+  <type>!?(<scope>): <description>
 
-https://github.com/timberio/vector/blob/master/.companies.toml
+  * `type` = chore, docs, enhancement, newfeat, perf
+  * `!` = signals a breaking change
+  * `scope` = https://github.com/timberio/vector/blob/master/.github/semantic.yml#L4
+  * `description` = short description of the change
 
+Examples:
+
+  * enhancement(file source): Added `sort` option to sort discovered files
+  * feat(new source): Initial `statsd` source
+  * fix(file source): Fixed a bug discovering new files
+  * perf(observability): Improved logging performance
+  * docs: Clarified `batch_size` option
 -->

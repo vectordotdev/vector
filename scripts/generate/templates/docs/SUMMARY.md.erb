@@ -1,0 +1,91 @@
+# Table of contents
+
+* [What Is Vector?](README.md)
+* [Use Cases](use-cases/README.md)
+  * [Reduce Lock-In](use-cases/lock-in.md)
+  * [Multi-Cloud](use-cases/multi-cloud.md)
+  * [Governance & Control](use-cases/governance.md)
+  * [Reduce Cost](use-cases/cost.md)
+  * [Security & Compliance](use-cases/security-and-compliance.md)
+  * [Backups & Archives](use-cases/backups.md)
+* [Performance](performance.md)
+* [Correctness](correctness.md)
+
+## About
+
+* [Concepts](about/concepts.md)
+* [Data Model](about/data-model/README.md)
+  * [Log Event](about/data-model/log.md)
+  * [Metric Event](about/data-model/metric.md)
+* [Guarantees](about/guarantees.md)
+
+## Setup
+
+* [Installation](setup/installation/README.md)
+  * [Platforms](setup/installation/platforms/README.md)
+    * [Docker](setup/installation/platforms/docker.md)
+  * [Package Managers](setup/installation/package-managers/README.md)
+    * [APT](setup/installation/package-managers/apt.md)
+    * [Homebrew](setup/installation/package-managers/homebrew.md)
+    * [YUM](setup/installation/package-managers/yum.md)
+  * [Operating Systems](setup/installation/operating-systems/README.md)
+    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
+    * [CentOS](setup/installation/operating-systems/centos.md)
+    * [Debian](setup/installation/operating-systems/debian.md)
+    * [MacOS](setup/installation/operating-systems/macos.md)
+    * [RHEL](setup/installation/operating-systems/rhel.md)
+    * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
+  * [Manual][docs.installation.manual]
+    * [From Archives][docs.from-archives]
+    * [From Source][docs.from-source]
+* [Getting Started][docs.getting-started]
+  * [Sending Your First Event][docs.sending-your-first-event]
+* [Deployment][docs.deployment]
+  * [Topologies][docs.deployment.topologies]
+  * [Roles][docs.roles]
+    * [Agent Role][docs.roles.agent]
+    * [Service Role][docs.roles.service]
+
+## Usage
+
+* [Configuration][docs.configuration]
+  * [Sources][docs.sources]
+    <%- metadata.sources.to_h.values.sort.each do |source| -%>
+    * [<%= source.name %> source][docs.sources.<%= source.name %>]
+    <%- end -%>
+  * [Transforms][docs.transforms]
+    <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
+    * [<%= transform.name %> transform][docs.transforms.<%= transform.name %>]
+    <%- end -%>
+  * [Sinks][docs.sinks]
+    <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
+    * [<%= sink.name %> sink][docs.sinks.<%= sink.name %>]
+    <%- end -%>
+  * [Specification][docs.configuration.specification]
+* [Administration][docs.administration]
+  * [Starting][docs.administration.starting]
+  * [Reloading][docs.administration.reloading]
+  * [Stopping][docs.administration.stopping]
+  * [Monitoring][docs.administration.monitoring]
+  * [Tuning][docs.administration.tuning]
+  * [Updating][docs.administration.updating]
+  * [Validating][docs.administration.validating]
+  * [Env Vars][docs.administration.env-vars]
+* [Guides][docs.guides]
+  * [Troubleshooting Guide][docs.guides.troubleshooting]
+
+## Resources
+
+* [Changelog][urls.vector_changelog]
+* [Community][urls.vector_community]
+* [Github Repo][urls.vector_repo]
+* [Releases][urls.vector_releases]
+* [Roadmap][urls.vector_roadmap]
+
+## Meta
+
+* [Conventions][docs.conventions]
+* [Glossary][docs.glossary]
+
+
+

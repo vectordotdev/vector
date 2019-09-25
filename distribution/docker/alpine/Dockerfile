@@ -1,31 +1,25 @@
-FROM alpine:3.10.1 AS builder
+FROM timberiodev/vector-builder-x86_64-unknown-linux-musl:latest AS builder
 
-RUN apk add git make cmake g++ gcc rust cargo snappy-dev protobuf-dev openssl-dev bash
+# RUN apk add git make cmake g++ gcc snappy-dev protobuf-dev openssl-dev bash curl
 RUN git clone https://github.com/timberio/vector && cd vector
 
 WORKDIR /vector
 
-ENV PROTOC /usr/bin/protoc
-
-# https://github.com/sfackler/rust-openssl/issues/604
-ENV OPENSSL_STATIC 1
-ENV OPENSSL_INCLUDE_DIR /usr/include
-ENV OPENSSL_LIB_DIR /usr/lib
-
-ENV LIBZ_SYS_STATIC 1
-
-RUN cargo build --release
+# We must do this so we can force the rustc version provided by
+# the container.
+RUN mv rust-toolchain rust-toolchain.bak
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
 RUN mkdir -p /release/bin
 RUN mkdir -p /release/etc/vector
-RUN cp -a target/release/vector /release/bin/
+RUN cp -a target/x86_64-unknown-linux-musl/release/vector /release/bin/
 RUN cp -a config/. /release/etc/vector/
 
 FROM alpine:3.10.1
 
-RUN apk --no-cache add libgcc libstdc++
+# RUN apk --no-cache add libgcc libstdc++
 
 COPY --from=builder /release/bin/* /usr/local/bin/
 COPY --from=builder /release/etc/vector /etc
 
-ENTRYPOINT ["/usr/local/bin/vector"] 
+ENTRYPOINT ["/usr/local/bin/vector"]

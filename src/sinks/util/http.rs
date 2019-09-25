@@ -4,6 +4,7 @@ use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -21,19 +22,64 @@ pub struct HttpService {
 }
 
 impl HttpService {
+    pub fn builder() -> HttpServiceBuilder {
+        HttpServiceBuilder::new()
+    }
+
     pub fn new<F>(request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
+        Self::builder().build(request_builder)
+    }
+}
+
+/// A builder for `HttpService`s
+pub struct HttpServiceBuilder {
+    threads: usize,
+    verify_certificate: bool,
+}
+
+impl HttpServiceBuilder {
+    fn new() -> Self {
+        Self {
+            threads: 4,
+            verify_certificate: true,
+        }
+    }
+
+    /// Build the configured `HttpService`
+    pub fn build<F>(&self, request_builder: F) -> HttpService
+    where
+        F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
+    {
+        let mut http = HttpConnector::new(self.threads);
+        http.enforce_http(false);
+        let tls = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(!self.verify_certificate)
+            .build()
+            .expect("TLS initialization failed");
+        let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        Self {
+        HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
+    }
+
+    /// Set the number of threads used by the `HttpService`
+    pub fn threads(&mut self, threads: usize) -> &mut Self {
+        self.threads = threads;
+        self
+    }
+
+    /// Verify the remote server's certificate
+    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
+        self.verify_certificate = verify;
+        self
     }
 }
 
@@ -82,11 +128,17 @@ impl RetryLogic for HttpRetryLogic {
         error.is_connect() || error.is_closed()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> bool {
+    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
         let status = response.status();
 
-        (status.is_server_error() && status != StatusCode::NOT_IMPLEMENTED)
-            || status == StatusCode::TOO_MANY_REQUESTS
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => Some("Too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => None,
+            _ if status.is_server_error() => {
+                Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
+            }
+            _ => None,
+        }
     }
 }
 
@@ -108,10 +160,10 @@ mod test {
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
-        assert!(logic.should_retry_response(&response_429));
-        assert!(logic.should_retry_response(&response_500));
-        assert!(!logic.should_retry_response(&response_400));
-        assert!(!logic.should_retry_response(&response_501));
+        assert!(logic.should_retry_response(&response_429).is_some());
+        assert!(logic.should_retry_response(&response_500).is_some());
+        assert!(logic.should_retry_response(&response_400).is_none());
+        assert!(logic.should_retry_response(&response_501).is_none());
     }
 
     #[test]

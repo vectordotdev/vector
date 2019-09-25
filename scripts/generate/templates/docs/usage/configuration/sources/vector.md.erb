@@ -6,17 +6,13 @@
 
 <%= component_config_example(component) %>
 
-## Options
-
-<%= options_table(component.options.to_h.values.sort) %>
-
 ## How It Works [[sort]]
 
 <%= component_sections(component) %>
 
 ### Encoding
 
-Data is encoded via Vector's [event protobuf][url.event_proto] before it is sent over the wire.
+Data is encoded via Vector's [event protobuf][urls.event_proto] before it is sent over the wire.
 
 ### Message Acking
 

@@ -1,0 +1,23 @@
+[transforms.field_filter]
+allow_you_to_description = "filter events by a log field's value"
+beta = true
+function_categories = ["filter"]
+guides = []
+input_types = ["log", "metric"]
+output_types = ["log", "metric"]
+resources = []
+
+[transforms.field_filter.options.field]
+type = "string"
+examples = ["file"]
+null = false
+description = "The target log field to compare against the `value`."
+
+[transforms.field_filter.options.value]
+type = "string"
+examples = ["/var/log/nginx.log"]
+null = false
+description = """\
+If the value of the specified `field` matches this value then the event \
+will be permitted, otherwise it is dropped.\
+"""

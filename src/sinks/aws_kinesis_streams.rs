@@ -16,6 +16,7 @@ use rusoto_kinesis::{
     PutRecordsRequestEntry,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{convert::TryInto, fmt, sync::Arc, time::Duration};
 use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
@@ -34,9 +35,9 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<Atom>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub encoding: Encoding,
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -47,16 +48,18 @@ pub struct KinesisSinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let config = self.clone();
         let sink = KinesisService::new(config, acker)?;
         let healthcheck = healthcheck(self.clone())?;
@@ -72,7 +75,7 @@ impl KinesisService {
     pub fn new(
         config: KinesisSinkConfig,
         acker: Acker,
-    ) -> Result<impl Sink<SinkItem = Event, SinkError = ()>, String> {
+    ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
         let client = Arc::new(KinesisClient::new(config.region.clone().try_into()?));
 
         let batch_size = config.batch_size.unwrap_or(bytesize::mib(1u64) as usize);
@@ -161,7 +164,22 @@ impl RetryLogic for KinesisRetryLogic {
     }
 }
 
-fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> {
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("ListStreams failed: {}", source))]
+    ListStreamsFailed {
+        source: rusoto_kinesis::ListStreamsError,
+    },
+    #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
+    StreamNamesMismatch { name: String, stream_name: String },
+    #[snafu(display(
+        "Stream returned does not contain any streams that match {}",
+        stream_name
+    ))]
+    NoMatchingStreamName { stream_name: String },
+}
+
+fn healthcheck(config: KinesisSinkConfig) -> crate::Result<super::Healthcheck> {
     let client = KinesisClient::new(config.region.try_into()?);
     let stream_name = config.stream_name;
 
@@ -170,23 +188,17 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
             exclusive_start_stream_name: Some(stream_name.clone()),
             limit: Some(1),
         })
-        .map_err(|e| format!("ListStreams failed: {}", e))
+        .map_err(|source| HealthcheckError::ListStreamsFailed { source }.into())
         .and_then(move |res| Ok(res.stream_names.into_iter().next()))
         .and_then(move |name| {
             if let Some(name) = name {
                 if name == stream_name {
                     Ok(())
                 } else {
-                    Err(format!(
-                        "Stream names do not match, got {}, expected {}",
-                        name, stream_name
-                    ))
+                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
                 }
             } else {
-                Err(format!(
-                    "Stream returned does not contain any streams that match {}",
-                    stream_name
-                ))
+                Err(HealthcheckError::NoMatchingStreamName { stream_name }.into())
             }
         });
 
@@ -196,7 +208,7 @@ fn healthcheck(config: KinesisSinkConfig) -> Result<super::Healthcheck, String> 
 fn encode_event(
     event: Event,
     partition_key_field: &Option<Atom>,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = partition_key_field
         .as_ref()
@@ -211,12 +223,12 @@ fn encode_event(
     };
 
     let log = event.into_log();
-    let data = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
+    let data = match encoding {
+        &Encoding::Json => {
             serde_json::to_vec(&log.unflatten()).expect("Error encoding event as json.")
         }
 
-        (&Some(Encoding::Text), _) | (_, false) => log
+        &Encoding::Text => log
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or(Vec::new()),
@@ -248,21 +260,21 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn kinesis_encode_event_non_structured() {
+    fn kinesis_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &None, &None).unwrap();
+        let event = encode_event(message.clone().into(), &None, &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
 
     #[test]
-    fn kinesis_encode_event_structured() {
+    fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
             .as_mut_log()
             .insert_explicit("key".into(), "value".into());
-        let event = encode_event(event, &None, &None).unwrap();
+        let event = encode_event(event, &None, &Encoding::Json).unwrap();
 
         let map: HashMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
@@ -276,7 +288,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_implicit("key".into(), "some_key".into());
-        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(&event.partition_key, &"some_key".to_string());
@@ -288,7 +300,7 @@ mod tests {
         event
             .as_mut_log()
             .insert_implicit("key".into(), random_string(300).into());
-        let event = encode_event(event, &Some("key".into()), &None).unwrap();
+        let event = encode_event(event, &Some("key".into()), &Encoding::Text).unwrap();
 
         assert_eq!(&event.data[..], "hello world".as_bytes());
         assert_eq!(event.partition_key.len(), 256);

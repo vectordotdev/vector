@@ -40,7 +40,7 @@ impl SourceConfig for VectorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         vector.run(self.address, self.shutdown_timeout_secs, out)
     }
@@ -101,7 +101,7 @@ mod test {
         rt.spawn(server);
         wait_for_tcp(addr);
 
-        let sink = vector(addr, Acker::Null);
+        let sink = vector("NONE".into(), addr, Acker::Null);
         let events = vec![
             Event::from("test"),
             Event::from("events"),

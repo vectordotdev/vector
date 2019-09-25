@@ -2,6 +2,7 @@ use futures::Future;
 
 pub mod docker;
 pub mod file;
+pub mod journald;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod statsd;

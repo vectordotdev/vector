@@ -120,11 +120,11 @@ impl Conversion {
             Conversion::Bytes => value,
             Conversion::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Integer(s.parse::<i64>().context(IntParseError { s })?)
+                ValueKind::Integer(s.parse::<i64>().with_context(|| IntParseError { s })?)
             }
             Conversion::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                ValueKind::Float(s.parse::<f64>().context(FloatParseError { s })?)
+                ValueKind::Float(s.parse::<f64>().with_context(|| FloatParseError { s })?)
             }
             Conversion::Boolean => {
                 ValueKind::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?)
@@ -138,13 +138,14 @@ impl Conversion {
                 ValueKind::Timestamp(datetime_to_utc(
                     Local
                         .datetime_from_str(&s, &format)
-                        .context(TimestampParseError { s })?,
+                        .with_context(|| TimestampParseError { s })?,
                 ))
             }
             Conversion::TimestampTZFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 ValueKind::Timestamp(datetime_to_utc(
-                    DateTime::parse_from_str(&s, &format).context(TimestampParseError { s })?,
+                    DateTime::parse_from_str(&s, &format)
+                        .with_context(|| TimestampParseError { s })?,
                 ))
             }
         })

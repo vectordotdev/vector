@@ -6,7 +6,7 @@
 #
 #   Checks that there are not any pending documentation changes. This is
 #   useful for CI, ensuring that documentation is updated through the
-#   /.metadata.toml file instead of the markdown files directly.
+#   /.meta dir instead of the markdown files directly.
 
 set -eu
 
@@ -20,7 +20,7 @@ if [[ -n "$changes" ]]; then
   echo "$changes"
   echo ''
   echo 'This usually means that auto-generated sections were updated. '
-  echo 'Instead, you should update the /.metadata.toml file and then run '
+  echo 'Instead, you should update the files in the /.meta dir and then run '
   ecgo '`make generate`. See the ./DOCUMENTING.md guide for more info.'
   exit 1
 else

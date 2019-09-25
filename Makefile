@@ -33,15 +33,20 @@ check-fmt: ## Checks code formatting correctness
 	@cargo fmt -- --check
 
 check-generate: ## Checks for pending `make generate` changes
-	@bundle install --gemfile=scripts/generate/Gemfile
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/check-generate.sh
 
-generate: ## Generates files across the repo from the /.metadata.toml file
-	@bundle install --gemfile=scripts/generate/Gemfile
-	@export VERSION=$(_latest_version); scripts/generate.rb --check-urls
+generate: ## Generates files across the repo using the data in /.meta
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@export VERSION=$(_latest_version); scripts/generate.rb
 
 fmt: ## Format code
 	@cargo fmt
+
+release: ## Release a new Vector version
+	@$(MAKE) release-meta
+	@$(MAKE) generate
+	@$(MAKE) release-commit
 
 run: ## Starts Vector in development mode
 	@cargo run
@@ -67,8 +72,8 @@ package-deb: ## Create a .deb package from artifacts created via `build`
 package-rpm: ## Create a .rpm package from artifacts created via `build`
 	@scripts/package-rpm.sh
 
-release: ## Interactive script that releases the next version (major or minor)
-	@scripts/release.sh
+release-commit: ## Commits release changes
+	@scripts/release-commit.rb
 
 release-deb: ## Release .deb via Package Cloud
 	@scripts/release-deb.sh
@@ -77,10 +82,19 @@ release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
 
 release-github: ## Release to Github
-	@scripts/release-github.sh
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@scripts/release-github.rb
 
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
+
+release-meta: ## Prepares the release metadata
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@scripts/release-meta.rb
+
+release-rollback:
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@scripts/release-rollback.rb
 
 release-rpm: ## Release .rpm via Package Cloud
 	@scripts/release-rpm.sh

@@ -1,0 +1,16 @@
+[sinks.aws_cloudwatch_metrics]
+beta = true
+buffer = false
+delivery_guarantee = "at_least_once"
+egress_method = "streaming"
+healthcheck = true
+input_types = ["metric"]
+service_limits_short_link = "aws_cw_metrics_service_limits"
+service_provider = "AWS"
+write_to_description = "[AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
+
+[sinks.aws_cloudwatch_logs.options.region]
+type = "string"
+examples = ["us-east-1"]
+null = false
+description = "The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
