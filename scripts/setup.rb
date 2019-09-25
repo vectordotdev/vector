@@ -39,3 +39,17 @@ DOCS_ROOT = File.join(ROOT_DIR, "docs")
 META_ROOT = File.join(ROOT_DIR, ".meta")
 RELEASE_META_DIR = "#{ROOT_DIR}/.meta/releases"
 TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
+
+#
+# Functions
+#
+
+def load_templates!
+  Templates.new(TEMPLATES_DIR, metadata)
+end
+
+def load_metadata!
+  Metadata.load!(META_ROOT, DOCS_ROOT)
+rescue Exception => e
+  error!(e.message)
+end
