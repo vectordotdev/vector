@@ -3,10 +3,10 @@ BITS = 4096
 CA_BASE = Vector_CA
 CRT_BASE = localhost
 
-all: $(CRT_BASE).crt $(CRT_BASE).jks
+all: $(CRT_BASE).crt $(CRT_BASE).p12
 
 clean:
-	rm -f $(CRT_BASE).crt $(CRT_BASE).key $(CRT_BASE).jks
+	rm -f $(CRT_BASE).crt $(CRT_BASE).key $(CRT_BASE).p12
 	rm -f $(CA_BASE).crt $(CA_BASE).key $(CA_BASE).srl
 
 %.key:
@@ -25,18 +25,3 @@ $(CA_BASE).crt: $(CA_BASE).cfg $(CA_BASE).key
 %.p12: %.key %.crt
 	openssl pkcs12 -export -inkey $*.key -in $*.crt -name $* -password pass:NOPASS -out $@
 
-%.jks: %.p12
-	@rm -f $@
-	docker run --rm --volume=$(CURDIR):/certs wurstmeister/kafka \
-		keytool -importkeystore \
-		-srckeystore /certs/$*.p12 \
-		-srcstoretype pkcs12 \
-		-destkeypass NOPASS \
-		-srcstorepass NOPASS \
-		-destkeystore /certs/$@ \
-		-storepass NOPASS
-	@# Output file will be owned as root, fix ownership
-	@mv -f $@ $@.root
-	@cp -f $@.root $@
-	@rm -f $@.root
-	@rm $*.p12
