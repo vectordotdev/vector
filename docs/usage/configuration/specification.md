@@ -1162,31 +1162,12 @@ end
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events as before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -1231,6 +1212,24 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer
@@ -1319,31 +1318,12 @@ end
   partition_key_field = "user_id"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -1388,6 +1368,24 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer
@@ -1470,6 +1468,66 @@ end
   healthcheck = true
 
   #
+  # Requests
+  #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The compression type to use before writing data.
+  # 
+  # * optional
+  # * default: "gzip"
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
+
+  #
   # Batching
   #
 
@@ -1521,67 +1579,6 @@ end
   key_prefix = "date=%F/hour=%H/"
   key_prefix = "year=%Y/month=%m/day=%d/"
   key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
-  # Requests
-  #
-
-  # The compression type to use before writing data.
-  # 
-  # * optional
-  # * default: "gzip"
-  # * enum: "gzip" or "none"
-  compression = "gzip"
-  compression = "none"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
 
   #
   # Buffer
@@ -2263,6 +2260,14 @@ end
   # * no default
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
 
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
+
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
   # will be used.
@@ -2276,15 +2281,6 @@ end
   # * required
   # * no default
   topic = "topic-1234"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -2409,31 +2405,12 @@ end
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
@@ -2478,6 +2455,24 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer
@@ -2551,10 +2546,9 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"

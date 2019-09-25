@@ -4,6 +4,7 @@ use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -127,11 +128,17 @@ impl RetryLogic for HttpRetryLogic {
         error.is_connect() || error.is_closed()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> bool {
+    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
         let status = response.status();
 
-        (status.is_server_error() && status != StatusCode::NOT_IMPLEMENTED)
-            || status == StatusCode::TOO_MANY_REQUESTS
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => Some("Too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => None,
+            _ if status.is_server_error() => {
+                Some(format!("{}: {}", status, String::from_utf8_lossy(response.body())).into())
+            }
+            _ => None,
+        }
     }
 }
 
@@ -153,10 +160,10 @@ mod test {
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
-        assert!(logic.should_retry_response(&response_429));
-        assert!(logic.should_retry_response(&response_500));
-        assert!(!logic.should_retry_response(&response_400));
-        assert!(!logic.should_retry_response(&response_501));
+        assert!(logic.should_retry_response(&response_429).is_some());
+        assert!(logic.should_retry_response(&response_500).is_some());
+        assert!(logic.should_retry_response(&response_400).is_none());
+        assert!(logic.should_retry_response(&response_501).is_none());
     }
 
     #[test]

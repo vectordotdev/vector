@@ -5,7 +5,9 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
-use futures::{future, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{
+    future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
+};
 use native_tls::{Certificate, Identity};
 use openssl::{
     pkcs12::Pkcs12,
@@ -75,7 +77,7 @@ enum BuildError {
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: Option<Encoding>,
+    pub encoding: Encoding,
     pub tls: Option<TlsConfig>,
 }
 
@@ -101,7 +103,7 @@ impl TcpSinkConfig {
     pub fn new(address: String) -> Self {
         Self {
             address,
-            encoding: None,
+            encoding: Encoding::Text,
             tls: None,
         }
     }
@@ -411,13 +413,13 @@ pub fn raw_tcp(
     hostname: String,
     addr: SocketAddr,
     acker: Acker,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     tls: Option<TcpSinkTls>,
 ) -> super::RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, tls)
             .stream_ack(acker)
-            .with(move |event| encode_event(event, &encoding)),
+            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
     )
 }
 
@@ -438,14 +440,12 @@ pub fn tcp_healthcheck(addr: SocketAddr) -> super::Healthcheck {
     Box::new(check)
 }
 
-fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> {
+fn encode_event(event: Event, encoding: &Encoding) -> Option<Bytes> {
     let log = event.into_log();
 
-    let b = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&log.unflatten()).map_err(|e| panic!("Error encoding: {}", e))
-        }
-        (&Some(Encoding::Text), _) | (_, false) => {
+    let b = match encoding {
+        &Encoding::Json => serde_json::to_vec(&log.unflatten()),
+        &Encoding::Text => {
             let bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
@@ -458,6 +458,8 @@ fn encode_event(event: Event, encoding: &Option<Encoding>) -> Result<Bytes, ()> 
         b.push(b'\n');
         Bytes::from(b)
     })
+    .map_err(|error| error!(message = "Unable to encode.", %error))
+    .ok()
 }
 
 enum MaybeTlsStream<R, T> {

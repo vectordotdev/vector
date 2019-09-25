@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install<a/>
+    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.4.0<a/>
   </strong>
 </p>
 
@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [download][urls.vector_releases], [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [manual][docs.manual]
+* [**Installation**][docs.installation] - [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -48,8 +48,9 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][urls.community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Roadmap**][urls.roadmap] - [vote on new features][urls.vote_feature]
+* [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
+* [**Releases**][urls.vector_releases] - [v0.4.0][urls.v0.4.0], [changelog][urls.vector_changelog]
+* [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
 ## Features
@@ -196,11 +197,12 @@ the License.
 [docs.data-model.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.data_model]: https://docs.vector.dev/about/data-model
 [docs.deployment]: https://docs.vector.dev/setup/deployment
+[docs.from-archives]: https://docs.vector.dev/setup/installation/manual/from-archives
+[docs.from-source]: https://docs.vector.dev/setup/installation/manual/from-source
 [docs.getting_started]: https://docs.vector.dev/setup/getting-started
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
 [docs.installation]: https://docs.vector.dev/setup/installation
-[docs.manual]: https://docs.vector.dev/setup/installation/manual
 [docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
 [docs.package_managers]: https://docs.vector.dev/setup/installation/package-managers
 [docs.performance]: https://docs.vector.dev/performance
@@ -259,7 +261,6 @@ the License.
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[urls.community]: https://vector.dev/community
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/
@@ -271,10 +272,13 @@ the License.
 [urls.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [urls.prometheus]: https://prometheus.io/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.rust]: https://www.rust-lang.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
+[urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_community]: https://vector.dev/community
 [urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
