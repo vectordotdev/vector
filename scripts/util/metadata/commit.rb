@@ -54,6 +54,10 @@ class Commit
     type == "chore"
   end
 
+  def component?
+    !component_name.nil? && !component_type.nil?
+  end
+
   def component_name
     return @component_name if defined?(@component_name)
 

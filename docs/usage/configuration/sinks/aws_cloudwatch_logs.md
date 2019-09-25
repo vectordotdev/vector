@@ -30,11 +30,15 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "aws_cloudwatch_logs" # must be: "aws_cloudwatch_logs"
   inputs = ["my-source-id"]
   group_name = "{{ file }}"
   region = "us-east-1"
   stream_name = "{{ instance_id }}"
+  
+  # REQUIRED - Requests
+  encoding = "json" # enum: "json" or "text"
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -109,31 +113,12 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events as before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -178,6 +163,24 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer

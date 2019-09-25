@@ -35,56 +35,57 @@
     * [MacOS](setup/installation/operating-systems/macos.md)
     * [RHEL](setup/installation/operating-systems/rhel.md)
     * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
-  * [Manual](setup/installation/manual/README.md)
-    * [From Archives](setup/installation/manual/from-archives.md)
-    * [From Source](setup/installation/manual/from-source.md)
-* [Getting Started](setup/getting-started/README.md)
-  * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
-* [Deployment](setup/deployment/README.md)
-  * [Topologies](setup/deployment/topologies.md)
-  * [Roles](setup/deployment/roles/README.md)
-    * [Agent Role](setup/deployment/roles/agent.md)
-    * [Service Role](setup/deployment/roles/service.md)
+  * [Manual][docs.installation.manual]
+    * [From Archives][docs.from-archives]
+    * [From Source][docs.from-source]
+* [Getting Started][docs.getting-started]
+  * [Sending Your First Event][docs.sending-your-first-event]
+* [Deployment][docs.deployment]
+  * [Topologies][docs.deployment.topologies]
+  * [Roles][docs.roles]
+    * [Agent Role][docs.roles.agent]
+    * [Service Role][docs.roles.service]
 
 ## Usage
 
-* [Configuration](usage/configuration/README.md)
-  * [Sources](usage/configuration/sources/README.md)
+* [Configuration][docs.configuration]
+  * [Sources][docs.sources]
     <%- metadata.sources.to_h.values.sort.each do |source| -%>
     * [<%= source.name %> source][docs.sources.<%= source.name %>]
     <%- end -%>
-  * [Transforms](usage/configuration/transforms/README.md)
+  * [Transforms][docs.transforms]
     <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
     * [<%= transform.name %> transform][docs.transforms.<%= transform.name %>]
     <%- end -%>
-  * [Sinks](usage/configuration/sinks/README.md)
+  * [Sinks][docs.sinks]
     <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
     * [<%= sink.name %> sink][docs.sinks.<%= sink.name %>]
     <%- end -%>
-  * [Specification](usage/configuration/specification.md)
-* [Administration](usage/administration/README.md)
-  * [Starting](usage/administration/starting.md)
-  * [Reloading](usage/administration/reloading.md)
-  * [Stopping](usage/administration/stopping.md)
-  * [Monitoring](usage/administration/monitoring.md)
-  * [Tuning](usage/administration/tuning.md)
-  * [Updating](usage/administration/updating.md)
-  * [Validating](usage/administration/validating.md)
-  * [Env Vars](usage/administration/env-vars.md)
-* [Guides](usage/guides/README.md)
-  * [Troubleshooting Guide](usage/guides/troubleshooting.md)
+  * [Specification][docs.configuration.specification]
+* [Administration][docs.administration]
+  * [Starting][docs.administration.starting]
+  * [Reloading][docs.administration.reloading]
+  * [Stopping][docs.administration.stopping]
+  * [Monitoring][docs.administration.monitoring]
+  * [Tuning][docs.administration.tuning]
+  * [Updating][docs.administration.updating]
+  * [Validating][docs.administration.validating]
+  * [Env Vars][docs.administration.env-vars]
+* [Guides][docs.guides]
+  * [Troubleshooting Guide][docs.guides.troubleshooting]
 
 ## Resources
 
-* [Community](https://vector.dev/community/)
-* [Download](https://github.com/timberio/vector/releases)
-* [Github Repo](https://github.com/timberio/vector)
-* [Roadmap](https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open)
+* [Changelog][urls.vector_changelog]
+* [Community][urls.vector_community]
+* [Github Repo][urls.vector_repo]
+* [Releases][urls.vector_releases]
+* [Roadmap][urls.vector_roadmap]
 
 ## Meta
 
-* [Conventions](meta/conventions.md)
-* [Glossary](meta/glossary.md)
+* [Conventions][docs.conventions]
+* [Glossary][docs.glossary]
 
 
 

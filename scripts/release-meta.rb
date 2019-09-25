@@ -26,7 +26,11 @@ TYPES_THAT_REQUIRE_SCOPES = ["feat", "improvement", "fix"]
 # Functions
 #
 
-def create_release_meta_file!(last_version, new_version)
+def breaking_change?(commit)
+  !commit.fetch("message").match(/^[a-z]*!/).nil?
+end
+
+def create_release_meta_file!(current_commits, new_version)
   release_meta_path = "#{RELEASE_META_DIR}/#{new_version}.toml"
 
   existing_release =
@@ -36,18 +40,18 @@ def create_release_meta_file!(last_version, new_version)
       {"commits" => []}
     end
 
-  existing_commits = existing_release.fetch("commits").collect do |c|
-  	{
-  		"sha" => c.fetch("sha"),
-  		"message" => c.fetch("message"),
-  		"author" => c.fetch("author"),
-  		"date" => c.fetch("date"),
-  		"files_count" => c["files_count"],
-  		"insertions_count" => c["insertions_count"],
-  		"deletions_count" => c["deletions_count"]
-  	}
-  end
-  current_commits = get_commits(last_version, new_version)
+  existing_commits =
+    existing_release.fetch("commits").collect do |c|
+    	{
+    		"sha" => c.fetch("sha"),
+    		"message" => c.fetch("message"),
+    		"author" => c.fetch("author"),
+    		"date" => c.fetch("date"),
+    		"files_count" => c["files_count"],
+    		"insertions_count" => c["insertions_count"],
+    		"deletions_count" => c["deletions_count"]
+    	}
+    end
 
   new_commits =
     current_commits.select do |current_commit|
@@ -101,14 +105,14 @@ def create_release_meta_file!(last_version, new_version)
   true
 end
 
-def get_commit_log(last_version, new_version)
+def get_commit_log(last_version)
   last_commit = `git rev-parse HEAD`.chomp
   range = "v#{last_version}...#{last_commit}"
   `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
 end
 
-def get_commits(last_version, new_version)
-  commit_log = get_commit_log(last_version, new_version)
+def get_commits(last_version)
+  commit_log = get_commit_log(last_version)
   commit_lines = commit_log.split("\n").reverse
 
   commit_lines.collect do |commit_line|
@@ -120,8 +124,35 @@ def get_commit_stats(sha)
   `git show --shortstat --oneline #{sha}`.split("\n").last
 end
 
-def get_new_version(last_version)
-  version_string = get("What is the next version you are releasing? (current version is #{last_version})")
+def get_new_version(last_version, commits)
+  next_version =
+    if commits.any? { |c| breaking_change?(c) }
+      next_version = "#{last_version.major + 1}.0.0"
+
+      words = "It looks like the new commits contain breaking changes. " +
+        "Would you like to use the recommended version #{next_version} for " +
+        "this release?"
+
+      if get(words, ["y", "n"]) == "y"
+        next_version
+      else
+        nil
+      end
+    elsif commits.any? { |c| new_feature?(c) }
+      next_version = "#{last_version.major}.#{last_version.minor + 1}.0"
+
+      words = "It looks like this release contains commits with new features. " +
+        "Would you like to use the recommended version #{next_version} for " +
+        "this release?"
+
+      if get(words, ["y", "n"]) == "y"
+        next_version
+      else
+        nil
+      end
+    end
+
+  version_string = next_version || get("What is the next version you are releasing? (current version is #{last_version})")
 
   version =
     begin
@@ -137,6 +168,10 @@ def get_new_version(last_version)
   else
     version
   end
+end
+
+def new_feature?(commit)
+  !commit.fetch("message").match(/^feat/).nil?
 end
 
 def parse_commit_line!(commit_line)
@@ -192,5 +227,6 @@ title("Creating release meta file...")
 
 last_tag = `git describe --abbrev=0`.chomp
 last_version = Version.new(last_tag.gsub(/^v/, ''))
-new_version = get_new_version(last_version)
-create_release_meta_file!(last_version, new_version)
+commits = get_commits(last_version)
+new_version = get_new_version(last_version, commits)
+create_release_meta_file!(commits, new_version)

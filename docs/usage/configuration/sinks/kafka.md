@@ -25,7 +25,8 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 [sinks.my_sink_id]
   type = "kafka" # must be: "kafka"
   inputs = ["my-source-id"]
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+  encoding = "json" # enum: "json" or "text"
   key_field = "user_id"
   topic = "topic-1234"
 
@@ -53,13 +54,20 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
   # * no default
   inputs = ["my-source-id"]
 
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself
+  # A list of host and port pairs that the Kafka client should contact to
+  # bootstrap its cluster metadata.
   # 
   # * required
   # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
@@ -74,15 +82,6 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
   # * required
   # * no default
   topic = "topic-1234"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   # Enables/disables the sink healthcheck upon start.
   # 

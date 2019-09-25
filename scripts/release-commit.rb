@@ -23,7 +23,7 @@ end
 
 metadata =
   begin
-    Metadata.load(META_ROOT, DOCS_ROOT)
+    Metadata.load!(META_ROOT, DOCS_ROOT)
   rescue Exception => e
     error!(e.message)
   end

@@ -317,7 +317,7 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 fn tcp_json_sink(address: String) -> TcpSinkConfig {
     TcpSinkConfig {
         address,
-        encoding: Some(tcp::Encoding::Json),
+        encoding: tcp::Encoding::Json,
         tls: None,
     }
 }

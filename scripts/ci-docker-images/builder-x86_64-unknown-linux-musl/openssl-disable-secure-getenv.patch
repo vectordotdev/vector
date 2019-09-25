@@ -1,0 +1,24 @@
+diff -ur openssl-1.0.2t/crypto/getenv.c openssl-1.0.2t-patched/crypto/getenv.c
+--- openssl-1.0.2t/crypto/getenv.c	2019-09-10 13:24:10.000000000 +0000
++++ openssl-1.0.2t-patched/crypto/getenv.c	2019-09-25 05:21:33.646750263 +0000
+@@ -16,16 +16,8 @@
+ 
+ char *ossl_safe_getenv(const char *name)
+ {
+-#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+-# if __GLIBC_PREREQ(2, 17)
+-#  define SECURE_GETENV
+-    return secure_getenv(name);
+-# endif
+-#endif
+-
+-#ifndef SECURE_GETENV
+-    if (OPENSSL_issetugid())
+-        return NULL;
+-    return getenv(name);
+-#endif
++  /* MUSL 1.22 doesn't provide secure_getenv */
++  if (OPENSSL_issetugid())
++      return NULL;
++  return getenv(name);
+ }

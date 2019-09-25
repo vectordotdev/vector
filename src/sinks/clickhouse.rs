@@ -15,6 +15,7 @@ use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use std::borrow::Cow;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -171,18 +172,22 @@ impl RetryLogic for ClickhouseRetryLogic {
         self.inner.is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> bool {
-        if response.status() == StatusCode::INTERNAL_SERVER_ERROR {
-            let body = response.body();
+    fn should_retry_response(&self, response: &Self::Response) -> Option<Cow<str>> {
+        match response.status() {
+            StatusCode::INTERNAL_SERVER_ERROR => {
+                let body = response.body();
 
-            // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
-            // This attempts to check if the body starts with `Code: {code_num}` and to not
-            // retry those errors.
-            //
-            // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
-            !(body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53"))
-        } else {
-            self.inner.should_retry_response(response)
+                // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
+                // This attempts to check if the body starts with `Code: {code_num}` and to not
+                // retry those errors.
+                //
+                // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
+                match body.starts_with(b"Code: 117") || body.starts_with(b"Code: 53") {
+                    false => Some(String::from_utf8_lossy(body).to_string().into()),
+                    true => None,
+                }
+            }
+            _ => self.inner.should_retry_response(response),
         }
     }
 }
