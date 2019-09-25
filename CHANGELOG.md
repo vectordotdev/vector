@@ -40,16 +40,16 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 ### New features
 
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Support aws authentication ([#864][urls.pr_864])
-* *new sink*: Initial `aws_cloudwatch_metrics` sink implementation  ([#707][urls.pr_707])
-* *new sink*: Initial `clickhouse` sink implementation ([#693][urls.pr_693])
-* *new sink*: New `file` sink ([#688][urls.pr_688])
-* *new source*: Initial `udp` source implementation ([#738][urls.pr_738])
-* *new source*: Add new `kafka` source ([#774][urls.pr_774])
-* *new source*: Initial `journald` source implementation ([#702][urls.pr_702])
-* *new transform*: Add coercer transform ([#666][urls.pr_666])
-* *new transform*: New `add_tags` transform ([#785][urls.pr_785])
-* *new transform*: New `remove_tags` transform ([#785][urls.pr_785])
-* *[`split` transform][docs.transforms.split]*: Add split transform ([#850][urls.pr_850])
+* *new sink*: Initial [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics] implementation ([#707][urls.pr_707])
+* *new sink*: Initial [`clickhouse` sink][docs.sinks.clickhouse] implementation ([#693][urls.pr_693])
+* *new sink*: Initial [`file` sink][docs.sinks.file] implementation ([#688][urls.pr_688])
+* *new source*: Initial [`udp` source][docs.sources.udp] implementation ([#738][urls.pr_738])
+* *new source*: Initial [`kafka` source][docs.sources.kafka] implementation ([#774][urls.pr_774])
+* *new source*: Initial [`journald` source][docs.sources.journald] implementation ([#702][urls.pr_702])
+* *new transform*: Initial [`coercer` transform][docs.transforms.coercer] implementation ([#666][urls.pr_666])
+* *new transform*: Initial [`add_tags` transform][docs.transforms.add_tags] implementation ([#785][urls.pr_785])
+* *new transform*: Initial [`remove_tags` transform][docs.transforms.remove_tags] implementation ([#785][urls.pr_785])
+* *new transform*: Initial [`split` transform][docs.transforms.split] implementation ([#850][urls.pr_850])
 * *[`syslog` source][docs.sources.syslog]*: Add all parsed syslog fields to event ([#836][urls.pr_836])
 
 ### Enhancements
@@ -142,21 +142,29 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [docs.platforms]: https://docs.vector.dev/setup/installation/platforms
 [docs.rhel]: https://docs.vector.dev/setup/installation/operating-systems/rhel
 [docs.sinks.aws_cloudwatch_logs]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.sinks.aws_cloudwatch_metrics]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_metrics
 [docs.sinks.aws_kinesis_streams]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.sinks.aws_s3]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
+[docs.sinks.clickhouse]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
 [docs.sinks.console]: https://docs.vector.dev/usage/configuration/sinks/console
 [docs.sinks.elasticsearch]: https://docs.vector.dev/usage/configuration/sinks/elasticsearch
+[docs.sinks.file]: https://docs.vector.dev/usage/configuration/sinks/file
 [docs.sinks.http]: https://docs.vector.dev/usage/configuration/sinks/http
 [docs.sinks.prometheus]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sources.file]: https://docs.vector.dev/usage/configuration/sources/file
 [docs.sources.journald]: https://docs.vector.dev/usage/configuration/sources/journald
+[docs.sources.kafka]: https://docs.vector.dev/usage/configuration/sources/kafka
 [docs.sources.syslog]: https://docs.vector.dev/usage/configuration/sources/syslog
+[docs.sources.udp]: https://docs.vector.dev/usage/configuration/sources/udp
 [docs.transforms.add_fields]: https://docs.vector.dev/usage/configuration/transforms/add_fields
+[docs.transforms.add_tags]: https://docs.vector.dev/usage/configuration/transforms/add_tags
+[docs.transforms.coercer]: https://docs.vector.dev/usage/configuration/transforms/coercer
 [docs.transforms.grok_parser]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
 [docs.transforms.log_to_metric]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.transforms.lua]: https://docs.vector.dev/usage/configuration/transforms/lua
 [docs.transforms.regex_parser]: https://docs.vector.dev/usage/configuration/transforms/regex_parser
+[docs.transforms.remove_tags]: https://docs.vector.dev/usage/configuration/transforms/remove_tags
 [docs.transforms.split]: https://docs.vector.dev/usage/configuration/transforms/split
 [docs.transforms.tokenizer]: https://docs.vector.dev/usage/configuration/transforms/tokenizer
 [docs.ubuntu]: https://docs.vector.dev/setup/installation/operating-systems/ubuntu

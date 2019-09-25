@@ -1247,6 +1247,34 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
+[sinks.aws_cloudwatch_metrics]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 # Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #

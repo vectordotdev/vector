@@ -36,6 +36,7 @@ and [source][docs.sources].
 | [`vector` source][docs.sources.vector] | `best_effort` |
 | **Sinks** | |
 | [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs] | `at_least_once` |
+| [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics] | `at_least_once` |
 | [`aws_kinesis_streams` sink][docs.sinks.aws_kinesis_streams] | `at_least_once` |
 | [`aws_s3` sink][docs.sinks.aws_s3] | `at_least_once` |
 | [`blackhole` sink][docs.sinks.blackhole] | `best_effort` |
@@ -113,6 +114,7 @@ keep you in the loop if this ever changes.
 
 [docs.event]: ../setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_cloudwatch_metrics]: ../usage/configuration/sinks/aws_cloudwatch_metrics.md
 [docs.sinks.aws_kinesis_streams]: ../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.sinks.aws_s3]: ../usage/configuration/sinks/aws_s3.md
 [docs.sinks.blackhole]: ../usage/configuration/sinks/blackhole.md

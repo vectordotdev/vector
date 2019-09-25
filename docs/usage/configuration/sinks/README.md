@@ -23,6 +23,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 | Name  | Description |
 |:------|:------------|
 | [**`aws_cloudwatch_logs`**][docs.sinks.aws_cloudwatch_logs] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_cloudwatch_metrics`**][docs.sinks.aws_cloudwatch_metrics] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html). |
 | [**`aws_kinesis_streams`**][docs.sinks.aws_kinesis_streams] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
@@ -46,6 +47,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ../../../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_cloudwatch_metrics]: ../../../usage/configuration/sinks/aws_cloudwatch_metrics.md
 [docs.sinks.aws_kinesis_streams]: ../../../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.sinks.aws_s3]: ../../../usage/configuration/sinks/aws_s3.md
 [docs.sinks.blackhole]: ../../../usage/configuration/sinks/blackhole.md
@@ -60,6 +62,7 @@ Sinks are last in the [pipeline][docs.configuration#composition], responsible fo
 [docs.sinks.tcp]: ../../../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../../../usage/configuration/sinks/vector.md
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
