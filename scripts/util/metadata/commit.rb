@@ -5,8 +5,8 @@ require "active_support/core_ext/string/filters"
 require_relative "commit_scope"
 
 class Commit
-  TYPES = ["chore", "docs", "feat", "fix", "improvement", "perf"]
-  TYPES_THAT_REQUIRE_SCOPES = ["feat", "improvement", "fix"]
+  TYPES = ["chore", "docs", "enhancement", "feat", "fix", "perf"]
+  TYPES_THAT_REQUIRE_SCOPES = ["enhancement", "feat", "fix"]
 
   attr_reader :author,
     :breaking_change,
@@ -54,6 +54,10 @@ class Commit
     type == "chore"
   end
 
+  def component?
+    !component_name.nil? && !component_type.nil?
+  end
+
   def component_name
     return @component_name if defined?(@component_name)
 
@@ -96,7 +100,7 @@ class Commit
   end
 
   def enhancement?
-    type == "improvement"
+    type == "enhancement"
   end
 
   def new_component?

@@ -6,39 +6,7 @@
 #
 #   Commits and tags the pending release
 
-#
-# Setup
-#
-
-# Changes into the scripts directory so that we can load the Bundler
-# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
-# outside of the cwd.
-Dir.chdir "scripts"
-
-#
-# Requires
-#
-
-require "rubygems"
-require "bundler"
-Bundler.require(:default)
-
-require_relative "util"
-
-#
-# Includes
-#
-
-include Printer
-
-#
-# Constants
-#
-
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
-
-DOCS_ROOT = File.join(ROOT_DIR, "docs")
-META_ROOT = File.join(ROOT_DIR, ".meta")
+require_relative "setup"
 
 #
 # Functions
@@ -55,7 +23,7 @@ end
 
 metadata =
   begin
-    Metadata.load(META_ROOT, DOCS_ROOT)
+    Metadata.load!(META_ROOT, DOCS_ROOT)
   rescue Exception => e
     error!(e.message)
   end
@@ -75,7 +43,7 @@ else
 
   commands =
     <<~EOF
-    git add docs/*
+    git add . -A
     git commit -sam 'chore: Prepare v#{release.version} release'
     git push origin master
     git tag -a v#{release.version} -m "v#{release.version}"
@@ -86,11 +54,17 @@ else
 
   commands.chomp!
 
+  status = `git status --short`.chomp!
+
   words =
     <<~EOF
     We'll be releasing v#{release.version} with the following commands:
 
     #{commands.indent(2)}
+
+    Your current `git status` is:
+
+    #{status.indent(2)}
 
     Proceed to execute the above commands?
     EOF
@@ -114,5 +88,6 @@ else
           #{$?.inspect}
         EOF
       )
+    end
   end
 end

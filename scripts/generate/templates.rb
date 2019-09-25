@@ -45,18 +45,26 @@ class Templates
     render("_partials/_commit.md", binding).gsub("\n", "")
   end
 
-  def commit_scope(scope)
-    text =
+  def commit_scope(commit)
+    scope = commit.scope
+
+    info =
       if scope.existing_component?
-        "`#{scope.component_name}` #{scope.component_type}"
+        {
+          text: "`#{scope.component_name}` #{scope.component_type}",
+          link: scope.short_link
+        }
       else
-         scope.name
+        {
+          text: scope.name,
+          link: scope.short_link
+        }
       end
 
-    if scope.short_link
-      "[#{text}][#{scope.short_link}]"
+    if info[:link] && metadata.links.exists?(info[:link])
+      "[#{info[:text]}][#{info[:link]}]"
     else
-      text
+      info[:text]
     end
   end
 
@@ -71,11 +79,7 @@ class Templates
   def commit_type_commits(type_name, commits, grouped: false)
     commits =
       commits.sort_by do |commit|
-        if grouped
-          [commit.scope.category, commit.scope.name, commit.date]
-        else
-          [commit.scope.name, commit.date]
-        end
+        [commit.scope.name, commit.date]
       end
 
     render("_partials/_commit_type_commits.md", binding)
@@ -229,6 +233,28 @@ class Templates
 
   def release_changes(release, grouped: false)
     render("_partials/_release_changes.md", binding)
+  end
+
+  def release_notes(release)
+    render("_partials/_release_notes.md", binding)
+  end
+
+  def release_summary(release)
+    parts = []
+
+    if release.new_features.any?
+      parts << pluralize(release.new_features.size, "new feature")
+    end
+
+    if release.enhancements.any?
+      parts << pluralize(release.enhancements.size, "enhancement")
+    end
+
+    if release.bug_fixes.any?
+      parts << pluralize(release.bug_fixes.size, "bug fix")
+    end
+
+    parts.join(", ")
   end
 
   def render(template_path, template_binding = nil)

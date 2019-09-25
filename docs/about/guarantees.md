@@ -36,6 +36,7 @@ and [source][docs.sources].
 | [`vector` source][docs.sources.vector] | `best_effort` |
 | **Sinks** | |
 | [`aws_cloudwatch_logs` sink][docs.sinks.aws_cloudwatch_logs] | `at_least_once` |
+| [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics] | `at_least_once` |
 | [`aws_kinesis_streams` sink][docs.sinks.aws_kinesis_streams] | `at_least_once` |
 | [`aws_s3` sink][docs.sinks.aws_s3] | `at_least_once` |
 | [`blackhole` sink][docs.sinks.blackhole] | `best_effort` |
@@ -47,6 +48,7 @@ and [source][docs.sources].
 | [`kafka` sink][docs.sinks.kafka] | `at_least_once` |
 | [`prometheus` sink][docs.sinks.prometheus] | `best_effort` |
 | [`splunk_hec` sink][docs.sinks.splunk_hec] | `at_least_once` |
+| [`statsd` sink][docs.sinks.statsd] | `best_effort` |
 | [`tcp` sink][docs.sinks.tcp] | `best_effort` |
 | [`vector` sink][docs.sinks.vector] | `best_effort` |
 
@@ -113,6 +115,7 @@ keep you in the loop if this ever changes.
 
 [docs.event]: ../setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ../usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_cloudwatch_metrics]: ../usage/configuration/sinks/aws_cloudwatch_metrics.md
 [docs.sinks.aws_kinesis_streams]: ../usage/configuration/sinks/aws_kinesis_streams.md
 [docs.sinks.aws_s3]: ../usage/configuration/sinks/aws_s3.md
 [docs.sinks.blackhole]: ../usage/configuration/sinks/blackhole.md
@@ -124,6 +127,7 @@ keep you in the loop if this ever changes.
 [docs.sinks.kafka]: ../usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ../usage/configuration/sinks/prometheus.md
 [docs.sinks.splunk_hec]: ../usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ../usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../usage/configuration/sinks/vector.md
 [docs.sinks]: ../usage/configuration/sinks

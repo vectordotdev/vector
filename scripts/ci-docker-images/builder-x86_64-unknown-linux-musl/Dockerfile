@@ -204,7 +204,7 @@ ENV CFLAGS="-nostdinc -isystem $LIBS_PREFIX/include"
 ENV CXXFLAGS="$CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 ENV LDFLAGS="-static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -lc++ -lc++abi -lunwind -lc"
 RUN ./config --prefix=$LIBS_PREFIX && \
-	make install
+  make install
 
 # Create wrappers for Clang that automatically use correct libraries and start files.
 # See

@@ -15,6 +15,7 @@ pub mod http;
 pub mod kafka;
 pub mod prometheus;
 pub mod splunk_hec;
+pub mod statsd;
 pub mod tcp;
 pub mod util;
 pub mod vector;

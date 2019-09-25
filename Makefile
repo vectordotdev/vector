@@ -82,7 +82,8 @@ release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
 
 release-github: ## Release to Github
-	@scripts/release-github.sh
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@scripts/release-github.rb
 
 release-homebrew: ## Release to timberio Homebrew tap
 	@scripts/release-homebrew.sh
@@ -90,6 +91,10 @@ release-homebrew: ## Release to timberio Homebrew tap
 release-meta: ## Prepares the release metadata
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/release-meta.rb
+
+release-rollback:
+	@bundle install --gemfile=scripts/Gemfile > /dev/null
+	@scripts/release-rollback.rb
 
 release-rpm: ## Release .rpm via Package Cloud
 	@scripts/release-rpm.sh

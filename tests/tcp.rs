@@ -1,7 +1,5 @@
 use approx::assert_relative_eq;
 use futures::{Future, Stream};
-use serde_json::json;
-//use std::collections::HashMap;
 use stream_cancel::{StreamExt, Tripwire};
 use tokio::codec::{FramedRead, LinesCodec};
 use tokio::net::TcpListener;
@@ -12,7 +10,7 @@ use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
 #[test]
-fn test_pipe() {
+fn pipe() {
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
@@ -48,7 +46,7 @@ fn test_pipe() {
 }
 
 #[test]
-fn test_sample() {
+fn sample() {
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
@@ -103,68 +101,8 @@ fn test_sample() {
     }
 }
 
-// #[test]
-// fn test_parse() {
-//     let in_addr = next_addr();
-//     let out_addr = next_addr();
-
-//     let mut config = config::Config::empty();
-//     config.add_source("in", sources::tcp::TcpConfig::new(in_addr));
-//     config.add_transform(
-//         "parser",
-//         &["in"],
-//         transforms::regex_parser::RegexParserConfig {
-//             regex: r"status=(?P<status>\d+)".to_string(),
-//             field: None,
-//         },
-//     );
-//     config.add_transform(
-//         "filter",
-//         &["parser"],
-//         transforms::field_filter::FieldFilterConfig {
-//             field: "status".to_string(),
-//             value: "404".to_string(),
-//         },
-//     );
-//     config.add_sink(
-//         "out",
-//         &["filter"],
-//         sinks::tcp::TcpSinkConfig::new(out_addr.to_string()),
-//     );
-
-//     let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-//     let output_lines = receive(&out_addr);
-
-//     let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-//     // Wait for server to accept traffic
-//     wait_for_tcp(in_addr);
-
-//     let input_lines = vec![
-//         "good status=200",
-//         "missing status=404",
-//         "none foo=bar",
-//         "blank status=",
-//     ]
-//     .into_iter()
-//     .map(str::to_owned);
-//     let send = send_lines(in_addr, input_lines.clone().into_iter());
-//     rt.block_on(send).unwrap();
-
-//     // Shut down server
-//     block_on(topology.stop()).unwrap();
-
-//     shutdown_on_idle(rt);
-//     let output_line = output_lines.wait().into_iter().next().unwrap();
-//     let output = serde_json::from_str::<HashMap<String, String>>(&output_line[..]).unwrap();
-
-//     assert_eq!(output["message"], "missing status=404");
-//     assert_eq!(output["host"], "127.0.0.1");
-//     assert_eq!(output["status"], "404");
-// }
-
 #[test]
-fn test_merge() {
+fn merge() {
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
@@ -222,7 +160,7 @@ fn test_merge() {
 }
 
 #[test]
-fn test_fork() {
+fn fork() {
     let num_lines: usize = 10000;
 
     let in_addr = next_addr();
@@ -268,7 +206,7 @@ fn test_fork() {
 }
 
 #[test]
-fn test_merge_and_fork() {
+fn merge_and_fork() {
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
@@ -338,92 +276,7 @@ fn test_merge_and_fork() {
 }
 
 #[test]
-fn test_merge_and_fork_json() {
-    let num_lines: usize = 10000;
-
-    let in_addr1 = next_addr();
-    let in_addr2 = next_addr();
-    let out_addr1 = next_addr();
-    let out_addr2 = next_addr();
-
-    // out1 receives both in1 and in2
-    // out2 receives in2 only
-    let config = json!({
-        "sources": {
-            "in1": {
-                "type": "tcp",
-                "address": in_addr1,
-            },
-            "in2": {
-                "type": "tcp",
-                "address": in_addr2,
-            },
-        },
-        "sinks": {
-            "out1": {
-                "type": "tcp",
-                "address": out_addr1,
-                "inputs": ["in1", "in2"],
-            },
-            "out2": {
-                "type": "tcp",
-                "address": out_addr2,
-                "inputs": ["in2"],
-            },
-        },
-    });
-
-    let config = serde_json::to_string_pretty(&config).unwrap();
-
-    let config: config::Config = serde_json::from_str(&config).unwrap();
-
-    let mut rt = runtime();
-
-    let output_lines1 = receive(&out_addr1);
-    let output_lines2 = receive(&out_addr2);
-
-    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-    // Wait for server to accept traffic
-    wait_for_tcp(in_addr1);
-    wait_for_tcp(in_addr2);
-
-    let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
-    let send1 = send_lines(in_addr1, input_lines1.clone().into_iter());
-    let send2 = send_lines(in_addr2, input_lines2.clone().into_iter());
-    let send = send1.join(send2);
-    rt.block_on(send).unwrap();
-
-    // Shut down server
-    block_on(topology.stop()).unwrap();
-
-    shutdown_on_idle(rt);
-    let output_lines1 = output_lines1.wait();
-    let output_lines2 = output_lines2.wait();
-
-    assert_eq!(num_lines, output_lines2.len());
-
-    assert_eq!(input_lines2, output_lines2);
-
-    assert_eq!(num_lines * 2, output_lines1.len());
-    // Assert that all of the output lines were present in the input and in the same order
-    let mut input_lines1 = input_lines1.into_iter().peekable();
-    let mut input_lines2 = input_lines2.into_iter().peekable();
-    for output_line in &output_lines1 {
-        if Some(output_line) == input_lines1.peek() {
-            input_lines1.next();
-        } else if Some(output_line) == input_lines2.peek() {
-            input_lines2.next();
-        } else {
-            panic!("Got line in output that wasn't in input");
-        }
-    }
-    assert_eq!(input_lines1.next(), None);
-    assert_eq!(input_lines2.next(), None);
-}
-
-#[test]
-fn test_reconnect() {
+fn reconnect() {
     let num_lines: usize = 1000;
 
     let in_addr = next_addr();
@@ -472,7 +325,7 @@ fn test_reconnect() {
 }
 
 #[test]
-fn test_healthcheck() {
+fn healthcheck() {
     let addr = next_addr();
 
     let _listener = TcpListener::bind(&addr).unwrap();

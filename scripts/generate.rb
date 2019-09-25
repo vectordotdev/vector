@@ -15,20 +15,12 @@
 # Setup
 #
 
-# Changes into the scripts directory so that we can load the Bundler
-# dependencies. Unfortunately, Bundler does not provide a way load a Gemfile
-# outside of the cwd.
-Dir.chdir "scripts"
+require_relative "setup"
 
 #
 # Requires
 #
 
-require "rubygems"
-require "bundler"
-Bundler.require(:default)
-
-require_relative "util"
 require_relative "generate/post_processors/link_definer"
 require_relative "generate/post_processors/option_referencer"
 require_relative "generate/post_processors/section_sorter"
@@ -37,23 +29,6 @@ require_relative "generate/templates"
 
 require_relative "generate/core_ext/hash"
 require_relative "generate/core_ext/string"
-
-#
-# Includes
-#
-
-include Printer
-
-#
-# Constants
-#
-
-ROOT_DIR = Pathname.new("#{Dir.pwd}/..").cleanpath
-
-DOCS_ROOT = File.join(ROOT_DIR, "docs")
-META_ROOT = File.join(ROOT_DIR, ".meta")
-TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
-VECTOR_DOCS_HOST = "https://docs.vector.dev"
 
 #
 # Functions
@@ -124,7 +99,7 @@ title("Generating files...")
 
 metadata =
   begin
-    Metadata.load(META_ROOT, DOCS_ROOT)
+    Metadata.load!(META_ROOT, DOCS_ROOT)
   rescue Exception => e
     error!(e.message)
   end
@@ -205,7 +180,7 @@ title("Checking URLs...")
 check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
 
 if check_urls
-  metadata.links.values.to_a.sort.each do |id, value|
+  Parallel.map(metadata.links.values.to_a.sort, in_threads: 30) do |id, value|
     if !link_valid?(value)
       error!(
         <<~EOF

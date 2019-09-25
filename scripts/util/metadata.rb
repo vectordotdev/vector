@@ -15,7 +15,7 @@ require_relative "metadata/transform"
 # each sub-component.
 class Metadata
   class << self
-    def load(meta_dir, docs_root)
+    def load!(meta_dir, docs_root)
       metadata = {}
 
       Dir.glob("#{meta_dir}/**/*.toml").each do |file|

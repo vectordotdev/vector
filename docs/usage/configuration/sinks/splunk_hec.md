@@ -23,10 +23,14 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
+  # REQUIRED - General
   type = "splunk_hec" # must be: "splunk_hec"
   inputs = ["my-source-id"]
   host = "my-splunk-host.com"
   token = "A94A8FE5CCB19BA61C4C08"
+  
+  # REQUIRED - Requests
+  encoding = "ndjson" # enum: "ndjson" or "text"
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -71,31 +75,12 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
@@ -140,6 +125,24 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer

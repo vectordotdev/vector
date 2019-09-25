@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install<a/>
+    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.4.0<a/>
   </strong>
 </p>
 
@@ -36,7 +36,7 @@ simple and unified.
 
 #### Setup
 
-* [**Installation**][docs.installation] - [download][urls.vector_releases], [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [manual][docs.manual]
+* [**Installation**][docs.installation] - [platforms][docs.platforms], [operating systems][docs.operating_systems], [package managers][docs.package_managers], [from archives][docs.from-archives], [from source][docs.from-source]
 * [**Getting started**][docs.getting_started]
 * [**Deployment**][docs.deployment] - [topologies][docs.topologies], [roles][docs.roles]
 
@@ -48,8 +48,9 @@ simple and unified.
 
 #### Resources
 
-* [**Community**][urls.community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Roadmap**][urls.roadmap] - [vote on new features][urls.vote_feature]
+* [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
+* [**Releases**][urls.vector_releases] - [v0.4.0][urls.v0.4.0], [changelog][urls.vector_changelog]
+* [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
 ## Features
@@ -147,6 +148,7 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`aws_cloudwatch_logs`**][docs.sinks.aws_cloudwatch_logs] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_cloudwatch_metrics`**][docs.sinks.aws_cloudwatch_metrics] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html). |
 | [**`aws_kinesis_streams`**][docs.sinks.aws_kinesis_streams] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
@@ -158,6 +160,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
 | [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
 | [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
@@ -196,11 +199,12 @@ the License.
 [docs.data-model.metric]: https://docs.vector.dev/about/data-model/metric
 [docs.data_model]: https://docs.vector.dev/about/data-model
 [docs.deployment]: https://docs.vector.dev/setup/deployment
+[docs.from-archives]: https://docs.vector.dev/setup/installation/manual/from-archives
+[docs.from-source]: https://docs.vector.dev/setup/installation/manual/from-source
 [docs.getting_started]: https://docs.vector.dev/setup/getting-started
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
 [docs.installation]: https://docs.vector.dev/setup/installation
-[docs.manual]: https://docs.vector.dev/setup/installation/manual
 [docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
 [docs.package_managers]: https://docs.vector.dev/setup/installation/package-managers
 [docs.performance]: https://docs.vector.dev/performance
@@ -210,6 +214,7 @@ the License.
 [docs.roles.service]: https://docs.vector.dev/setup/deployment/roles/service
 [docs.roles]: https://docs.vector.dev/setup/deployment/roles
 [docs.sinks.aws_cloudwatch_logs]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.sinks.aws_cloudwatch_metrics]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_metrics
 [docs.sinks.aws_kinesis_streams]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.sinks.aws_s3]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 [docs.sinks.blackhole]: https://docs.vector.dev/usage/configuration/sinks/blackhole
@@ -221,6 +226,7 @@ the License.
 [docs.sinks.kafka]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.sinks.prometheus]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.sinks.splunk_hec]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.sinks.statsd]: https://docs.vector.dev/usage/configuration/sinks/statsd
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sinks.vector]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
@@ -255,11 +261,11 @@ the License.
 [docs.updating]: https://docs.vector.dev/usage/administration/updating
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
-[urls.community]: https://vector.dev/community
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/
@@ -271,10 +277,14 @@ the License.
 [urls.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
 [urls.prometheus]: https://prometheus.io/
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[urls.roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.rust]: https://www.rust-lang.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
+[urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
+[urls.vector_community]: https://vector.dev/community
 [urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
 [urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
