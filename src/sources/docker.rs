@@ -64,7 +64,7 @@ impl SourceConfig for DockerConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> crate::Result<super::Source> {
         Ok(Box::new(DockerSource::new(self.clone(), out)) as Box<_>)
     }
 
