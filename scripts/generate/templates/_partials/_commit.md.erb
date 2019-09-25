@@ -1,12 +1,4 @@
-<%- if commit.new_component? -%>
-<%- if metadata.links.exists?("docs.#{commit.component_type.pluralize}.#{commit.component_name}") -%>
-*new*: [`<%= commit.component_name %>` <%= commit.component_type %>][docs.<%= commit.component_type.pluralize %>.<%= commit.component_name %>]
-<%- else -%>
-*new*: `<%= commit.component_name %>` <%= commit.component_type %>
-<%- end -%>
-<%- else -%>
 *<%= commit_scope(commit.scope) %>*: <%= commit.description.capitalize %>
-<%- end -%>
 
 <%- if !commit.pr_number.nil? -%>
  ([#<%= commit.pr_number %>][urls.pr_<%= commit.pr_number %>])
