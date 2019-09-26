@@ -17,7 +17,7 @@ data:
     # Configuration for vector-agent
 
     # Set global options
-    data_dir = "/var/lib/vector/"
+    data_dir = "/var/tmp/vector"
 
     # Ingest logs from Kubernetes
     [sources.kubernetes_logs]
@@ -51,14 +51,13 @@ spec:
       - name: var-log
         hostPath:
           path: /var/log/
-      # Docker log files in Kubernetes are symlinks to this folder.
-      #
-      # Vector can persist local data in here. Having that, updated
-      # Vector could continue where the last one stopped, if all the
-      # used sources have that capability.
+      # Docker and containerd log files in Kubernetes are symlinks to this folder.
       - name: var-lib
         hostPath:
           path: /var/lib/
+      # Vector will store it's data here.
+      - name: data-dir
+        emptyDir: {}
       # Mount vector configuration from config map as a file vector.toml
       - name: config-dir
         configMap:
@@ -77,14 +76,9 @@ spec:
           readOnly: true        
         - name: var-lib
           mountPath: /var/lib
+          readOnly: true 
+        - name: data-dir
+          mountPath: /var/tmp/vector
         - name: config-dir
           mountPath: /etc/vector
           readOnly: true 
-      # /var/lib/vector/ needs to be created
-      initContainers:
-      - name: init-vector-dir
-        image: busybox:1.28
-        command: ["mkdir","-p", "/var/lib/vector/"]
-        volumeMounts:  
-        - name: var-lib
-          mountPath: /var/lib

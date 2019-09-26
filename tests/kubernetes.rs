@@ -33,7 +33,6 @@ static WAIT_LIMIT: usize = 60; //s
 // - value of USER_NAMESPACE_MARKER set as only namespace to listen
 // - image: vector:latest
 // - imagePullPolicy: Never
-// - use empty_dir at /tmp/vector/ instead of /var/lib/vector/ for storage
 // - split documents into separate things.
 
 static NAMESPACE_YAML: &'static str = r#"
