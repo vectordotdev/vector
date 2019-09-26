@@ -40,6 +40,15 @@ pub enum Direction {
 }
 
 impl Metric {
+    pub fn name(&self) -> &str {
+        match self {
+            Metric::Counter { name, .. } => name,
+            Metric::Gauge { name, .. } => name,
+            Metric::Histogram { name, .. } => name,
+            Metric::Set { name, .. } => name,
+        }
+    }
+
     pub fn tags(&self) -> &Option<HashMap<String, String>> {
         match self {
             Metric::Counter { tags, .. } => tags,
@@ -55,6 +64,51 @@ impl Metric {
             Metric::Gauge { tags, .. } => tags,
             Metric::Histogram { tags, .. } => tags,
             Metric::Set { tags, .. } => tags,
+        }
+    }
+
+    pub fn is_mergeable(&self) -> bool {
+        match self {
+            Metric::Counter { .. } => true,
+            Metric::Gauge { .. } => true,
+            Metric::Histogram { .. } => false,
+            Metric::Set { .. } => false,
+        }
+    }
+
+    pub fn merge(&mut self, other: &Metric) {
+        match (self, other) {
+            (
+                Metric::Counter {
+                    ref mut val,
+                    ref mut timestamp,
+                    ..
+                },
+                Metric::Counter {
+                    val: v,
+                    timestamp: ts,
+                    ..
+                },
+            ) => {
+                *val += *v;
+                *timestamp = *ts;
+            }
+            (
+                Metric::Gauge {
+                    ref mut val,
+                    ref mut timestamp,
+                    ..
+                },
+                Metric::Gauge {
+                    val: v,
+                    timestamp: ts,
+                    ..
+                },
+            ) => {
+                *val = *v;
+                *timestamp = *ts;
+            }
+            _ => unimplemented!(),
         }
     }
 }
