@@ -3,11 +3,12 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
+use chrono::{Duration, Utc};
 use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
+    consumer::{CommitMode, Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
     error::KafkaResult,
     message::{BorrowedMessage, Message},
 };
@@ -33,12 +34,18 @@ pub struct KafkaSourceConfig {
     auto_offset_reset: String,
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: u64,
+    #[serde(default = "default_commit_interval_ms")]
+    commit_interval_ms: u64,
     host_key: Option<String>,
     key_field: Option<String>,
 }
 
 fn default_session_timeout_ms() -> u64 {
     10000 // default in librdkafka
+}
+
+fn default_commit_interval_ms() -> u64 {
+    5000 // default in librdkafka
 }
 
 fn default_auto_offset_reset() -> String {
@@ -77,8 +84,22 @@ fn kafka_source(
             }),
         };
 
+        let mut prev_commit_dt = Utc::now();
+        let commit_interval = Duration::milliseconds(config.commit_interval_ms as i64);
         stream
             .then(move |message| {
+                // commit offset for the previous messages only after the next message is received
+                // to ensure that "at least once" delivery happened
+                let now = Utc::now();
+                // XXX: if there are N threads, then the offsets will be commited
+                // once per commit_interval_ms / N on average
+                if now - prev_commit_dt >= commit_interval {
+                    consumer_ref
+                        .commit_consumer_state(CommitMode::Sync)
+                        .map_err(|e| error!(message = "Cannot commit offsets", error = ?e))?;
+                    prev_commit_dt = now;
+                }
+
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
                     Ok(Err(e)) => Err(error!(message = "Kafka returned error", error = ?e)),
@@ -103,10 +124,9 @@ fn kafka_source(
                                     .insert_implicit(key_field.clone().into(), key.into()),
                             }
                         }
-
-                        consumer_ref
-                            .store_offset(&msg)
-                            .map_err(|e| error!(message = "Cannot store offset", error = ?e))?;
+                        consumer_ref.store_offset(&msg).map_err(
+                            |e| error!(message = "Cannot store offset for the message", error = ?e),
+                        )?;
                         Ok(event)
                     }
                 }
@@ -126,6 +146,7 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
         .set("session.timeout.ms", &config.session_timeout_ms.to_string())
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "false")
+        .set("enable.auto.offset.store", "false")
         .set("client.id", "vector")
         .create()
         .context(KafkaCreateError)?;
@@ -162,6 +183,7 @@ mod test {
             group_id: "group-id".to_string(),
             auto_offset_reset: "earliest".to_string(),
             session_timeout_ms: 10000,
+            commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
         }
@@ -229,6 +251,7 @@ mod integration_test {
             group_id: group_id.clone(),
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
+            commit_interval_ms: 5000,
             host_key: None,
             key_field: Some("message_key".to_string()),
         };
