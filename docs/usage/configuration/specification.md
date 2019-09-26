@@ -1267,6 +1267,34 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
+[sinks.aws_cloudwatch_metrics]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 # Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #
@@ -2252,13 +2280,12 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself
+  # A list of host and port pairs that the Kafka client should contact to
+  # bootstrap its cluster metadata.
   # 
   # * required
   # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
 
   # The encoding format used to serialize the events before flushing.
   # 
@@ -2323,6 +2350,44 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+  #
+  # Tls
+  #
+
+  [sinks.kafka.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
+    # Absolute path to additional CA certificate file, in JKS format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in JKS
+    # format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in JKS format. If
+    # this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
 
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
@@ -2509,6 +2574,40 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+# Streams `metric` events to StatsD metrics service.
+[sinks.statsd]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "statsd"
+  type = "statsd"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # A prefix that will be added to all metric names.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # The UDP socket address to send stats to.
+  # 
+  # * optional
+  # * default: "127.0.0.1:8125"
+  address = "127.0.0.1:8125"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
 
 # Streams `log` events to a TCP connection.
 [sinks.tcp]

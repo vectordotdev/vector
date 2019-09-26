@@ -50,6 +50,7 @@ scopes:
   - tokenizer transform
   # sinks
   - aws_cloudwatch_logs sink
+  - aws_cloudwatch_metrics sink
   - aws_kinesis_streams sink
   - aws_s3 sink
   - blackhole sink
@@ -61,6 +62,7 @@ scopes:
   - kafka sink
   - prometheus sink
   - splunk_hec sink
+  - statsd sink
   - tcp sink
   - vector sink
 

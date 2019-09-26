@@ -10,7 +10,7 @@ use tokio::{
 };
 use tracing::field;
 
-mod parser;
+pub mod parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct StatsdConfig {

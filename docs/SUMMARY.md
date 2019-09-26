@@ -76,6 +76,7 @@
     * [tokenizer transform][docs.transforms.tokenizer]
   * [Sinks][docs.sinks]
     * [aws_cloudwatch_logs sink][docs.sinks.aws_cloudwatch_logs]
+    * [aws_cloudwatch_metrics sink][docs.sinks.aws_cloudwatch_metrics]
     * [aws_kinesis_streams sink][docs.sinks.aws_kinesis_streams]
     * [aws_s3 sink][docs.sinks.aws_s3]
     * [blackhole sink][docs.sinks.blackhole]
@@ -87,6 +88,7 @@
     * [kafka sink][docs.sinks.kafka]
     * [prometheus sink][docs.sinks.prometheus]
     * [splunk_hec sink][docs.sinks.splunk_hec]
+    * [statsd sink][docs.sinks.statsd]
     * [tcp sink][docs.sinks.tcp]
     * [vector sink][docs.sinks.vector]
   * [Specification][docs.configuration.specification]
@@ -142,6 +144,7 @@
 [docs.roles]: ./setup/deployment/roles
 [docs.sending-your-first-event]: ./setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_cloudwatch_metrics]: ./usage/configuration/sinks/aws_cloudwatch_metrics.md
 [docs.sinks.aws_kinesis_streams]: ./usage/configuration/sinks/aws_kinesis_streams.md
 [docs.sinks.aws_s3]: ./usage/configuration/sinks/aws_s3.md
 [docs.sinks.blackhole]: ./usage/configuration/sinks/blackhole.md
@@ -153,6 +156,7 @@
 [docs.sinks.kafka]: ./usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ./usage/configuration/sinks/prometheus.md
 [docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ./usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ./usage/configuration/sinks/vector.md
 [docs.sinks]: ./usage/configuration/sinks

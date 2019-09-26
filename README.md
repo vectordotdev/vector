@@ -148,6 +148,7 @@ Or view [platform specific installation instructions][docs.installation].
 | Name  | Description |
 |:------|:------------|
 | [**`aws_cloudwatch_logs`**][docs.sinks.aws_cloudwatch_logs] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html). |
+| [**`aws_cloudwatch_metrics`**][docs.sinks.aws_cloudwatch_metrics] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html). |
 | [**`aws_kinesis_streams`**][docs.sinks.aws_kinesis_streams] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). |
 | [**`aws_s3`**][docs.sinks.aws_s3] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html). |
 | [**`blackhole`**][docs.sinks.blackhole] | [Streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to a blackhole that simply discards data, designed for testing and benchmarking purposes. |
@@ -159,6 +160,7 @@ Or view [platform specific installation instructions][docs.installation].
 | [**`kafka`**][docs.sinks.kafka] | [Streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]. |
 | [**`prometheus`**][docs.sinks.prometheus] | [Exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service. |
 | [**`splunk_hec`**][docs.sinks.splunk_hec] | [Batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec]. |
+| [**`statsd`**][docs.sinks.statsd] | [Streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service. |
 | [**`tcp`**][docs.sinks.tcp] | [Streams](#streaming) [`log`][docs.data-model.log] events to a TCP connection. |
 | [**`vector`**][docs.sinks.vector] | [Streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance. |
 
@@ -212,6 +214,7 @@ the License.
 [docs.roles.service]: https://docs.vector.dev/setup/deployment/roles/service
 [docs.roles]: https://docs.vector.dev/setup/deployment/roles
 [docs.sinks.aws_cloudwatch_logs]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.sinks.aws_cloudwatch_metrics]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_metrics
 [docs.sinks.aws_kinesis_streams]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.sinks.aws_s3]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 [docs.sinks.blackhole]: https://docs.vector.dev/usage/configuration/sinks/blackhole
@@ -223,6 +226,7 @@ the License.
 [docs.sinks.kafka]: https://docs.vector.dev/usage/configuration/sinks/kafka
 [docs.sinks.prometheus]: https://docs.vector.dev/usage/configuration/sinks/prometheus
 [docs.sinks.splunk_hec]: https://docs.vector.dev/usage/configuration/sinks/splunk_hec
+[docs.sinks.statsd]: https://docs.vector.dev/usage/configuration/sinks/statsd
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sinks.vector]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
@@ -257,6 +261,7 @@ the License.
 [docs.updating]: https://docs.vector.dev/usage/administration/updating
 [docs.use_cases]: https://docs.vector.dev/use-cases
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
@@ -274,6 +279,7 @@ the License.
 [urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
 [urls.rust]: https://www.rust-lang.org/
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
+[urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md

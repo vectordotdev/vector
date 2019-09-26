@@ -40,16 +40,16 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 ### New features
 
 * *[`elasticsearch` sink][docs.sinks.elasticsearch]*: Support aws authentication ([#864][urls.pr_864])
-* *new*: `aws_cloudwatch_metrics` sink ([#707][urls.pr_707])
-* *new*: [`clickhouse` sink][docs.sinks.clickhouse] ([#693][urls.pr_693])
-* *new*: [`file` sink][docs.sinks.file] ([#688][urls.pr_688])
-* *new*: [`udp` source][docs.sources.udp] ([#738][urls.pr_738])
-* *new*: [`kafka` source][docs.sources.kafka] ([#774][urls.pr_774])
-* *new*: [`journald` source][docs.sources.journald] ([#702][urls.pr_702])
-* *new*: [`coercer` transform][docs.transforms.coercer] ([#666][urls.pr_666])
-* *new*: [`add_tags` transform][docs.transforms.add_tags] ([#785][urls.pr_785])
-* *new*: [`remove_tags` transform][docs.transforms.remove_tags] ([#785][urls.pr_785])
-* *new*: [`split` transform][docs.transforms.split] ([#850][urls.pr_850])
+* *new sink*: Initial [`aws_cloudwatch_metrics` sink][docs.sinks.aws_cloudwatch_metrics] implementation ([#707][urls.pr_707])
+* *new sink*: Initial [`clickhouse` sink][docs.sinks.clickhouse] implementation ([#693][urls.pr_693])
+* *new sink*: Initial [`file` sink][docs.sinks.file] implementation ([#688][urls.pr_688])
+* *new source*: Initial [`udp` source][docs.sources.udp] implementation ([#738][urls.pr_738])
+* *new source*: Initial [`kafka` source][docs.sources.kafka] implementation ([#774][urls.pr_774])
+* *new source*: Initial [`journald` source][docs.sources.journald] implementation ([#702][urls.pr_702])
+* *new transform*: Initial [`coercer` transform][docs.transforms.coercer] implementation ([#666][urls.pr_666])
+* *new transform*: Initial [`add_tags` transform][docs.transforms.add_tags] implementation ([#785][urls.pr_785])
+* *new transform*: Initial [`remove_tags` transform][docs.transforms.remove_tags] implementation ([#785][urls.pr_785])
+* *new transform*: Initial [`split` transform][docs.transforms.split] implementation ([#850][urls.pr_850])
 * *[`syslog` source][docs.sources.syslog]*: Add all parsed syslog fields to event ([#836][urls.pr_836])
 
 ### Enhancements
@@ -142,6 +142,7 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [docs.platforms]: https://docs.vector.dev/setup/installation/platforms
 [docs.rhel]: https://docs.vector.dev/setup/installation/operating-systems/rhel
 [docs.sinks.aws_cloudwatch_logs]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_logs
+[docs.sinks.aws_cloudwatch_metrics]: https://docs.vector.dev/usage/configuration/sinks/aws_cloudwatch_metrics
 [docs.sinks.aws_kinesis_streams]: https://docs.vector.dev/usage/configuration/sinks/aws_kinesis_streams
 [docs.sinks.aws_s3]: https://docs.vector.dev/usage/configuration/sinks/aws_s3
 [docs.sinks.clickhouse]: https://docs.vector.dev/usage/configuration/sinks/clickhouse
@@ -243,5 +244,5 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 [urls.pr_902]: https://github.com/timberio/vector/pull/902
 [urls.pr_904]: https://github.com/timberio/vector/pull/904
 [urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
-[urls.vector_nightly_builds]: http://google.com
+[urls.vector_nightly_builds]: http://packages.timber.io/vector/nightly/latest/
 [urls.vector_releases]: https://github.com/timberio/vector/releases
