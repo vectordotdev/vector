@@ -36,7 +36,7 @@ cargo deb --target $TARGET --deb-version $VERSION --no-build
 
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
-rename -v 's/vector_([^_]*)_(.*)\.deb/vector-$1-$2\.deb/' target/$TARGET/debian/*.deb
+rename -v 's/vector_([^_]*)_(.*)\.deb/vector-$2\.deb/' target/$TARGET/debian/*.deb
 
-# Move the deb into the artifactws dir
+# Move the deb into the artifacts dir
 mv -v $(find target/$TARGET/debian/ -name *.deb) target/artifacts

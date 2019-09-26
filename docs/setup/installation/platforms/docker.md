@@ -26,7 +26,7 @@ A couple of things to note:
 
 1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
 your `$PATH`.
-2. Configuration is located in `/etc/vector`.
+2. The configuration directory is located at `/etc/vector`.
 {% endtab %}
 {% tab title="debian-slim" %}
 ```bash
@@ -41,7 +41,7 @@ A few things to note:
 1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
 your `$PATH`.
 2. A Systemd script is also installed; you can start vector via `systemctl start vector`.
-3. Configuration is located in `/etc/vector`.
+3. The configuration directory is located at `/etc/vector`.
 {% endtab %}
 {% tab title="debian" %}
 ```bash
@@ -56,7 +56,7 @@ A few things to note:
 1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
 your `$PATH`.
 2. A Systemd script is also installed; you can start vector via `systemctl start vector`.
-3. Configuration is located in `/etc/vector`.
+3. The configuration directory is located at `/etc/vector`.
 {% endtab %}
 {% endtabs %}
 
