@@ -19,7 +19,7 @@ method. Each installation guide provides it's own "Updating" section:
 
 ## Working Upstream
 
-![Where To Start Example](../../assets/updating-upstream.svg)
+![Where To Start Example][assets.updating-upstream]
 
 Depending on your [topology][docs.topologies], you'll want update your Vector
 instances in a specific order. You should _always_ start downstream and work
@@ -38,6 +38,7 @@ data. We recommend provisioning at least 20% of head room, on all resources,
 to account for spikes and updating.
 
 
+[assets.updating-upstream]: ../../assets/updating-upstream.svg
 [docs.apt#updating]: ../../setup/installation/package-managers/apt.md#updating
 [docs.docker#updating]: ../../setup/installation/platforms/docker.md#updating
 [docs.from_archives#updating]: ../../setup/installation/manual/from-archives.md#updating

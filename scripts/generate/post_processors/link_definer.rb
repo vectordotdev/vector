@@ -16,7 +16,7 @@ module PostProcessors
       end
 
       def remove_link_footers(content)
-        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\.# ]*)\]:/)
+        parts = content.partition(/\n\n\[([a-zA-Z0-9_\-\.\/# ]*)\]:/)
         parts.first.strip
       end
     end
@@ -39,11 +39,11 @@ module PostProcessors
     end
 
     def define!
-      if !file_path.include?("SUMMARY.md")
+      if !file_path.end_with?("SUMMARY.md") && !file_path.end_with?("conventions.md")
         verify_no_direct_links!
       end
 
-      link_names = content.scan(/\]\[([a-zA-Z0-9_\-\.# ]*)\]/).flatten.uniq
+      link_names = content.scan(/\]\[([a-zA-Z0-9_\-\.\/# ]*)\]/).flatten.uniq
 
       footer_links = []
 
@@ -75,7 +75,7 @@ module PostProcessors
       end
 
       def verify_no_direct_links!
-        direct_links = content.scan(/\]\(([a-zA-Z0-9_\-\. ]*)\)/).flatten.uniq
+        direct_links = content.scan(/\]\([^#]([a-zA-Z0-9_\-\.\/# ]*)\)/).flatten.uniq
 
         if direct_links.any?
           raise <<~EOF

@@ -12,7 +12,7 @@ description: Vector configuration
 
 # Configuration
 
-![](../../assets/configure.svg)
+![][assets.configure]
 
 This section covers configuring Vector and creating [pipelines][docs.configuration#composition]
 like the one shown above. Vector requires only a _single_ [TOML][urls.toml]
@@ -291,6 +291,7 @@ All TOML values types are supported. For convenience this includes:
 * [Tables](https://github.com/toml-lang/toml#table)
 
 
+[assets.configure]: ../../assets/configure.svg
 [docs.configuration#composition]: ../../usage/configuration#composition
 [docs.data-model.log]: ../../about/data-model/log.md
 [docs.data-model.metric]: ../../about/data-model/metric.md

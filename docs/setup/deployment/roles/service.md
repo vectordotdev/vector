@@ -4,7 +4,7 @@ description: Deploying and running Vector as a service
 
 # Service Role
 
-![](../../../assets/centralized-service.svg)
+![][assets.centralized-service]
 
 When Vector serves as a service, its purpose is to efficiently receive,
 aggregate, and route data downstream. In this scenario, Vector is the primary
@@ -125,6 +125,7 @@ service, restarting without disruption is achieved by higher level design
 decisions, such as [load balancing][docs.roles.service#load-balancing].
 
 
+[assets.centralized-service]: ../../../assets/centralized-service.svg
 [docs.performance]: ../../../performance.md
 [docs.reloading]: ../../../usage/administration/reloading.md
 [docs.roles.service#load-balancing]: ../../../setup/deployment/roles/service.md#load-balancing

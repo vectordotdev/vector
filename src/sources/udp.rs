@@ -184,5 +184,4 @@ mod test {
 
         assert_eq!(events[0].as_log()[&event::HOST], format!("{}", from).into());
     }
-
 }

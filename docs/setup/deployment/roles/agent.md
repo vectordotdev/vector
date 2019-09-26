@@ -4,7 +4,7 @@ description: Deploying and running Vector as an agent
 
 # Agent Role
 
-![](../../../assets/agent.svg)
+![][assets.agent]
 
 When Vector serves as an agent, its purpose is to efficiently and quietly
 collect data. In this scenario, Vector is typically sharing a host with a more
@@ -111,6 +111,7 @@ continue running while Vector restarts. When Vector is restarted, it can resume
 where it left off.
 
 
+[assets.agent]: ../../../assets/agent.svg
 [docs.docker]: ../../../setup/installation/platforms/docker.md
 [docs.performance]: ../../../performance.md
 [docs.platforms]: ../../../setup/installation/platforms

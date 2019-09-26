@@ -31,6 +31,7 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<Atom>,
     encoding: Encoding,
+    tls: Option<KafkaSinkTlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -38,6 +39,15 @@ pub struct KafkaSinkConfig {
 pub enum Encoding {
     Text,
     Json,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct KafkaSinkTlsConfig {
+    enabled: Option<bool>,
+    ca_path: Option<String>,
+    crt_path: Option<String>,
+    key_path: Option<String>,
+    key_phrase: Option<String>,
 }
 
 pub struct KafkaSink {
@@ -71,6 +81,25 @@ impl KafkaSinkConfig {
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = self.bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
+        if let Some(ref tls) = self.tls {
+            let enabled = tls.enabled.unwrap_or(false);
+            client_config.set(
+                "security.protocol",
+                if enabled { "ssl" } else { "plaintext" },
+            );
+            if let Some(ref path) = tls.ca_path {
+                client_config.set("ssl.ca.location", path);
+            }
+            if let Some(ref path) = tls.crt_path {
+                client_config.set("ssl.certificate.location", path);
+            }
+            if let Some(ref path) = tls.key_path {
+                client_config.set("ssl.keystore.location", path);
+            }
+            if let Some(ref phrase) = tls.key_phrase {
+                client_config.set("ssl.keystore.password", phrase);
+            }
+        }
         client_config
     }
 }
@@ -258,15 +287,38 @@ mod integration_test {
     use std::{thread, time::Duration};
 
     #[test]
-    fn kafka_happy_path() {
-        let bootstrap_servers = vec![String::from("localhost:9092")];
+    fn kafka_happy_path_plaintext() {
+        kafka_happy_path("localhost:9092", None);
+    }
+
+    const TEST_CA: &str = "tests/data/Vector_CA.crt";
+
+    #[test]
+    fn kafka_happy_path_tls() {
+        kafka_happy_path(
+            "localhost:9091",
+            Some(KafkaSinkTlsConfig {
+                enabled: Some(true),
+                ca_path: Some(TEST_CA.into()),
+                ..Default::default()
+            }),
+        );
+    }
+
+    fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
+        let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
+        let tls_enabled = tls
+            .as_ref()
+            .map(|tls| tls.enabled.unwrap_or(false))
+            .unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
-            key_field: None,
             encoding: Encoding::Text,
+            key_field: None,
+            tls,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
@@ -283,6 +335,10 @@ mod integration_test {
         client_config.set("bootstrap.servers", &bs);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
+        if tls_enabled {
+            client_config.set("security.protocol", "ssl");
+            client_config.set("ssl.ca.location", TEST_CA);
+        }
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);

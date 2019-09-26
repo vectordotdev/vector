@@ -71,19 +71,27 @@ def post_process(content, doc, links)
 end
 
 def url_valid?(url)
-  uri = URI.parse(url)
-  req = Net::HTTP.new(uri.host, uri.port)
-  req.open_timeout = 500
-  req.read_timeout = 1000
-  req.ssl_timeout = 1000
-  req.use_ssl = true if uri.scheme == 'https'
-  path = uri.path == "" ? "/" : uri.path
+  case url
+  # We add an exception for paths on packages.timber.io because the
+  # index.html file we use also serves as the error page. This is how
+  # it serves directories.
+  when /^https:\/\/packages\.timber\.io\/vector[^.]*$/
+    true
+  else
+    uri = URI.parse(url)
+    req = Net::HTTP.new(uri.host, uri.port)
+    req.open_timeout = 500
+    req.read_timeout = 1000
+    req.ssl_timeout = 1000
+    req.use_ssl = true if uri.scheme == 'https'
+    path = uri.path == "" ? "/" : uri.path
 
-  begin
-    res = req.request_head(path)
-    res.code.to_i != 404
-  rescue Errno::ECONNREFUSED
-    return false
+    begin
+      res = req.request_head(path)
+      res.code.to_i != 404
+    rescue Errno::ECONNREFUSED
+      return false
+    end
   end
 end
 
@@ -130,7 +138,14 @@ Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   each do |template_path|
     target_file = template_path.gsub(/^#{TEMPLATES_DIR}\//, "").gsub(/\.erb$/, "")
     target_path = "#{ROOT_DIR}/#{target_file}"
-    content = templates.render(target_file)
+    
+    content =
+      begin
+        templates.render(target_file)
+      rescue Exception => e
+        error!(e.message)
+      end
+
     content = post_process(content, target_path, metadata.links)
 
 
@@ -180,11 +195,11 @@ title("Checking URLs...")
 check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
 
 if check_urls
-  Parallel.map(metadata.links.values.to_a.sort, in_threads: 30) do |id, value|
+  Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|
     if !link_valid?(value)
       error!(
         <<~EOF
-        Link invalid!
+        Link `#{id}` invalid!
 
           #{value}
 

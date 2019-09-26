@@ -76,6 +76,8 @@ class CommitScope
 
     @short_link =
       case name
+      when "cli"
+        "docs.administration"
       when "config"
         "docs.configuration"
       when "log data model"

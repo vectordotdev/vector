@@ -1,6 +1,6 @@
 # Governance & Control
 
-![](../assets/governance.svg)
+![][assets.governance]
 
 
-
+[assets.governance]: ../assets/governance.svg

@@ -154,5 +154,5 @@ issue, please:
 [urls.statsd_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+bug%22
 [urls.statsd_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22+label%3A%22Type%3A+enhancement%22
 [urls.statsd_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+statsd%22
-[urls.statsd_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/statsd/mod.rs
+[urls.statsd_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/statsd.rs
 [urls.vector_chat]: https://chat.vector.dev
