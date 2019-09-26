@@ -35,14 +35,14 @@ services:
         KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
         KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
         KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
-        KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.jks
+        KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
         KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
-        KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.jks
+        KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
         KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
         KAFKA_SSL_KEY_PASSWORD: NOPASS
         KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
       volumes:
-        - ./tests/data/localhost.jks:/certs/localhost.jks:ro
+        - ./tests/data/localhost.p12:/certs/localhost.p12:ro
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:
