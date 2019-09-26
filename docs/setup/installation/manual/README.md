@@ -4,27 +4,22 @@ description: Install Vector manually
 
 # Manual Installation
 
-{% hint style="info" %}
-Please make sure your [platform][docs.platforms] is not supported before proceeding
-with package manager installation instructions. We generally recommend
-[platform installation instructions][docs.platforms] first.
-{% endhint %}
+You can install Vector manually through one of the following methods. We
+highly recommend using pre-built archives if possible.
 
-Vector offers installation instructions for the following package managers:
+{% page-ref page="from-archives.md" %}
 
-{% page-ref page="apt.md" %}
-
-{% page-ref page="homebrew.md" %}
-
-{% page-ref page="yum.md" %}
+{% page-ref page="from-source.md" %}
 
 ## Alternatives
 
 If you do not see your package manager you can consider:
 
+{% page-ref page="../platforms/README.md" %}
+
 {% page-ref page="../operating-systems/README.md" %}
 
-{% page-ref page="../manual/README.md" %}
+{% page-ref page="../package-managers/README.md" %}
 
 
-[docs.platforms]: ../../../setup/installation/platforms
+

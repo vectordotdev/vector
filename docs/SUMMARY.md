@@ -1,40 +1,40 @@
 # Table of contents
 
 * [What Is Vector?](README.md)
-* [Use Cases](use-cases/README.md)
+* [Use Cases][docs.use-cases]
   * [Reduce Lock-In](use-cases/lock-in.md)
   * [Multi-Cloud](use-cases/multi-cloud.md)
   * [Governance & Control](use-cases/governance.md)
   * [Reduce Cost](use-cases/cost.md)
   * [Security & Compliance](use-cases/security-and-compliance.md)
   * [Backups & Archives](use-cases/backups.md)
-* [Performance](performance.md)
-* [Correctness](correctness.md)
+* [Performance][docs.performance]
+* [Correctness][docs.correctness]
 
 ## About
 
-* [Concepts](about/concepts.md)
-* [Data Model](about/data-model/README.md)
-  * [Log Event](about/data-model/log.md)
-  * [Metric Event](about/data-model/metric.md)
-* [Guarantees](about/guarantees.md)
+* [Concepts][docs.concepts]
+* [Data Model][docs.data-model]
+  * [Log Event][docs.data-model.log]
+  * [Metric Event][docs.data-model.metric]
+* [Guarantees][docs.guarantees]
 
 ## Setup
 
-* [Installation](setup/installation/README.md)
-  * [Platforms](setup/installation/platforms/README.md)
-    * [Docker](setup/installation/platforms/docker.md)
-  * [Package Managers](setup/installation/package-managers/README.md)
-    * [APT](setup/installation/package-managers/apt.md)
-    * [Homebrew](setup/installation/package-managers/homebrew.md)
-    * [YUM](setup/installation/package-managers/yum.md)
-  * [Operating Systems](setup/installation/operating-systems/README.md)
-    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
-    * [CentOS](setup/installation/operating-systems/centos.md)
-    * [Debian](setup/installation/operating-systems/debian.md)
-    * [MacOS](setup/installation/operating-systems/macos.md)
-    * [RHEL](setup/installation/operating-systems/rhel.md)
-    * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
+* [Installation][docs.installation]
+  * [Platforms][docs.installation.platforms]
+    * [Docker][docs.platforms.docker]
+  * [Package Managers][docs.installation.package-managers]
+    * [APT][docs.package-managers.apt]
+    * [Homebrew][docs.package-managers.homebrew]
+    * [YUM][docs.package-managers.yum]
+  * [Operating Systems][docs.installation.operating-systems]
+    * [Amazon Linux][docs.operating-systems.amazon-linux]
+    * [CentOS][docs.operating-systems.centos]
+    * [Debian][docs.operating-systems.debian]
+    * [MacOS][docs.operating-systems.macos]
+    * [RHEL][docs.operating-systems.rhel]
+    * [Ubuntu][docs.operating-systems.ubuntu]
   * [Manual][docs.installation.manual]
     * [From Archives][docs.from-archives]
     * [From Source][docs.from-source]
@@ -108,6 +108,7 @@
 
 * [Changelog][urls.vector_changelog]
 * [Community][urls.vector_community]
+* [Downloads][urls.vector_downloads]
 * [Github Repo][urls.vector_repo]
 * [Releases][urls.vector_releases]
 * [Roadmap][urls.vector_roadmap]
@@ -127,18 +128,39 @@
 [docs.administration.updating]: ./usage/administration/updating.md
 [docs.administration.validating]: ./usage/administration/validating.md
 [docs.administration]: ./usage/administration
+[docs.concepts]: ./about/concepts.md
 [docs.configuration.specification]: ./usage/configuration/specification.md
 [docs.configuration]: ./usage/configuration
 [docs.conventions]: ./meta/conventions.md
+[docs.correctness]: ./correctness.md
+[docs.data-model.log]: ./about/data-model/log.md
+[docs.data-model.metric]: ./about/data-model/metric.md
+[docs.data-model]: ./about/data-model
 [docs.deployment.topologies]: ./setup/deployment/topologies.md
 [docs.deployment]: ./setup/deployment
 [docs.from-archives]: ./setup/installation/manual/from-archives.md
 [docs.from-source]: ./setup/installation/manual/from-source.md
 [docs.getting-started]: ./setup/getting-started
 [docs.glossary]: ./meta/glossary.md
+[docs.guarantees]: ./about/guarantees.md
 [docs.guides.troubleshooting]: ./usage/guides/troubleshooting.md
 [docs.guides]: ./usage/guides
 [docs.installation.manual]: ./setup/installation/manual
+[docs.installation.operating-systems]: ./setup/installation/operating-systems
+[docs.installation.package-managers]: ./setup/installation/package-managers
+[docs.installation.platforms]: ./setup/installation/platforms
+[docs.installation]: ./setup/installation
+[docs.operating-systems.amazon-linux]: ./setup/installation/operating-systems/amazon-linux.md
+[docs.operating-systems.centos]: ./setup/installation/operating-systems/centos.md
+[docs.operating-systems.debian]: ./setup/installation/operating-systems/debian.md
+[docs.operating-systems.macos]: ./setup/installation/operating-systems/macos.md
+[docs.operating-systems.rhel]: ./setup/installation/operating-systems/rhel.md
+[docs.operating-systems.ubuntu]: ./setup/installation/operating-systems/ubuntu.md
+[docs.package-managers.apt]: ./setup/installation/package-managers/apt.md
+[docs.package-managers.homebrew]: ./setup/installation/package-managers/homebrew.md
+[docs.package-managers.yum]: ./setup/installation/package-managers/yum.md
+[docs.performance]: ./performance.md
+[docs.platforms.docker]: ./setup/installation/platforms/docker.md
 [docs.roles.agent]: ./setup/deployment/roles/agent.md
 [docs.roles.service]: ./setup/deployment/roles/service.md
 [docs.roles]: ./setup/deployment/roles
@@ -185,8 +207,10 @@
 [docs.transforms.split]: ./usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ./usage/configuration/transforms/tokenizer.md
 [docs.transforms]: ./usage/configuration/transforms
+[docs.use-cases]: ./use-cases
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_community]: https://vector.dev/community
+[urls.vector_downloads]: https://packages.timber.io/vector
 [urls.vector_releases]: https://github.com/timberio/vector/releases
 [urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

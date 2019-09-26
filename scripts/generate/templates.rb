@@ -261,7 +261,24 @@ class Templates
     template_binding = binding if template_binding.nil?
     content = File.read("#{dir}/#{template_path}.erb")
     renderer = ERB.new(content, nil, '-')
-    content = renderer.result(template_binding)
+    content =
+      begin
+        renderer.result(template_binding)
+      rescue Exception => e
+        raise(
+          <<~EOF
+          Error rendering template!
+
+            #{dir.gsub(/#{ROOT_DIR}/, "")}/#{template_path}.erb
+
+          Error:
+
+            #{e.message}
+
+          #{e.backtrace.join("\n").indent(2)}
+          EOF
+        )
+      end
 
     if template_path.end_with?(".md") && !partial?(template_path)
       notice =

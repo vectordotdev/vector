@@ -192,12 +192,14 @@ class Links
 
       when /^(.*)_(sink|source|transform)_source$/
         name = $1
-        type = $2.pluralize
+        type = $2
+
         source_file_url =
-          if ["statsd"].include?(name)
-            "#{VECTOR_ROOT}/tree/master/src/#{type}/#{name}/mod.rs"
+          case "#{name}_#{type}"
+          when "statsd_source"
+            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}/mod.rs"
           else
-            "#{VECTOR_ROOT}/tree/master/src/#{type}/#{name}.rs"
+            "#{VECTOR_ROOT}/tree/master/src/#{type.pluralize}/#{name}.rs"
           end
 
       when /^(.*)_test$/
@@ -235,18 +237,9 @@ class Links
       when /^v([a-z0-9\-\.]+)_branch$/
         "#{VECTOR_ROOT}/tree/v#{$1}"
 
-      when /^vector_latest_(release|nightly)_(.*)/
-        channel = $1
-        target = $2
-
-        case channel
-        when "release"
-          "https://packages.timber.io/vector/latest/vector-#{target}.tar.gz"
-        when "nightly"
-          "https://packages.timber.io/vector/nightly/latest/vector-#{target}.tar.gz"
-        else
-          raise("Unknown release channel: #{channel}")
-        end
+      when /^vector_downloads\.?(.*)$/
+        path = $1 == "" ? nil : $1
+        ["https://packages.timber.io/vector", path].compact.join("/")
       else
         raise KeyError.new(
           <<~EOF

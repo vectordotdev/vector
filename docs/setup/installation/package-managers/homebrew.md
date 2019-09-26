@@ -54,7 +54,17 @@ brew remove vector
 brew update && brew upgrade vector
 ```
 
+## Versions
+
+Historical Vector versions can be found in the [releases][urls.vector_releases].
+Once you've found the version you'd like to install you can specify it with:
+
+```bash
+brew install vector@X.X.X
+```
+
 
 [docs.configuration]: ../../../usage/configuration
 [urls.homebrew]: https://brew.sh/
 [urls.homebrew_services]: https://github.com/Homebrew/homebrew-services
+[urls.vector_releases]: https://github.com/timberio/vector/releases

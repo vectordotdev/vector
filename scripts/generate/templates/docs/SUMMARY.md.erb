@@ -1,40 +1,39 @@
 # Table of contents
 
 * [What Is Vector?](README.md)
-* [Use Cases](use-cases/README.md)
+* [Use Cases][docs.use-cases]
   * [Reduce Lock-In](use-cases/lock-in.md)
   * [Multi-Cloud](use-cases/multi-cloud.md)
   * [Governance & Control](use-cases/governance.md)
   * [Reduce Cost](use-cases/cost.md)
   * [Security & Compliance](use-cases/security-and-compliance.md)
   * [Backups & Archives](use-cases/backups.md)
-* [Performance](performance.md)
-* [Correctness](correctness.md)
+* [Performance][docs.performance]
+* [Correctness][docs.correctness]
 
 ## About
 
-* [Concepts](about/concepts.md)
-* [Data Model](about/data-model/README.md)
-  * [Log Event](about/data-model/log.md)
-  * [Metric Event](about/data-model/metric.md)
-* [Guarantees](about/guarantees.md)
+* [Concepts][docs.concepts]
+* [Data Model][docs.data-model]
+  * [Log Event][docs.data-model.log]
+  * [Metric Event][docs.data-model.metric]
+* [Guarantees][docs.guarantees]
 
 ## Setup
 
-* [Installation](setup/installation/README.md)
-  * [Platforms](setup/installation/platforms/README.md)
-    * [Docker](setup/installation/platforms/docker.md)
-  * [Package Managers](setup/installation/package-managers/README.md)
-    * [APT](setup/installation/package-managers/apt.md)
-    * [Homebrew](setup/installation/package-managers/homebrew.md)
-    * [YUM](setup/installation/package-managers/yum.md)
-  * [Operating Systems](setup/installation/operating-systems/README.md)
-    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
-    * [CentOS](setup/installation/operating-systems/centos.md)
-    * [Debian](setup/installation/operating-systems/debian.md)
-    * [MacOS](setup/installation/operating-systems/macos.md)
-    * [RHEL](setup/installation/operating-systems/rhel.md)
-    * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
+* [Installation][docs.installation]
+  * [Platforms][docs.installation.platforms]
+    <%- metadata.installation.platforms.each do |platform| -%>
+    * [<%= platform.name %>][docs.platforms.<%= platform.id %>]
+    <%- end -%>
+  * [Package Managers][docs.installation.package-managers]
+    <%- metadata.installation.package_managers.each do |package_manager| -%>
+    * [<%= package_manager.name %>][docs.package-managers.<%= package_manager.id %>]
+    <%- end -%>
+  * [Operating Systems][docs.installation.operating-systems]
+    <%- metadata.installation.operating_systems.each do |operating_system| -%>
+    * [<%= operating_system.name %>][docs.operating-systems.<%= operating_system.id %>]
+    <%- end -%>
   * [Manual][docs.installation.manual]
     * [From Archives][docs.from-archives]
     * [From Source][docs.from-source]
@@ -78,6 +77,7 @@
 
 * [Changelog][urls.vector_changelog]
 * [Community][urls.vector_community]
+* [Downloads][urls.vector_downloads]
 * [Github Repo][urls.vector_repo]
 * [Releases][urls.vector_releases]
 * [Roadmap][urls.vector_roadmap]
