@@ -72,7 +72,7 @@ impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common);
-        let sink = es(self, common, acker);
+        let sink = es(self, common, acker)?;
 
         Ok((sink, healthcheck))
     }
@@ -157,7 +157,7 @@ fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
     acker: Acker,
-) -> super::RouterSink {
+) -> crate::Result<super::RouterSink> {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -249,7 +249,7 @@ fn es(
                 }
             }
         }
-    });
+    })?;
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
@@ -266,7 +266,7 @@ fn es(
         )
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
-    Box::new(sink)
+    Ok(Box::new(sink))
 }
 
 fn encode_event(

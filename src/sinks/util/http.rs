@@ -1,10 +1,12 @@
-use super::retries::RetryLogic;
+use super::{retries::RetryLogic, tls::TlsConnectorExt};
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use snafu::Snafu;
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -14,6 +16,12 @@ use tracing_tower_http::InstrumentedHttpService;
 
 pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 pub type Response = hyper::Response<Bytes>;
+
+#[derive(Debug, Snafu)]
+enum BuilderError {
+    #[snafu(display("Must specify both TLS key_file and crt_file"))]
+    MissingCrtKeyFile,
+}
 
 #[derive(Clone)]
 pub struct HttpService {
@@ -26,7 +34,7 @@ impl HttpService {
         HttpServiceBuilder::new()
     }
 
-    pub fn new<F>(request_builder: F) -> Self
+    pub fn new<F>(request_builder: F) -> crate::Result<Self>
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -35,9 +43,14 @@ impl HttpService {
 }
 
 /// A builder for `HttpService`s
+#[derive(Default)]
 pub struct HttpServiceBuilder {
     threads: usize,
     verify_certificate: bool,
+    ca_path: Option<PathBuf>,
+    crt_path: Option<PathBuf>,
+    key_path: Option<PathBuf>,
+    key_pass: Option<String>,
 }
 
 impl HttpServiceBuilder {
@@ -45,29 +58,42 @@ impl HttpServiceBuilder {
         Self {
             threads: 4,
             verify_certificate: true,
+            ..Default::default()
         }
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(&self, request_builder: F) -> HttpService
+    pub fn build<F>(&self, request_builder: F) -> crate::Result<HttpService>
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
         let mut http = HttpConnector::new(self.threads);
         http.enforce_http(false);
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(!self.verify_certificate)
-            .build()
-            .expect("TLS initialization failed");
+        let mut tls = native_tls::TlsConnector::builder();
+        tls.danger_accept_invalid_certs(!self.verify_certificate);
+        if let Some(ref path) = self.ca_path {
+            tls.load_add_root_certificate(path)?;
+        }
+        if self.key_path.is_some() != self.crt_path.is_some() {
+            return Err(Box::new(BuilderError::MissingCrtKeyFile));
+        }
+        if self.key_path.is_some() && self.crt_path.is_some() {
+            tls.load_identity(
+                self.key_path.as_ref().unwrap(),
+                &self.key_pass,
+                self.crt_path.as_ref().unwrap(),
+            )?;
+        }
+        let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        HttpService {
+        Ok(HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-        }
+        })
     }
 
     /// Set the number of threads used by the `HttpService`
@@ -79,6 +105,30 @@ impl HttpServiceBuilder {
     /// Verify the remote server's certificate
     pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
         self.verify_certificate = verify;
+        self
+    }
+
+    /// Set the path to the certificate authority file or directory
+    pub fn ca_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
+        self.ca_path = path.map(|p| p.into());
+        self
+    }
+
+    /// Set the path to the client certificate file
+    pub fn crt_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
+        self.crt_path = path.map(|p| p.into());
+        self
+    }
+
+    /// Set the path to the client key file
+    pub fn key_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
+        self.key_path = path.map(|p| p.into());
+        self
+    }
+
+    /// Set the password for the client keys
+    pub fn key_pass(&mut self, pass: Option<String>) -> &mut Self {
+        self.key_pass = pass;
         self
     }
 }
@@ -179,7 +229,8 @@ mod test {
             builder.method(Method::POST);
             builder.uri(uri.clone());
             builder.body(body.into()).unwrap()
-        });
+        })
+        .unwrap();
 
         let req = service.call(request);
 
