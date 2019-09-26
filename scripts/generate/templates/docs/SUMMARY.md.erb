@@ -1,7 +1,7 @@
 # Table of contents
 
 * [What Is Vector?](README.md)
-* [Use Cases][docs.use-cases]
+* [Use Cases][docs.use-cases.readme]
   * [Reduce Lock-In](use-cases/lock-in.md)
   * [Multi-Cloud](use-cases/multi-cloud.md)
   * [Governance & Control](use-cases/governance.md)
@@ -14,49 +14,49 @@
 ## About
 
 * [Concepts][docs.concepts]
-* [Data Model][docs.data-model]
+* [Data Model][docs.data-model.readme]
   * [Log Event][docs.data-model.log]
   * [Metric Event][docs.data-model.metric]
 * [Guarantees][docs.guarantees]
 
 ## Setup
 
-* [Installation][docs.installation]
-  * [Platforms][docs.installation.platforms]
+* [Installation][docs.installation.readme]
+  * [Platforms][docs.installation.platforms.readme]
     <%- metadata.installation.platforms.each do |platform| -%>
     * [<%= platform.name %>][docs.platforms.<%= platform.id %>]
     <%- end -%>
-  * [Package Managers][docs.installation.package-managers]
+  * [Package Managers][docs.installation.package-managers.readme]
     <%- metadata.installation.package_managers.each do |package_manager| -%>
     * [<%= package_manager.name %>][docs.package-managers.<%= package_manager.id %>]
     <%- end -%>
-  * [Operating Systems][docs.installation.operating-systems]
+  * [Operating Systems][docs.installation.operating-systems.readme]
     <%- metadata.installation.operating_systems.each do |operating_system| -%>
     * [<%= operating_system.name %>][docs.operating-systems.<%= operating_system.id %>]
     <%- end -%>
   * [Manual][docs.installation.manual]
     * [From Archives][docs.from-archives]
     * [From Source][docs.from-source]
-* [Getting Started][docs.getting-started]
+* [Getting Started][docs.getting-started.readme]
   * [Sending Your First Event][docs.sending-your-first-event]
-* [Deployment][docs.deployment]
+* [Deployment][docs.deployment.readme]
   * [Topologies][docs.deployment.topologies]
-  * [Roles][docs.roles]
+  * [Roles][docs.roles.readme]
     * [Agent Role][docs.roles.agent]
     * [Service Role][docs.roles.service]
 
 ## Usage
 
-* [Configuration][docs.configuration]
-  * [Sources][docs.sources]
+* [Configuration][docs.configuration.readme]
+  * [Sources][docs.sources.readme]
     <%- metadata.sources.to_h.values.sort.each do |source| -%>
     * [<%= source.name %> source][docs.sources.<%= source.name %>]
     <%- end -%>
-  * [Transforms][docs.transforms]
+  * [Transforms][docs.transforms.readme]
     <%- metadata.transforms.to_h.values.sort.each do |transform| -%>
     * [<%= transform.name %> transform][docs.transforms.<%= transform.name %>]
     <%- end -%>
-  * [Sinks][docs.sinks]
+  * [Sinks][docs.sinks.readme]
     <%- metadata.sinks.to_h.values.sort.each do |sink| -%>
     * [<%= sink.name %> sink][docs.sinks.<%= sink.name %>]
     <%- end -%>

@@ -195,7 +195,7 @@ title("Checking URLs...")
 check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
 
 if check_urls
-  Parallel.map(metadata.links.values.to_a.sort, in_threads: 30) do |id, value|
+  Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|
     if !link_valid?(value)
       error!(
         <<~EOF

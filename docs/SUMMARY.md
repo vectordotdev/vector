@@ -1,7 +1,7 @@
 # Table of contents
 
 * [What Is Vector?](README.md)
-* [Use Cases][docs.use-cases]
+* [Use Cases][docs.use-cases.readme]
   * [Reduce Lock-In](use-cases/lock-in.md)
   * [Multi-Cloud](use-cases/multi-cloud.md)
   * [Governance & Control](use-cases/governance.md)
@@ -14,21 +14,21 @@
 ## About
 
 * [Concepts][docs.concepts]
-* [Data Model][docs.data-model]
+* [Data Model][docs.data-model.readme]
   * [Log Event][docs.data-model.log]
   * [Metric Event][docs.data-model.metric]
 * [Guarantees][docs.guarantees]
 
 ## Setup
 
-* [Installation][docs.installation]
-  * [Platforms][docs.installation.platforms]
+* [Installation][docs.installation.readme]
+  * [Platforms][docs.installation.platforms.readme]
     * [Docker][docs.platforms.docker]
-  * [Package Managers][docs.installation.package-managers]
+  * [Package Managers][docs.installation.package-managers.readme]
     * [APT][docs.package-managers.apt]
     * [Homebrew][docs.package-managers.homebrew]
     * [YUM][docs.package-managers.yum]
-  * [Operating Systems][docs.installation.operating-systems]
+  * [Operating Systems][docs.installation.operating-systems.readme]
     * [Amazon Linux][docs.operating-systems.amazon-linux]
     * [CentOS][docs.operating-systems.centos]
     * [Debian][docs.operating-systems.debian]
@@ -38,18 +38,18 @@
   * [Manual][docs.installation.manual]
     * [From Archives][docs.from-archives]
     * [From Source][docs.from-source]
-* [Getting Started][docs.getting-started]
+* [Getting Started][docs.getting-started.readme]
   * [Sending Your First Event][docs.sending-your-first-event]
-* [Deployment][docs.deployment]
+* [Deployment][docs.deployment.readme]
   * [Topologies][docs.deployment.topologies]
-  * [Roles][docs.roles]
+  * [Roles][docs.roles.readme]
     * [Agent Role][docs.roles.agent]
     * [Service Role][docs.roles.service]
 
 ## Usage
 
-* [Configuration][docs.configuration]
-  * [Sources][docs.sources]
+* [Configuration][docs.configuration.readme]
+  * [Sources][docs.sources.readme]
     * [file source][docs.sources.file]
     * [journald source][docs.sources.journald]
     * [kafka source][docs.sources.kafka]
@@ -59,7 +59,7 @@
     * [tcp source][docs.sources.tcp]
     * [udp source][docs.sources.udp]
     * [vector source][docs.sources.vector]
-  * [Transforms][docs.transforms]
+  * [Transforms][docs.transforms.readme]
     * [add_fields transform][docs.transforms.add_fields]
     * [add_tags transform][docs.transforms.add_tags]
     * [coercer transform][docs.transforms.coercer]
@@ -74,7 +74,7 @@
     * [sampler transform][docs.transforms.sampler]
     * [split transform][docs.transforms.split]
     * [tokenizer transform][docs.transforms.tokenizer]
-  * [Sinks][docs.sinks]
+  * [Sinks][docs.sinks.readme]
     * [aws_cloudwatch_logs sink][docs.sinks.aws_cloudwatch_logs]
     * [aws_cloudwatch_metrics sink][docs.sinks.aws_cloudwatch_metrics]
     * [aws_kinesis_streams sink][docs.sinks.aws_kinesis_streams]
@@ -129,27 +129,27 @@
 [docs.administration.validating]: ./usage/administration/validating.md
 [docs.administration]: ./usage/administration
 [docs.concepts]: ./about/concepts.md
+[docs.configuration.readme]: ./usage/configuration/README.md
 [docs.configuration.specification]: ./usage/configuration/specification.md
-[docs.configuration]: ./usage/configuration
 [docs.conventions]: ./meta/conventions.md
 [docs.correctness]: ./correctness.md
 [docs.data-model.log]: ./about/data-model/log.md
 [docs.data-model.metric]: ./about/data-model/metric.md
-[docs.data-model]: ./about/data-model
+[docs.data-model.readme]: ./about/data-model/README.md
+[docs.deployment.readme]: ./setup/deployment/README.md
 [docs.deployment.topologies]: ./setup/deployment/topologies.md
-[docs.deployment]: ./setup/deployment
 [docs.from-archives]: ./setup/installation/manual/from-archives.md
 [docs.from-source]: ./setup/installation/manual/from-source.md
-[docs.getting-started]: ./setup/getting-started
+[docs.getting-started.readme]: ./setup/getting-started/README.md
 [docs.glossary]: ./meta/glossary.md
 [docs.guarantees]: ./about/guarantees.md
 [docs.guides.troubleshooting]: ./usage/guides/troubleshooting.md
 [docs.guides]: ./usage/guides
 [docs.installation.manual]: ./setup/installation/manual
-[docs.installation.operating-systems]: ./setup/installation/operating-systems
-[docs.installation.package-managers]: ./setup/installation/package-managers
-[docs.installation.platforms]: ./setup/installation/platforms
-[docs.installation]: ./setup/installation
+[docs.installation.operating-systems.readme]: ./setup/installation/operating-systems/README.md
+[docs.installation.package-managers.readme]: ./setup/installation/package-managers/README.md
+[docs.installation.platforms.readme]: ./setup/installation/platforms/README.md
+[docs.installation.readme]: ./setup/installation/README.md
 [docs.operating-systems.amazon-linux]: ./setup/installation/operating-systems/amazon-linux.md
 [docs.operating-systems.centos]: ./setup/installation/operating-systems/centos.md
 [docs.operating-systems.debian]: ./setup/installation/operating-systems/debian.md
@@ -162,8 +162,8 @@
 [docs.performance]: ./performance.md
 [docs.platforms.docker]: ./setup/installation/platforms/docker.md
 [docs.roles.agent]: ./setup/deployment/roles/agent.md
+[docs.roles.readme]: ./setup/deployment/roles/README.md
 [docs.roles.service]: ./setup/deployment/roles/service.md
-[docs.roles]: ./setup/deployment/roles
 [docs.sending-your-first-event]: ./setup/getting-started/sending-your-first-event.md
 [docs.sinks.aws_cloudwatch_logs]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
 [docs.sinks.aws_cloudwatch_metrics]: ./usage/configuration/sinks/aws_cloudwatch_metrics.md
@@ -177,21 +177,21 @@
 [docs.sinks.http]: ./usage/configuration/sinks/http.md
 [docs.sinks.kafka]: ./usage/configuration/sinks/kafka.md
 [docs.sinks.prometheus]: ./usage/configuration/sinks/prometheus.md
+[docs.sinks.readme]: ./usage/configuration/sinks/README.md
 [docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
 [docs.sinks.statsd]: ./usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ./usage/configuration/sinks/vector.md
-[docs.sinks]: ./usage/configuration/sinks
 [docs.sources.file]: ./usage/configuration/sources/file.md
 [docs.sources.journald]: ./usage/configuration/sources/journald.md
 [docs.sources.kafka]: ./usage/configuration/sources/kafka.md
+[docs.sources.readme]: ./usage/configuration/sources/README.md
 [docs.sources.statsd]: ./usage/configuration/sources/statsd.md
 [docs.sources.stdin]: ./usage/configuration/sources/stdin.md
 [docs.sources.syslog]: ./usage/configuration/sources/syslog.md
 [docs.sources.tcp]: ./usage/configuration/sources/tcp.md
 [docs.sources.udp]: ./usage/configuration/sources/udp.md
 [docs.sources.vector]: ./usage/configuration/sources/vector.md
-[docs.sources]: ./usage/configuration/sources
 [docs.transforms.add_fields]: ./usage/configuration/transforms/add_fields.md
 [docs.transforms.add_tags]: ./usage/configuration/transforms/add_tags.md
 [docs.transforms.coercer]: ./usage/configuration/transforms/coercer.md
@@ -200,14 +200,14 @@
 [docs.transforms.json_parser]: ./usage/configuration/transforms/json_parser.md
 [docs.transforms.log_to_metric]: ./usage/configuration/transforms/log_to_metric.md
 [docs.transforms.lua]: ./usage/configuration/transforms/lua.md
+[docs.transforms.readme]: ./usage/configuration/transforms/README.md
 [docs.transforms.regex_parser]: ./usage/configuration/transforms/regex_parser.md
 [docs.transforms.remove_fields]: ./usage/configuration/transforms/remove_fields.md
 [docs.transforms.remove_tags]: ./usage/configuration/transforms/remove_tags.md
 [docs.transforms.sampler]: ./usage/configuration/transforms/sampler.md
 [docs.transforms.split]: ./usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ./usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ./usage/configuration/transforms
-[docs.use-cases]: ./use-cases
+[docs.use-cases.readme]: ./use-cases/README.md
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_community]: https://vector.dev/community
 [urls.vector_downloads]: https://packages.timber.io/vector

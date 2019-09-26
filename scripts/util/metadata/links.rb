@@ -41,8 +41,7 @@ class Links
     @docs =
       Dir.glob("#{docs_root}/**/*").
       to_a.
-      collect { |f| f.gsub(docs_root, "") }.
-      select { |f| !f.end_with?("README.md") }
+      collect { |f| f.gsub(docs_root, "") }
   end
 
   def []=(id)
@@ -134,17 +133,23 @@ class Links
 
     def fetch_doc(name)
       normalized_name = name.downcase.gsub(".", "/").gsub("-", "_").split("#", 2).first
+      available_docs = @docs.select { |doc| !doc.start_with?("/assets/") }
 
-      docs =
-        @docs.
-          select { |doc| !doc.start_with?("/assets/") }.
-          select do |doc|
-            doc.downcase.gsub(/\.md$/, "").gsub("-", "_").end_with?(normalized_name)
-          end
+      available_docs =
+        if name.end_with?(".readme")
+          available_docs
+        else
+          available_docs.select { |doc| !doc.end_with?("/README.md") }
+        end
 
-      if docs.length == 1
-        docs.first
-      elsif docs.length == 0
+      found_docs =
+        available_docs.select do |doc|
+          doc.downcase.gsub(/\.md$/, "").gsub("-", "_").end_with?(normalized_name)
+        end
+
+      if found_docs.length == 1
+        found_docs.first
+      elsif found_docs.length == 0
         raise KeyError.new(
           <<~EOF
           Unknown link name!
@@ -163,7 +168,7 @@ class Links
 
           This link matches more than 1 doc:
 
-            * #{docs.join("\n  * ")}
+            * #{found_docs.join("\n  * ")}
 
           Please use something more specific that will match only a single document.
           EOF
