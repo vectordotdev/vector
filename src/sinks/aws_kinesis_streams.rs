@@ -438,5 +438,4 @@ mod integration_tests {
     fn gen_stream() -> String {
         format!("test-{}", random_string(10).to_lowercase())
     }
-
 }
