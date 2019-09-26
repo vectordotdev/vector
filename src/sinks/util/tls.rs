@@ -1,4 +1,4 @@
-use native_tls::Certificate;
+use native_tls::{Certificate, Identity, TlsConnectorBuilder};
 use openssl::{
     pkcs12::Pkcs12,
     pkey::{PKey, Private},
@@ -24,6 +24,10 @@ enum TlsError {
         filename: PathBuf,
         source: std::io::Error,
     },
+    #[snafu(display("Could not set TCP TLS identity: {}", source))]
+    TlsIdentityError { source: native_tls::Error },
+    #[snafu(display("Could not export identity to DER: {}", source))]
+    DerExportError { source: openssl::error::ErrorStack },
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,
@@ -41,6 +45,49 @@ enum TlsError {
     },
     #[snafu(display("Could not build PKCS#12 archive for identity: {}", source))]
     Pkcs12Error { source: openssl::error::ErrorStack },
+}
+
+pub trait TlsConnectorExt {
+    fn load_add_root_certificate<P>(&mut self, path: P) -> crate::Result<&mut Self>
+    where
+        P: AsRef<Path> + Debug;
+    fn load_identity<P1, P2>(
+        &mut self,
+        key_path: P1,
+        key_pass: &Option<String>,
+        crt_path: P2,
+    ) -> crate::Result<&mut Self>
+    where
+        P1: AsRef<Path> + Debug,
+        P2: AsRef<Path> + Debug;
+}
+
+impl TlsConnectorExt for TlsConnectorBuilder {
+    fn load_add_root_certificate<P: AsRef<Path> + Debug>(
+        &mut self,
+        path: P,
+    ) -> crate::Result<&mut Self> {
+        let certificate = load_certificate(path)?;
+        self.add_root_certificate(certificate);
+        Ok(self)
+    }
+
+    fn load_identity<P1, P2>(
+        &mut self,
+        key_path: P1,
+        key_pass: &Option<String>,
+        crt_path: P2,
+    ) -> crate::Result<&mut Self>
+    where
+        P1: AsRef<Path> + Debug,
+        P2: AsRef<Path> + Debug,
+    {
+        let identity = load_build_pkcs12(key_path, key_pass, crt_path)?;
+        let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
+            .context(TlsIdentityError)?;
+        self.identity(identity);
+        Ok(self)
+    }
 }
 
 /// Load a `native_tls::Certificate` from a named file
