@@ -30,13 +30,13 @@ specific platform below.
 
 ## Platforms
 
-{% page-ref page="operating-systems/docker.md" %}
+{% page-ref page="platforms/docker.md" %}
 
 ## Package Managers
 
-{% page-ref page="operating-systems/apt.md" %}
-{% page-ref page="operating-systems/homebrew.md" %}
-{% page-ref page="operating-systems/yum.md" %}
+{% page-ref page="package-managers/apt.md" %}
+{% page-ref page="package-managers/homebrew.md" %}
+{% page-ref page="package-managers/yum.md" %}
 
 ## Operating Systems
 

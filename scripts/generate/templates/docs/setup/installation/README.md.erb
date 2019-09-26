@@ -23,13 +23,13 @@ specific platform below.
 ## Platforms
 
 <%- metadata.installation.platforms.each do |platform| -%>
-{% page-ref page="operating-systems/<%= platform.id %>.md" %}
+{% page-ref page="platforms/<%= platform.id %>.md" %}
 <%- end -%>
 
 ## Package Managers
 
 <%- metadata.installation.package_managers.each do |package_manager| -%>
-{% page-ref page="operating-systems/<%= package_manager.id %>.md" %}
+{% page-ref page="package-managers/<%= package_manager.id %>.md" %}
 <%- end -%>
 
 ## Operating Systems
