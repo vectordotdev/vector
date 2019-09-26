@@ -3,6 +3,7 @@ pub mod buffer;
 pub mod http;
 pub mod partition;
 pub mod retries;
+pub mod tls;
 
 use crate::buffers::Acker;
 use futures::{
