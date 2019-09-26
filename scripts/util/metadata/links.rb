@@ -244,7 +244,7 @@ class Links
 
       when /^vector_downloads\.?(.*)$/
         path = $1 == "" ? nil : $1
-        ["https://packages.timber.io/vector", path].compact.join("/")
+        ["https://packages.timber.io/vector", path].compact.join("")
       else
         raise KeyError.new(
           <<~EOF

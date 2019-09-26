@@ -32,7 +32,7 @@ sudo systemctl start vector
 That's it! Proceed to [configure](#configuring) Vector for your use case.
 {% endtab %}
 {% tab title="dpkg" %}
-Download the [Vector `.deb file`][urls.urls.vector/latest/vector-amd64.deb]:
+Download the [Vector `.deb file`][urls.vector_downloads/latest/vector-amd64.deb]:
 
 ```bash
 curl -O <%= metadata.links.fetch("urls.vector/latest/vector-amd64.deb") %>
@@ -100,4 +100,5 @@ sudo apt-get install vector=X.X.X
 [docs.configuration]: ../../../usage/configuration
 [urls.apt]: https://wiki.debian.org/Apt
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.vector_downloads/latest/vector-amd64.deb]: https://packages.timber.io/vector/latest/vector-amd64.deb
 [urls.vector_releases]: https://github.com/timberio/vector/releases

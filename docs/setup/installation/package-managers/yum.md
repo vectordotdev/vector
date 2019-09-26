@@ -32,7 +32,7 @@ sudo systemctl start vector
 That's it! Proceed to [configure](#configuring) Vector for your use case.
 {% endtab %}
 {% tab title="rpm" %}
-Download the [Vector `.rpm file`][urls.vector/latest/vector-x86_64.rpm]
+Download the [Vector `.rpm file`][urls.vector_downloads/latest/vector-x86_64.rpm]
 
 ```bash
 curl -O <%= metadata.links.fetch("urls.vector/latest/vector-x86_64.rpm") %>
@@ -96,5 +96,6 @@ sudo yum install vector-X.X.X
 
 [docs.configuration]: ../../../usage/configuration
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
+[urls.vector_downloads/latest/vector-x86_64.rpm]: https://packages.timber.io/vector/latest/vector-x86_64.rpm
 [urls.vector_releases]: https://github.com/timberio/vector/releases
 [urls.yum]: http://yum.baseurl.org/

@@ -134,5 +134,6 @@ Simply follow the same [installation instructions above](#installation).
 [docs.operating_systems]: ../../../setup/installation/operating-systems
 [docs.platforms]: ../../../setup/installation/platforms
 [urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain:%3A+Operations
-[urls.vector_downloads.latest]: https://packages.timber.io/vector/latest
+[urls.vector_downloads.latest]: https://packages.timber.io/vectorlatest
+[urls.vector_downloads.nightly/latest]: https://packages.timber.io/vectornightly/latest
 [urls.vector_downloads]: https://packages.timber.io/vector
