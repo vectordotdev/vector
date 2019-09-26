@@ -51,8 +51,8 @@ sudo systemctl start vector
 ```
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
-{% endtabs %}
 {% endtab %}
+{% endtabs %}
 
 ## Configuring
 
