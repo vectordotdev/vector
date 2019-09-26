@@ -138,6 +138,10 @@ install_from_archive() {
     need_cmd mkdir
     need_cmd rm
     need_cmd rmdir
+    need_cmd grep
+    need_cmd tar
+    need_cmd head
+    need_cmd sed
 
     get_architecture || return 1
     local _arch="$RETVAL"
@@ -171,12 +175,15 @@ install_from_archive() {
 
     printf "$_prompt Unpacking archive to $HOME/.vector ..."
     ensure mkdir -p "$HOME/.vector"
+    local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
     ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=1
+
     printf " ✓\n"
 
     printf "$_prompt Adding Vector path to ~/.profile"
-    echo 'export PATH="$HOME/.vector/bin:$PATH"' >> $HOME/.profile
-    echo 'export PATH="$HOME/.vector/bin:$PATH"' >> $HOME/.zprofile
+    local _path="export PATH=\"\$HOME/.vector/${_dir_name}/bin:\$PATH\""
+    grep -qxF "${_path}" "${HOME}/.profile" || echo "${_path}" >> "${HOME}/.profile"
+    grep -qxF "${_path}" "${HOME}/.zprofile" || echo "${_path}" >> "${HOME}/.zprofile"
     printf " ✓\n"
 
     printf "$_prompt Install succeeded! 🚀\n"
