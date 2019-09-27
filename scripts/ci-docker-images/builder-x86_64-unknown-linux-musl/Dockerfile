@@ -64,7 +64,7 @@ ENV PATH="$CLANG_PREFIX/bin:$PATH"
 
 # Get all sources at first, so that changes in compilation
 # flags would not redownload them.
-RUN apt-get update && apt-get -y install curl xz-utils rsync
+RUN apt-get update && apt-get -y install curl xz-utils
 
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
@@ -85,7 +85,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
 ENV OPENSSL_DIR=$SRC_DIR/openssl-$OPENSSL_VERSION
 
 # Install build dependencies.
-RUN apt-get update && apt-get -y install curl ninja-build cmake python3-distutils
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils
 
 ARG LIBS_PREFIX
 
