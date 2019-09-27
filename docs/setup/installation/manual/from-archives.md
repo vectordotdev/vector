@@ -133,7 +133,7 @@ Simply follow the same [installation instructions above](#installation).
 [docs.from_source]: ../../../setup/installation/manual/from-source.md
 [docs.operating_systems]: ../../../setup/installation/operating-systems
 [docs.platforms]: ../../../setup/installation/platforms
-[urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain:%3A+Operations
+[urls.new_target]: https://github.com/timberio/vector/issues/new?labels=Type%3A+Task&labels=Domain%3A+Operations
 [urls.vector_downloads.latest]: https://packages.timber.io/vector/latest
 [urls.vector_downloads.nightly/latest]: https://packages.timber.io/vector/nightly/latest
 [urls.vector_downloads]: https://packages.timber.io/vector
