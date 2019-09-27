@@ -40,15 +40,6 @@ pub enum Direction {
 }
 
 impl Metric {
-    pub fn name(&self) -> &str {
-        match self {
-            Metric::Counter { name, .. } => name,
-            Metric::Gauge { name, .. } => name,
-            Metric::Histogram { name, .. } => name,
-            Metric::Set { name, .. } => name,
-        }
-    }
-
     pub fn tags(&self) -> &Option<HashMap<String, String>> {
         match self {
             Metric::Counter { tags, .. } => tags,
@@ -67,46 +58,54 @@ impl Metric {
         }
     }
 
-    pub fn is_mergeable(&self) -> bool {
-        match self {
-            Metric::Counter { .. } => true,
-            Metric::Gauge { .. } => true,
-            Metric::Histogram { .. } => false,
-            Metric::Set { .. } => false,
-        }
-    }
-
     pub fn merge(&mut self, other: &Metric) {
         match (self, other) {
             (
                 Metric::Counter {
                     ref mut val,
                     ref mut timestamp,
+                    ref mut tags,
                     ..
                 },
                 Metric::Counter {
-                    val: v,
-                    timestamp: ts,
+                    val: new_val,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
                     ..
                 },
             ) => {
-                *val += *v;
-                *timestamp = *ts;
+                *val += *new_val;
+                *timestamp = *new_timestamp;
+                *tags = new_tags.clone();
             }
             (
                 Metric::Gauge {
                     ref mut val,
+                    direction: None,
                     ref mut timestamp,
+                    ref mut tags,
                     ..
                 },
                 Metric::Gauge {
-                    val: v,
-                    timestamp: ts,
+                    val: new_val,
+                    timestamp: new_timestamp,
+                    direction: new_direction,
+                    tags: new_tags,
                     ..
                 },
             ) => {
-                *val = *v;
-                *timestamp = *ts;
+                if new_direction.is_none() {
+                    *val = *new_val;
+                } else {
+                    let delta = match new_direction {
+                        None => 0.0,
+                        Some(Direction::Plus) => *val,
+                        Some(Direction::Minus) => -*val,
+                    };
+                    *val += delta;
+                };
+                *timestamp = *new_timestamp;
+                *tags = new_tags.clone();
             }
             _ => unimplemented!(),
         }
