@@ -4,6 +4,7 @@ use openssl::{
     pkey::{PKey, Private},
     x509::X509,
 };
+use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -51,7 +52,7 @@ enum TlsError {
 }
 
 /// Standard TLS connector options
-#[derive(Clone, Derivative)]
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 pub struct TlsOptions {
     #[derivative(Default(value = "true"))]

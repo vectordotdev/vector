@@ -5,6 +5,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
+        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
@@ -12,9 +13,13 @@ use crate::{
 };
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
-use hyper::header::{HeaderName, HeaderValue};
-use hyper::{Body, Client, Request};
+use hyper::{
+    client::HttpConnector,
+    header::{HeaderName, HeaderValue},
+    Body, Client, Request,
+};
 use hyper_tls::HttpsConnector;
+use native_tls::TlsConnector;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -22,8 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::path::PathBuf;
+use std::convert::{TryFrom, TryInto};
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -53,7 +57,7 @@ pub struct ElasticSearchConfig {
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
-    pub tls: Option<ElasticSearchTlsConfig>,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -68,14 +72,6 @@ pub struct ElasticSearchBasicAuthConfig {
 pub enum Provider {
     Default,
     Aws,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct ElasticSearchTlsConfig {
-    ca_path: Option<PathBuf>,
-    crt_path: Option<PathBuf>,
-    key_path: Option<PathBuf>,
-    key_phrase: Option<String>,
 }
 
 #[typetag::serde(name = "elasticsearch")]
@@ -98,6 +94,7 @@ struct ElasticSearchCommon {
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
+    tls_options: TlsOptions,
 }
 
 #[derive(Debug, Snafu)]
@@ -151,10 +148,11 @@ impl ElasticSearchCommon {
             authorization,
             region,
             credentials,
+            tls_options: config.tls.clone().unwrap_or(Default::default()),
         })
     }
 
-    fn builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
+    fn request_builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
         let uri = format!("{}{}", self.host, path);
         let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
         let mut builder = Request::builder();
@@ -217,14 +215,9 @@ fn es(
     }
 
     let mut builder = HttpService::builder();
-    if let Some(ref tls) = config.tls {
-        builder.ca_path(tls.ca_path.clone());
-        builder.crt_path(tls.crt_path.clone());
-        builder.key_path(tls.key_path.clone());
-        builder.key_pass(tls.key_phrase.clone());
-    }
+    builder.tls_options(common.tls_options.clone());
     let http_service = builder.build(move |body: Vec<u8>| {
-        let (uri, mut builder) = common.builder(Method::POST, &path_query);
+        let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
         match common.credentials {
             None => {
@@ -324,7 +317,7 @@ fn encode_event(
 }
 
 fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
-    let (uri, mut builder) = common.builder(Method::GET, "/_cluster/health");
+    let (uri, mut builder) = common.request_builder(Method::GET, "/_cluster/health");
     match &common.credentials {
         None => {
             if let Some(authorization) = &common.authorization {
@@ -340,7 +333,13 @@ fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
     }
     let request = builder.body(Body::empty()).unwrap();
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
+    let tls_settings =
+        TlsSettings::try_from(&common.tls_options).expect("Building TLS settings failed");
+    let tls = TlsConnector::builder()
+        .use_tls_settings(tls_settings)
+        .build()
+        .expect("Building TLS connector failed");
+    let https = HttpsConnector::from((HttpConnector::new(1), tls));
     let client = Client::builder().build(https);
     Box::new(
         client
@@ -438,6 +437,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         event,
+        sinks::util::tls::TlsOptions,
         test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
         Event,
@@ -520,7 +520,7 @@ mod integration_tests {
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
-            tls: Some(ElasticSearchTlsConfig {
+            tls: Some(TlsOptions {
                 ca_path: Some("tests/data/Vector_CA.crt".into()),
                 ..Default::default()
             }),
