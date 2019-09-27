@@ -102,7 +102,7 @@ release-rpm: ## Release .rpm via Package Cloud
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
-set-version:
+set-version: ## Updates the Vector version to the result of `make version`
 	@export VERSION=$(_latest_version); scripts/set-version.rb
 
 version: ## Get the current Vector version
