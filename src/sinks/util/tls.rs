@@ -33,6 +33,8 @@ enum TlsError {
         filename: PathBuf,
         source: native_tls::Error,
     },
+    #[snafu(display("Must specify both TLS key_file and crt_file"))]
+    MissingCrtKeyFile,
     #[snafu(display("Could not parse X509 certificate in {:?}: {}", filename, source))]
     X509ParseError {
         filename: PathBuf,
@@ -47,45 +49,46 @@ enum TlsError {
     Pkcs12Error { source: openssl::error::ErrorStack },
 }
 
+/// Standard TLS connector options
+#[derive(Derivative)]
+#[derivative(Default)]
+pub struct TlsOptions {
+    #[derivative(Default(value = "true"))]
+    pub verify_certificate: bool,
+    pub ca_path: Option<PathBuf>,
+    pub crt_path: Option<PathBuf>,
+    pub key_path: Option<PathBuf>,
+    pub key_pass: Option<String>,
+}
+
 pub trait TlsConnectorExt {
-    fn load_add_root_certificate<P>(&mut self, path: P) -> crate::Result<&mut Self>
-    where
-        P: AsRef<Path> + Debug;
-    fn load_identity<P1, P2>(
-        &mut self,
-        key_path: P1,
-        key_pass: &Option<String>,
-        crt_path: P2,
-    ) -> crate::Result<&mut Self>
-    where
-        P1: AsRef<Path> + Debug,
-        P2: AsRef<Path> + Debug;
+    fn use_tls_options(&mut self, options: &TlsOptions) -> crate::Result<&mut Self>;
 }
 
 impl TlsConnectorExt for TlsConnectorBuilder {
-    fn load_add_root_certificate<P: AsRef<Path> + Debug>(
-        &mut self,
-        path: P,
-    ) -> crate::Result<&mut Self> {
-        let certificate = load_certificate(path)?;
-        self.add_root_certificate(certificate);
-        Ok(self)
-    }
+    fn use_tls_options(&mut self, options: &TlsOptions) -> crate::Result<&mut Self> {
+        self.danger_accept_invalid_certs(!options.verify_certificate);
 
-    fn load_identity<P1, P2>(
-        &mut self,
-        key_path: P1,
-        key_pass: &Option<String>,
-        crt_path: P2,
-    ) -> crate::Result<&mut Self>
-    where
-        P1: AsRef<Path> + Debug,
-        P2: AsRef<Path> + Debug,
-    {
-        let identity = load_build_pkcs12(key_path, key_pass, crt_path)?;
-        let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
-            .context(TlsIdentityError)?;
-        self.identity(identity);
+        if options.crt_path.is_some() != options.key_path.is_some() {
+            return Err(TlsError::MissingCrtKeyFile.into());
+        }
+
+        if let Some(ref path) = options.ca_path {
+            let certificate = load_certificate(path)?;
+            self.add_root_certificate(certificate);
+        }
+
+        if let Some(ref crt_path) = options.crt_path {
+            let identity = load_build_pkcs12(
+                options.key_path.as_ref().unwrap(),
+                &options.key_pass,
+                crt_path,
+            )?;
+            let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
+                .context(TlsIdentityError)?;
+            self.identity(identity);
+        }
+
         Ok(self)
     }
 }

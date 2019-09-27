@@ -1,12 +1,13 @@
-use super::{retries::RetryLogic, tls::TlsConnectorExt};
+use super::{
+    retries::RetryLogic,
+    tls::{TlsConnectorExt, TlsOptions},
+};
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
-use snafu::Snafu;
 use std::borrow::Cow;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -16,12 +17,6 @@ use tracing_tower_http::InstrumentedHttpService;
 
 pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 pub type Response = hyper::Response<Bytes>;
-
-#[derive(Debug, Snafu)]
-enum BuilderError {
-    #[snafu(display("Must specify both TLS key_file and crt_file"))]
-    MissingCrtKeyFile,
-}
 
 #[derive(Clone)]
 pub struct HttpService {
@@ -46,18 +41,13 @@ impl HttpService {
 #[derive(Default)]
 pub struct HttpServiceBuilder {
     threads: usize,
-    verify_certificate: bool,
-    ca_path: Option<PathBuf>,
-    crt_path: Option<PathBuf>,
-    key_path: Option<PathBuf>,
-    key_pass: Option<String>,
+    tls_options: Option<TlsOptions>,
 }
 
 impl HttpServiceBuilder {
     fn new() -> Self {
         Self {
             threads: 4,
-            verify_certificate: true,
             ..Default::default()
         }
     }
@@ -70,19 +60,8 @@ impl HttpServiceBuilder {
         let mut http = HttpConnector::new(self.threads);
         http.enforce_http(false);
         let mut tls = native_tls::TlsConnector::builder();
-        tls.danger_accept_invalid_certs(!self.verify_certificate);
-        if let Some(ref path) = self.ca_path {
-            tls.load_add_root_certificate(path)?;
-        }
-        if self.key_path.is_some() != self.crt_path.is_some() {
-            return Err(Box::new(BuilderError::MissingCrtKeyFile));
-        }
-        if self.key_path.is_some() && self.crt_path.is_some() {
-            tls.load_identity(
-                self.key_path.as_ref().unwrap(),
-                &self.key_pass,
-                self.crt_path.as_ref().unwrap(),
-            )?;
+        if let Some(ref options) = self.tls_options {
+            tls.use_tls_options(options)?;
         }
         let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
@@ -102,33 +81,9 @@ impl HttpServiceBuilder {
         self
     }
 
-    /// Verify the remote server's certificate
-    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
-        self.verify_certificate = verify;
-        self
-    }
-
-    /// Set the path to the certificate authority file or directory
-    pub fn ca_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
-        self.ca_path = path.map(|p| p.into());
-        self
-    }
-
-    /// Set the path to the client certificate file
-    pub fn crt_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
-        self.crt_path = path.map(|p| p.into());
-        self
-    }
-
-    /// Set the path to the client key file
-    pub fn key_path<P: Into<PathBuf>>(&mut self, path: Option<P>) -> &mut Self {
-        self.key_path = path.map(|p| p.into());
-        self
-    }
-
-    /// Set the password for the client keys
-    pub fn key_pass(&mut self, pass: Option<String>) -> &mut Self {
-        self.key_pass = pass;
+    /// Set the standard TLS options
+    pub fn tls_options(&mut self, options: TlsOptions) -> &mut Self {
+        self.tls_options = Some(options);
         self
     }
 }

@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
+        tls::TlsOptions,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -125,7 +126,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
-    let verify = config.verify_certificate.unwrap_or(true);
+    let verify_certificate = config.verify_certificate.unwrap_or(true);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -133,15 +134,20 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    if !verify {
+    if !verify_certificate {
         warn!(
             message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
         );
     }
 
+    let tls_options = TlsOptions {
+        verify_certificate,
+        ..Default::default()
+    };
+
     let http_service =
         HttpService::builder()
-            .verify_certificate(verify)
+            .tls_options(tls_options)
             .build(move |body: Vec<u8>| {
                 let mut builder = hyper::Request::builder();
 
