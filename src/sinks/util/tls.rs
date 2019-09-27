@@ -5,6 +5,7 @@ use openssl::{
     x509::X509,
 };
 use snafu::{ResultExt, Snafu};
+use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
@@ -50,7 +51,7 @@ enum TlsError {
 }
 
 /// Standard TLS connector options
-#[derive(Derivative)]
+#[derive(Clone, Derivative)]
 #[derivative(Default)]
 pub struct TlsOptions {
     #[derivative(Default(value = "true"))]
@@ -61,35 +62,65 @@ pub struct TlsOptions {
     pub key_pass: Option<String>,
 }
 
-pub trait TlsConnectorExt {
-    fn use_tls_options(&mut self, options: &TlsOptions) -> crate::Result<&mut Self>;
+/// Directly usable settings for TLS connectors
+#[derive(Derivative)]
+#[derivative(Default)]
+pub struct TlsSettings {
+    #[derivative(Default(value = "true"))]
+    verify_certificate: bool,
+    authority: Option<Certificate>,
+    identity: Option<Identity>,
 }
 
-impl TlsConnectorExt for TlsConnectorBuilder {
-    fn use_tls_options(&mut self, options: &TlsOptions) -> crate::Result<&mut Self> {
-        self.danger_accept_invalid_certs(!options.verify_certificate);
-
+impl TryFrom<&TlsOptions> for TlsSettings {
+    type Error = crate::Error;
+    fn try_from(options: &TlsOptions) -> Result<Self, Self::Error> {
         if options.crt_path.is_some() != options.key_path.is_some() {
             return Err(TlsError::MissingCrtKeyFile.into());
         }
 
-        if let Some(ref path) = options.ca_path {
-            let certificate = load_certificate(path)?;
+        let authority = match options.ca_path {
+            None => None,
+            Some(ref path) => Some(load_certificate(path)?),
+        };
+
+        let identity = match options.crt_path {
+            None => None,
+            Some(ref crt_path) => {
+                let identity = load_build_pkcs12(
+                    options.key_path.as_ref().unwrap(),
+                    &options.key_pass,
+                    crt_path,
+                )?;
+                Some(
+                    Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
+                        .context(TlsIdentityError)?,
+                )
+            }
+        };
+
+        Ok(Self {
+            verify_certificate: options.verify_certificate,
+            authority,
+            identity,
+        })
+    }
+}
+
+pub trait TlsConnectorExt {
+    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self;
+}
+
+impl TlsConnectorExt for TlsConnectorBuilder {
+    fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
+        self.danger_accept_invalid_certs(!settings.verify_certificate);
+        if let Some(certificate) = settings.authority {
             self.add_root_certificate(certificate);
         }
-
-        if let Some(ref crt_path) = options.crt_path {
-            let identity = load_build_pkcs12(
-                options.key_path.as_ref().unwrap(),
-                &options.key_pass,
-                crt_path,
-            )?;
-            let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
-                .context(TlsIdentityError)?;
+        if let Some(identity) = settings.identity {
             self.identity(identity);
         }
-
-        Ok(self)
+        self
     }
 }
 

@@ -8,6 +8,7 @@ use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::borrow::Cow;
+use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -61,7 +62,7 @@ impl HttpServiceBuilder {
         http.enforce_http(false);
         let mut tls = native_tls::TlsConnector::builder();
         if let Some(ref options) = self.tls_options {
-            tls.use_tls_options(options)?;
+            tls.use_tls_settings(options.try_into()?);
         }
         let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
