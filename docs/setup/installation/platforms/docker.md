@@ -28,21 +28,6 @@ A couple of things to note:
 your `$PATH`.
 2. The configuration directory is located at `/etc/vector`.
 {% endtab %}
-{% tab title="debian-slim" %}
-```bash
-docker run \
-  -v $PWD/vector.toml:/etc/vector/vector.toml:ro \
-  timberio/vector:latest-debian-slim
-```
-
-Modify `$PWD` to the directory where you store your local `vector.toml` file.
-A few things to note:
-
-1. The `vector` binary is located at `/usr/local/bin/vector`, which should be in
-your `$PATH`.
-2. A Systemd script is also installed; you can start vector via `systemctl start vector`.
-3. The configuration directory is located at `/etc/vector`.
-{% endtab %}
 {% tab title="debian" %}
 ```bash
 docker run \
@@ -79,16 +64,6 @@ This image is based on [`alpine:latest`][urls.docker_alpine] which is a Linux
 distribution built around musl libc and BusyBox. It is considerably smaller in
 size than other Docker images and statically links libraries. This is the image
 we recommend due to it's small size and reliability.
-
-### timberio/vector:&lt;version&gt;-debian-slim
-
-This image is based on `debian:9-slim` which is much smaller (up to 30x), and
-thus leads to much slimmer images in general.
-
-This variant is highly recommended when final image size being as small as
-possible is desired. To minimize image size, it's uncommon for additional
-related tools (such as git or bash) to be included. Using this image as a
-base, add the things you need in your own Dockerfile.
 
 ### timberio/vector:&lt;version&gt;-debian
 
