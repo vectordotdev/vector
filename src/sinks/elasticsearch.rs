@@ -78,7 +78,7 @@ pub enum Provider {
 impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(&common);
+        let healthcheck = healthcheck(&common)?;
         let sink = es(self, common, acker)?;
 
         Ok((sink, healthcheck))
@@ -159,6 +159,15 @@ impl ElasticSearchCommon {
         builder.method(method);
         builder.uri(&uri);
         (uri, builder)
+    }
+
+    fn make_client(&self) -> crate::Result<Client<HttpsConnector<HttpConnector>>> {
+        let tls_settings = TlsSettings::try_from(&self.tls_options)?;
+        let tls = TlsConnector::builder()
+            .use_tls_settings(tls_settings)
+            .build()?;
+        let https = HttpsConnector::from((HttpConnector::new(1), tls));
+        Ok(Client::builder().build(https))
     }
 }
 
@@ -316,7 +325,7 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
+fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck> {
     let (uri, mut builder) = common.request_builder(Method::GET, "/_cluster/health");
     match &common.credentials {
         None => {
@@ -331,25 +340,18 @@ fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
             finish_signer(&mut signer, &credentials, &mut builder);
         }
     }
-    let request = builder.body(Body::empty()).unwrap();
+    let request = builder.body(Body::empty())?;
 
-    let tls_settings =
-        TlsSettings::try_from(&common.tls_options).expect("Building TLS settings failed");
-    let tls = TlsConnector::builder()
-        .use_tls_settings(tls_settings)
-        .build()
-        .expect("Building TLS connector failed");
-    let https = HttpsConnector::from((HttpConnector::new(1), tls));
-    let client = Client::builder().build(https);
-    Box::new(
-        client
+    Ok(Box::new(
+        common
+            .make_client()?
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
                 hyper::StatusCode::OK => Ok(()),
                 status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
             }),
-    )
+    ))
 }
 
 fn finish_signer(
