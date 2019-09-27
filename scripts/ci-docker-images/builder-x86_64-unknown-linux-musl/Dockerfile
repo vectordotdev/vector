@@ -10,7 +10,7 @@ ARG MUSL_VERSION=1.1.22
 ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.2.9
+ARG LINUX_HEADERS_VERSION=5.3.1
 # OpenSSL needs to be compiled against MUSL too, so we install it from source.
 ARG OPENSSL_VERSION=1.0.2t
 
@@ -64,7 +64,7 @@ ENV PATH="$CLANG_PREFIX/bin:$PATH"
 
 # Get all sources at first, so that changes in compilation
 # flags would not redownload them.
-RUN apt-get update && apt-get -y install curl xz-utils
+RUN apt-get update && apt-get -y install curl xz-utils rsync
 
 ARG MUSL_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf \
