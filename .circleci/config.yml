@@ -120,6 +120,7 @@ jobs:
           name: Build archive
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            make set-version
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
@@ -142,7 +143,7 @@ jobs:
       - run:
           name: Build .deb package
           command: |
-            export VERSION=$(make version)
+            make set-version
             make package-deb
       - persist_to_workspace:
           root: target/artifacts
@@ -161,6 +162,7 @@ jobs:
           command: |
             export RUST_LTO="lto"
             export TARGET="x86_64-unknown-linux-musl"
+            make set-version
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
@@ -188,7 +190,7 @@ jobs:
       - run:
           name: Build x86_64-unknown-linux-gnu .rpm package
           command: |
-            export VERSION=$(make version)
+            make set-version
             make package-rpm
           environment:
             TARGET: x86_64-unknown-linux-gnu

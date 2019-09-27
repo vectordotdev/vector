@@ -67,10 +67,10 @@ build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
 
 package-deb: ## Create a .deb package from artifacts created via `build`
-	@scripts/package-deb.sh
+	@export VERSION=$(_latest_version); scripts/package-deb.sh
 
 package-rpm: ## Create a .rpm package from artifacts created via `build`
-	@scripts/package-rpm.sh
+	@export VERSION=$(_latest_version); scripts/package-rpm.sh
 
 release-commit: ## Commits release changes
 	@scripts/release-commit.rb
@@ -101,6 +101,9 @@ release-rpm: ## Release .rpm via Package Cloud
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
+
+set-version:
+	@export VERSION=$(_latest_version); scripts/set-version.rb
 
 version: ## Get the current Vector version
 	@echo $(_version)

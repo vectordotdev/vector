@@ -44,6 +44,26 @@ TEMPLATES_DIR = File.join(ROOT_DIR, "scripts", "generate", "templates")
 # Functions
 #
 
+def execute!(command)
+  system(command)
+
+  if !$?.success?
+    error!(
+      <<~EOF
+      Command failed!
+
+        #{command}
+
+      Produced the following error:
+
+        #{$?.inspect}
+      EOF
+    )
+  end
+
+  true
+end
+
 def load_templates!
   Templates.new(TEMPLATES_DIR, metadata)
 end

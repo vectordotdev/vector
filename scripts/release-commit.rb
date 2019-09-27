@@ -74,20 +74,6 @@ else
   end
 
   commands.chomp.split("\n").each do |command|
-    system(command)
-
-    if !$?.success?
-      error!(
-        <<~EOF
-        Command failed!
-
-          #{command}
-
-        Produced the following error:
-
-          #{$?.inspect}
-        EOF
-      )
-    end
+    execute!(command)
   end
 end
