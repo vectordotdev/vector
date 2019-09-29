@@ -1,5 +1,5 @@
-use crate::sinks::util::Batch;
 use crate::event::{Event, Metric};
+use crate::sinks::util::Batch;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 
