@@ -1,7 +1,11 @@
-use super::{batch::Batch, partition::Partition};
+use super::batch::Batch;
+use partition::Partition;
 use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
+
+pub mod partition;
+pub mod metrics;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "lowercase")]

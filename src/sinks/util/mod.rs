@@ -1,8 +1,6 @@
 pub mod batch;
 pub mod buffer;
 pub mod http;
-pub mod metrics_buffer;
-pub mod partition;
 pub mod retries;
 pub mod tls;
 
@@ -17,8 +15,8 @@ use tower::Service;
 
 pub use batch::{Batch, BatchSink};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
-pub use metrics_buffer::MetricBuffer;
-pub use partition::{Partition, PartitionedBatchSink};
+pub use buffer::metrics::MetricBuffer;
+pub use buffer::partition::{Partition, PartitionedBatchSink};
 
 pub trait SinkExt<T>
 where

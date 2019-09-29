@@ -1,4 +1,4 @@
-use super::batch::Batch;
+use crate::sinks::util::Batch;
 use crate::event::{Event, Metric};
 use indexmap::IndexMap;
 use std::collections::HashMap;
