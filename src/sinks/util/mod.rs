@@ -44,7 +44,7 @@ where
     where
         T: Batch,
     {
-        BatchSink::new_min_max(self, batch, max, 0, Some(delay))
+        BatchSink::new_max(self, batch, max, Some(delay))
     }
 
     fn partitioned_batched_with_min<K>(
