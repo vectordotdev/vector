@@ -41,15 +41,6 @@ pub enum Direction {
 }
 
 impl Metric {
-    pub fn name(&self) -> &str {
-        match self {
-            Metric::Counter { name, .. } => name,
-            Metric::Gauge { name, .. } => name,
-            Metric::Histogram { name, .. } => name,
-            Metric::Set { name, .. } => name,
-        }
-    }
-
     pub fn tags(&self) -> &Option<HashMap<String, String>> {
         match self {
             Metric::Counter { tags, .. } => tags,

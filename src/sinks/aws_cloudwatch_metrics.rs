@@ -455,16 +455,6 @@ mod integration_tests {
             events.push(event);
         }
 
-        for i in 0..10 {
-            let event = Event::Metric(Metric::Set {
-                name: format!("set-{}", 0),
-                val: format!("set-value-{}", i),
-                timestamp: None,
-                tags: None,
-            });
-            events.push(event);
-        }
-
         let stream = stream::iter_ok(events.clone().into_iter());
 
         let pump = sink.send_all(stream);
