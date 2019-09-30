@@ -446,8 +446,7 @@ mod integration_tests {
     };
     use elastic::client::SyncClientBuilder;
     use futures::{Future, Sink};
-    use hyper::{Body, Client, Request};
-    use hyper_tls::HttpsConnector;
+    use hyper::{Body, Request};
     use serde_json::{json, Value};
 
     #[test]
@@ -477,7 +476,7 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(&config.host)).unwrap();
+        block_on(flush(&config)).unwrap();
 
         let client = SyncClientBuilder::new().build().unwrap();
 
@@ -556,7 +555,7 @@ mod integration_tests {
         block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&config.host)).expect("Flushing writes failed");
+        block_on(flush(&config)).expect("Flushing writes failed");
 
         let client = SyncClientBuilder::new()
             .static_node(config.host)
@@ -587,18 +586,19 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: &str) -> impl Future<Item = (), Error = crate::Error> {
-        let uri = format!("{}/_flush", host);
+    fn flush(config: &ElasticSearchConfig) -> impl Future<Item = (), Error = crate::Error> {
+        let uri = format!("{}/_flush", config.host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = Client::builder().build(https);
-        client
-            .request(request)
-            .map_err(|source| source.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => Ok(()),
-                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
-            })
+        let common = ElasticSearchCommon::parse_config(config).expect("Config error");
+        dbg!(common
+            .make_client()
+            .expect("Could not build client to flush")
+            .request(request))
+        .map_err(|source| source.into())
+        .and_then(|response| match response.status() {
+            hyper::StatusCode::OK => Ok(()),
+            status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
+        })
     }
 }
