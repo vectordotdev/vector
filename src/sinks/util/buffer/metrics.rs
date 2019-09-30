@@ -1,27 +1,28 @@
 use crate::event::{Event, Metric};
 use crate::sinks::util::Batch;
 use indexmap::IndexMap;
-use std::collections::HashMap;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-struct MetricKey {
-    name: String,
-    tags: Option<Vec<(String, String)>>,
+trait Aggregate {
+    fn partition(&self) -> String;
 }
 
-impl MetricKey {
-    fn new(name: &str, tags: &Option<HashMap<String, String>>) -> Self {
-        Self {
-            name: name.to_owned(),
-            tags: tags.clone().map(|m| m.into_iter().collect()),
+impl Aggregate for Metric {
+    fn partition(&self) -> String {
+        match self {
+            Metric::Counter { name, tags, .. } => format!("{}{:?}", name, tags),
+            Metric::Gauge { name, tags, .. } => format!("{}{:?}", name, tags),
+            Metric::Set {
+                name, tags, val, ..
+            } => format!("{}{:?}{}", name, tags, val),
+            h @ Metric::Histogram { .. } => format!("{:?}", h),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricBuffer {
-    state: IndexMap<MetricKey, Metric>,
-    metrics: IndexMap<MetricKey, Metric>,
+    state: IndexMap<String, Metric>,
+    metrics: IndexMap<String, Metric>,
 }
 
 impl MetricBuffer {
@@ -43,39 +44,40 @@ impl Batch for MetricBuffer {
 
     fn push(&mut self, item: Self::Input) {
         let item = item.into_metric();
+        let key = item.partition();
 
         match item {
-            Metric::Counter {
-                ref name, ref tags, ..
-            } => {
-                let key = MetricKey::new(name, tags);
+            Metric::Counter { .. } => {
                 if let Some(metric) = self.metrics.get_mut(&key) {
                     metric.merge(&item);
                 } else {
                     self.metrics.insert(key, item);
                 }
             }
-            Metric::Gauge {
-                ref name,
-                ref val,
-                ref tags,
-                ..
-            } => {
-                let key = MetricKey::new(name, tags);
+            Metric::Gauge { .. } => {
                 if let Some(metric) = self.metrics.get_mut(&key) {
                     metric.merge(&item);
                 } else {
-                    let default = Metric::Gauge {
-                        name: name.clone(),
-                        val: *val,
-                        direction: None,
-                        timestamp: None,
-                        tags: tags.clone(),
+                    // if the gauge is not present in active batch,
+                    // then we look it up in permanent state, where we keep track
+                    // of gauge values throughout the entire application uptime
+                    let value = if let Some(default) = self.state.get(&key) {
+                        default.clone()
+                    } else {
+                        Metric::Gauge {
+                            name: String::from(""),
+                            val: 0.0,
+                            direction: None,
+                            timestamp: None,
+                            tags: None,
+                        }
                     };
-                    self.metrics.insert(key, default);
+                    self.metrics.entry(key).or_insert(value).merge(&item);
                 }
             }
-            _ => {}
+            _ => {
+                self.metrics.insert(key, item);
+            }
         }
     }
 
@@ -86,11 +88,8 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for (k, v) in self.metrics.iter() {
-            match v {
-                Metric::Gauge { .. } => {
-                    state.insert(k.clone(), v.clone());
-                }
-                _ => {}
+            if v.is_gauge() {
+                state.insert(k.clone(), v.clone());
             }
         }
 
@@ -119,6 +118,7 @@ mod test {
     };
     use futures::{future::Future, stream, Sink};
     use pretty_assertions::assert_eq;
+    use std::collections::HashMap;
     use std::time::Duration;
 
     fn tag(name: &str) -> HashMap<String, String> {
@@ -249,7 +249,7 @@ mod test {
             events.push(event);
         }
 
-        for i in 0..4 {
+        for i in 0..5 {
             let event = Event::Metric(Metric::Gauge {
                 name: format!("gauge-{}", i),
                 val: i as f64,
@@ -280,7 +280,7 @@ mod test {
         assert_eq!(buffer.len(), 3);
         assert_eq!(buffer[0].len(), 4);
         assert_eq!(buffer[1].len(), 4);
-        assert_eq!(buffer[2].len(), 2);
+        assert_eq!(buffer[2].len(), 3);
 
         assert_eq!(
             buffer[0].clone().finish(),
@@ -327,6 +327,13 @@ mod test {
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
+                    name: "gauge-4".into(),
+                    val: 4.0,
+                    direction: None,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::Gauge {
                     name: "gauge-0".into(),
                     val: 0.0,
                     direction: None,
@@ -335,14 +342,7 @@ mod test {
                 },
                 Metric::Gauge {
                     name: "gauge-1".into(),
-                    val: 1.0,
-                    direction: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                },
-                Metric::Gauge {
-                    name: "gauge-2".into(),
-                    val: 2.0,
+                    val: 1.0 + 1.0,
                     direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
@@ -354,18 +354,89 @@ mod test {
             buffer[2].clone().finish(),
             [
                 Metric::Gauge {
+                    name: "gauge-2".into(),
+                    val: 2.0 + 2.0,
+                    direction: None,
+                    timestamp: None,
+                    tags: Some(tag("staging")),
+                },
+                Metric::Gauge {
                     name: "gauge-3".into(),
-                    val: 3.0,
+                    val: 3.0 + 3.0,
                     direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                 },
                 Metric::Gauge {
                     name: "gauge-4".into(),
-                    val: 4.0,
+                    val: 4.0 + 4.0,
                     direction: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_sets() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for i in 0..4 {
+            let event = Event::Metric(Metric::Set {
+                name: "set-0".into(),
+                val: format!("{}", i),
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        for i in 0..4 {
+            let event = Event::Metric(Metric::Set {
+                name: "set-0".into(),
+                val: format!("{}", i),
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            buffer[0].clone().finish(),
+            [
+                Metric::Set {
+                    name: "set-0".into(),
+                    val: "0".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Set {
+                    name: "set-0".into(),
+                    val: "1".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Set {
+                    name: "set-0".into(),
+                    val: "2".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Set {
+                    name: "set-0".into(),
+                    val: "3".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
                 },
             ]
         );

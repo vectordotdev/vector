@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
+use derive_is_enum_variant::is_enum_variant;
 use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, is_enum_variant)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Metric {
     Counter {
@@ -40,6 +41,15 @@ pub enum Direction {
 }
 
 impl Metric {
+    pub fn name(&self) -> &str {
+        match self {
+            Metric::Counter { name, .. } => name,
+            Metric::Gauge { name, .. } => name,
+            Metric::Histogram { name, .. } => name,
+            Metric::Set { name, .. } => name,
+        }
+    }
+
     pub fn tags(&self) -> &Option<HashMap<String, String>> {
         match self {
             Metric::Counter { tags, .. } => tags,
@@ -62,36 +72,37 @@ impl Metric {
         match (self, other) {
             (
                 Metric::Counter {
+                    ref mut name,
                     ref mut val,
                     ref mut timestamp,
                     ref mut tags,
-                    ..
                 },
                 Metric::Counter {
+                    name: new_name,
                     val: new_val,
                     timestamp: new_timestamp,
                     tags: new_tags,
-                    ..
                 },
             ) => {
+                *name = new_name.clone();
                 *val += *new_val;
                 *timestamp = *new_timestamp;
                 *tags = new_tags.clone();
             }
             (
                 Metric::Gauge {
+                    ref mut name,
                     ref mut val,
                     direction: None,
                     ref mut timestamp,
                     ref mut tags,
-                    ..
                 },
                 Metric::Gauge {
+                    name: new_name,
                     val: new_val,
                     timestamp: new_timestamp,
                     direction: new_direction,
                     tags: new_tags,
-                    ..
                 },
             ) => {
                 if new_direction.is_none() {
@@ -104,6 +115,7 @@ impl Metric {
                     };
                     *val += delta;
                 };
+                *name = new_name.clone();
                 *timestamp = *new_timestamp;
                 *tags = new_tags.clone();
             }
