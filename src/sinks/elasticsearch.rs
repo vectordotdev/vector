@@ -546,15 +546,17 @@ mod integration_tests {
         let index = gen_index();
         config.index = Some(index.clone());
 
-        let (sink, _hc) = config.build(Acker::Null).unwrap();
+        let (sink, healthcheck) = config.build(Acker::Null).unwrap();
+
+        block_on(healthcheck).expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
 
         let pump = sink.send_all(events);
-        block_on(pump).unwrap();
+        block_on(pump).expect("Sending events failed");
 
         // make sure writes all all visible
-        block_on(flush(&config.host)).unwrap();
+        block_on(flush(&config.host)).expect("Flushing writes failed");
 
         let client = SyncClientBuilder::new()
             .static_node(config.host)
