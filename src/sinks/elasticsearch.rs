@@ -547,7 +547,7 @@ mod integration_tests {
         let index = gen_index();
         config.index = Some(index.clone());
 
-        let (sink, healthcheck) = config.build(Acker::Null).unwrap();
+        let (sink, healthcheck) = config.build(Acker::Null).expect("Building config failed");
 
         block_on(healthcheck).expect("Health check failed");
 
@@ -562,7 +562,7 @@ mod integration_tests {
         let client = SyncClientBuilder::new()
             .static_node(config.host)
             .build()
-            .unwrap();
+            .expect("Building test client failed");
 
         let response = client
             .search::<Value>()
@@ -571,7 +571,7 @@ mod integration_tests {
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
-            .unwrap();
+            .expect("Issuing test query failed");
 
         assert_eq!(input.len() as u64, response.total());
         let input = input
@@ -593,14 +593,14 @@ mod integration_tests {
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
         let common = ElasticSearchCommon::parse_config(config).expect("Config error");
-        dbg!(common
+        common
             .make_client()
             .expect("Could not build client to flush")
-            .request(request))
-        .map_err(|source| source.into())
-        .and_then(|response| match response.status() {
-            hyper::StatusCode::OK => Ok(()),
-            status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
-        })
+            .request(request)
+            .map_err(|source| dbg!(source).into())
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
+            })
     }
 }
