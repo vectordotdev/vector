@@ -1,0 +1,36 @@
+[transforms.javascript]
+allow_you_to_description = "transform events with a full embedded JavaScript engine"
+beta = true
+function_categories = ["program"]
+guides = []
+input_types = ["log"]
+output_types = ["log"]
+resources = []
+
+[transforms.javascript.options.source]
+type = "string"
+examples = [
+"""\
+event => ({...event, field: 'value'})
+"""
+]
+null = true
+description = "The inline JavaScript source with handler function."
+
+[transforms.javascript.options.path]
+type = "string"
+examples = ["/etc/vector/transform.js"]
+null = true
+description = "The path to JavaScript source file with handler function."
+
+[transforms.javascript.options.handler]
+type = "string"
+examples = ["handler"]
+null = true
+description = "Name of the handler function."
+
+[transforms.javascript.options.memory_limit]
+type = "int"
+examples = [10000000]
+null = true
+description = "Maximum allowed RAM usage for JavaScript engine in bytes."
