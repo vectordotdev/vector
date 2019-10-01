@@ -4,7 +4,7 @@ description: How Vector works across clouds
 
 # Multi-Cloud
 
-![](../assets/multi-cloud.svg)
+![][assets.multi-cloud]
 
 
-
+[assets.multi-cloud]: ../assets/multi-cloud.svg

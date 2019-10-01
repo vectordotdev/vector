@@ -12,9 +12,9 @@ description: Parse, structure, and transform events
 
 # Transforms
 
-![][images.transforms]
+![][assets.transforms]
 
-Transforms are in the middle of the [pipeline][docs.pipelines], sitting
+Transforms are in the middle of the [pipeline][docs.configuration#composition], sitting
 in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [events][docs.event] or the stream as a whole.
 
@@ -53,9 +53,21 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
 [docs.sinks]: ../../../usage/configuration/sinks
 [docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[images.transforms]: ../../../assets/transforms.svg
-[url.grok]: http://grokdebug.herokuapp.com/
-[url.lua]: https://www.lua.org/
-[url.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
-[url.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
+[docs.transforms.add_tags]: ../../../usage/configuration/transforms/add_tags.md
+[docs.transforms.coercer]: ../../../usage/configuration/transforms/coercer.md
+[docs.transforms.field_filter]: ../../../usage/configuration/transforms/field_filter.md
+[docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.transforms.json_parser]: ../../../usage/configuration/transforms/json_parser.md
+[docs.transforms.log_to_metric]: ../../../usage/configuration/transforms/log_to_metric.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
+[docs.transforms.remove_fields]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.transforms.remove_tags]: ../../../usage/configuration/transforms/remove_tags.md
+[docs.transforms.sampler]: ../../../usage/configuration/transforms/sampler.md
+[docs.transforms.split]: ../../../usage/configuration/transforms/split.md
+[docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
+[urls.grok]: http://grokdebug.herokuapp.com/
+[urls.lua]: https://www.lua.org/
+[urls.new_transform]: https://github.com/timberio/vector/issues/new?labels=Type%3A+New+Feature
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression

@@ -14,16 +14,24 @@ use rdkafka::{
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
 };
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("creating kafka producer failed: {}", source))]
+    KafkaCreateFailed { source: rdkafka::error::KafkaError },
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KafkaSinkConfig {
     bootstrap_servers: Vec<String>,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
+    tls: Option<KafkaSinkTlsConfig>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -33,11 +41,20 @@ pub enum Encoding {
     Json,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct KafkaSinkTlsConfig {
+    enabled: Option<bool>,
+    ca_path: Option<String>,
+    crt_path: Option<String>,
+    key_path: Option<String>,
+    key_phrase: Option<String>,
+}
+
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     key_field: Option<Atom>,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     in_flight: FuturesUnordered<MetadataFuture<DeliveryFuture, usize>>,
 
     acker: Acker,
@@ -48,7 +65,7 @@ pub struct KafkaSink {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), acker)?;
         let hc = healthcheck(self.clone());
         Ok((Box::new(sink), hc))
@@ -64,27 +81,43 @@ impl KafkaSinkConfig {
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = self.bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
+        if let Some(ref tls) = self.tls {
+            let enabled = tls.enabled.unwrap_or(false);
+            client_config.set(
+                "security.protocol",
+                if enabled { "ssl" } else { "plaintext" },
+            );
+            if let Some(ref path) = tls.ca_path {
+                client_config.set("ssl.ca.location", path);
+            }
+            if let Some(ref path) = tls.crt_path {
+                client_config.set("ssl.certificate.location", path);
+            }
+            if let Some(ref path) = tls.key_path {
+                client_config.set("ssl.keystore.location", path);
+            }
+            if let Some(ref phrase) = tls.key_phrase {
+                client_config.set("ssl.keystore.password", phrase);
+            }
+        }
         client_config
     }
 }
 
 impl KafkaSink {
-    fn new(config: KafkaSinkConfig, acker: Acker) -> Result<Self, String> {
-        config
-            .to_rdkafka()
-            .create()
-            .map_err(|e| format!("error creating kafka producer: {}", e))
-            .map(|producer| KafkaSink {
-                producer,
-                topic: config.topic,
-                key_field: config.key_field,
-                encoding: config.encoding,
-                in_flight: FuturesUnordered::new(),
-                acker,
-                seq_head: 0,
-                seq_tail: 0,
-                pending_acks: HashSet::new(),
-            })
+    fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
+        let producer = config.to_rdkafka().create().context(KafkaCreateFailed)?;
+        Ok(KafkaSink {
+            producer,
+            topic: config.topic,
+            key_field: config.key_field,
+            encoding: config.encoding,
+            in_flight: FuturesUnordered::new(),
+            acker,
+            seq_head: 0,
+            seq_tail: 0,
+            pending_acks: HashSet::new(),
+        })
     }
 }
 
@@ -170,10 +203,10 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
             consumer
                 .fetch_metadata(Some(&config.topic), Duration::from_secs(3))
                 .map(|_| ())
-                .map_err(|e| e.to_string())
+                .map_err(|err| err.into())
         })
     })
-    .map_err(|e| e.to_string())
+    .map_err(|err| err.into())
     .and_then(|result| result.into_future());
 
     Box::new(check)
@@ -182,7 +215,7 @@ fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
 fn encode_event(
     event: &Event,
     key_field: &Option<Atom>,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
         .as_ref()
@@ -190,11 +223,9 @@ fn encode_event(
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or(Vec::new());
 
-    let body = match (encoding, event.as_log().is_structured()) {
-        (&Some(Encoding::Json), _) | (_, true) => {
-            serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap()
-        }
-        (&Some(Encoding::Text), _) | (_, false) => event
+    let body = match encoding {
+        &Encoding::Json => serde_json::to_vec(&event.as_log().clone().unflatten()).unwrap(),
+        &Encoding::Text => event
             .as_log()
             .get(&event::MESSAGE)
             .map(|v| v.as_bytes().to_vec())
@@ -211,17 +242,17 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn kafka_encode_event_non_structured() {
+    fn kafka_encode_event_text() {
         let key = "";
         let message = "hello world".to_string();
-        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &None);
+        let (key_bytes, bytes) = encode_event(&message.clone().into(), &None, &Encoding::Text);
 
         assert_eq!(&key_bytes[..], key.as_bytes());
         assert_eq!(&bytes[..], message.as_bytes());
     }
 
     #[test]
-    fn kafka_encode_event_structured() {
+    fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
@@ -231,7 +262,7 @@ mod tests {
             .as_mut_log()
             .insert_explicit("foo".into(), "bar".into());
 
-        let (key, bytes) = encode_event(&event, &Some("key".into()), &None);
+        let (key, bytes) = encode_event(&event, &Some("key".into()), &Encoding::Json);
 
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
@@ -245,7 +276,7 @@ mod tests {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{KafkaSink, KafkaSinkConfig};
+    use super::*;
     use crate::buffers::Acker;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
@@ -256,15 +287,38 @@ mod integration_test {
     use std::{thread, time::Duration};
 
     #[test]
-    fn kafka_happy_path() {
-        let bootstrap_servers = vec![String::from("localhost:9092")];
+    fn kafka_happy_path_plaintext() {
+        kafka_happy_path("localhost:9092", None);
+    }
+
+    const TEST_CA: &str = "tests/data/Vector_CA.crt";
+
+    #[test]
+    fn kafka_happy_path_tls() {
+        kafka_happy_path(
+            "localhost:9091",
+            Some(KafkaSinkTlsConfig {
+                enabled: Some(true),
+                ca_path: Some(TEST_CA.into()),
+                ..Default::default()
+            }),
+        );
+    }
+
+    fn kafka_happy_path(server: &str, tls: Option<KafkaSinkTlsConfig>) {
+        let bootstrap_servers = vec![server.into()];
         let topic = format!("test-{}", random_string(10));
 
+        let tls_enabled = tls
+            .as_ref()
+            .map(|tls| tls.enabled.unwrap_or(false))
+            .unwrap_or(false);
         let config = KafkaSinkConfig {
             bootstrap_servers: bootstrap_servers.clone(),
             topic: topic.clone(),
+            encoding: Encoding::Text,
             key_field: None,
-            encoding: None,
+            tls,
         };
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = KafkaSink::new(config, acker).unwrap();
@@ -281,6 +335,10 @@ mod integration_test {
         client_config.set("bootstrap.servers", &bs);
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
+        if tls_enabled {
+            client_config.set("security.protocol", "ssl");
+            client_config.set("ssl.ca.location", TEST_CA);
+        }
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);

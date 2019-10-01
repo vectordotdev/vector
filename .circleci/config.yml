@@ -70,17 +70,26 @@ jobs:
           DATA_DIR: /tmp/localstack/data
           DEBUG: 1
           PORT_WEB_UI: 8888
-          SERVICES: kinesis,cloudwatch
+          SERVICES: kinesis,cloudwatch,elasticsearch
       - image: minio/minio
         environment:
           MINIO_ACCESS_KEY: "test-access-key"
           MINIO_SECRET_KEY: "test-secret-key"
         command: server /tmp
       - image: luciofranco/mockwatchlogs:latest
-      - image: spotify/kafka
+      - image: wurstmeister/zookeeper:3.4.6
+      - image: timberiodev/kafka-test:2.12-2.3.0-2
         environment:
-          ADVERTISED_HOST: localhost
-          ADVERTISED_PORT: 9092
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
+          KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
+          KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
+          KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
+          KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
+          KAFKA_SSL_KEY_PASSWORD: NOPASS
+          KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
       - image: timberio/splunk-hec-test:latest
       - image: elasticsearch:6.6.2
         environment:
@@ -98,41 +107,6 @@ jobs:
   # Building - Archives
   #
 
-  build-armv7-unknown-linux-gnueabihf-archive:
-    docker:
-      - image: timberiodev/vector-builder-armv7-unknown-linux-gnueabihf:latest
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run:
-          name: Build archive
-          command: |
-            export VERSION=$(make version)
-            export FEATURES="jemallocator"
-            export STRIP=false
-            make build-archive
-      - persist_to_workspace:
-          root: target/artifacts
-          paths:
-            - "*-armv7-unknown-linux-gnueabihf.tar.gz"
-
-  # build-armv7-unknown-linux-musleabihf-archive:
-  #   docker:
-  #     - image: timberiodev/vector-builder-armv7-unknown-linux-musleabihf:latest
-  #   resource_class: xlarge
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Build archive
-  #         command: |
-  #           export VERSION=$(make version)
-  #           export FEATURES="jemallocator"
-  #           make build-archive 
-  #     - persist_to_workspace:
-  #         root: target/artifacts
-  #         paths:
-  #           - "*-armv7-unknown-linux-musleabihf.tar.gz"
-
   build-x86_64-apple-darwin-archive:
     resource_class: large
     macos:
@@ -146,7 +120,6 @@ jobs:
           name: Build archive
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            export VERSION=$(make version)
             make build-archive
       - persist_to_workspace:
           root: target/artifacts
@@ -161,9 +134,7 @@ jobs:
       - checkout
       - run:
           name: Build archive
-          command: |
-            export VERSION=$(make version)
-            make build-archive
+          command: make build-archive
       # We _must_ build the deb package on the same machine that created
       # the binary. `cargo deb` performs dependency calculation via `ldd`
       # and this process must happen on the same machine it was built in
@@ -188,7 +159,6 @@ jobs:
       - run:
           name: Build archive
           command: |
-            export VERSION=$(make version)
             export RUST_LTO="lto"
             export TARGET="x86_64-unknown-linux-musl"
             make build-archive
@@ -382,6 +352,7 @@ jobs:
             export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-docker
+          no_output_timeout: 30m
 
   release-github:
     docker:
@@ -462,8 +433,6 @@ require-checks-and-tests: &require-checks-and-tests
 
 require-builds: &require-builds
   requires:
-    - build-armv7-unknown-linux-gnueabihf-archive
-    # - build-armv7-unknown-linux-musleabihf-archive
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -507,6 +476,26 @@ workflows:
           <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
           <<: *require-checks-and-tests
+      - package-rpm:
+          <<: *require-builds
+      - verify-amazon-linux-1:
+          <<: *require-packages
+      - verify-amazon-linux-2:
+          <<: *require-packages
+      - verify-centos-7:
+          <<: *require-packages
+      - verify-deb-8:
+          <<: *require-packages
+      - verify-deb-9:
+          <<: *require-packages
+      - verify-deb-10:
+          <<: *require-packages
+      - verify-ubuntu-16-04:
+          <<: *require-packages
+      - verify-ubuntu-18-04:
+          <<: *require-packages
+      - verify-ubuntu-19-04:
+          <<: *require-packages
 
   nightly:
     triggers:
@@ -521,23 +510,34 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
-      - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *require-checks-and-tests
-      # - build-armv7-unknown-linux-musleabihf-archive:
-      #     <<: *tag-workflow-filters
-      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
           <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
           <<: *require-checks-and-tests
-      - release-s3:
+      - package-rpm:
           <<: *require-builds
-      # Installs directly from S3
-      - release-docker:
-          requires:
-            - release-s3
+      - verify-amazon-linux-1:
+          <<: *require-packages
+      - verify-amazon-linux-2:
+          <<: *require-packages
+      - verify-centos-7:
+          <<: *require-packages
+      - verify-deb-8:
+          <<: *require-packages
+      - verify-deb-9:
+          <<: *require-packages
+      - verify-deb-10:
+          <<: *require-packages
+      - verify-ubuntu-16-04:
+          <<: *require-packages
+      - verify-ubuntu-18-04:
+          <<: *require-packages
+      - verify-ubuntu-19-04:
+          <<: *require-packages
+      - release-s3:
+          <<: *require-verifies
 
   tag:
     jobs:
@@ -549,12 +549,6 @@ workflows:
           <<: *tag-workflow-filters
       - test-stable:
           <<: *tag-workflow-filters
-      - build-armv7-unknown-linux-gnueabihf-archive:
-          <<: *tag-workflow-filters
-          <<: *require-checks-and-tests
-      # - build-armv7-unknown-linux-musleabihf-archive:
-      #     <<: *tag-workflow-filters
-      #     <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *tag-workflow-filters
           <<: *require-checks-and-tests

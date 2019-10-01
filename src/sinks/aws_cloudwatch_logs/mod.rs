@@ -23,6 +23,7 @@ use rusoto_logs::{
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryInto, fmt, time::Duration};
 use tower::{
     buffer::Buffer,
@@ -35,6 +36,18 @@ use tower::{
     Service, ServiceBuilder, ServiceExt,
 };
 
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("{}", source))]
+    HttpClientError {
+        source: rusoto_core::request::TlsError,
+    },
+    #[snafu(display("{}", source))]
+    InvalidCloudwatchCredentials {
+        source: rusoto_core::CredentialsError,
+    },
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
@@ -42,11 +55,11 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub encoding: Encoding,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     pub batch_timeout: Option<u64>,
     pub batch_size: Option<usize>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -59,7 +72,7 @@ pub struct CloudwatchLogsSinkConfig {
 
 pub struct CloudwatchLogsSvc {
     client: CloudWatchLogsClient,
-    encoding: Option<Encoding>,
+    encoding: Encoding,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -86,9 +99,11 @@ pub struct CloudwatchLogsPartitionSvc {
     request_config: RequestConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Json,
 }
@@ -115,7 +130,7 @@ pub enum CloudwatchError {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let batch_timeout = self.batch_timeout.unwrap_or(1);
         let batch_size = self.batch_size.unwrap_or(1000);
 
@@ -150,7 +165,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig) -> Result<Self, String> {
+    pub fn new(config: CloudwatchLogsSinkConfig) -> crate::Result<Self> {
         let timeout_secs = config.request_timeout_secs.unwrap_or(60);
         let rate_limit_duration_secs = config.request_rate_limit_duration_secs.unwrap_or(1);
         let rate_limit_num = config.request_rate_limit_num.unwrap_or(5);
@@ -236,7 +251,7 @@ impl Service<PartitionInnerBuffer<Vec<Event>, CloudwatchKey>> for CloudwatchLogs
 }
 
 impl CloudwatchLogsSvc {
-    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> Result<Self, String> {
+    pub fn new(config: &CloudwatchLogsSinkConfig, key: &CloudwatchKey) -> crate::Result<Self> {
         let region = config.region.clone().try_into()?;
         let client = create_client(region)?;
 
@@ -265,14 +280,14 @@ impl CloudwatchLogsSvc {
             chrono::Utc::now().timestamp_millis()
         };
 
-        match (&self.encoding, log.is_structured()) {
-            (&Some(Encoding::Json), _) | (None, true) => {
+        match &self.encoding {
+            &Encoding::Json => {
                 let bytes = serde_json::to_vec(&log.unflatten()).unwrap();
                 let message = String::from_utf8(bytes).unwrap();
 
                 InputLogEvent { message, timestamp }
             }
-            (&Some(Encoding::Text), _) | (None, false) => {
+            &Encoding::Text => {
                 let message = log
                     .get(&event::MESSAGE)
                     .map(|v| v.to_string_lossy())
@@ -379,7 +394,21 @@ fn partition(
     Some(PartitionInnerBuffer::new(event, key))
 }
 
-fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, String> {
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("DescribeLogStreams failed: {}", source))]
+    DescribeLogStreamsFailed {
+        source: rusoto_logs::DescribeLogGroupsError,
+    },
+    #[snafu(display("No log group found"))]
+    NoLogGroup,
+    #[snafu(display("Unable to extract group name"))]
+    GroupNameError,
+    #[snafu(display("Group name mismatch: expected {}, found {}", expected, name))]
+    GroupNameMismatch { expected: String, name: String },
+}
+
+fn healthcheck(config: CloudwatchLogsSinkConfig) -> crate::Result<super::Healthcheck> {
     if config.group_name.is_dynamic() {
         info!("cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(Box::new(future::ok(())));
@@ -387,9 +416,7 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
 
     let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
 
-    let region = config.region.clone();
-
-    let client = create_client(region.try_into()?)?;
+    let client = create_client(config.region.clone().try_into()?)?;
 
     let request = DescribeLogGroupsRequest {
         limit: Some(1),
@@ -403,11 +430,11 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
     // it matches the one that AWS sends back.
     let fut = client
         .describe_log_groups(request)
-        .map_err(|e| format!("DescribeLogStreams failed: {}", e))
+        .map_err(|source| HealthcheckError::DescribeLogStreamsFailed { source }.into())
         .and_then(|response| {
             response
                 .log_groups
-                .ok_or_else(|| "No log group found".to_string())
+                .ok_or_else(|| HealthcheckError::NoLogGroup.into())
         })
         .and_then(move |groups| {
             if let Some(group) = groups.into_iter().next() {
@@ -415,25 +442,26 @@ fn healthcheck(config: CloudwatchLogsSinkConfig) -> Result<super::Healthcheck, S
                     if name == expected_group_name {
                         Ok(())
                     } else {
-                        Err(format!(
-                            "Group name mismatch: Expected {}, found {}",
-                            expected_group_name, name
-                        ))
+                        Err(HealthcheckError::GroupNameMismatch {
+                            expected: expected_group_name,
+                            name,
+                        }
+                        .into())
                     }
                 } else {
-                    Err("Unable to extract group name".to_string())
+                    Err(HealthcheckError::GroupNameError.into())
                 }
             } else {
-                Err("No log group found".to_string())
+                Err(HealthcheckError::NoLogGroup.into())
             }
         });
 
     Ok(Box::new(fut))
 }
 
-fn create_client(region: Region) -> Result<CloudWatchLogsClient, String> {
-    let http = HttpClient::new().map_err(|e| format!("{}", e))?;
-    let creds = DefaultCredentialsProvider::new().map_err(|e| format!("{}", e))?;
+fn create_client(region: Region) -> crate::Result<CloudWatchLogsClient> {
+    let http = HttpClient::new().context(HttpClientError)?;
+    let creds = DefaultCredentialsProvider::new().context(InvalidCloudwatchCredentials)?;
 
     Ok(CloudWatchLogsClient::new_with(http, creds, region))
 }
@@ -692,26 +720,9 @@ mod tests {
     }
 
     #[test]
-    fn cloudwatch_encode_log_with_implicit_value() {
-        let mut event = Event::from("hello world").into_log();
-        event.insert_implicit("key".into(), "value".into());
-        let encoded = svc(Default::default()).encode_log(event.clone());
-        assert_eq!(encoded.message, "hello world");
-    }
-
-    #[test]
-    fn cloudwatch_encode_log_with_explicit_value() {
-        let mut event = Event::from("hello world").into_log();
-        event.insert_explicit("key".into(), "value".into());
-        let encoded = svc(Default::default()).encode_log(event.clone());
-        let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::TIMESTAMP).is_none());
-    }
-
-    #[test]
     fn cloudwatch_encode_log_as_json() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: Some(Encoding::Json),
+            encoding: Encoding::Json,
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();
@@ -724,7 +735,7 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_text() {
         let config = CloudwatchLogsSinkConfig {
-            encoding: Some(Encoding::Text),
+            encoding: Encoding::Text,
             ..Default::default()
         };
         let mut event = Event::from("hello world").into_log();

@@ -1,0 +1,22 @@
+[sources.vector]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["log", "metric"]
+resources = []
+through_description = "another upstream Vector instance"
+
+[sources.vector.options.address]
+type = "string"
+examples = ["0.0.0.0:9000"]
+null = false
+description = "The TCP address to bind to."
+
+[sources.vector.options.shutdown_timeout_secs]
+type = "int"
+default = 30
+null = false
+unit = "seconds"
+description = """\
+The timeout before a connection is forcefully closed during shutdown.\
+"""

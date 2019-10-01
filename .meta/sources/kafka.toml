@@ -1,0 +1,67 @@
+[sources.kafka]
+beta = true
+delivery_guarantee = "at_least_once"
+guides = []
+output_types = ["log"]
+resources = []
+through_description = "Kafka 0.9 or later"
+
+[sources.kafka.options.bootstrap_servers]
+type = "string"
+examples = ["10.14.22.123:9092,10.14.23.332:9092"]
+null = false
+description = """\
+A comma-separated list of host and port pairs that are the addresses of the \
+Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects \
+to initially to bootstrap itself.\
+"""
+
+[sources.kafka.options.topics]
+type = "[string]"
+examples = [
+  ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+]
+null = false
+description = """\
+The Kafka topics names to read events from. Regex is supported if the topic \
+begins with `^`.
+"""
+
+[sources.kafka.options.group_id]
+type = "string"
+examples = ["consumer-group-name"]
+null = false
+description = """\
+The consumer group name to be used to consume events from Kafka.
+"""
+
+[sources.kafka.options.key_field]
+type = "string"
+examples = ["user_id"]
+null = true
+description = """\
+The log field name to use for the topic key. If unspecified, the key would not \
+be added to the log event. If the message has null key, then this field would \
+not be added to the log event.\
+"""
+
+[sources.kafka.options.auto_offset_reset]
+type = "string"
+examples = ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
+null = true
+default = "largest"
+description = """\
+If offsets for consumer group do not exist, set them using this strategy. \
+[librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) \
+for `auto.offset.reset` option for explanation.\
+"""
+
+[sources.kafka.options.session_timeout_ms]
+type = "int"
+examples = [5000, 10000]
+null = true
+default = 10000
+unit = "milliseconds"
+description = """\
+The Kafka session timeout in milliseconds.
+"""

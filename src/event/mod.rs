@@ -30,13 +30,13 @@ pub enum Event {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
-    structured: HashMap<Atom, Value>,
+    fields: HashMap<Atom, Value>,
 }
 
 impl Event {
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent {
-            structured: HashMap::new(),
+            fields: HashMap::new(),
         })
     }
 
@@ -85,19 +85,19 @@ impl Event {
 
 impl LogEvent {
     pub fn get(&self, key: &Atom) -> Option<&ValueKind> {
-        self.structured.get(key).map(|v| &v.value)
+        self.fields.get(key).map(|v| &v.value)
     }
 
     pub fn into_value(mut self, key: &Atom) -> Option<ValueKind> {
-        self.structured.remove(key).map(|v| v.value)
+        self.fields.remove(key).map(|v| v.value)
     }
 
     pub fn is_structured(&self) -> bool {
-        self.structured.iter().any(|(_, v)| v.explicit)
+        self.fields.iter().any(|(_, v)| v.explicit)
     }
 
     pub fn insert_explicit(&mut self, key: Atom, value: ValueKind) {
-        self.structured.insert(
+        self.fields.insert(
             key,
             Value {
                 value,
@@ -107,7 +107,7 @@ impl LogEvent {
     }
 
     pub fn insert_implicit(&mut self, key: Atom, value: ValueKind) {
-        self.structured.insert(
+        self.fields.insert(
             key,
             Value {
                 value,
@@ -117,27 +117,27 @@ impl LogEvent {
     }
 
     pub fn remove(&mut self, key: &Atom) -> Option<ValueKind> {
-        self.structured.remove(key).map(|v| v.value)
+        self.fields.remove(key).map(|v| v.value)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &Atom> {
-        self.structured.keys()
+        self.fields.keys()
     }
 
     pub fn all_fields<'a>(&'a self) -> FieldsIter<'a> {
         FieldsIter {
-            inner: self.structured.iter(),
+            inner: self.fields.iter(),
             explicit_only: false,
         }
     }
 
     pub fn unflatten(self) -> unflatten::Unflatten {
-        unflatten::Unflatten::from(self.structured)
+        unflatten::Unflatten::from(self.fields)
     }
 
     pub fn explicit_fields<'a>(&'a self) -> FieldsIter<'a> {
         FieldsIter {
-            inner: self.structured.iter(),
+            inner: self.fields.iter(),
             explicit_only: true,
         }
     }
@@ -147,7 +147,7 @@ impl std::ops::Index<&Atom> for LogEvent {
     type Output = ValueKind;
 
     fn index(&self, key: &Atom) -> &ValueKind {
-        &self.structured[key].value
+        &self.fields[key].value
     }
 }
 
@@ -155,7 +155,7 @@ impl std::ops::Index<&Atom> for LogEvent {
 impl<K: Into<Atom>, V: Into<ValueKind>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         Self {
-            structured: iter
+            fields: iter
                 .into_iter()
                 .map(|(key, value)| {
                     (
@@ -344,13 +344,13 @@ impl From<proto::EventWrapper> for Event {
 
         match event {
             EventProto::Log(proto) => {
-                let structured = proto
-                    .structured
+                let fields = proto
+                    .fields
                     .into_iter()
                     .filter_map(|(k, v)| decode_value(v).map(|value| (Atom::from(k), value)))
                     .collect::<HashMap<_, _>>();
 
-                Event::Log(LogEvent { structured })
+                Event::Log(LogEvent { fields })
             }
             EventProto::Metric(proto) => {
                 let metric = proto.metric.unwrap();
@@ -444,8 +444,8 @@ impl From<proto::EventWrapper> for Event {
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
-            Event::Log(LogEvent { structured }) => {
-                let structured = structured
+            Event::Log(LogEvent { fields }) => {
+                let fields = fields
                     .into_iter()
                     .map(|(k, v)| {
                         let value = proto::Value {
@@ -473,7 +473,7 @@ impl From<Event> for proto::EventWrapper {
                     })
                     .collect::<HashMap<_, _>>();
 
-                let event = EventProto::Log(Log { structured });
+                let event = EventProto::Log(Log { fields });
 
                 proto::EventWrapper { event: Some(event) }
             }
@@ -603,7 +603,7 @@ impl From<Event> for Vec<u8> {
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
-            structured: HashMap::new(),
+            fields: HashMap::new(),
         });
 
         event

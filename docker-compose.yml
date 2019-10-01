@@ -5,8 +5,9 @@ services:
       ports:
         - "4568:4568"
         - "4582:4582"
+        - "4571:4571"
       environment:
-        SERVICES: kinesis:4568,cloudwatch:4582
+        SERVICES: kinesis:4568,cloudwatch:4582,elasticsearch:4571
     minio:
       image: minio/minio
       ports:
@@ -21,14 +22,27 @@ services:
         - "6000:6000"
       environment:
         RUST_LOG: trace
-    kafka:
-      image: spotify/kafka
+    zookeeper:
+      image: wurstmeister/zookeeper
       ports:
-        - "9092:9092"
         - "2181:2181"
+    kafka:
+      image: wurstmeister/kafka
+      ports:
+        - "9091-9093:9091-9093"
       environment:
-        ADVERTISED_HOST: localhost
-        ADVERTISED_PORT: 9092
+        KAFKA_BROKER_ID: 1
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_LISTENERS: PLAINTEXT://:9092,SSL://:9091
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,SSL://localhost:9091
+        KAFKA_SSL_KEYSTORE_LOCATION: /certs/localhost.p12
+        KAFKA_SSL_KEYSTORE_PASSWORD: NOPASS
+        KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/localhost.p12
+        KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
+        KAFKA_SSL_KEY_PASSWORD: NOPASS
+        KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
+      volumes:
+        - ./tests/data/localhost.p12:/certs/localhost.p12:ro
     splunk:
       image: timberio/splunk-hec-test:latest
       ports:

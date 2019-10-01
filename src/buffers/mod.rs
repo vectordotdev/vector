@@ -64,6 +64,7 @@ impl BufferInputCloner {
                     Box::new(inner)
                 }
             }
+
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
                 if when_full == &WhenFull::DropNewest {
@@ -102,6 +103,7 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))
             }
+
             #[cfg(feature = "leveldb")]
             BufferConfig::Disk {
                 max_size,
@@ -112,7 +114,8 @@ impl BufferConfig {
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?;
                 let buffer_dir = format!("{}_buffer", sink_name);
 
-                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)?;
+                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
+                    .map_err(|err| err.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))

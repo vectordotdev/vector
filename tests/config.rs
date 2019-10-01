@@ -23,6 +23,7 @@ fn happy_path() {
         [sinks.out]
         type = "tcp"
         inputs = ["sampler"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
@@ -37,7 +38,7 @@ fn happy_path() {
         sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
 
         [sinks]
-        out = {type = "tcp", inputs = ["sampler"], address = "127.0.0.1:9999"}
+        out = {type = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
     )
     .unwrap();
@@ -115,6 +116,7 @@ fn nonexistant_input() {
         [sinks.out]
         type = "tcp"
         inputs = ["asdf"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
@@ -146,12 +148,14 @@ fn bad_regex() {
         [sinks.out]
         type = "tcp"
         inputs = ["sampler"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"sampler\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 
     let err = load(
         r#"
@@ -167,12 +171,14 @@ fn bad_regex() {
         [sinks.out]
         type = "tcp"
         inputs = ["parser"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
     .unwrap_err();
 
-    assert_eq!(err, vec!["Transform \"parser\": regex parse error:\n    ([\n     ^\nerror: unclosed character class"]);
+    assert_eq!(err.len(), 1);
+    assert!(err[0].contains("error: unclosed character class"));
 }
 
 #[test]
@@ -194,6 +200,7 @@ fn good_regex_parser() {
         [sinks.out]
         type = "tcp"
         inputs = ["parser"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     );
@@ -221,6 +228,7 @@ fn good_tokenizer() {
         [sinks.out]
         type = "tcp"
         inputs = ["parser"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     );
@@ -241,6 +249,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
 
@@ -249,6 +258,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "moonbase-alpha"
@@ -258,6 +268,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         region = "us-east-1"
@@ -268,6 +279,7 @@ fn bad_s3_region() {
         inputs = ["in"]
         batch_size = 100000
         compression = "gzip"
+        encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
         endpoint = "this shoudlnt work"
@@ -278,7 +290,7 @@ fn bad_s3_region() {
     assert_eq!(
         err,
         vec![
-            "Sink \"out1\": Must set 'region' or 'endpoint'",
+            "Sink \"out1\": Must set either 'region' or 'endpoint'",
             "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
             "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
@@ -313,6 +325,7 @@ fn warnings() {
         [sinks.out]
         type = "tcp"
         inputs = ["sampler1"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
@@ -362,6 +375,7 @@ fn cycle() {
         [sinks.out]
         type = "tcp"
         inputs = ["four"]
+        encoding = "text"
         address = "127.0.0.1:9999"
       "#,
     )
@@ -382,6 +396,7 @@ fn disabled_healthcheck() {
       type = "tcp"
       inputs = ["in"]
       address = "0.0.0.0:0"
+      encoding = "text"
       healthcheck = false
       "#,
     )

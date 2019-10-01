@@ -6,11 +6,10 @@ that command.
 
 ## Metadata
 
-To start, you shuold be familiar with the Vector
-[`/.metadata.toml`](/.metadata.toml) file. This file contains various metadata
-about the Vector project as a whole, mostly configuration details but also
-link definitions. This file is loaded via the [`metadata.rb`](metadata.rb)
-file and represented as an object.
+To start, you shuold be familiar with the Vector [`/.meta`](/.meta) directory.
+This directory contains various metadata about the Vector project as a whole,
+mostly configuration details but also link definitions and m0ore. This file is
+loaded via the [`metadata.rb`](metadata.rb) file and represented as an object.
 
 ## Templates
 

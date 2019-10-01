@@ -1,0 +1,13 @@
+[sources.statsd]
+beta = true
+delivery_guarantee = "best_effort"
+guides = []
+output_types = ["metric"]
+resources = []
+through_description = "the StatsD UDP protocol"
+
+[sources.statsd.options.address]
+type = "string"
+null = false
+examples = ["127.0.0.1:8126"]
+description = "UDP socket address to bind to."

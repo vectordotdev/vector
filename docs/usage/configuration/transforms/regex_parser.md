@@ -1,5 +1,5 @@
 ---
-description: Accepts `log` events and allows you to parse a field's value with a Regular Expression.
+description: Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 ---
 
 <!--
@@ -12,55 +12,25 @@ description: Accepts `log` events and allows you to parse a field's value with a
 
 # regex_parser transform
 
-![][images.regex_parser_transform]
+![][assets.regex_parser_transform]
 
 
-The `regex_parser` transform accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex].
+The `regex_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  # REQUIRED - General
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-  
-  # OPTIONAL - General
-  drop_field = true # default
-  field = "message" # default
-  
-  # OPTIONAL - Types
-  [transforms.my_transform_id.types]
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  # REQUIRED - General
-  type = "regex_parser"
-  inputs = ["<string>", ...]
-  regex = "<string>"
-
-  # OPTIONAL - General
-  drop_field = <bool>
-  field = "<string>"
-
-  # OPTIONAL - Types
-  [transforms.<transform-id>.types]
-    * = {"string" | "int" | "float" | "bool" | "timestamp|strftime"}
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.regex_parser_transform]
   #
@@ -87,13 +57,13 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   # * no default
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
 
-  # If the `field` should be dropped (removed) after parsing.
+  # If the specified `field` should be dropped (removed) after parsing.
   # 
   # * optional
   # * default: true
   drop_field = true
 
-  # The field to parse.
+  # The log field to parse.
   # 
   # * optional
   # * default: "message"
@@ -104,8 +74,9 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
   #
 
   [transforms.regex_parser_transform.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # A definition of mapped log field types. They key is the log field name and
+    # the value is the type. `strftime` specifiers are supported for the
+    # `timestamp` type.
     # 
     # * required
     # * no default
@@ -120,20 +91,6 @@ The `regex_parser` transform accepts [`log`][docs.log_event] events and allows y
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
-
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "regex_parser"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `regex` | `string` | The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.<br />`required` `example: (see above)` |
-| **OPTIONAL** - General | | |
-| `drop_field` | `bool` | If the `field` should be dropped (removed) after parsing.<br />`default: true` |
-| `field` | `string` | The field to parse. See [Failed Parsing](#failed-parsing) for more info.<br />`default: "message"` |
-| **OPTIONAL** - Types | | |
-| `types.*` | `string` | A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][url.strftime_specifiers] are supported for the `timestamp` type.<br />`required` `enum: "string", "int", "float", "bool", and "timestamp\|strftime"` |
 
 ## Examples
 
@@ -168,7 +125,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 ```javascript
 {
@@ -197,13 +154,13 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Failed Parsing
 
 If the `field` value fails to parse against the provided `regex` then an error
-will be [logged][docs.monitoring_logs] and the event will be kept or discarded
+will be [logged][docs.monitoring#logs] and the event will be kept or discarded
 depending on the `drop_failed` value.
 
 A failure includes any event that does not successfully parse against the
@@ -214,19 +171,19 @@ specified `field`.
 
 The `regex_parser` source has been involved in the following performance tests:
 
-* [`regex_parsing_performance`][url.regex_parsing_performance_test]
+* [`regex_parsing_performance`][urls.regex_parsing_performance_test]
 
 Learn more in the [Performance][docs.performance] sections.
 
 ### Regex Debugger
 
 To test the validity of the `regex` option, we recommend the [Golang Regex
-Tester][url.regex_tester] as it's Regex syntax closely 
+Tester][urls.regex_tester] as it's Regex syntax closely 
 follows Rust's.
 
 ### Regex Syntax
 
-Vector follows the [documented Rust Regex syntax][url.rust_regex_syntax] since
+Vector follows the [documented Rust Regex syntax][urls.rust_regex_syntax] since
 Vector is written in Rust. This syntax follows a Perl-style regular expression
 syntax, but lacks a few features like look around and backreferences.
 
@@ -242,7 +199,7 @@ Will capture `timestamp`, `level`, and `message`. All values are extracted as
 `string` values and must be coerced with the `types` table.
 
 More info can be found in the [Regex grouping and flags
-documentation][url.regex_grouping_and_flags].
+documentation][urls.regex_grouping_and_flags].
 
 #### Flags
 
@@ -264,7 +221,7 @@ For example, to enable the case-insensitive flag you can write:
 ```
 
 More info can be found in the [Regex grouping and flags
-documentation][url.regex_grouping_and_flags].
+documentation][urls.regex_grouping_and_flags].
 
 
 ### Types
@@ -296,22 +253,22 @@ The available types are:
 | `float`     | Coerce to 64 bit floats.                                                                                            |
 | `int`       | Coerce to a 64 bit integer.                                                                                         |
 | `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][url.strftime_specifiers] must be used to parse the string. |
+| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `regex_parser_transform` issues][url.regex_parser_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_regex_parser_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_regex_parser_transform_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `regex_parser_transform` issues][urls.regex_parser_transform_issues].
+2. If encountered a bug, please [file a bug report][urls.new_regex_parser_transform_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_regex_parser_transform_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
@@ -325,10 +282,10 @@ Finally, consider the following alternatives:
 
 ## Resources
 
-* [**Issues**][url.regex_parser_transform_issues] - [enhancements][url.regex_parser_transform_enhancements] - [bugs][url.regex_parser_transform_bugs]
-* [**Source code**][url.regex_parser_transform_source]
-* [**Regex Tester**][url.regex_tester]
-* [**Rust Regex Syntax**][url.rust_regex_syntax]
+* [**Issues**][urls.regex_parser_transform_issues] - [enhancements][urls.regex_parser_transform_enhancements] - [bugs][urls.regex_parser_transform_bugs]
+* [**Source code**][urls.regex_parser_transform_source]
+* [**Regex Tester**][urls.regex_tester]
+* [**Rust Regex Syntax**][urls.rust_regex_syntax]
 
 
 [docs.config_composition]: ../../../usage/configuration/README.md#composition
@@ -339,21 +296,21 @@ Finally, consider the following alternatives:
 [docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
 [docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.tokenizer_transform]: ../../../usage/configuration/transforms/tokenizer.md
-[docs.transforms]: ../../../usage/configuration/transforms
+[docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms.split]: ../../../usage/configuration/transforms/split.md
+[docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
-[url.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+bug
-[url.new_regex_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+enhancement
-[url.regex]: https://en.wikipedia.org/wiki/Regular_expression
-[url.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
-[url.regex_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22+label%3A%22Type%3A+bug%22
-[url.regex_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22+label%3A%22Type%3A+enhancement%22
-[url.regex_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
-[url.regex_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
-[url.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
-[url.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
-[url.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
-[url.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
-[url.vector_chat]: https://chat.vector.dev
+[urls.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+bug
+[urls.new_regex_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+enhancement
+[urls.regex]: https://en.wikipedia.org/wiki/Regular_expression
+[urls.regex_grouping_and_flags]: https://docs.rs/regex/1.1.7/regex/#grouping-and-flags
+[urls.regex_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22+label%3A%22Type%3A+bug%22
+[urls.regex_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22+label%3A%22Type%3A+enhancement%22
+[urls.regex_parser_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+regex_parser%22
+[urls.regex_parser_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/regex_parser.rs
+[urls.regex_parsing_performance_test]: https://github.com/timberio/vector-test-harness/tree/master/cases/regex_parsing_performance
+[urls.regex_tester]: https://regex-golang.appspot.com/assets/html/index.html
+[urls.rust_regex_syntax]: https://docs.rs/regex/1.1.7/regex/#syntax
+[urls.strftime_specifiers]: https://docs.rs/chrono/0.3.1/chrono/format/strftime/index.html
+[urls.vector_chat]: https://chat.vector.dev

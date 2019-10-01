@@ -20,7 +20,13 @@ use vector::{metrics, topology};
 #[structopt(rename_all = "kebab-case")]
 struct Opts {
     /// Read configuration from the specified file
-    #[structopt(name = "config", value_name = "FILE", short, long)]
+    #[structopt(
+        name = "config",
+        value_name = "FILE",
+        short,
+        long,
+        default_value = "/etc/vector/vector.toml"
+    )]
     config_path: PathBuf,
 
     /// Exit on startup if any sinks fail healthchecks
@@ -84,6 +90,7 @@ impl std::str::FromStr for Color {
 }
 
 fn main() {
+    openssl_probe::init_ssl_cert_env_vars();
     let opts = Opts::from_args();
 
     let level = match opts.quiet {

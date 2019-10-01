@@ -8,7 +8,7 @@
 
 set -eu
 
-archive_name="vector-$VERSION-$TARGET.tar.gz"
+archive_name="vector-$TARGET.tar.gz"
 archive_path="target/artifacts/$archive_name"
 
 # RPM has a concept of releases, but we do not need this so every
@@ -33,7 +33,7 @@ cp -av distribution/init.d/. /root/rpmbuild/SOURCES/init.d
 cp -av distribution/systemd/. /root/rpmbuild/SOURCES/systemd
 
 # Copy the archive into the sources dir
-cp -a $archive_path "/root/rpmbuild/SOURCES/vector-$VERSION-$ARCH.tar.gz"
+cp -a $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
 # Calling rpmbuild with --target tells RPM everything it needs to know
@@ -41,4 +41,5 @@ cp -a $archive_path "/root/rpmbuild/SOURCES/vector-$VERSION-$ARCH.tar.gz"
 rpmbuild --target $TARGET -ba distribution/rpm/vector.spec
 
 # Move the RPM into the artifacts dir
-mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$VERSION-$ARCH.rpm"
+ls "/root/rpmbuild/RPMS/$ARCH"
+mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
