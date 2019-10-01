@@ -52,11 +52,9 @@ enum TlsError {
 }
 
 /// Standard TLS connector options
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsOptions {
-    #[derivative(Default(value = "true"))]
-    pub verify_certificate: bool,
+    pub verify_certificate: Option<bool>,
     pub ca_path: Option<PathBuf>,
     pub crt_path: Option<PathBuf>,
     pub key_path: Option<PathBuf>,
@@ -64,10 +62,7 @@ pub struct TlsOptions {
 }
 
 /// Directly usable settings for TLS connectors
-#[derive(Derivative)]
-#[derivative(Default)]
 pub struct TlsSettings {
-    #[derivative(Default(value = "true"))]
     verify_certificate: bool,
     authority: Option<Certificate>,
     identity: Option<Identity>,
@@ -101,7 +96,7 @@ impl TryFrom<&TlsOptions> for TlsSettings {
         };
 
         Ok(Self {
-            verify_certificate: options.verify_certificate,
+            verify_certificate: options.verify_certificate.unwrap_or(true),
             authority,
             identity,
         })

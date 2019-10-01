@@ -126,7 +126,6 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
-    let verify_certificate = config.verify_certificate.unwrap_or(true);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -134,14 +133,14 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    if !verify_certificate {
+    if config.verify_certificate == Some(false) {
         warn!(
             message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
         );
     }
 
     let tls_options = TlsOptions {
-        verify_certificate,
+        verify_certificate: config.verify_certificate,
         ..Default::default()
     };
 
