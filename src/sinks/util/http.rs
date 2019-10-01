@@ -54,7 +54,7 @@ impl HttpServiceBuilder {
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(&self, request_builder: F) -> crate::Result<HttpService>
+    pub fn build<F>(self, request_builder: F) -> crate::Result<HttpService>
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -77,13 +77,13 @@ impl HttpServiceBuilder {
     }
 
     /// Set the number of threads used by the `HttpService`
-    pub fn threads(&mut self, threads: usize) -> &mut Self {
+    pub fn threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
     }
 
     /// Set the standard TLS options
-    pub fn tls_options(&mut self, options: TlsOptions) -> &mut Self {
+    pub fn tls_options(mut self, options: TlsOptions) -> Self {
         self.tls_options = Some(options);
         self
     }

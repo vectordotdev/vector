@@ -225,53 +225,57 @@ fn es(
         gzip = false;
     }
 
-    let mut builder = HttpService::builder();
-    builder.tls_options(common.tls_options.clone());
-    let http_service = builder.build(move |body: Vec<u8>| {
-        let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
+    let http_service = HttpService::builder()
+        .tls_options(common.tls_options.clone())
+        .build(move |body: Vec<u8>| {
+            let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
-        match common.credentials {
-            None => {
-                builder.header("Content-Type", "application/x-ndjson");
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
+            match common.credentials {
+                None => {
+                    builder.header("Content-Type", "application/x-ndjson");
+                    if gzip {
+                        builder.header("Content-Encoding", "gzip");
+                    }
+
+                    for (header, value) in &headers {
+                        builder.header(&header[..], &value[..]);
+                    }
+
+                    if let Some(ref auth) = common.authorization {
+                        builder.header("Authorization", &auth[..]);
+                    }
+
+                    builder.body(body).unwrap()
                 }
+                Some(ref credentials) => {
+                    let mut request = SignedRequest::new(
+                        "POST",
+                        "es",
+                        common.region.as_ref().unwrap(),
+                        uri.path(),
+                    );
+                    request.set_hostname(uri.host().map(|s| s.into()));
 
-                for (header, value) in &headers {
-                    builder.header(&header[..], &value[..]);
+                    request.add_header("Content-Type", "application/x-ndjson");
+
+                    for (header, value) in &headers {
+                        request.add_header(header, value);
+                    }
+
+                    request.set_payload(Some(body));
+
+                    finish_signer(&mut request, &credentials, &mut builder);
+
+                    // The SignedRequest ends up owning the body, so we have
+                    // to play games here
+                    let body = request.payload.take().unwrap();
+                    match body {
+                        SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                        _ => unreachable!(),
+                    }
                 }
-
-                if let Some(ref auth) = common.authorization {
-                    builder.header("Authorization", &auth[..]);
-                }
-
-                builder.body(body).unwrap()
             }
-            Some(ref credentials) => {
-                let mut request =
-                    SignedRequest::new("POST", "es", common.region.as_ref().unwrap(), uri.path());
-                request.set_hostname(uri.host().map(|s| s.into()));
-
-                request.add_header("Content-Type", "application/x-ndjson");
-
-                for (header, value) in &headers {
-                    request.add_header(header, value);
-                }
-
-                request.set_payload(Some(body));
-
-                finish_signer(&mut request, &credentials, &mut builder);
-
-                // The SignedRequest ends up owning the body, so we have
-                // to play games here
-                let body = request.payload.take().unwrap();
-                match body {
-                    SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
-                    _ => unreachable!(),
-                }
-            }
-        }
-    })?;
+        })?;
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
