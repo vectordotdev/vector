@@ -176,7 +176,10 @@ where
         .context(Pkcs12Error)?)
 }
 
-fn open_read<F: AsRef<Path> + Debug>(filename: F, note: &'static str) -> crate::Result<Vec<u8>> {
+pub fn open_read<F: AsRef<Path> + Debug>(
+    filename: F,
+    note: &'static str,
+) -> crate::Result<Vec<u8>> {
     let mut text = Vec::<u8>::new();
     let filename = filename.as_ref();
 

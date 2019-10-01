@@ -441,7 +441,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         event,
-        sinks::util::tls::TlsOptions,
+        sinks::util::tls::{open_read, TlsOptions},
         test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
         Event,
@@ -559,7 +559,17 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");
 
+        let http_client = reqwest::Client::builder()
+            .add_root_certificate(
+                reqwest::Certificate::from_pem(
+                    &open_read("tests/data/Vector_CA.crt", "certificate").unwrap(),
+                )
+                .expect("Could not parse test CA"),
+            )
+            .build()
+            .expect("Could not build HTTP client");
         let client = SyncClientBuilder::new()
+            .http_client(http_client)
             .static_node(config.host)
             .build()
             .expect("Building test client failed");
