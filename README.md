@@ -125,20 +125,23 @@ Or view [platform specific installation instructions][docs.installation].
 
 | Name  | Description |
 |:------|:------------|
-| [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
-| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce event fields into fixed types. |
-| [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
-| [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
-| [**`javascript`**][docs.javascript_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded JavaScript engine. |
-| [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
-| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
-| [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
-| [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
-| [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
-| [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`add_fields`**][docs.transforms.add_fields] | Accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields. |
+| [**`add_tags`**][docs.transforms.add_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags. |
+| [**`coercer`**][docs.transforms.coercer] | Accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types. |
+| [**`field_filter`**][docs.transforms.field_filter] | Accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value. |
+| [**`grok_parser`**][docs.transforms.grok_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok]. |
+| [**`javascript`**][docs.transforms.javascript] | Accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded JavaScript engine. |
+| [**`json_parser`**][docs.transforms.json_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON. |
+| [**`log_to_metric`**][docs.transforms.log_to_metric] | Accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics. |
+| [**`lua`**][docs.transforms.lua] | Accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine. |
+| [**`regex_parser`**][docs.transforms.regex_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex]. |
+| [**`remove_fields`**][docs.transforms.remove_fields] | Accepts [`log`][docs.data-model.log] events and allows you to remove one or more log fields. |
+| [**`remove_tags`**][docs.transforms.remove_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags. |
+| [**`sampler`**][docs.transforms.sampler] | Accepts [`log`][docs.data-model.log] events and allows you to sample events with a configurable rate. |
+| [**`split`**][docs.transforms.split] | Accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
+| [**`tokenizer`**][docs.transforms.tokenizer] | Accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
 
-[+ request a new transform][url.new_transform]
+[+ request a new transform][urls.new_transform]
 
 
 ## Sinks
@@ -203,17 +206,8 @@ the License.
 [docs.guarantees]: https://docs.vector.dev/about/guarantees
 [docs.guides]: https://docs.vector.dev/usage/guides
 [docs.installation]: https://docs.vector.dev/setup/installation
-[docs.javascript_transform]: https://docs.vector.dev/usage/configuration/transforms/javascript
-[docs.journald_source]: https://docs.vector.dev/usage/configuration/sources/journald
-[docs.json_parser_transform]: https://docs.vector.dev/usage/configuration/transforms/json_parser
-[docs.kafka_sink]: https://docs.vector.dev/usage/configuration/sinks/kafka
-[docs.kafka_source]: https://docs.vector.dev/usage/configuration/sources/kafka
-[docs.log]: https://docs.vector.dev/about/data-model/log
-[docs.log_event]: https://docs.vector.dev/about/data-model/log
-[docs.log_to_metric_transform]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
-[docs.lua_transform]: https://docs.vector.dev/usage/configuration/transforms/lua
-[docs.metric]: https://docs.vector.dev/about/data-model/metric
-[docs.metric_event]: https://docs.vector.dev/about/data-model/metric
+[docs.operating_systems]: https://docs.vector.dev/setup/installation/operating-systems
+[docs.package_managers]: https://docs.vector.dev/setup/installation/package-managers
 [docs.performance]: https://docs.vector.dev/performance
 [docs.platforms]: https://docs.vector.dev/setup/installation/platforms
 [docs.reloading]: https://docs.vector.dev/usage/administration/reloading
@@ -255,6 +249,7 @@ the License.
 [docs.transforms.coercer]: https://docs.vector.dev/usage/configuration/transforms/coercer
 [docs.transforms.field_filter]: https://docs.vector.dev/usage/configuration/transforms/field_filter
 [docs.transforms.grok_parser]: https://docs.vector.dev/usage/configuration/transforms/grok_parser
+[docs.transforms.javascript]: https://docs.vector.dev/usage/configuration/transforms/javascript
 [docs.transforms.json_parser]: https://docs.vector.dev/usage/configuration/transforms/json_parser
 [docs.transforms.log_to_metric]: https://docs.vector.dev/usage/configuration/transforms/log_to_metric
 [docs.transforms.lua]: https://docs.vector.dev/usage/configuration/transforms/lua

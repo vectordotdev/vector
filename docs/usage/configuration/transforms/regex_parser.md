@@ -275,10 +275,11 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`grok_parser` transform][docs.grok_parser_transform]
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
-* [`tokenizer` transform][docs.tokenizer_transform]
+* [`grok_parser` transform][docs.transforms.grok_parser]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
+* [`split` transform][docs.transforms.split]
+* [`tokenizer` transform][docs.transforms.tokenizer]
 
 ## Resources
 
@@ -288,15 +289,13 @@ Finally, consider the following alternatives:
 * [**Rust Regex Syntax**][urls.rust_regex_syntax]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md

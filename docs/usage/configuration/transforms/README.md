@@ -20,37 +20,30 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 
 | Name  | Description |
 |:------|:------------|
-| [**`add_fields`**][docs.add_fields_transform] | Accepts [`log`][docs.log_event] events and allows you to add one or more fields. |
-| [**`coercer`**][docs.coercer_transform] | Accepts [`log`][docs.log_event] events and allows you to coerce event fields into fixed types. |
-| [**`field_filter`**][docs.field_filter_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to filter events by a field's value. |
-| [**`grok_parser`**][docs.grok_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value with [Grok][url.grok]. |
-| [**`javascript`**][docs.javascript_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded JavaScript engine. |
-| [**`json_parser`**][docs.json_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field value as JSON. |
-| [**`log_to_metric`**][docs.log_to_metric_transform] | Accepts [`log`][docs.log_event] events and allows you to convert logs into one or more metrics. |
-| [**`lua`**][docs.lua_transform] | Accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded [Lua][url.lua] engine. |
-| [**`regex_parser`**][docs.regex_parser_transform] | Accepts [`log`][docs.log_event] events and allows you to parse a field's value with a [Regular Expression][url.regex]. |
-| [**`remove_fields`**][docs.remove_fields_transform] | Accepts [`log`][docs.log_event] and [`metric`][docs.metric_event] events and allows you to remove one or more event fields. |
-| [**`sampler`**][docs.sampler_transform] | Accepts [`log`][docs.log_event] events and allows you to sample events with a configurable rate. |
-| [**`tokenizer`**][docs.tokenizer_transform] | Accepts [`log`][docs.log_event] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zipping the tokens into ordered field names. |
+| [**`add_fields`**][docs.transforms.add_fields] | Accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields. |
+| [**`add_tags`**][docs.transforms.add_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags. |
+| [**`coercer`**][docs.transforms.coercer] | Accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types. |
+| [**`field_filter`**][docs.transforms.field_filter] | Accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value. |
+| [**`grok_parser`**][docs.transforms.grok_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok]. |
+| [**`javascript`**][docs.transforms.javascript] | Accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded JavaScript engine. |
+| [**`json_parser`**][docs.transforms.json_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON. |
+| [**`log_to_metric`**][docs.transforms.log_to_metric] | Accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics. |
+| [**`lua`**][docs.transforms.lua] | Accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine. |
+| [**`regex_parser`**][docs.transforms.regex_parser] | Accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex]. |
+| [**`remove_fields`**][docs.transforms.remove_fields] | Accepts [`log`][docs.data-model.log] events and allows you to remove one or more log fields. |
+| [**`remove_tags`**][docs.transforms.remove_tags] | Accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags. |
+| [**`sampler`**][docs.transforms.sampler] | Accepts [`log`][docs.data-model.log] events and allows you to sample events with a configurable rate. |
+| [**`split`**][docs.transforms.split] | Accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names. |
+| [**`tokenizer`**][docs.transforms.tokenizer] | Accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names. |
 
-[+ request a new transform][url.new_transform]
+[+ request a new transform][urls.new_transform]
 
 
-[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
-[docs.coercer_transform]: ../../../usage/configuration/transforms/coercer.md
-[docs.event]: ../../../about/data-model/README.md#event
-[docs.field_filter_transform]: ../../../usage/configuration/transforms/field_filter.md
-[docs.grok_parser_transform]: ../../../usage/configuration/transforms/grok_parser.md
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.json_parser_transform]: ../../../usage/configuration/transforms/json_parser.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.log_to_metric_transform]: ../../../usage/configuration/transforms/log_to_metric.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.pipelines]: ../../../usage/configuration/README.md#composition
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sampler_transform]: ../../../usage/configuration/transforms/sampler.md
+[assets.transforms]: ../../../assets/transforms.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model.metric]: ../../../about/data-model/metric.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.sinks]: ../../../usage/configuration/sinks
 [docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
@@ -58,6 +51,7 @@ in-between [sources][docs.sources] and [sinks][docs.sinks]. They transform
 [docs.transforms.coercer]: ../../../usage/configuration/transforms/coercer.md
 [docs.transforms.field_filter]: ../../../usage/configuration/transforms/field_filter.md
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
 [docs.transforms.json_parser]: ../../../usage/configuration/transforms/json_parser.md
 [docs.transforms.log_to_metric]: ../../../usage/configuration/transforms/log_to_metric.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md

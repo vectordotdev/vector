@@ -12,48 +12,31 @@ description: Accepts `log` events and allows you to transform events with a full
 
 # javascript transform
 
-![][images.javascript_transform]
+![][assets.javascript_transform]
 
 {% hint style="warning" %}
 The `javascript` transform is in beta. Please see the current
-[enhancements][url.javascript_transform_enhancements] and
-[bugs][url.javascript_transform_bugs] for known issues.
-We kindly ask that you [add any missing issues][url.new_javascript_transform_issue]
+[enhancements][urls.javascript_transform_enhancements] and
+[bugs][urls.javascript_transform_bugs] for known issues.
+We kindly ask that you [add any missing issues][urls.new_javascript_transform_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `javascript` transform accepts [`log`][docs.log_event] events and allows you to transform events with a full embedded JavaScript engine.
+The `javascript` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded JavaScript engine.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "javascript" # must be: "javascript"
   inputs = ["my-source-id"]
-  
-  handler = "handler" # no default
-  memory_limit = 10000000 # no default
-  path = "/etc/vector/transform.js" # no default
-  source = """
-event => ({...event, field: 'value'})
 
-"""
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[transforms.<transform-id>]
-  type = "javascript"
-  inputs = ["<string>", ...]
-  handler = "<string>"
-  memory_limit = <int>
-  path = "<string>"
-  source = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.javascript_transform]
   # The component type
@@ -106,7 +89,7 @@ event => ({...event, field: 'value'})
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "javascript"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | **OPTIONAL** | | |
 | `handler` | `string` | Name of the handler function. See [Environment Variables](#environment-variables) for more info.<br />`no default` `example: "handler"` |
 | `memory_limit` | `int` | Maximum allowed RAM usage for JavaScript engine in bytes.<br />`no default` `example: 10000000` |
@@ -197,7 +180,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 Vector uses [QuickJS](https://bellard.org/quickjs/quickjs.html) embedded
@@ -223,47 +206,47 @@ should consist of ASCII characters and be a valid JavaScript identifier.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `javascript_transform` issues][url.javascript_transform_issues].
-2. If encountered a bug, please [file a bug report][url.new_javascript_transform_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_javascript_transform_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `javascript_transform` issues][urls.javascript_transform_issues].
+2. If encountered a bug, please [file a bug report][urls.new_javascript_transform_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_javascript_transform_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 
 ### Alternatives
 
 Finally, consider the following alternatives:
 
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
-* [**Issues**][url.javascript_transform_issues] - [enhancements][url.javascript_transform_enhancements] - [bugs][url.javascript_transform_bugs]
-* [**Source code**][url.javascript_transform_source]
+* [**Issues**][urls.javascript_transform_issues] - [enhancements][urls.javascript_transform_enhancements] - [bugs][urls.javascript_transform_bugs]
+* [**Source code**][urls.javascript_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.javascript_transform]: ../../../assets/javascript-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources]: ../../../usage/configuration/sources
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.javascript_transform]: ../../../assets/javascript-transform.svg
-[url.javascript_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22+label%3A%22Type%3A+bug%22
-[url.javascript_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22+label%3A%22Type%3A+enhancement%22
-[url.javascript_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22
-[url.javascript_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/javascript.rs
-[url.new_javascript_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript&labels=Type%3A+bug
-[url.new_javascript_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript&labels=Type%3A+enhancement
-[url.new_javascript_transform_issue]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript
-[url.vector_chat]: https://chat.vector.dev
+[urls.javascript_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22+label%3A%22Type%3A+bug%22
+[urls.javascript_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22+label%3A%22Type%3A+enhancement%22
+[urls.javascript_transform_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+javascript%22
+[urls.javascript_transform_source]: https://github.com/timberio/vector/tree/master/src/transforms/javascript.rs
+[urls.new_javascript_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript&labels=Type%3A+bug
+[urls.new_javascript_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript&labels=Type%3A+enhancement
+[urls.new_javascript_transform_issue]: https://github.com/timberio/vector/issues/new?labels=transform%3A+javascript
+[urls.vector_chat]: https://chat.vector.dev

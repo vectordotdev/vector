@@ -202,8 +202,8 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
@@ -217,13 +217,9 @@ Finally, consider the following alternatives:
 [docs.data-model.log#default-schema]: ../../../about/data-model/log.md#default-schema
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
-[docs.default_schema]: ../../../about/data-model/log.md#default-schema
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/

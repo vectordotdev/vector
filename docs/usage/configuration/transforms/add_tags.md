@@ -102,6 +102,7 @@ issue, please:
 
 Finally, consider the following alternatives:
 
+* [`javascript` transform][docs.transforms.javascript]
 * [`lua` transform][docs.transforms.lua]
 * [`remove_tags` transform][docs.transforms.remove_tags]
 
@@ -115,6 +116,7 @@ Finally, consider the following alternatives:
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_tags]: ../../../usage/configuration/transforms/remove_tags.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md

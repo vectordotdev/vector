@@ -104,8 +104,8 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
@@ -113,14 +113,12 @@ Finally, consider the following alternatives:
 * [**Source code**][urls.sampler_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[assets.sampler_transform]: ../../../assets/sampler-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+bug
 [urls.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+enhancement

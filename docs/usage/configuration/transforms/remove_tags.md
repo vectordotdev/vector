@@ -88,6 +88,7 @@ issue, please:
 Finally, consider the following alternatives:
 
 * [`add_tags` transform][docs.transforms.add_tags]
+* [`javascript` transform][docs.transforms.javascript]
 * [`lua` transform][docs.transforms.lua]
 
 ## Resources
@@ -101,6 +102,7 @@ Finally, consider the following alternatives:
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.transforms.add_tags]: ../../../usage/configuration/transforms/add_tags.md
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_remove_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+bug

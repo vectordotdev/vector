@@ -699,6 +699,7 @@ data_dir = "/var/lib/vector"
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts `log` events and allows you to transform events with a full embedded JavaScript engine.
 [transforms.javascript]
   # The component type
   # 
@@ -741,6 +742,7 @@ event => ({...event, field: 'value'})
 
 """
 
+# Accepts `log` events and allows you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type
   # 

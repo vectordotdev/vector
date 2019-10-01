@@ -173,10 +173,11 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
-* [`regex_parser` transform][docs.regex_parser_transform]
-* [`tokenizer` transform][docs.tokenizer_transform]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
+* [`regex_parser` transform][docs.transforms.regex_parser]
+* [`split` transform][docs.transforms.split]
+* [`tokenizer` transform][docs.transforms.tokenizer]
 
 ## Resources
 
@@ -186,13 +187,12 @@ Finally, consider the following alternatives:
 * [**Grok Patterns**][urls.grok_patterns]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
+[assets.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md

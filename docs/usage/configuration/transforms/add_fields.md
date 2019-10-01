@@ -241,29 +241,26 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
-* [`remove_fields` transform][docs.remove_fields_transform]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
+* [`remove_fields` transform][docs.transforms.remove_fields]
 
 ## Resources
 
-* [**Issues**][url.add_fields_transform_issues] - [enhancements][url.add_fields_transform_enhancements] - [bugs][url.add_fields_transform_bugs]
-* [**Source code**][url.add_fields_transform_source]
+* [**Issues**][urls.add_fields_transform_issues] - [enhancements][urls.add_fields_transform_enhancements] - [bugs][urls.add_fields_transform_bugs]
+* [**Source code**][urls.add_fields_transform_source]
 
 
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.config_value_types]: ../../../usage/configuration/README.md#value-types
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.data_model]: ../../../about/data-model
-[docs.event_key_special_characters]: ../../../about/data-model/log.md#special-characters
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log]: ../../../about/data-model/log.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.remove_fields_transform]: ../../../usage/configuration/transforms/remove_fields.md
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[assets.add_fields_transform]: ../../../assets/add_fields-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.configuration#value-types]: ../../../usage/configuration#value-types
+[docs.data-model.log#special-characters]: ../../../about/data-model/log.md#special-characters
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.data-model]: ../../../about/data-model
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms.remove_fields]: ../../../usage/configuration/transforms/remove_fields.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
 [urls.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+enhancement%22

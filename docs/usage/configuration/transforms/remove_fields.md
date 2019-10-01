@@ -87,9 +87,9 @@ issue, please:
 
 Finally, consider the following alternatives:
 
-* [`add_fields` transform][docs.add_fields_transform]
-* [`javascript` transform][docs.javascript_transform]
-* [`lua` transform][docs.lua_transform]
+* [`add_fields` transform][docs.transforms.add_fields]
+* [`javascript` transform][docs.transforms.javascript]
+* [`lua` transform][docs.transforms.lua]
 
 ## Resources
 
@@ -97,16 +97,13 @@ Finally, consider the following alternatives:
 * [**Source code**][urls.remove_fields_transform_source]
 
 
-[docs.add_fields_transform]: ../../../usage/configuration/transforms/add_fields.md
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.javascript_transform]: ../../../usage/configuration/transforms/javascript.md
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.lua_transform]: ../../../usage/configuration/transforms/lua.md
-[docs.metric_event]: ../../../about/data-model/metric.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[assets.remove_fields_transform]: ../../../assets/remove_fields-transform.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
+[docs.transforms.javascript]: ../../../usage/configuration/transforms/javascript.md
+[docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_remove_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_fields&labels=Type%3A+bug
 [urls.new_remove_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_fields&labels=Type%3A+enhancement
