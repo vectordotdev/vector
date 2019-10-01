@@ -75,8 +75,8 @@ impl Metric {
                     tags: new_tags,
                 },
             ) => {
-                *name = new_name.clone();
                 *val += *new_val;
+                *name = new_name.clone();
                 *timestamp = *new_timestamp;
                 *tags = new_tags.clone();
             }
@@ -106,6 +106,32 @@ impl Metric {
                     };
                     *val += delta;
                 };
+                *name = new_name.clone();
+                *timestamp = *new_timestamp;
+                *tags = new_tags.clone();
+            }
+            (
+                Metric::Histogram {
+                    ref mut name,
+                    ref mut val,
+                    ref mut sample_rate,
+                    ref mut timestamp,
+                    ref mut tags,
+                },
+                Metric::Histogram {
+                    name: new_name,
+                    val: new_val,
+                    sample_rate: new_sample_rate,
+                    timestamp: new_timestamp,
+                    tags: new_tags,
+                },
+            ) => {
+                if val == new_val {
+                    *sample_rate += *new_sample_rate;
+                } else {
+                    unimplemented!();
+                };
+
                 *name = new_name.clone();
                 *timestamp = *new_timestamp;
                 *tags = new_tags.clone();

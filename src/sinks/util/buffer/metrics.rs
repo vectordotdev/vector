@@ -14,7 +14,9 @@ impl Aggregate for Metric {
             Metric::Set {
                 name, tags, val, ..
             } => format!("{}{:?}{}", name, tags, val),
-            h @ Metric::Histogram { .. } => format!("{:?}", h),
+            Metric::Histogram {
+                name, tags, val, ..
+            } => format!("{}{:?}{}", name, tags, val),
         }
     }
 }
@@ -75,8 +77,15 @@ impl Batch for MetricBuffer {
                     self.metrics.entry(key).or_insert(value).merge(&item);
                 }
             }
-            _ => {
+            Metric::Set { .. } => {
                 self.metrics.insert(key, item);
+            }
+            Metric::Histogram { .. } => {
+                if let Some(metric) = self.metrics.get_mut(&key) {
+                    metric.merge(&item);
+                } else {
+                    self.metrics.insert(key, item);
+                }
             }
         }
     }
@@ -435,6 +444,76 @@ mod test {
                 Metric::Set {
                     name: "set-0".into(),
                     val: "3".into(),
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn metric_buffer_histograms() {
+        let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
+
+        let mut events = Vec::new();
+        for i in 2..6 {
+            let event = Event::Metric(Metric::Histogram {
+                name: "hist-2".into(),
+                val: 2.0,
+                sample_rate: 10,
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        for i in 2..6 {
+            let event = Event::Metric(Metric::Histogram {
+                name: format!("hist-{}", i),
+                val: i as f64,
+                sample_rate: 10,
+                timestamp: None,
+                tags: Some(tag("production")),
+            });
+            events.push(event);
+        }
+
+        let (buffer, _) = sink
+            .send_all(stream::iter_ok(events.into_iter()))
+            .wait()
+            .unwrap();
+
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer.len(), 1);
+
+        assert_eq!(
+            buffer[0].clone().finish(),
+            [
+                Metric::Histogram {
+                    name: "hist-2".into(),
+                    val: 2.0,
+                    sample_rate: 50,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Histogram {
+                    name: "hist-3".into(),
+                    val: 3.0,
+                    sample_rate: 10,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Histogram {
+                    name: "hist-4".into(),
+                    val: 4.0,
+                    sample_rate: 10,
+                    timestamp: None,
+                    tags: Some(tag("production")),
+                },
+                Metric::Histogram {
+                    name: "hist-5".into(),
+                    val: 5.0,
+                    sample_rate: 10,
                     timestamp: None,
                     tags: Some(tag("production")),
                 },
