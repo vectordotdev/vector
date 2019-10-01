@@ -456,7 +456,7 @@ mod test {
         let sink = BatchSink::new_max(vec![], MetricBuffer::new(), 6, Some(Duration::from_secs(1)));
 
         let mut events = Vec::new();
-        for i in 2..6 {
+        for _i in 2..6 {
             let event = Event::Metric(Metric::Histogram {
                 name: "hist-2".into(),
                 val: 2.0,
