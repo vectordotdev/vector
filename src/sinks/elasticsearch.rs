@@ -162,11 +162,13 @@ impl ElasticSearchCommon {
     }
 
     fn make_client(&self) -> crate::Result<Client<HttpsConnector<HttpConnector>>> {
+        let mut http = HttpConnector::new(1);
+        http.enforce_http(false);
         let tls_settings = TlsSettings::try_from(&self.tls_options)?;
         let tls = TlsConnector::builder()
             .use_tls_settings(tls_settings)
             .build()?;
-        let https = HttpsConnector::from((HttpConnector::new(1), tls));
+        let https = HttpsConnector::from((http, tls));
         Ok(Client::builder().build(https))
     }
 }
