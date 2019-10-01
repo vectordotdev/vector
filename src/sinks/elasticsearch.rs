@@ -117,6 +117,11 @@ impl ElasticSearchCommon {
             host: config.host.clone(),
         })?;
 
+        config
+            .tls
+            .as_ref()
+            .map(|tls| tls.check_warnings("elasticsearch"));
+
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))

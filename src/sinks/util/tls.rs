@@ -61,6 +61,16 @@ pub struct TlsOptions {
     pub key_pass: Option<String>,
 }
 
+impl TlsOptions {
+    pub fn check_warnings(&self, sink: &str) {
+        if self.verify_certificate == Some(false) {
+            warn!(
+                "`verify_certificate` in {} sink is DISABLED, this may lead to security vulnerabilities", sink
+            );
+        }
+    }
+}
+
 /// Directly usable settings for TLS connectors
 pub struct TlsSettings {
     verify_certificate: bool,

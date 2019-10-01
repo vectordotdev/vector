@@ -134,16 +134,11 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    if config.verify_certificate == Some(false) {
-        warn!(
-            message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
-        );
-    }
-
     let tls_options = TlsOptions {
         verify_certificate: config.verify_certificate,
         ..Default::default()
     };
+    tls_options.check_warnings("http");
 
     let http_service = HttpService::builder()
         .tls_settings(tls_options.try_into()?)
