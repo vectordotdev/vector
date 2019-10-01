@@ -1,6 +1,6 @@
 use super::{
     retries::RetryLogic,
-    tls::{TlsConnectorExt, TlsOptions},
+    tls::{TlsConnectorExt, TlsSettings},
 };
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
@@ -8,7 +8,6 @@ use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use std::borrow::Cow;
-use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
 use tower::Service;
@@ -42,7 +41,7 @@ impl HttpService {
 #[derive(Default)]
 pub struct HttpServiceBuilder {
     threads: usize,
-    tls_options: Option<TlsOptions>,
+    tls_settings: Option<TlsSettings>,
 }
 
 impl HttpServiceBuilder {
@@ -61,8 +60,8 @@ impl HttpServiceBuilder {
         let mut http = HttpConnector::new(self.threads);
         http.enforce_http(false);
         let mut tls = native_tls::TlsConnector::builder();
-        if let Some(ref options) = self.tls_options {
-            tls.use_tls_settings(options.try_into()?);
+        if let Some(settings) = self.tls_settings {
+            tls.use_tls_settings(settings);
         }
         let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
@@ -82,9 +81,9 @@ impl HttpServiceBuilder {
         self
     }
 
-    /// Set the standard TLS options
-    pub fn tls_options(mut self, options: TlsOptions) -> Self {
-        self.tls_options = Some(options);
+    /// Set the standard TLS settings
+    pub fn tls_settings(mut self, settings: TlsSettings) -> Self {
+        self.tls_settings = Some(settings);
         self
     }
 }

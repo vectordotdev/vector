@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
+        tls::{TlsConnectorExt, TlsOptions},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -164,9 +164,8 @@ impl ElasticSearchCommon {
     fn make_client(&self) -> crate::Result<Client<HttpsConnector<HttpConnector>>> {
         let mut http = HttpConnector::new(1);
         http.enforce_http(false);
-        let tls_settings = TlsSettings::try_from(&self.tls_options)?;
         let tls = TlsConnector::builder()
-            .use_tls_settings(tls_settings)
+            .use_tls_settings((&self.tls_options).try_into()?)
             .build()?;
         let https = HttpsConnector::from((http, tls));
         Ok(Client::builder().build(https))
@@ -226,7 +225,7 @@ fn es(
     }
 
     let http_service = HttpService::builder()
-        .tls_options(common.tls_options.clone())
+        .tls_settings((&common.tls_options).try_into()?)
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 

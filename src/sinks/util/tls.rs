@@ -103,6 +103,13 @@ impl TryFrom<&TlsOptions> for TlsSettings {
     }
 }
 
+impl TryFrom<TlsOptions> for TlsSettings {
+    type Error = crate::Error;
+    fn try_from(options: TlsOptions) -> Result<Self, Self::Error> {
+        Self::try_from(&options)
+    }
+}
+
 pub trait TlsConnectorExt {
     fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self;
 }
