@@ -94,6 +94,14 @@ jobs:
       - image: elasticsearch:6.6.2
         environment:
           - discovery.type=single-node
+      - image: timberiodev/elasticsearch-test-https:6.6.2-1
+        environment:
+          - discovery.type=single-node
+          - xpack.security.enabled=true
+          - xpack.security.http.ssl.enabled=true
+          - xpack.security.transport.ssl.enabled=true
+          - xpack.ssl.certificate=certs/localhost.crt
+          - xpack.ssl.key=certs/localhost.key
       - image: yandex/clickhouse-server:19
     steps:
       - checkout

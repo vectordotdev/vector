@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
+        tls::TlsOptions,
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -19,6 +20,7 @@ use hyper_tls::HttpsConnector;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -125,7 +127,6 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
-    let verify = config.verify_certificate.unwrap_or(true);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -133,50 +134,49 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    if !verify {
-        warn!(
-            message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
-        );
-    }
+    let tls_options = TlsOptions {
+        verify_certificate: config.verify_certificate,
+        ..Default::default()
+    };
+    tls_options.check_warnings("http");
 
-    let http_service =
-        HttpService::builder()
-            .verify_certificate(verify)
-            .build(move |body: Vec<u8>| {
-                let mut builder = hyper::Request::builder();
+    let http_service = HttpService::builder()
+        .tls_settings(tls_options.try_into()?)
+        .build(move |body: Vec<u8>| {
+            let mut builder = hyper::Request::builder();
 
-                let method = match method {
-                    HttpMethod::Post => Method::POST,
-                    HttpMethod::Put => Method::PUT,
-                };
+            let method = match method {
+                HttpMethod::Post => Method::POST,
+                HttpMethod::Put => Method::PUT,
+            };
 
-                builder.method(method);
+            builder.method(method);
 
-                builder.uri(uri.clone());
+            builder.uri(uri.clone());
 
-                match encoding {
-                    Encoding::Text => builder.header("Content-Type", "text/plain"),
-                    Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
-                };
+            match encoding {
+                Encoding::Text => builder.header("Content-Type", "text/plain"),
+                Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+            };
 
-                if gzip {
-                    builder.header("Content-Encoding", "gzip");
+            if gzip {
+                builder.header("Content-Encoding", "gzip");
+            }
+
+            if let Some(headers) = &headers {
+                for (header, value) in headers.iter() {
+                    builder.header(header.as_str(), value.as_str());
                 }
+            }
 
-                if let Some(headers) = &headers {
-                    for (header, value) in headers.iter() {
-                        builder.header(header.as_str(), value.as_str());
-                    }
-                }
+            let mut request = builder.body(body).unwrap();
 
-                let mut request = builder.body(body).unwrap();
+            if let Some(auth) = &basic_auth {
+                auth.apply(request.headers_mut());
+            }
 
-                if let Some(auth) = &basic_auth {
-                    auth.apply(request.headers_mut());
-                }
-
-                request
-            });
+            request
+        })?;
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

@@ -2025,6 +2025,45 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+  #
+  # Tls
+  #
+
+  [sinks.elasticsearch.tls]
+    # If `true`, Vector will force certificate validation. Do NOT set this to
+    # `false` unless you know the risks of not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify = true
+
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in PEM format. If
+    # this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_path` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
 # Streams `log` events to a file.
 [sinks.file]
   # The component type

@@ -120,7 +120,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         builder.header("Authorization", token.clone());
 
         builder.body(body).unwrap()
-    });
+    })?;
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    sinks::util::SinkExt,
+    sinks::util::{tls, SinkExt},
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
@@ -9,19 +9,10 @@ use futures::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
 use native_tls::{Certificate, Identity};
-use openssl::{
-    pkcs12::Pkcs12,
-    pkey::{PKey, Private},
-    x509::X509,
-};
+use openssl::pkcs12::Pkcs12;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::fmt::Debug;
-use std::fs::File;
-use std::io::Read;
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::path::Path;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::{
     codec::{BytesCodec, FramedWrite},
@@ -34,18 +25,6 @@ use tracing::field;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Could not open {} file {:?}: {}", note, filename, source))]
-    FileOpenFailed {
-        note: &'static str,
-        filename: PathBuf,
-        source: std::io::Error,
-    },
-    #[snafu(display("Could not read {} file {:?}: {}", note, filename, source))]
-    FileReadFailed {
-        note: &'static str,
-        filename: PathBuf,
-        source: std::io::Error,
-    },
     #[snafu(display("Must specify both TLS key_file and crt_file"))]
     MissingCrtKeyFile,
     #[snafu(display("Could not build TLS connector: {}", source))]
@@ -54,23 +33,6 @@ enum BuildError {
     TlsIdentityError { source: native_tls::Error },
     #[snafu(display("Could not export identity to DER: {}", source))]
     DerExportError { source: openssl::error::ErrorStack },
-    #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
-    CertificateParseError {
-        filename: PathBuf,
-        source: native_tls::Error,
-    },
-    #[snafu(display("Could not parse X509 certificate in {:?}: {}", filename, source))]
-    X509ParseError {
-        filename: PathBuf,
-        source: openssl::error::ErrorStack,
-    },
-    #[snafu(display("Could not parse private key in {:?}: {}", filename, source))]
-    PrivateKeyParseError {
-        filename: PathBuf,
-        source: openssl::error::ErrorStack,
-    },
-    #[snafu(display("Could not build PKCS#12 archive for identity: {}", source))]
-    Pkcs12Error { source: openssl::error::ErrorStack },
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -129,20 +91,15 @@ impl SinkConfig for TcpSinkConfig {
                     }
                     let add_ca = match &tls.ca_file {
                         None => None,
-                        Some(filename) => Some(load_certificate(filename)?),
+                        Some(filename) => Some(tls::load_certificate(filename)?),
                     };
                     let identity = match &tls.crt_file {
                         None => None,
-                        Some(filename) => {
-                            // This unwrap is safe because of the crt/key check above
-                            let key = load_key(tls.key_file.as_ref().unwrap(), &tls.key_phrase)?;
-                            let crt = load_x509(filename)?;
-                            Some(
-                                Pkcs12::builder()
-                                    .build("", filename, &key, &crt)
-                                    .context(Pkcs12Error)?,
-                            )
-                        }
+                        Some(filename) => Some(tls::load_build_pkcs12(
+                            tls.key_file.as_ref().unwrap(), // Safe due to check above
+                            &tls.key_phrase,
+                            filename,
+                        )?),
                     };
                     Some(TcpSinkTls {
                         verify: tls.verify.unwrap_or(true),
@@ -171,48 +128,6 @@ impl SinkConfig for TcpSinkConfig {
     fn input_type(&self) -> DataType {
         DataType::Log
     }
-}
-
-fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<Certificate> {
-    let filename = filename.as_ref();
-    let data = open_read(filename, "certificate authority")?;
-    Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
-}
-
-fn load_key<T: AsRef<Path> + Debug>(
-    filename: T,
-    pass_phrase: &Option<String>,
-) -> crate::Result<PKey<Private>> {
-    let filename = filename.as_ref();
-    let data = open_read(filename, "key")?;
-    match pass_phrase {
-        None => {
-            Ok(PKey::private_key_from_pem(&data)
-                .with_context(|| PrivateKeyParseError { filename })?)
-        }
-        Some(phrase) => Ok(
-            PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
-                .with_context(|| PrivateKeyParseError { filename })?,
-        ),
-    }
-}
-
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<X509> {
-    let filename = filename.as_ref();
-    let data = open_read(filename, "certificate")?;
-    Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
-}
-
-fn open_read<F: AsRef<Path> + Debug>(filename: F, note: &'static str) -> crate::Result<Vec<u8>> {
-    let mut text = Vec::<u8>::new();
-    let filename = filename.as_ref();
-
-    File::open(filename)
-        .with_context(|| FileOpenFailed { note, filename })?
-        .read_to_end(&mut text)
-        .with_context(|| FileReadFailed { note, filename })?;
-
-    Ok(text)
 }
 
 pub struct TcpSink {
