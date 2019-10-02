@@ -158,7 +158,7 @@ docker = [
   "kafka-integration-tests",
   "kinesis-integration-tests",
   "s3-integration-tests",
-  "splunk-integration-tests",  
+  "splunk-integration-tests",
 ]
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
