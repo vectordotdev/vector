@@ -426,19 +426,6 @@ jobs:
   # Release
   #
 
-  release-deb:
-    docker:
-      - image: timberiodev/vector-releaser:latest
-    steps:
-      - checkout
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Release deb
-          command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-deb
-
   release-docker:
     docker:
       - image: timberiodev/vector-releaser:latest
@@ -480,19 +467,6 @@ jobs:
             export VERSION=$(make version)
             echo "Releasing $VERSION..."
             make release-homebrew
-
-  release-rpm:
-    docker:
-      - image: timberiodev/vector-releaser:latest
-    steps:
-      - checkout
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Release Github
-          command: |
-            export VERSION=$(make version)
-            echo "Releasing $VERSION..."
-            make release-rpm
 
   release-s3:
     docker:
@@ -796,13 +770,7 @@ workflows:
 
       # Releasing
 
-      - release-deb:
-          <<: *release-filters
-          <<: *require-verifications
       - release-github:
-          <<: *release-filters
-          <<: *require-verifications
-      - release-rpm:
           <<: *release-filters
           <<: *require-verifications
       - release-s3:
