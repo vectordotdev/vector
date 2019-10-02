@@ -26,24 +26,24 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   # Add nightly files with today's date for posterity
   today=$(date +"%F")
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$today"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive
+  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$today" --recursive --acl public-read
   echo "Uploaded archives"
 
   # Add "latest" nightly files
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/latest"
   aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/latest"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/latest" --recursive
+  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/latest" --recursive --acl public-read
   echo "Uploaded archives"
 elif [[ "$CHANNEL" == "latest" ]]; then
   # Upload the specific version
   echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/$VERSION/" --recursive
+  aws s3 cp "$td" "s3://packages.timber.io/vector/$VERSION/" --recursive --acl public-read
   echo "Uploaded archives"
 
   # Update the "latest" files
   echo "Uploading all artifacts to s3://packages.timber.io/vector/latest/"
   aws s3 rm --recursive "s3://packages.timber.io/vector/latest/"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/latest/" --recursive
+  aws s3 cp "$td" "s3://packages.timber.io/vector/latest/" --recursive --acl public-read
   echo "Uploaded archives"
 fi
 
