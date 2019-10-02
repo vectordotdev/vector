@@ -13,6 +13,7 @@ restore-artifacts-from-workspace: &restore-artifacts-from-workspace
     at: target/artifacts
 
 verify-install: &verify-install
+  - checkout
   - run:
       name: Execute install.sh
       command: sudo distribution/install.sh -y
@@ -329,56 +330,48 @@ jobs:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-1
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-amazon-linux-2:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-2
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-cent-os-7:
     docker:
       - image: centos:7
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-deb-8:
      docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-deb-9:
      docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-deb-10:
      docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-unbuntu-16-04:
      docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
-      - checkout
       <<: *verify-install
 
   verify-install-on-unbuntu-18-04:
      docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
-      - checkout
       <<: *verify-install
 
   #
