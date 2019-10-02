@@ -45,10 +45,8 @@ impl SourceConfig for KubernetesConfig {
 
         let now = TimeFilter::new();
 
-        // File source
         let (file_recv, file_source) = file_source(name, globals)?;
 
-        // Transforms
         let mut transform_file = transform_file()?;
         let mut parse_message = parse_message()?;
 
