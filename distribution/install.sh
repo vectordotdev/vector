@@ -73,44 +73,46 @@ main() {
 
     # Confirm with the user before proceeding to install Vector through a
     # package manager. Otherwise, we install from an archive.
-    if [ "$prompt" = "yes" ] && [ -n "$_package_manager" ]; then
-        echo "$_prompt How would you like to install vector?"
-        echo ""
-        echo "$_indent 1) Through the $_package_manager package manger (recommended)"
-        echo "$_indent 2) Directly from a pre-built archive"
+    if [ "$prompt" = "yes" ]; then
+        if [ -n "$_package_manager" ]; then
+            echo "$_prompt We'll be installing Vector via the $_package_manager package at https://packages.timber.io/vector/latest/"
+        else
+            echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/latest/"
+        fi
+
+        echo "$_prompt Ready to proceed? (y/n)"
         echo ""
 
         while true; do
             read -p "$_prompt " _choice </dev/tty
             case $_choice in
-                1)
-                    break
+                n)
+                    err "exiting"
                     ;;
-                2)
-                    _package_manager=""
+                y)
                     break
                     ;;
                 *)
-                    echo "Please enter 1 or 2."
+                    echo "Please enter y or n."
                     ;;
             esac
         done
-    fi
 
-    # Print a divider to separate the Vector installer output and the
-    # package manager installer output.
-    if [ -n "$_package_manager" ]; then
-        echo ""
-        echo "$_divider"
-        echo ""
+        # Print a divider to separate the Vector installer output and the
+        # package manager installer output.
+        if [ -n "$_package_manager" ]; then
+            echo ""
+            echo "$_divider"
+            echo ""
+        fi
     fi
 
     case "$_package_manager" in
-        apt)
-            apt-get install -y vector
+        dpkg)
+            install_from_deb
             ;;
-        yum)
-            yum install -y vector
+        rpm)
+            install_from_rpm
             ;;
         homebrew)
             brew tap timberio/brew
@@ -123,10 +125,10 @@ main() {
 }
 
 get_package_manager() {
-    if check_cmd "apt-get"; then
-        echo "apt"
-    elif check_cmd "yum"; then
-        echo "yum"
+    if check_cmd "dpkg"; then
+        echo "dpkg"
+    elif check_cmd "rpm"; then
+        echo "rpm"
     elif check_cmd "brew"; then
         echo "homebrew"
     fi
@@ -169,7 +171,7 @@ install_from_archive() {
 
     ensure mkdir -p "$_dir"
 
-    printf "$_prompt Downloading Vector..."
+    printf "$_prompt Downloading Vector via $_url"
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
@@ -199,6 +201,86 @@ install_from_archive() {
     ignore rmdir "$_dir"
 
     return "$_retval"
+}
+
+install_from_deb() {
+    need_cmd dpkg
+    need_cmd mktemp
+    need_cmd mkdir
+
+    get_architecture || return 1
+    local _arch="$RETVAL"
+    assert_nz "$_arch" "arch"
+
+    local _package_arch=""
+    case "$_arch" in
+        x86_64-*)
+            _package_arch="amd64"
+            ;;
+        *)
+            err "unsupported arch: $_arch"
+            ;;
+    esac
+
+    local _url="${PACKAGE_ROOT}/latest/vector-${_package_arch}.deb"
+    local _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+    local _file="${_dir}/vector-${_package_arch}.deb"
+
+    ensure mkdir -p "$_dir"
+
+    printf "$_prompt Downloading Vector via $_url"
+    ensure downloader "$_url" "$_file"
+    printf " ✓\n"
+
+    printf "$_prompt Installing Vector via dpkg..."
+    ensure dpkg -i $_file
+
+    printf "$_prompt Install succeeded! 🚀\n"
+    printf "$_prompt To start Vector:\n"
+    printf "\n"
+    printf "$_indent sudo systemctl start vector\n"
+    printf "\n"
+    printf "$_prompt More information at https://docs.vector.dev\n"
+}
+
+install_from_rpm() {
+    need_cmd mktemp
+    need_cmd mkdir
+    need_cmd rpm
+
+    get_architecture || return 1
+    local _arch="$RETVAL"
+    assert_nz "$_arch" "arch"
+
+    local _package_arch=""
+    case "$_arch" in
+        x86_64-*)
+            _package_arch="x86_64"
+            ;;
+        *)
+            err "unsupported arch: $_arch"
+            ;;
+    esac
+
+    local _url="${PACKAGE_ROOT}/latest/vector-${_package_arch}.rpm"
+    local _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+    local _file="${_dir}/vector-${_package_arch}.rpm"
+
+    ensure mkdir -p "$_dir"
+
+    printf "$_prompt Downloading Vector via $_url"
+    ensure downloader "$_url" "$_file"
+    printf " ✓\n"
+
+    printf "$_prompt Installing Vector via rpm..."
+    ensure rpm -i $_file
+
+    printf "$_prompt Install succeeded! 🚀\n"
+    printf "$_prompt To start Vector:\n"
+    printf "\n"
+    printf "$_indent sudo systemctl start vector\n"
+    printf "\n"
+    printf "$_prompt More information at https://docs.vector.dev\n"
 }
 
 # ------------------------------------------------------------------------------

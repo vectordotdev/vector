@@ -8,9 +8,19 @@ install-rust: &install-rust
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
 
+install-vector: &install-vector
+  run:
+    name: Execute install.sh
+    command: distribution/install.sh -y
+
 restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
     at: target/artifacts
+
+verify-install: &verify-install
+  run:
+    name: Verify installation
+    command: vector --version
 
 #
 # Main document
@@ -206,46 +216,10 @@ jobs:
             - "*.rpm"
 
   #
-  # Verifying
+  # Verifying the deb artifact
   #
 
-  verify-amazon-linux-1:
-    docker:
-      - image: timberiodev/vector-verifier-amazonlinux-1
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-amazon-linux-2:
-    docker:
-      - image: timberiodev/vector-verifier-amazonlinux-2
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-centos-7:
-    docker:
-      - image: centos:7
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-deb-8:
+  verify-deb-artifact-on-deb-8:
     docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
@@ -257,7 +231,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-9:
+  verify-deb-artifact-on-deb-9:
     docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
@@ -269,7 +243,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-deb-10:
+  verify-deb-artifact-on-deb-10:
     docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
@@ -281,19 +255,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-systemd:
-    machine: true
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
-      - run:
-          name: Verify Systemd starts the service
-          command: |
-            sudo systemctl start vector
-
-  verify-ubuntu-16-04:
+  verify-deb-artifact-on-ubuntu-16-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04
     steps:
@@ -305,7 +267,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-ubuntu-18-04:
+  verify-deb-artifact-on-ubuntu-18-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04
     steps:
@@ -317,7 +279,7 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  verify-ubuntu-19-04:
+  verify-deb-artifact-on-ubuntu-19-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-19-04
     steps:
@@ -328,6 +290,137 @@ jobs:
       - run:
           name: Verify installation
           command: vector --version
+
+  #
+  # Verifying the rpm artifact
+  #
+
+  verify-rpm-artifact-on-amazon-linux-1:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-1
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-rpm-artifact-on-amazon-linux-2:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-2
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-rpm-artifact-on-centos-7:
+    docker:
+      - image: centos:7
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  #
+  # Verifying the install script
+  #
+
+  verify-install-on-amazon-linux-1:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-1
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-amazon-linux-2:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-2
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-centos-7:
+    docker:
+      - image: centos:7
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-deb-8:
+    docker:
+      - image: timberiodev/vector-verifier-deb-8:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-deb-9:
+    docker:
+      - image: timberiodev/vector-verifier-deb-9:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-deb-10:
+    docker:
+      - image: timberiodev/vector-verifier-deb-10:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-unbuntu-16-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-16-04:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-unbuntu-18-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-18-04:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  verify-install-on-unbuntu-19-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-19-04:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
+  #
+  # Verifying the systemd service script
+  #
+
+  verify-systemd-on-debian:
+    machine: true
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .deb package
+          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Verify Systemd starts the service
+          command: sudo systemctl start vector
 
   #
   # Release
@@ -414,18 +507,20 @@ jobs:
             echo "Releasing $VERSION..."
             make release-s3
 
+  sync-install:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - run:
+          name: Sync install.sh
+          command: make sync-install
+
 #
 # Workflow Macros
 #
 
-test-filters: &test-filters
-  filters:
-    branches:
-      only: /.*/
-    tags:
-      ignore: /.*/
-
-tag-workflow-filters: &tag-workflow-filters
+release-filters: &release-filters
   filters:
     branches:
       ignore: /.*/
@@ -449,17 +544,41 @@ require-packages: &require-packages
   requires:
     - package-rpm
 
-require-verifies: &require-verifies
+require-verifications: &require-verifications
   requires:
-    - verify-amazon-linux-1
-    - verify-amazon-linux-2
-    - verify-centos-7
-    - verify-deb-8
-    - verify-deb-9
-    - verify-deb-10
-    - verify-ubuntu-16-04
-    - verify-ubuntu-18-04
-    - verify-ubuntu-19-04
+    - verify-deb-artifact-on-deb-8
+    - verify-deb-artifact-on-deb-9
+    - verify-deb-artifact-on-deb-10
+    - verify-deb-artifact-on-ubuntu-16-04
+    - verify-deb-artifact-on-ubuntu-18-04
+    - verify-deb-artifact-on-ubuntu-19-04
+    - verify-install-on-amazon-linux-1
+    - verify-install-on-amazon-linux-2
+    - verify-install-on-centos-7
+    - verify-install-on-deb-8
+    - verify-install-on-deb-9
+    - verify-install-on-deb-10
+    - verify-install-on-unbuntu-16-04
+    - verify-install-on-unbuntu-18-04
+    - verify-install-on-unbuntu-19-04
+    - verify-rpm-artifact-on-amazon-linux-1
+    - verify-rpm-artifact-on-amazon-linux-2
+    - verify-rpm-artifact-on-centos-7
+
+sync-filters: &sync-filters
+  filters:
+    branches:
+      only: master
+    tags:
+      ignore: /.*/
+
+test-filters: &test-filters
+  filters:
+    branches:
+      only: /.*/
+    tags:
+      ignore: /.*/
+
 
 #
 # Workflows
@@ -478,6 +597,9 @@ workflows:
           <<: *test-filters
       - test-stable:
           <<: *test-filters
+
+      # Building & packaging
+
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
@@ -486,24 +608,51 @@ workflows:
           <<: *require-checks-and-tests
       - package-rpm:
           <<: *require-builds
-      - verify-amazon-linux-1:
+
+      # Verifying
+
+      - verify-deb-artifact-on-deb-8:
           <<: *require-packages
-      - verify-amazon-linux-2:
+      - verify-deb-artifact-on-deb-9:
           <<: *require-packages
-      - verify-centos-7:
+      - verify-deb-artifact-on-deb-10:
           <<: *require-packages
-      - verify-deb-8:
+      - verify-deb-artifact-on-ubuntu-16-04:
           <<: *require-packages
-      - verify-deb-9:
+      - verify-deb-artifact-on-ubuntu-18-04:
           <<: *require-packages
-      - verify-deb-10:
+      - verify-deb-artifact-on-ubuntu-19-04:
           <<: *require-packages
-      - verify-ubuntu-16-04:
+      - verify-install-on-amazon-linux-1:
           <<: *require-packages
-      - verify-ubuntu-18-04:
+      - verify-install-on-amazon-linux-2:
           <<: *require-packages
-      - verify-ubuntu-19-04:
+      - verify-install-on-centos-7:
           <<: *require-packages
+      - verify-install-on-deb-8:
+          <<: *require-packages
+      - verify-install-on-deb-9:
+          <<: *require-packages
+      - verify-install-on-deb-10:
+          <<: *require-packages
+      - verify-install-on-unbuntu-16-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-18-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-19-04:
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-1:
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-2:
+          <<: *require-packages
+      - verify-rpm-artifact-on-centos-7:
+          <<: *require-packages
+
+      # Syncing
+
+      - sync-install:
+          <<: *sync-filters
+          <<: *require-verifications
 
   nightly:
     triggers:
@@ -518,6 +667,9 @@ workflows:
       - check-fmt
       - check-generate
       - test-stable
+
+      # Building & packaging
+
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
@@ -526,98 +678,149 @@ workflows:
           <<: *require-checks-and-tests
       - package-rpm:
           <<: *require-builds
-      - verify-amazon-linux-1:
+
+      # Verifying
+
+      - verify-deb-artifact-on-deb-8:
           <<: *require-packages
-      - verify-amazon-linux-2:
+      - verify-deb-artifact-on-deb-9:
           <<: *require-packages
-      - verify-centos-7:
+      - verify-deb-artifact-on-deb-10:
           <<: *require-packages
-      - verify-deb-8:
+      - verify-deb-artifact-on-ubuntu-16-04:
           <<: *require-packages
-      - verify-deb-9:
+      - verify-deb-artifact-on-ubuntu-18-04:
           <<: *require-packages
-      - verify-deb-10:
+      - verify-deb-artifact-on-ubuntu-19-04:
           <<: *require-packages
-      - verify-ubuntu-16-04:
+      - verify-install-on-amazon-linux-1:
           <<: *require-packages
-      - verify-ubuntu-18-04:
+      - verify-install-on-amazon-linux-2:
           <<: *require-packages
-      - verify-ubuntu-19-04:
+      - verify-install-on-centos-7:
+          <<: *require-packages
+      - verify-install-on-deb-8:
+          <<: *require-packages
+      - verify-install-on-deb-9:
+          <<: *require-packages
+      - verify-install-on-deb-10:
+          <<: *require-packages
+      - verify-install-on-unbuntu-16-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-18-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-19-04:
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-1:
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-2:
+          <<: *require-packages
+      - verify-rpm-artifact-on-centos-7:
           <<: *require-packages
       - release-s3:
-          <<: *require-verifies
+          <<: *require-verifications
 
-  tag:
+  release:
     jobs:
       - check-code:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - check-fmt:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - check-generate:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - test-stable:
-          <<: *tag-workflow-filters
+          <<: *release-filters
+
+      # Building & packaging
+
       - build-x86_64-unknown-linux-gnu-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - package-rpm:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-builds
-      - verify-amazon-linux-1:
-          <<: *tag-workflow-filters
+
+      # Verifying
+
+      - verify-deb-artifact-on-deb-8:
+          <<: *release-filters
           <<: *require-packages
-      - verify-amazon-linux-2:
-          <<: *tag-workflow-filters
+      - verify-deb-artifact-on-deb-9:
+          <<: *release-filters
           <<: *require-packages
-      - verify-centos-7:
-          <<: *tag-workflow-filters
+      - verify-deb-artifact-on-deb-10:
+          <<: *release-filters
           <<: *require-packages
-      - verify-deb-8:
-          <<: *tag-workflow-filters
+      - verify-deb-artifact-on-ubuntu-16-04:
+          <<: *release-filters
           <<: *require-packages
-      - verify-deb-9:
-          <<: *tag-workflow-filters
+      - verify-deb-artifact-on-ubuntu-18-04:
+          <<: *release-filters
           <<: *require-packages
-      - verify-deb-10:
-          <<: *tag-workflow-filters
+      - verify-deb-artifact-on-ubuntu-19-04:
+          <<: *release-filters
           <<: *require-packages
-      - verify-ubuntu-16-04:
-          <<: *tag-workflow-filters
+      - verify-install-on-amazon-linux-1:
           <<: *require-packages
-      - verify-ubuntu-18-04:
-          <<: *tag-workflow-filters
+      - verify-install-on-amazon-linux-2:
           <<: *require-packages
-      - verify-ubuntu-19-04:
-          <<: *tag-workflow-filters
+      - verify-install-on-centos-7:
           <<: *require-packages
+      - verify-install-on-deb-8:
+          <<: *require-packages
+      - verify-install-on-deb-9:
+          <<: *require-packages
+      - verify-install-on-deb-10:
+          <<: *require-packages
+      - verify-install-on-unbuntu-16-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-18-04:
+          <<: *require-packages
+      - verify-install-on-unbuntu-19-04:
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-1:
+          <<: *release-filters
+          <<: *require-packages
+      - verify-rpm-artifact-on-amazon-linux-2:
+          <<: *release-filters
+          <<: *require-packages
+      - verify-rpm-artifact-on-centos-7:
+          <<: *release-filters
+          <<: *require-packages
+
+      # Releasing
+
       - release-deb:
-          <<: *tag-workflow-filters
-          <<: *require-verifies
+          <<: *release-filters
+          <<: *require-verifications
       - release-github:
-          <<: *tag-workflow-filters
-          <<: *require-verifies
+          <<: *release-filters
+          <<: *require-verifications
       - release-rpm:
-          <<: *tag-workflow-filters
-          <<: *require-verifies
+          <<: *release-filters
+          <<: *require-verifications
       - release-s3:
-          <<: *tag-workflow-filters
-          <<: *require-verifies
-      # Installs directly from S3
+          <<: *release-filters
+          <<: *require-verifications
+
+      # Must come after S3 since Docker installs directly from S3
       - release-docker:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           requires:
             - release-s3
-      # Installs directly from S3
+
+      # Must come after S3 since Homebrew installs from S3
       - release-homebrew:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           requires:
             - release-s3
+
 experimental:
   notify:
     branches:

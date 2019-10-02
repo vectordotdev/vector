@@ -102,5 +102,8 @@ release-rpm: ## Release .rpm via Package Cloud
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
+sync-install:
+	@aws s3 cp distribution/install.sh s3://sh.vector.dev
+
 version: ## Get the current Vector version
 	@echo $(_version)
