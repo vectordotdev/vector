@@ -77,11 +77,19 @@ impl TlsOptions {
 }
 
 /// Directly usable settings for TLS connectors
+#[derive(Clone, Default)]
 pub struct TlsSettings {
     accept_invalid_certificates: bool,
     accept_invalid_hostnames: bool,
     authority: Option<Certificate>,
-    identity: Option<Identity>,
+    identity: Option<Vec<u8>>, // native_tls::Identity doesn't implement Clone yet
+}
+
+#[derive(Clone)]
+struct IdentityStore {
+    name: String,
+    crt: X509,
+    key: PKey<Private>,
 }
 
 impl TryFrom<&TlsOptions> for TlsSettings {
@@ -99,15 +107,21 @@ impl TryFrom<&TlsOptions> for TlsSettings {
         let identity = match options.crt_path {
             None => None,
             Some(ref crt_path) => {
-                let identity = load_build_pkcs12(
-                    options.key_path.as_ref().unwrap(),
-                    &options.key_pass,
-                    crt_path,
-                )?;
-                Some(
-                    Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
-                        .context(TlsIdentityError)?,
-                )
+                let name = crt_path.to_string_lossy().to_string();
+                let crt = load_x509(crt_path)?;
+                let key_path = options.key_path.as_ref().unwrap();
+                let key = load_key(&key_path, &options.key_pass)?;
+                let pkcs12 = Pkcs12::builder()
+                    .build("", &name, &key, &crt)
+                    .context(Pkcs12Error)?;
+                let identity = pkcs12.to_der().context(DerExportError)?;
+
+                // Build the resulting Identity, but don't store it, as
+                // it cannot be cloned.  This is just for error
+                // checking.
+                let _identity = Identity::from_pkcs12(&identity, "").context(TlsIdentityError)?;
+
+                Some(identity)
             }
         };
 
@@ -139,6 +153,11 @@ impl TlsConnectorExt for TlsConnectorBuilder {
             self.add_root_certificate(certificate);
         }
         if let Some(identity) = settings.identity {
+            // This data was test-built previously, so we can just use
+            // it here and expect the results will not fail. This can
+            // all be reworked when `native_tls::Identity` gains the
+            // Clone impl.
+            let identity = Identity::from_pkcs12(&identity, "").expect("Could not build identity");
             self.identity(identity);
         }
         self
