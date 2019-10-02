@@ -35,7 +35,7 @@ impl SourceConfig for KubernetesConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> crate::Result<super::Source> {
         // Kubernetes source uses 'file source' and various transforms to implement
         // gathering of logs over Kubernetes CRI supported container runtimes.
 
@@ -113,7 +113,7 @@ impl TimeFilter {
 fn file_source(
     kube_name: &str,
     globals: &GlobalOptions,
-) -> Result<(mpsc::Receiver<Event>, super::Source), String> {
+) -> crate::Result<(mpsc::Receiver<Event>, super::Source)> {
     let mut config = FileConfig::default();
 
     // TODO: Having a configurable option for excluding namespaces, seams to be usefull.
@@ -159,7 +159,7 @@ fn file_source(
     Ok((file_recv, file_source))
 }
 
-fn parse_message() -> Result<impl FnMut(Event) -> Option<Event> + Send, String> {
+fn parse_message() -> crate::Result<impl FnMut(Event) -> Option<Event> + Send> {
     // Transforms
     let mut transform_json_message = transform_json_message();
     let mut transform_cri_message = transform_cri_message()?;
@@ -249,7 +249,7 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
     }
 }
 
-fn transform_cri_message() -> Result<Box<dyn Transform>, String> {
+fn transform_cri_message() -> crate::Result<Box<dyn Transform>> {
     let mut rp_config = RegexParserConfig::default();
     // message field
     rp_config.regex =
@@ -266,10 +266,11 @@ fn transform_cri_message() -> Result<Box<dyn Transform>, String> {
             "Failed in creating message regex transform with error: {:?}",
             e
         )
+        .into()
     })
 }
 
-fn transform_file() -> Result<Box<dyn Transform>, String> {
+fn transform_file() -> crate::Result<Box<dyn Transform>> {
     let mut config = RegexParserConfig::default();
 
     config.field = Some("file".into());
@@ -288,6 +289,7 @@ fn transform_file() -> Result<Box<dyn Transform>, String> {
             "Failed in creating file regex transform with error: {:?}",
             e
         )
+        .into()
     })
 }
 
