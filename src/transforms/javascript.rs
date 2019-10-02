@@ -7,6 +7,7 @@ use lazy_static::lazy_static;
 use quick_js::{Context, JsValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -64,6 +65,52 @@ lazy_static! {
     .collect();
 }
 
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("Cannot load JavaScript source from \"{}\": {}", path, source))]
+    JavascriptLoadSourceError {
+        path: String,
+        source: std::io::Error,
+    },
+    #[snafu(display("Handler name \"{}\" is not a valid JavaScript identifier", handler))]
+    JavascriptHandlerIsNotIdentifierError { handler: String },
+    #[snafu(display(
+        "Handler name \"{}\" is reserved in JavaScript and cannot be used",
+        handler
+    ))]
+    JavascriptHandlerReservedError { handler: String },
+    #[snafu(display("Cannot create JavaScript runtime: {}", source))]
+    JavascriptRuntimeCreationError { source: quick_js::ContextError },
+    #[snafu(display("Cannot inject handler: {}", source))]
+    JavascriptInjectionError { source: quick_js::ExecutionError },
+    #[snafu(display("Cannot validate handler: {}", source))]
+    JavascriptValidationError { source: quick_js::ExecutionError },
+    #[snafu(display("Handler is not a function"))]
+    JavascriptHandlerIsNotAFunctionError,
+}
+#[derive(Debug, Snafu)]
+enum ProcessError {
+    #[snafu(display("Expected event object or null, found: {:?}", js_event))]
+    JavascriptUnexpectedValueError { js_event: JsValue },
+    #[snafu(display("Runtime error in JavaScript code: {}", source))]
+    JavascriptRuntimeError { source: quick_js::ExecutionError },
+    #[snafu(display(
+        "Nested objects inside events are not supported, but field \"{}\" contains an object: {:?}",
+        field,
+        value
+    ))]
+    JavascriptNestedObjectsError {
+        field: String,
+        value: HashMap<String, JsValue>,
+    },
+    #[snafu(display(
+        "Arrays inside events are not supported, but field \"{}\" contains an array: {:?}",
+        field,
+        value
+    ))]
+    JavascriptNestedArraysError { field: String, value: Vec<JsValue> },
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(untagged, deny_unknown_fields)]
 pub enum SourceOrPath {
@@ -81,7 +128,7 @@ pub struct JavaScriptConfig {
 
 #[typetag::serde(name = "javascript")]
 impl TransformConfig for JavaScriptConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         JavaScript::new(self.clone()).map(|js| -> Box<dyn Transform> { Box::new(js) })
     }
 
@@ -100,7 +147,7 @@ enum ProcessorInput {
 }
 
 enum ProcessorOutput {
-    Start(Result<(), String>),
+    Start(crate::Result<()>),
     Events(Vec<Event>),
 }
 
@@ -110,7 +157,7 @@ pub struct JavaScript {
 }
 
 impl JavaScript {
-    pub fn new(config: JavaScriptConfig) -> Result<Self, String> {
+    pub fn new(config: JavaScriptConfig) -> crate::Result<Self> {
         let (input, thread_input) = mpsc::sync_channel(0);
         let (thread_output, output) = mpsc::sync_channel(0);
         thread::spawn(move || {
@@ -191,28 +238,28 @@ struct JavaScriptProcessor {
 }
 
 impl JavaScriptProcessor {
-    pub fn new(config: JavaScriptConfig) -> Result<Self, String> {
+    pub fn new(config: JavaScriptConfig) -> crate::Result<Self> {
         // load source
         let source = match config.source_or_path {
             SourceOrPath::Source { source } => source,
-            SourceOrPath::Path { path } => fs::read_to_string(&path).map_err(|err| {
-                format!("Cannot load JavaScript source from \"{}\": {}", path, err)
-            })?,
+            SourceOrPath::Path { path } => {
+                fs::read_to_string(&path).context(JavascriptLoadSourceError { path })?
+            }
         };
 
         // validate handler parameter if present
         if let Some(ref handler) = config.handler {
             if !JS_VALID_IDENTIFIER.is_match(&handler) {
-                return Err(format!(
-                    "Handler name \"{}\" is not a valid JavaScript identifier",
-                    handler
+                return Err(Box::new(
+                    BuildError::JavascriptHandlerIsNotIdentifierError {
+                        handler: handler.to_string(),
+                    },
                 ));
             }
             if JS_RESERVED_KEYWORDS.contains(&handler[..]) {
-                return Err(format!(
-                    "Handler name \"{}\" is reserved in JavaScript and cannot be used",
-                    handler
-                ));
+                return Err(Box::new(BuildError::JavascriptHandlerReservedError {
+                    handler: handler.to_string(),
+                }));
             }
         }
 
@@ -221,9 +268,8 @@ impl JavaScriptProcessor {
         if let Some(memory_limit) = config.memory_limit {
             builder = builder.memory_limit(memory_limit);
         }
-        let ctx = builder
-            .build()
-            .map_err(|err| format!("Cannot create JavaScript runtime: {}", err))?;
+
+        let ctx = builder.build().context(JavascriptRuntimeCreationError)?;
 
         // inject handler source
         let source = if let Some(handler) = config.handler {
@@ -231,31 +277,32 @@ impl JavaScriptProcessor {
         } else {
             format!(r"__vector_handler = ({})", source)
         };
-        ctx.eval(&source)
-            .map_err(|err| format!("Cannot create handler: {}", err))?;
+        ctx.eval(&source).context(JavascriptInjectionError)?;
 
         // check that handler is a function
         let handler_is_a_function: bool = ctx
             .eval_as(r"typeof __vector_handler === 'function'")
-            .map_err(|err| format!("Cannot validate handler: {}", err))?;
+            .context(JavascriptValidationError)?;
         if !handler_is_a_function {
-            return Err("Handler is not a function".to_string());
+            return Err(Box::new(
+                BuildError::JavascriptHandlerIsNotAFunctionError {},
+            ));
         }
 
         Ok(Self { ctx })
     }
 
-    pub fn process(&self, output: &mut Vec<Event>, event: Event) -> Result<(), String> {
-        let encoded = encode(event)?;
+    pub fn process(&self, output: &mut Vec<Event>, event: Event) -> crate::Result<()> {
+        let encoded = encode(event);
         let transformed = self
             .ctx
             .call_function("__vector_handler", vec![encoded])
-            .map_err(|err| format!("Runtime error in JavaScript code: {}", err))?;
+            .context(JavascriptRuntimeError)?;
         write_value(transformed, output)
     }
 }
 
-fn encode(event: Event) -> Result<JsValue, String> {
+fn encode(event: Event) -> JsValue {
     let js_event = event
         .as_log()
         .all_fields()
@@ -272,10 +319,10 @@ fn encode(event: Event) -> Result<JsValue, String> {
             )
         })
         .collect();
-    Ok(JsValue::Object(js_event))
+    JsValue::Object(js_event)
 }
 
-fn write_value(value: JsValue, output: &mut Vec<Event>) -> Result<(), String> {
+fn write_value(value: JsValue, output: &mut Vec<Event>) -> crate::Result<()> {
     match value {
         JsValue::Array(js_events) => {
             for js_event in js_events {
@@ -287,7 +334,7 @@ fn write_value(value: JsValue, output: &mut Vec<Event>) -> Result<(), String> {
     }
 }
 
-fn write_event(js_event: JsValue, output: &mut Vec<Event>) -> Result<(), String> {
+fn write_event(js_event: JsValue, output: &mut Vec<Event>) -> crate::Result<()> {
     match js_event {
         JsValue::Null => Ok(()),
         JsValue::Object(object) => {
@@ -295,14 +342,13 @@ fn write_event(js_event: JsValue, output: &mut Vec<Event>) -> Result<(), String>
             output.push(event);
             Ok(())
         }
-        _ => Err(format!(
-            "Expected event object or null, found: {:?}",
-            js_event
-        )),
+        _ => Err(Box::new(ProcessError::JavascriptUnexpectedValueError {
+            js_event,
+        })),
     }
 }
 
-fn object_to_event(object: HashMap<String, JsValue>) -> Result<Event, String> {
+fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
     for (k, v) in object.into_iter() {
@@ -314,18 +360,16 @@ fn object_to_event(object: HashMap<String, JsValue>) -> Result<Event, String> {
             JsValue::String(v) => ValueKind::Bytes(v.into()),
             JsValue::Date(v) => ValueKind::Timestamp(v),
             JsValue::Object(v) => {
-                return Err(format!(
-                    "Nested objects inside events are not supported, \
-                     but field \"{}\" contains an object: {:?}",
-                    k, v
-                ));
+                return Err(Box::new(ProcessError::JavascriptNestedObjectsError {
+                    field: k,
+                    value: v,
+                }));
             }
             JsValue::Array(v) => {
-                return Err(format!(
-                    "Arrays inside events are not supported, \
-                     but field \"{}\" contains an array: {:?}",
-                    k, v
-                ))
+                return Err(Box::new(ProcessError::JavascriptNestedArraysError {
+                    field: k,
+                    value: v,
+                }))
             }
         };
         log.insert_implicit(k.into(), v.into());
