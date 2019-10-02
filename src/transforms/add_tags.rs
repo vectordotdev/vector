@@ -20,7 +20,7 @@ pub struct AddTags {
 
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone())))
     }
 

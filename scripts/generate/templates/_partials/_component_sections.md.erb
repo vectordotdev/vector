@@ -4,18 +4,18 @@
 Vector checks for AWS credentials in the following order:
 
 1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-2. The [`credential_process` command][url.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
-3. The [AWS credentials file][url.aws_credentials_file]. (usually located at `~/.aws/credentials`)
-4. The [IAM instance profile][url.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
+2. The [`credential_process` command][urls.aws_credential_process] in the AWS config file. (usually located at `~/.aws/config`)
+3. The [AWS credentials file][urls.aws_credentials_file]. (usually located at `~/.aws/credentials`)
+4. The [IAM instance profile][urls.iam_instance_profile]. (will only work if running on an EC2 instance with an instance profile/role)
 
 If credentials are not found the [healtcheck](#healthchecks) will fail and an
-error will be [logged][docs.monitoring_logs].
+error will be [logged][docs.monitoring#logs].
 
 #### Obtaining an access key
 
 In general, we recommend using instance profiles/roles whenever possible. In
 cases where this is not possible you can generate an AWS access key for any user
-within your AWS account. AWS provides a [detailed guide][url.aws_access_keys] on
+within your AWS account. AWS provides a [detailed guide][urls.aws_access_keys] on
 how to do this.
 <%- end -%>
 <%- if component.sink? && component.buffer? && component.batching? -%>
@@ -23,9 +23,9 @@ how to do this.
 ### Buffers & Batches
 
 <%- if component.partition_options.any? -%> 
-![][images.sink-flow-partitioned]
+![][assets.sink-flow-partitioned]
 <%- else -%>
-![][images.sink-flow-serial]
+![][assets.sink-flow-serial]
 <%- end -%>
 
 The `<%= component.name %>` <%= component.type %> buffers & batches data as
@@ -89,11 +89,11 @@ options.
 
 <% case component.delivery_guarantee -%>
 <% when "at_least_once" -%>
-This component offers an [**at least once** delivery guarantee][docs.at_least_once_delivery]
-if your [pipeline is configured to achieve this][docs.at_least_once_delivery].
+This component offers an [**at least once** delivery guarantee][docs.guarantees#at-least-once-delivery]
+if your [pipeline is configured to achieve this][docs.guarantees#at-least-once-delivery].
 <% when "best_effort" -%>
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 <% end -%>
 <% end -%>
 <% if component.options.encoding -%>
@@ -119,7 +119,7 @@ structuring), Vector will use `json` to encode the structured data. If the event
 was not explicitly structured, the `text` encoding will be used.
 
 To further explain why Vector adopts this default, take the simple example of
-accepting data over the [`tcp` source][docs.tcp_source] and then connecting
+accepting data over the [`tcp` source][docs.sources.tcp] and then connecting
 it directly to the `<%= component.name %>` <%= component.type %>. It is less
 surprising that the outgoing data reflects the incoming data exactly since it
 was not explicitly structured.
@@ -132,7 +132,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 <%- if component.sink? && component.exposing? -%>
 
@@ -189,7 +189,7 @@ more than the specified number of requests are in-flight at any given time.
 
 Please note, Vector's defaults are carefully chosen and it should be rare that
 you need to adjust these. If you found a good reason to do so please share it
-with the Vector team by [opening an issie][url.new_<%= component.id %>_issue].
+with the Vector team by [opening an issie][urls.new_<%= component.id %>_issue].
 <%- end -%>
 <%- if component.options.retry_attempts -%>
 
@@ -211,9 +211,9 @@ event-by-event basis. It does not batch data.
 ### Template Syntax
 
 The <%= option_names(component.templateable_options).to_sentence %> options
-support [Vector's template syntax][docs.configuration.template-syntax],
+support [Vector's template syntax][docs.configuration#template-syntax],
 enabling dynamic values derived from the event's data. This syntax accepts
-[strftime specifiers][url.strftime_specifiers] as well as the
+[strftime specifiers][urls.strftime_specifiers] as well as the
 `{{ field_name }}` syntax for accessing event fields. For example:
 
 {% code-tabs %}
@@ -231,7 +231,7 @@ enabling dynamic values derived from the event's data. This syntax accepts
 {% endcode-tabs %}
 
 You can read more about the complete syntax in the
-[template syntax section][docs.configuration.template-syntax].
+[template syntax section][docs.configuration#template-syntax].
 <%- end -%>
 <%- if component.options.request_timeout_secs -%>
 
@@ -276,5 +276,5 @@ The available types are:
 | `float`     | Coerce to 64 bit floats.                                                                                            |
 | `int`       | Coerce to a 64 bit integer.                                                                                         |
 | `string`    | Coerces to a string. Generally not necessary since values are extracted as strings.                                 |
-| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][url.strftime_specifiers] must be used to parse the string. |
+| `timestamp` | Coerces to a Vector timestamp. [`strftime` specificiers][urls.strftime_specifiers] must be used to parse the string. |
 <% end -%>

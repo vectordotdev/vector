@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     event::Event,
+    region::RegionOrEndpoint,
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
@@ -10,12 +11,18 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use futures::{stream::iter_ok, Future, Sink};
-use http::{Method, Uri};
+use http::{uri::InvalidUri, Method, Uri};
+use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
 use hyper_tls::HttpsConnector;
+use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
+use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
+use rusoto_credential::{AwsCredentials, CredentialsError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -29,6 +36,8 @@ pub struct ElasticSearchConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub provider: Option<Provider>,
+    pub region: Option<RegionOrEndpoint>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -51,11 +60,19 @@ pub struct ElasticSearchBasicAuthConfig {
     pub user: String,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Provider {
+    Default,
+    Aws,
+}
+
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
-        let sink = es(self, acker);
-        let healthcheck = healthcheck(&self.host);
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+        let common = ElasticSearchCommon::parse_config(&self)?;
+        let healthcheck = healthcheck(&common);
+        let sink = es(self, common, acker);
 
         Ok((sink, healthcheck))
     }
@@ -65,9 +82,84 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
+struct ElasticSearchCommon {
+    host: String,
+    authorization: Option<String>,
+    region: Option<Region>,
+    credentials: Option<AwsCredentials>,
+}
+
+#[derive(Debug, Snafu)]
+enum ParseError {
+    #[snafu(display("Invalid host {:?}: {:?}", host, source))]
+    InvalidHost { host: String, source: InvalidUri },
+    #[snafu(display("AWS provider requires a configured region"))]
+    AWSRequiresRegion,
+    #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
+    AWSCredentialsProviderFailed { source: CredentialsError },
+    #[snafu(display("Could not generate AWS credentials: {:?}", source))]
+    AWSCredentialsGenerateFailed { source: CredentialsError },
+}
+
+impl ElasticSearchCommon {
+    fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
+        // Test the configured host, but ignore the result
+        let uri = format!("{}/_test", config.host);
+        uri.parse::<Uri>().with_context(|| InvalidHost {
+            host: config.host.clone(),
+        })?;
+
+        let authorization = config.basic_auth.as_ref().map(|auth| {
+            let token = format!("{}:{}", auth.user, auth.password);
+            format!("Basic {}", base64::encode(token.as_bytes()))
+        });
+
+        let region: Option<Region> = match config.region {
+            Some(ref region) => Some(region.try_into()?),
+            None => None,
+        };
+
+        let credentials = match config.provider.as_ref().unwrap_or(&Provider::Default) {
+            Provider::Default => None,
+            Provider::Aws => {
+                if region.is_none() {
+                    return Err(ParseError::AWSRequiresRegion.into());
+                }
+                Some(
+                    DefaultCredentialsProvider::new()
+                        .context(AWSCredentialsProviderFailed)?
+                        .credentials()
+                        .wait()
+                        .context(AWSCredentialsGenerateFailed)?,
+                )
+            }
+        };
+
+        Ok(Self {
+            host: config.host.clone(),
+            authorization,
+            region,
+            credentials,
+        })
+    }
+
+    fn builder(&self, method: Method, path: &str) -> (Uri, http::request::Builder) {
+        let uri = format!("{}{}", self.host, path);
+        let uri = uri.parse::<Uri>().unwrap(); // Already tested that this parses above.
+        let mut builder = Request::builder();
+        builder.method(method);
+        builder.uri(&uri);
+        (uri, builder)
+    }
+}
+
+fn es(
+    config: &ElasticSearchConfig,
+    common: ElasticSearchCommon,
+    acker: Acker,
+) -> super::RouterSink {
     let id_key = config.id_key.clone();
-    let gzip = match config.compression.unwrap_or(Compression::Gzip) {
+    let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
         Compression::Gzip => true,
     };
@@ -95,10 +187,6 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
         HttpRetryLogic,
     );
 
-    let authorization = config.basic_auth.clone().map(|auth| {
-        let token = format!("{}:{}", auth.user, auth.password);
-        format!("Basic {}", base64::encode(token.as_bytes()))
-    });
     let headers = config
         .headers
         .as_ref()
@@ -111,27 +199,56 @@ fn es(config: &ElasticSearchConfig, acker: Acker) -> super::RouterSink {
             path_query.append_pair(&p[..], &v[..]);
         }
     }
-    let uri = format!("{}{}", config.host, path_query.finish());
-    let uri = uri.parse::<Uri>().expect("Invalid elasticsearch host");
+    let path_query = path_query.finish();
+
+    if common.credentials.is_some() {
+        gzip = false;
+    }
 
     let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(&uri);
+        let (uri, mut builder) = common.builder(Method::POST, &path_query);
 
-        builder.header("Content-Type", "application/x-ndjson");
-        if let Some(ref auth) = authorization {
-            builder.header("Authorization", &auth[..]);
-        }
-        for (header, value) in &headers {
-            builder.header(&header[..], &value[..]);
-        }
+        match common.credentials {
+            None => {
+                builder.header("Content-Type", "application/x-ndjson");
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                for (header, value) in &headers {
+                    builder.header(&header[..], &value[..]);
+                }
 
-        builder.body(body).unwrap()
+                if let Some(ref auth) = common.authorization {
+                    builder.header("Authorization", &auth[..]);
+                }
+
+                builder.body(body).unwrap()
+            }
+            Some(ref credentials) => {
+                let mut request =
+                    SignedRequest::new("POST", "es", common.region.as_ref().unwrap(), uri.path());
+                request.set_hostname(uri.host().map(|s| s.into()));
+
+                request.add_header("Content-Type", "application/x-ndjson");
+
+                for (header, value) in &headers {
+                    request.add_header(header, value);
+                }
+
+                request.set_payload(Some(body));
+
+                finish_signer(&mut request, &credentials, &mut builder);
+
+                // The SignedRequest ends up owning the body, so we have
+                // to play games here
+                let body = request.payload.take().unwrap();
+                match body {
+                    SignedRequestPayload::Buffer(body) => builder.body(body).unwrap(),
+                    _ => unreachable!(),
+                }
+            }
+        }
     });
 
     let service = ServiceBuilder::new()
@@ -188,24 +305,53 @@ fn encode_event(
     Some(body)
 }
 
-fn healthcheck(host: &str) -> super::Healthcheck {
-    let uri = format!("{}/_cluster/health", host);
-    let request = Request::get(uri).body(Body::empty()).unwrap();
+fn healthcheck(common: &ElasticSearchCommon) -> super::Healthcheck {
+    let (uri, mut builder) = common.builder(Method::GET, "/_cluster/health");
+    match &common.credentials {
+        None => {
+            if let Some(authorization) = &common.authorization {
+                builder.header("Authorization", authorization.clone());
+            }
+        }
+        Some(credentials) => {
+            let mut signer =
+                SignedRequest::new("GET", "es", common.region.as_ref().unwrap(), uri.path());
+            signer.set_hostname(uri.host().map(|s| s.into()));
+            finish_signer(&mut signer, &credentials, &mut builder);
+        }
+    }
+    let request = builder.body(Body::empty()).unwrap();
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);
-    let healthcheck = client
-        .request(request)
-        .map_err(|err| err.to_string())
-        .and_then(|response| {
-            if response.status() == hyper::StatusCode::OK {
-                Ok(())
-            } else {
-                Err(format!("Unexpected status: {}", response.status()))
-            }
-        });
+    Box::new(
+        client
+            .request(request)
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+            }),
+    )
+}
 
-    Box::new(healthcheck)
+fn finish_signer(
+    signer: &mut SignedRequest,
+    credentials: &AwsCredentials,
+    builder: &mut http::request::Builder,
+) {
+    signer.sign_with_plus(&credentials, true);
+
+    for (name, values) in signer.headers() {
+        let header_name = name
+            .parse::<HeaderName>()
+            .expect("Could not parse header name.");
+        for value in values {
+            let header_value =
+                HeaderValue::from_bytes(value).expect("Could not parse header value.");
+            builder.header(&header_name, header_value);
+        }
+    }
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
@@ -311,7 +457,7 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(config.host)).unwrap();
+        block_on(flush(&config.host)).unwrap();
 
         let client = SyncClientBuilder::new().build().unwrap();
 
@@ -340,15 +486,30 @@ mod integration_tests {
 
     #[test]
     fn insert_events() {
-        let index = gen_index();
-        let config = ElasticSearchConfig {
-            host: "http://localhost:9200/".into(),
-            index: Some(index.clone()),
+        run_insert_tests(ElasticSearchConfig {
+            host: "http://localhost:9200".into(),
             doc_type: Some("log_lines".into()),
             compression: Some(Compression::None),
             batch_size: Some(1),
             ..Default::default()
-        };
+        });
+    }
+
+    #[test]
+    fn insert_events_on_aws() {
+        let url = "http://localhost:4571";
+        run_insert_tests(ElasticSearchConfig {
+            host: url.into(),
+            batch_size: Some(1),
+            provider: Some(Provider::Aws),
+            region: Some(RegionOrEndpoint::with_endpoint(url.into())),
+            ..Default::default()
+        });
+    }
+
+    fn run_insert_tests(mut config: ElasticSearchConfig) {
+        let index = gen_index();
+        config.index = Some(index.clone());
 
         let (sink, _hc) = config.build(Acker::Null).unwrap();
 
@@ -358,9 +519,12 @@ mod integration_tests {
         block_on(pump).unwrap();
 
         // make sure writes all all visible
-        block_on(flush(config.host)).unwrap();
+        block_on(flush(&config.host)).unwrap();
 
-        let client = SyncClientBuilder::new().build().unwrap();
+        let client = SyncClientBuilder::new()
+            .static_node(config.host)
+            .build()
+            .unwrap();
 
         let response = client
             .search::<Value>()
@@ -386,7 +550,7 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(host: String) -> impl Future<Item = (), Error = String> {
+    fn flush(host: &str) -> impl Future<Item = (), Error = crate::Error> {
         let uri = format!("{}/_flush", host);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
@@ -394,14 +558,10 @@ mod integration_tests {
         let client = Client::builder().build(https);
         client
             .request(request)
-            .map_err(|err| err.to_string())
-            .and_then(|response| {
-                if response.status() == hyper::StatusCode::OK {
-                    Ok(())
-                } else {
-                    Err(format!("Unexpected status: {}", response.status()))
-                }
+            .map_err(|source| source.into())
+            .and_then(|response| match response.status() {
+                hyper::StatusCode::OK => Ok(()),
+                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
             })
     }
-
 }

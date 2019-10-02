@@ -5,6 +5,7 @@ use futures::{
     Future, Stream,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::sync::{Arc, Mutex};
 use vector::buffers::Acker;
 use vector::event::{Event, Metric, ValueKind, MESSAGE};
@@ -58,7 +59,7 @@ impl SourceConfig for MockSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: Sender<Event>,
-    ) -> Result<Source, String> {
+    ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let source = future::lazy(move || {
             wrapped
@@ -143,7 +144,7 @@ impl MockTransformConfig {
 
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self) -> Result<Box<dyn Transform>, String> {
+    fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -176,9 +177,15 @@ impl MockSinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("unhealthy"))]
+    Unhealthy,
+}
+
 #[typetag::serde(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), String> {
+    fn build(&self, acker: Acker) -> Result<(RouterSink, Healthcheck), vector::Error> {
         let sink = self
             .sender
             .clone()
@@ -187,7 +194,7 @@ impl SinkConfig for MockSinkConfig {
             .sink_map_err(|e| error!("Error sending in sink {}", e));
         let healthcheck = match self.healthy {
             true => future::ok(()),
-            false => future::err("unhealthy".to_owned()),
+            false => future::err(HealthcheckError::Unhealthy.into()),
         };
         Ok((Box::new(sink), Box::new(healthcheck)))
     }

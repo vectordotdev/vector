@@ -1,0 +1,62 @@
+[transforms.log_to_metric]
+allow_you_to_description = "convert logs into one or more metrics"
+function_categories = ["convert_types"]
+guides = []
+input_types = ["log"]
+output_types = ["metric"]
+resources = []
+
+[transforms.log_to_metric.options.metrics]
+type = "[table]"
+null = false
+description = """\
+A table of key/value pairs representing the keys to be added to the \
+event.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.type]
+type = "string"
+enum = ["counter", "gauge", "histogram", "set"]
+null = false
+description = "The metric type."
+
+[transforms.log_to_metric.options.metrics.options.field]
+type = "string"
+examples = ["duration"]
+null = false
+description = "The log field to use as the metric."
+
+[transforms.log_to_metric.options.metrics.options.increment_by_value]
+type = "bool"
+default = false
+null = false
+relevant_when = {type = "counter"}
+description = """\
+If `true` the metric will be incremented by the `field` value. If `false` \
+the metric will be incremented by 1 regardless of the `field` value.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.name]
+type = "string"
+examples = ["duration_total"]
+null = false
+description = """\
+The name of the metric. Defaults to `<field>_total` for `counter` and \
+`<field>` for `gauge`.\
+"""
+
+[transforms.log_to_metric.options.metrics.options.tags]
+type = "table"
+display = "inline"
+null = true
+description = "Key/value pairs representing metric tags."
+
+[transforms.log_to_metric.options.metrics.options.tags.options."*"]
+type = "string"
+examples = [
+  {name = "host", value = "${HOSTNAME}"},
+  {name = "region", value = "us-east-1"},
+  {name = "status", value = "{{status}}"},
+]
+null = false
+description = "Key/value pairs representing the metric tags."

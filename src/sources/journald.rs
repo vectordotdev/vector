@@ -8,9 +8,10 @@ use futures::{future, sync::mpsc, Future, Sink};
 use journald::{Journal, Record};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::{Error, Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::sync::mpsc::RecvTimeoutError;
@@ -23,6 +24,12 @@ lazy_static! {
     static ref MESSAGE: Atom = Atom::from("MESSAGE");
     static ref TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
+}
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("journald error: {}", source))]
+    JournaldError { source: ::journald::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -41,11 +48,11 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> crate::Result<super::Source> {
         let local_only = self.local_only.unwrap_or(true);
         let runtime_only = self.current_runtime_only.unwrap_or(true);
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
-        let journal = Journal::open(local_only, runtime_only).map_err(|err| format!("{}", err))?;
+        let journal = Journal::open(local_only, runtime_only).context(JournaldError)?;
 
         // Map the given unit names into valid systemd units by
         // appending ".service" if no extension is present.
@@ -79,7 +86,7 @@ fn journald_source<J>(
     units: HashSet<String>,
 ) -> super::Source
 where
-    J: Iterator<Item = Result<Record, Error>> + JournalCursor + Send + 'static,
+    J: Iterator<Item = Result<Record, io::Error>> + JournalCursor + Send + 'static,
 {
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
@@ -138,15 +145,15 @@ fn create_event(record: Record) -> Event {
 }
 
 trait JournalCursor {
-    fn cursor(&self) -> Result<String, Error>;
-    fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error>;
+    fn cursor(&self) -> Result<String, io::Error>;
+    fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error>;
 }
 
 impl JournalCursor for Journal {
-    fn cursor(&self) -> Result<String, Error> {
+    fn cursor(&self) -> Result<String, io::Error> {
         Journal::cursor(self)
     }
-    fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error> {
+    fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error> {
         Journal::seek_cursor(self, cursor)
     }
 }
@@ -161,7 +168,7 @@ struct JournaldServer<J, T> {
 
 impl<J, T> JournaldServer<J, T>
 where
-    J: Iterator<Item = Result<Record, Error>> + JournalCursor,
+    J: Iterator<Item = Result<Record, io::Error>> + JournalCursor,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
@@ -245,7 +252,7 @@ struct Checkpointer {
 }
 
 impl Checkpointer {
-    fn new(mut filename: PathBuf) -> Result<Self, Error> {
+    fn new(mut filename: PathBuf) -> Result<Self, io::Error> {
         filename.push(CHECKPOINT_FILENAME);
         let file = OpenOptions::new()
             .read(true)
@@ -255,13 +262,13 @@ impl Checkpointer {
         Ok(Checkpointer { file })
     }
 
-    fn set(&mut self, token: &str) -> Result<(), Error> {
+    fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0))?;
         self.file.write(format!("{}\n", token).as_bytes())?;
         Ok(())
     }
 
-    fn get(&mut self) -> Result<Option<String>, Error> {
+    fn get(&mut self) -> Result<Option<String>, io::Error> {
         let mut buf = Vec::<u8>::new();
         self.file.seek(SeekFrom::Start(0))?;
         self.file.read_to_end(&mut buf)?;
@@ -326,7 +333,7 @@ mod tests {
     use super::*;
     use crate::test_util::{block_on, runtime, shutdown_on_idle};
     use futures::stream::Stream;
-    use std::io::Error;
+    use std::io;
     use std::iter::FromIterator;
     use std::time::{Duration, SystemTime};
     use stream_cancel::Tripwire;
@@ -356,7 +363,7 @@ mod tests {
     }
 
     impl Iterator for FakeJournal {
-        type Item = Result<Record, Error>;
+        type Item = Result<Record, io::Error>;
         fn next(&mut self) -> Option<Self::Item> {
             self.cursor += 1;
             self.records.pop().map(|item| Ok(item))
@@ -365,10 +372,10 @@ mod tests {
 
     impl JournalCursor for FakeJournal {
         // The fake journal cursor is just a line number
-        fn cursor(&self) -> Result<String, Error> {
+        fn cursor(&self) -> Result<String, io::Error> {
             Ok(format!("{}", self.cursor))
         }
-        fn seek_cursor(&mut self, cursor: &str) -> Result<(), Error> {
+        fn seek_cursor(&mut self, cursor: &str) -> Result<(), io::Error> {
             let cursor = cursor.parse::<usize>().expect("Invalid cursor");
             for _ in 0..cursor {
                 self.records.pop();

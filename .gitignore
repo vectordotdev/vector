@@ -8,3 +8,4 @@ miniodat
 .idea/
 checkpoints/*
 *.iml
+*.tmp

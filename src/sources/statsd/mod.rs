@@ -10,7 +10,7 @@ use tokio::{
 };
 use tracing::field;
 
-mod parser;
+pub mod parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 struct StatsdConfig {
@@ -24,7 +24,7 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         _name: &str,
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> Result<super::Source, String> {
+    ) -> crate::Result<super::Source> {
         Ok(statsd(self.address, out))
     }
 

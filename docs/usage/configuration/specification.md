@@ -36,30 +36,28 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # possible values.
 #
 # More info on Vector's configuration can be found at:
-# https://docs.vector.dev/usage/configuration
+# /usage/configuration
 
 # ------------------------------------------------------------------------------
 # Global
 # ------------------------------------------------------------------------------
 # Global options are relevant to Vector as a whole and apply to global behavior.
-#
-# Documentation: https://docs.vector.dev/usage/configuration
+
 # The directory used for persisting Vector state, such as on-disk buffers, file
-  # checkpoints, and more. Please make sure the Vector project has write
-  # permissions to this dir.
-  # 
-  # * optional
-  # * no default
-  data_dir = "/var/lib/vector"
+# checkpoints, and more. Please make sure the Vector project has write
+# permissions to this dir.
+# 
+# * optional
+# * no default
+data_dir = "/var/lib/vector"
 
 # ------------------------------------------------------------------------------
 # Sources
 # ------------------------------------------------------------------------------
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
-#
-# Documentation: https://docs.vector.dev/usage/configuration/sources
 
+# Ingests data through one or more local files and outputs `log` events.
 [sources.file]
   #
   # General
@@ -71,13 +69,6 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   # * must be: "file"
   type = "file"
-
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
-  # over the `include` option.*
-  # 
-  # * required
-  # * no default
-  exclude = ["/var/log/nginx/access.log"]
 
   # Array of file patterns to include. Globbing is supported.
   # 
@@ -92,6 +83,13 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * optional
   # * no default
   data_dir = "/var/lib/vector"
+
+  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
+  # over the `include` option.*
+  # 
+  # * optional
+  # * no default
+  exclude = ["/var/log/nginx/access.log"]
 
   # Delay between file discovery calls. This controls the interval at which
   # Vector searches for files.
@@ -204,6 +202,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     # * unit: bytes
     ignored_header_bytes = 0
 
+# Ingests data through log records from journald and outputs `log` events.
 [sources.journald]
   # The component type
   # 
@@ -240,6 +239,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   units = ["ntpd", "sysinit.target"]
 
+# Ingests data through Kafka 0.9 or later and outputs `log` events.
 [sources.kafka]
   # The component type
   # 
@@ -298,6 +298,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   session_timeout_ms = 5000
   session_timeout_ms = 10000
 
+# Ingests data through the StatsD UDP protocol and outputs `metric` events.
 [sources.statsd]
   # The component type
   # 
@@ -312,6 +313,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   address = "127.0.0.1:8126"
 
+# Ingests data through standard input (STDIN) and outputs `log` events.
 [sources.stdin]
   #
   # General
@@ -341,6 +343,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+# Ingests data through the Syslog 5424 protocol and outputs `log` events.
 [sources.syslog]
   #
   # General
@@ -391,6 +394,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+# Ingests data through the TCP protocol and outputs `log` events.
 [sources.tcp]
   #
   # General
@@ -433,6 +437,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+# Ingests data through the UDP protocol and outputs `log` events.
 [sources.udp]
   #
   # General
@@ -468,6 +473,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "host"
   host_key = "host"
 
+# Ingests data through another upstream Vector instance and outputs `log` and `metric` events.
 [sources.vector]
   # The component type
   # 
@@ -494,9 +500,8 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
 # Transforms
 # ------------------------------------------------------------------------------
 # Transforms parse, structure, and enrich events.
-#
-# Documentation: https://docs.vector.dev/usage/configuration/transforms
 
+# Accepts `log` events and allows you to add one or more log fields.
 [transforms.add_fields]
   #
   # General
@@ -531,10 +536,11 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     my_int_field = 1
     my_float_field = 1.2
     my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00.999998-07:00
+    my_timestamp_field = 1979-05-27T00:32:00Z
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
 
+# Accepts `metric` events and allows you to add one or more metric tags.
 [transforms.add_tags]
   #
   # General
@@ -566,6 +572,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
 
+# Accepts `log` events and allows you to coerce log fields into fixed types.
 [transforms.coercer]
   #
   # General
@@ -605,6 +612,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts `log` and `metric` events and allows you to filter events by a log field's value.
 [transforms.field_filter]
   # The component type
   # 
@@ -633,6 +641,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * no default
   value = "/var/log/nginx.log"
 
+# Accepts `log` events and allows you to parse a log field value with Grok.
 [transforms.grok_parser]
   #
   # General
@@ -690,6 +699,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts `log` events and allows you to parse a log field value as JSON.
 [transforms.json_parser]
   # The component type
   # 
@@ -718,6 +728,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
   # * default: "message"
   field = "message"
 
+# Accepts `log` events and allows you to convert logs into one or more metrics.
 [transforms.log_to_metric]
   #
   # General
@@ -781,6 +792,7 @@ Vector package installs, generally located at `/etc/vector/vector.spec.yml`:
       region = "us-east-1"
       status = "{{status}}"
 
+# Accepts `log` events and allows you to transform events with a full embedded Lua engine.
 [transforms.lua]
   # The component type
   # 
@@ -812,7 +824,6 @@ if event["host"] == nil then
 end
 """
 
-
   # A list of directories search when loading a Lua file via the `require`
   # function.
   # 
@@ -820,6 +831,7 @@ end
   # * no default
   search_dirs = ["/etc/vector/lua"]
 
+# Accepts `log` events and allows you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
   # General
@@ -877,6 +889,7 @@ end
     timestamp = "timestamp|%F"
     timestamp = "timestamp|%a %b %e %T %Y"
 
+# Accepts `log` events and allows you to remove one or more log fields.
 [transforms.remove_fields]
   # The component type
   # 
@@ -898,6 +911,7 @@ end
   # * no default
   fields = ["field1", "field2"]
 
+# Accepts `metric` events and allows you to remove one or more metric tags.
 [transforms.remove_tags]
   # The component type
   # 
@@ -919,6 +933,7 @@ end
   # * no default
   tags = ["tag1", "tag2"]
 
+# Accepts `log` events and allows you to sample events with a configurable rate.
 [transforms.sampler]
   # The component type
   # 
@@ -950,6 +965,71 @@ end
   # * no default
   pass_list = ["[error]", "field2"]
 
+# Accepts `log` events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
+[transforms.split]
+  #
+  # General
+  #
+
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "split"
+  type = "split"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # The field names assigned to the resulting tokens, in order.
+  # 
+  # * required
+  # * no default
+  field_names = ["timestamp", "level", "message"]
+
+  # If `true` the `field` will be dropped after parsing.
+  # 
+  # * optional
+  # * default: true
+  drop_field = true
+
+  # The field to apply the split on.
+  # 
+  # * optional
+  # * default: "message"
+  field = "message"
+
+  # The separator to split the field on. If no separator is given, it will split
+  # on whitespace.
+  # 
+  # * optional
+  # * no default
+  separator = ","
+
+  #
+  # Types
+  #
+
+  [transforms.split.types]
+    # A definition of mapped field types. They key is the field name and the value
+    # is the type. `strftime` specifiers are supported for the `timestamp` type.
+    # 
+    # * required
+    # * no default
+    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
+    status = "int"
+    duration = "float"
+    success = "bool"
+    timestamp = "timestamp|%s"
+    timestamp = "timestamp|%+"
+    timestamp = "timestamp|%F"
+    timestamp = "timestamp|%a %b %e %T %Y"
+
+# Accepts `log` events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 [transforms.tokenizer]
   #
   # General
@@ -1012,9 +1092,8 @@ end
 # Sinks
 # ------------------------------------------------------------------------------
 # Sinks batch or stream data out of Vector.
-#
-# Documentation: https://docs.vector.dev/usage/configuration/sinks
 
+# Batches `log` events to AWS CloudWatch Logs via the `PutLogEvents` API endpoint.
 [sinks.aws_cloudwatch_logs]
   #
   # General
@@ -1070,44 +1149,25 @@ end
   # * default: true
   create_missing_stream = true
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
 
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
   #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events as before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -1152,6 +1212,24 @@ end
   # * default: 5
   # * unit: seconds
   retry_backoff_secs = 5
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
 
   #
   # Buffer
@@ -1189,6 +1267,35 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
+[sinks.aws_cloudwatch_metrics]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "aws_cloudwatch_metrics"
+  type = "aws_cloudwatch_metrics"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+# Batches `log` events to AWS Kinesis Data Stream via the `PutRecords` API endpoint.
 [sinks.aws_kinesis_streams]
   #
   # General
@@ -1220,17 +1327,17 @@ end
   # * no default
   stream_name = "my-stream"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
-
-  # Custom hostname to send requests to. Useful for testing.
-  # 
-  # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
 
   # The log field used as the Kinesis record's partition key value.
   # 
@@ -1239,31 +1346,12 @@ end
   partition_key_field = "user_id"
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -1310,6 +1398,24 @@ end
   retry_backoff_secs = 5
 
   #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
   # Buffer
   #
 
@@ -1345,6 +1451,7 @@ end
     # * unit: events
     num_items = 500
 
+# Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 [sinks.aws_s3]
   #
   # General
@@ -1376,17 +1483,77 @@ end
   # * no default
   region = "us-east-1"
 
+  # Custom endpoint for use with AWS-compatible services.
+  # 
+  # * optional
+  # * no default
+  endpoint = "127.0.0.0:5000"
+
   # Enables/disables the sink healthcheck upon start.
   # 
   # * optional
   # * default: true
   healthcheck = true
 
-  # Custom hostname to send requests to. Useful for testing.
+  #
+  # Requests
+  #
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "ndjson" or "text"
+  encoding = "ndjson"
+  encoding = "text"
+
+  # The compression type to use before writing data.
   # 
   # * optional
-  # * no default
-  hostname = "127.0.0.0:5000"
+  # * default: "gzip"
+  # * enum: "gzip" or "none"
+  compression = "gzip"
+  compression = "none"
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 30
+  # * unit: seconds
+  request_timeout_secs = 30
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
 
   #
   # Batching
@@ -1442,73 +1609,6 @@ end
   key_prefix = "application_id={{ application_id }}/date=%F/"
 
   #
-  # Requests
-  #
-
-  # The compression type to use before writing data.
-  # 
-  # * optional
-  # * no default
-  # * must be: "gzip" (if supplied)
-  compression = "gzip"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # Whether to Gzip the content before writing or not. Please note, enabling this
-  # has a slight performance cost but significantly reduces bandwidth.
-  # 
-  # * optional
-  # * default: false
-  gzip = false
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
   # Buffer
   #
 
@@ -1544,6 +1644,7 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
   # The component type
   # 
@@ -1572,6 +1673,7 @@ end
   # * default: true
   healthcheck = true
 
+# Batches `log` events to Clickhouse via the `HTTP` Interface.
 [sinks.clickhouse]
   #
   # General
@@ -1684,6 +1786,7 @@ end
   # * unit: seconds
   retry_backoff_secs = 9223372036854775807
 
+# Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
 [sinks.console]
   # The component type
   # 
@@ -1722,6 +1825,7 @@ end
   # * default: true
   healthcheck = true
 
+# Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
   #
   # General
@@ -1768,6 +1872,21 @@ end
   # * no default
   index = "vector-%Y-%m-%d"
   index = "application-{{ application_id }}-%Y-%m-%d"
+
+  # The provider of the Elasticsearch service.
+  # 
+  # * optional
+  # * default: "default"
+  # * enum: "default" or "aws"
+  provider = "default"
+  provider = "aws"
+
+  # When using the AWS provider, the AWS region of the target Elasticsearch
+  # instance.
+  # 
+  # * optional
+  # * no default
+  region = "us-east-1"
 
   #
   # Batching
@@ -1906,6 +2025,7 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+# Streams `log` events to a file.
 [sinks.file]
   # The component type
   # 
@@ -1950,6 +2070,7 @@ end
   # * default: "30"
   idle_timeout_secs = "30"
 
+# Batches `log` events to a generic HTTP endpoint.
 [sinks.http]
   #
   # General
@@ -2139,6 +2260,7 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+# Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
   #
   # General
@@ -2158,13 +2280,20 @@ end
   # * no default
   inputs = ["my-source-id"]
 
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself
+  # A list of host and port pairs that the Kafka client should contact to
+  # bootstrap its cluster metadata.
   # 
   # * required
   # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
+
+  # The encoding format used to serialize the events before flushing.
+  # 
+  # * required
+  # * no default
+  # * enum: "json" or "text"
+  encoding = "json"
+  encoding = "text"
 
   # The log field name to use for the topic key. If unspecified, the key will be
   # randomly generated. If the field does not exist on the log, a blank value
@@ -2179,15 +2308,6 @@ end
   # * required
   # * no default
   topic = "topic-1234"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
 
   # Enables/disables the sink healthcheck upon start.
   # 
@@ -2231,6 +2351,45 @@ end
     # * unit: events
     num_items = 500
 
+  #
+  # Tls
+  #
+
+  [sinks.kafka.tls]
+    # Enable TLS during connections to the remote.
+    # 
+    # * optional
+    # * default: false
+    enabled = false
+
+    # Absolute path to additional CA certificate file, in JKS format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to certificate file used to identify this connection, in JKS
+    # format. If this is set, `key_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to key file used to identify this connection, in JKS format. If
+    # this is set, `crt_file` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase to unlock the encrypted key file. This has no effect unless
+    # `key_file` above is set.
+    # 
+    # * optional
+    # * no default
+    key_phrase = "PassWord1"
+
+# Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
   # The component type
   # 
@@ -2272,6 +2431,7 @@ end
   # * default: true
   healthcheck = true
 
+# Batches `log` events to a Splunk HTTP Event Collector.
 [sinks.splunk_hec]
   #
   # General
@@ -2310,31 +2470,12 @@ end
   healthcheck = true
 
   #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "ndjson" or "text"
   encoding = "ndjson"
@@ -2381,6 +2522,24 @@ end
   retry_backoff_secs = 5
 
   #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1049000
+  # * unit: bytes
+  batch_size = 1049000
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
   # Buffer
   #
 
@@ -2416,6 +2575,41 @@ end
     # * unit: events
     num_items = 500
 
+# Streams `metric` events to StatsD metrics service.
+[sinks.statsd]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "statsd"
+  type = "statsd"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # A prefix that will be added to all metric names.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # The UDP socket address to send stats to.
+  # 
+  # * optional
+  # * default: "127.0.0.1:8125"
+  address = "127.0.0.1:8125"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
+# Streams `log` events to a TCP connection.
 [sinks.tcp]
   #
   # General
@@ -2451,10 +2645,9 @@ end
   # Requests
   #
 
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
+  # The encoding format used to serialize the events before flushing.
   # 
-  # * optional
+  # * required
   # * no default
   # * enum: "json" or "text"
   encoding = "json"
@@ -2541,6 +2734,7 @@ end
     # * no default
     key_phrase = "PassWord1"
 
+# Streams `log` events to another downstream Vector instance.
 [sinks.vector]
   #
   # General

@@ -51,7 +51,7 @@ pub struct CloudWatchMetricsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = CloudWatchMetricsSvc::new(self.clone(), acker)?;
         let healthcheck = CloudWatchMetricsSvc::healthcheck(self)?;
         Ok((sink, healthcheck))
@@ -66,7 +66,7 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         acker: Acker,
-    ) -> Result<super::RouterSink, String> {
+    ) -> crate::Result<super::RouterSink> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
         let batch_size = config.batch_size.unwrap_or(20);
@@ -109,7 +109,7 @@ impl CloudWatchMetricsSvc {
         Ok(Box::new(sink))
     }
 
-    fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> Result<super::Healthcheck, String> {
+    fn healthcheck(config: &CloudWatchMetricsSinkConfig) -> crate::Result<super::Healthcheck> {
         let client = Self::create_client(config.region.clone().try_into()?)?;
 
         let datum = MetricDatum {
@@ -123,12 +123,12 @@ impl CloudWatchMetricsSvc {
         };
 
         let response = client.put_metric_data(request);
-        let healthcheck = response.map_err(|err| err.to_string());
+        let healthcheck = response.map_err(|err| err.into());
 
         Ok(Box::new(healthcheck))
     }
 
-    fn create_client(region: Region) -> Result<CloudWatchClient, String> {
+    fn create_client(region: Region) -> crate::Result<CloudWatchClient> {
         #[cfg(test)]
         {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name

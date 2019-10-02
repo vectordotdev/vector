@@ -1,152 +1,216 @@
 # Table of contents
 
 * [What Is Vector?](README.md)
-* [Use Cases](use-cases/README.md)
+* [Use Cases][docs.use-cases.readme]
   * [Reduce Lock-In](use-cases/lock-in.md)
   * [Multi-Cloud](use-cases/multi-cloud.md)
   * [Governance & Control](use-cases/governance.md)
   * [Reduce Cost](use-cases/cost.md)
   * [Security & Compliance](use-cases/security-and-compliance.md)
   * [Backups & Archives](use-cases/backups.md)
-* [Performance](performance.md)
-* [Correctness](correctness.md)
+* [Performance][docs.performance]
+* [Correctness][docs.correctness]
 
 ## About
 
-* [Concepts](about/concepts.md)
-* [Data Model](about/data-model/README.md)
-  * [Log Event](about/data-model/log.md)
-  * [Metric Event](about/data-model/metric.md)
-* [Guarantees](about/guarantees.md)
+* [Concepts][docs.concepts]
+* [Data Model][docs.data-model.readme]
+  * [Log Event][docs.data-model.log]
+  * [Metric Event][docs.data-model.metric]
+* [Guarantees][docs.guarantees]
 
 ## Setup
 
-* [Installation](setup/installation/README.md)
-  * [Platforms](setup/installation/platforms/README.md)
-    * [Docker](setup/installation/platforms/docker.md)
-  * [Package Managers](setup/installation/package-managers/README.md)
-    * [APT](setup/installation/package-managers/apt.md)
-    * [Homebrew](setup/installation/package-managers/homebrew.md)
-    * [YUM](setup/installation/package-managers/yum.md)
-  * [Operating Systems](setup/installation/operating-systems/README.md)
-    * [Amazon Linux](setup/installation/operating-systems/amazon-linux.md)
-    * [CentOS](setup/installation/operating-systems/centos.md)
-    * [Debian](setup/installation/operating-systems/debian.md)
-    * [MacOS](setup/installation/operating-systems/macos.md)
-    * [RHEL](setup/installation/operating-systems/rhel.md)
-    * [Ubuntu](setup/installation/operating-systems/ubuntu.md)
-  * [Manual](setup/installation/manual/README.md)
-    * [From Archives](setup/installation/manual/from-archives.md)
-    * [From Source](setup/installation/manual/from-source.md)
-* [Getting Started](setup/getting-started/README.md)
-  * [Sending Your First Event](setup/getting-started/sending-your-first-event.md)
-* [Deployment](setup/deployment/README.md)
-  * [Topologies](setup/deployment/topologies.md)
-  * [Roles](setup/deployment/roles/README.md)
-    * [Agent Role](setup/deployment/roles/agent.md)
-    * [Service Role](setup/deployment/roles/service.md)
+* [Installation][docs.installation.readme]
+  * [Platforms][docs.installation.platforms.readme]
+    * [Docker][docs.platforms.docker]
+  * [Package Managers][docs.installation.package-managers.readme]
+    * [APT][docs.package-managers.apt]
+    * [Homebrew][docs.package-managers.homebrew]
+    * [YUM][docs.package-managers.yum]
+  * [Operating Systems][docs.installation.operating-systems.readme]
+    * [Amazon Linux][docs.operating-systems.amazon-linux]
+    * [CentOS][docs.operating-systems.centos]
+    * [Debian][docs.operating-systems.debian]
+    * [MacOS][docs.operating-systems.macos]
+    * [RHEL][docs.operating-systems.rhel]
+    * [Ubuntu][docs.operating-systems.ubuntu]
+  * [Manual][docs.installation.manual]
+    * [From Archives][docs.from-archives]
+    * [From Source][docs.from-source]
+* [Getting Started][docs.getting-started.readme]
+  * [Sending Your First Event][docs.sending-your-first-event]
+* [Deployment][docs.deployment.readme]
+  * [Topologies][docs.deployment.topologies]
+  * [Roles][docs.roles.readme]
+    * [Agent Role][docs.roles.agent]
+    * [Service Role][docs.roles.service]
 
 ## Usage
 
-* [Configuration](usage/configuration/README.md)
-  * [Sources](usage/configuration/sources/README.md)
-    * [file source][docs.file_source]
-    * [journald source][docs.journald_source]
-    * [kafka source][docs.kafka_source]
-    * [statsd source][docs.statsd_source]
-    * [stdin source][docs.stdin_source]
-    * [syslog source][docs.syslog_source]
-    * [tcp source][docs.tcp_source]
-    * [udp source][docs.udp_source]
-    * [vector source][docs.vector_source]
-  * [Transforms](usage/configuration/transforms/README.md)
-    * [add_fields transform][docs.add_fields_transform]
-    * [add_tags transform][docs.add_tags_transform]
-    * [coercer transform][docs.coercer_transform]
-    * [field_filter transform][docs.field_filter_transform]
-    * [grok_parser transform][docs.grok_parser_transform]
-    * [json_parser transform][docs.json_parser_transform]
-    * [log_to_metric transform][docs.log_to_metric_transform]
-    * [lua transform][docs.lua_transform]
-    * [regex_parser transform][docs.regex_parser_transform]
-    * [remove_fields transform][docs.remove_fields_transform]
-    * [remove_tags transform][docs.remove_tags_transform]
-    * [sampler transform][docs.sampler_transform]
-    * [tokenizer transform][docs.tokenizer_transform]
-  * [Sinks](usage/configuration/sinks/README.md)
-    * [aws_cloudwatch_logs sink][docs.aws_cloudwatch_logs_sink]
-    * [aws_kinesis_streams sink][docs.aws_kinesis_streams_sink]
-    * [aws_s3 sink][docs.aws_s3_sink]
-    * [blackhole sink][docs.blackhole_sink]
-    * [clickhouse sink][docs.clickhouse_sink]
-    * [console sink][docs.console_sink]
-    * [elasticsearch sink][docs.elasticsearch_sink]
-    * [file sink][docs.file_sink]
-    * [http sink][docs.http_sink]
-    * [kafka sink][docs.kafka_sink]
-    * [prometheus sink][docs.prometheus_sink]
-    * [splunk_hec sink][docs.splunk_hec_sink]
-    * [tcp sink][docs.tcp_sink]
-    * [vector sink][docs.vector_sink]
-  * [Specification](usage/configuration/specification.md)
-* [Administration](usage/administration/README.md)
-  * [Starting](usage/administration/starting.md)
-  * [Reloading](usage/administration/reloading.md)
-  * [Stopping](usage/administration/stopping.md)
-  * [Monitoring](usage/administration/monitoring.md)
-  * [Tuning](usage/administration/tuning.md)
-  * [Updating](usage/administration/updating.md)
-  * [Validating](usage/administration/validating.md)
-  * [Env Vars](usage/administration/env-vars.md)
-* [Guides](usage/guides/README.md)
-  * [Troubleshooting Guide](usage/guides/troubleshooting.md)
+* [Configuration][docs.configuration.readme]
+  * [Sources][docs.sources.readme]
+    * [file source][docs.sources.file]
+    * [journald source][docs.sources.journald]
+    * [kafka source][docs.sources.kafka]
+    * [statsd source][docs.sources.statsd]
+    * [stdin source][docs.sources.stdin]
+    * [syslog source][docs.sources.syslog]
+    * [tcp source][docs.sources.tcp]
+    * [udp source][docs.sources.udp]
+    * [vector source][docs.sources.vector]
+  * [Transforms][docs.transforms.readme]
+    * [add_fields transform][docs.transforms.add_fields]
+    * [add_tags transform][docs.transforms.add_tags]
+    * [coercer transform][docs.transforms.coercer]
+    * [field_filter transform][docs.transforms.field_filter]
+    * [grok_parser transform][docs.transforms.grok_parser]
+    * [json_parser transform][docs.transforms.json_parser]
+    * [log_to_metric transform][docs.transforms.log_to_metric]
+    * [lua transform][docs.transforms.lua]
+    * [regex_parser transform][docs.transforms.regex_parser]
+    * [remove_fields transform][docs.transforms.remove_fields]
+    * [remove_tags transform][docs.transforms.remove_tags]
+    * [sampler transform][docs.transforms.sampler]
+    * [split transform][docs.transforms.split]
+    * [tokenizer transform][docs.transforms.tokenizer]
+  * [Sinks][docs.sinks.readme]
+    * [aws_cloudwatch_logs sink][docs.sinks.aws_cloudwatch_logs]
+    * [aws_cloudwatch_metrics sink][docs.sinks.aws_cloudwatch_metrics]
+    * [aws_kinesis_streams sink][docs.sinks.aws_kinesis_streams]
+    * [aws_s3 sink][docs.sinks.aws_s3]
+    * [blackhole sink][docs.sinks.blackhole]
+    * [clickhouse sink][docs.sinks.clickhouse]
+    * [console sink][docs.sinks.console]
+    * [elasticsearch sink][docs.sinks.elasticsearch]
+    * [file sink][docs.sinks.file]
+    * [http sink][docs.sinks.http]
+    * [kafka sink][docs.sinks.kafka]
+    * [prometheus sink][docs.sinks.prometheus]
+    * [splunk_hec sink][docs.sinks.splunk_hec]
+    * [statsd sink][docs.sinks.statsd]
+    * [tcp sink][docs.sinks.tcp]
+    * [vector sink][docs.sinks.vector]
+  * [Specification][docs.configuration.specification]
+* [Administration][docs.administration]
+  * [Starting][docs.administration.starting]
+  * [Reloading][docs.administration.reloading]
+  * [Stopping][docs.administration.stopping]
+  * [Monitoring][docs.administration.monitoring]
+  * [Tuning][docs.administration.tuning]
+  * [Updating][docs.administration.updating]
+  * [Validating][docs.administration.validating]
+  * [Env Vars][docs.administration.env-vars]
+* [Guides][docs.guides]
+  * [Troubleshooting Guide][docs.guides.troubleshooting]
 
 ## Resources
 
-* [Community](https://vector.dev/community/)
-* [Download](https://github.com/timberio/vector/releases)
-* [Github Repo](https://github.com/timberio/vector)
-* [Roadmap](https://github.com/timberio/vector/milestones?direction=asc&sort=title&state=open)
+* [Changelog][urls.vector_changelog]
+* [Community][urls.vector_community]
+* [Downloads][urls.vector_downloads]
+* [Github Repo][urls.vector_repo]
+* [Releases][urls.vector_releases]
+* [Roadmap][urls.vector_roadmap]
 
 ## Meta
 
-* [Conventions](meta/conventions.md)
-* [Glossary](meta/glossary.md)
+* [Conventions][docs.conventions]
+* [Glossary][docs.glossary]
 
 
-[docs.add_fields_transform]: ./usage/configuration/transforms/add_fields.md
-[docs.add_tags_transform]: ./usage/configuration/transforms/add_tags.md
-[docs.aws_cloudwatch_logs_sink]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
-[docs.aws_kinesis_streams_sink]: ./usage/configuration/sinks/aws_kinesis_streams.md
-[docs.aws_s3_sink]: ./usage/configuration/sinks/aws_s3.md
-[docs.blackhole_sink]: ./usage/configuration/sinks/blackhole.md
-[docs.clickhouse_sink]: ./usage/configuration/sinks/clickhouse.md
-[docs.coercer_transform]: ./usage/configuration/transforms/coercer.md
-[docs.console_sink]: ./usage/configuration/sinks/console.md
-[docs.elasticsearch_sink]: ./usage/configuration/sinks/elasticsearch.md
-[docs.field_filter_transform]: ./usage/configuration/transforms/field_filter.md
-[docs.file_sink]: ./usage/configuration/sinks/file.md
-[docs.file_source]: ./usage/configuration/sources/file.md
-[docs.grok_parser_transform]: ./usage/configuration/transforms/grok_parser.md
-[docs.http_sink]: ./usage/configuration/sinks/http.md
-[docs.journald_source]: ./usage/configuration/sources/journald.md
-[docs.json_parser_transform]: ./usage/configuration/transforms/json_parser.md
-[docs.kafka_sink]: ./usage/configuration/sinks/kafka.md
-[docs.kafka_source]: ./usage/configuration/sources/kafka.md
-[docs.log_to_metric_transform]: ./usage/configuration/transforms/log_to_metric.md
-[docs.lua_transform]: ./usage/configuration/transforms/lua.md
-[docs.prometheus_sink]: ./usage/configuration/sinks/prometheus.md
-[docs.regex_parser_transform]: ./usage/configuration/transforms/regex_parser.md
-[docs.remove_fields_transform]: ./usage/configuration/transforms/remove_fields.md
-[docs.remove_tags_transform]: ./usage/configuration/transforms/remove_tags.md
-[docs.sampler_transform]: ./usage/configuration/transforms/sampler.md
-[docs.splunk_hec_sink]: ./usage/configuration/sinks/splunk_hec.md
-[docs.statsd_source]: ./usage/configuration/sources/statsd.md
-[docs.stdin_source]: ./usage/configuration/sources/stdin.md
-[docs.syslog_source]: ./usage/configuration/sources/syslog.md
-[docs.tcp_sink]: ./usage/configuration/sinks/tcp.md
-[docs.tcp_source]: ./usage/configuration/sources/tcp.md
-[docs.tokenizer_transform]: ./usage/configuration/transforms/tokenizer.md
-[docs.udp_source]: ./usage/configuration/sources/udp.md
-[docs.vector_sink]: ./usage/configuration/sinks/vector.md
-[docs.vector_source]: ./usage/configuration/sources/vector.md
+[docs.administration.env-vars]: ./usage/administration/env-vars.md
+[docs.administration.monitoring]: ./usage/administration/monitoring.md
+[docs.administration.reloading]: ./usage/administration/reloading.md
+[docs.administration.starting]: ./usage/administration/starting.md
+[docs.administration.stopping]: ./usage/administration/stopping.md
+[docs.administration.tuning]: ./usage/administration/tuning.md
+[docs.administration.updating]: ./usage/administration/updating.md
+[docs.administration.validating]: ./usage/administration/validating.md
+[docs.administration]: ./usage/administration
+[docs.concepts]: ./about/concepts.md
+[docs.configuration.readme]: ./usage/configuration/README.md
+[docs.configuration.specification]: ./usage/configuration/specification.md
+[docs.conventions]: ./meta/conventions.md
+[docs.correctness]: ./correctness.md
+[docs.data-model.log]: ./about/data-model/log.md
+[docs.data-model.metric]: ./about/data-model/metric.md
+[docs.data-model.readme]: ./about/data-model/README.md
+[docs.deployment.readme]: ./setup/deployment/README.md
+[docs.deployment.topologies]: ./setup/deployment/topologies.md
+[docs.from-archives]: ./setup/installation/manual/from-archives.md
+[docs.from-source]: ./setup/installation/manual/from-source.md
+[docs.getting-started.readme]: ./setup/getting-started/README.md
+[docs.glossary]: ./meta/glossary.md
+[docs.guarantees]: ./about/guarantees.md
+[docs.guides.troubleshooting]: ./usage/guides/troubleshooting.md
+[docs.guides]: ./usage/guides
+[docs.installation.manual]: ./setup/installation/manual
+[docs.installation.operating-systems.readme]: ./setup/installation/operating-systems/README.md
+[docs.installation.package-managers.readme]: ./setup/installation/package-managers/README.md
+[docs.installation.platforms.readme]: ./setup/installation/platforms/README.md
+[docs.installation.readme]: ./setup/installation/README.md
+[docs.operating-systems.amazon-linux]: ./setup/installation/operating-systems/amazon-linux.md
+[docs.operating-systems.centos]: ./setup/installation/operating-systems/centos.md
+[docs.operating-systems.debian]: ./setup/installation/operating-systems/debian.md
+[docs.operating-systems.macos]: ./setup/installation/operating-systems/macos.md
+[docs.operating-systems.rhel]: ./setup/installation/operating-systems/rhel.md
+[docs.operating-systems.ubuntu]: ./setup/installation/operating-systems/ubuntu.md
+[docs.package-managers.apt]: ./setup/installation/package-managers/apt.md
+[docs.package-managers.homebrew]: ./setup/installation/package-managers/homebrew.md
+[docs.package-managers.yum]: ./setup/installation/package-managers/yum.md
+[docs.performance]: ./performance.md
+[docs.platforms.docker]: ./setup/installation/platforms/docker.md
+[docs.roles.agent]: ./setup/deployment/roles/agent.md
+[docs.roles.readme]: ./setup/deployment/roles/README.md
+[docs.roles.service]: ./setup/deployment/roles/service.md
+[docs.sending-your-first-event]: ./setup/getting-started/sending-your-first-event.md
+[docs.sinks.aws_cloudwatch_logs]: ./usage/configuration/sinks/aws_cloudwatch_logs.md
+[docs.sinks.aws_cloudwatch_metrics]: ./usage/configuration/sinks/aws_cloudwatch_metrics.md
+[docs.sinks.aws_kinesis_streams]: ./usage/configuration/sinks/aws_kinesis_streams.md
+[docs.sinks.aws_s3]: ./usage/configuration/sinks/aws_s3.md
+[docs.sinks.blackhole]: ./usage/configuration/sinks/blackhole.md
+[docs.sinks.clickhouse]: ./usage/configuration/sinks/clickhouse.md
+[docs.sinks.console]: ./usage/configuration/sinks/console.md
+[docs.sinks.elasticsearch]: ./usage/configuration/sinks/elasticsearch.md
+[docs.sinks.file]: ./usage/configuration/sinks/file.md
+[docs.sinks.http]: ./usage/configuration/sinks/http.md
+[docs.sinks.kafka]: ./usage/configuration/sinks/kafka.md
+[docs.sinks.prometheus]: ./usage/configuration/sinks/prometheus.md
+[docs.sinks.readme]: ./usage/configuration/sinks/README.md
+[docs.sinks.splunk_hec]: ./usage/configuration/sinks/splunk_hec.md
+[docs.sinks.statsd]: ./usage/configuration/sinks/statsd.md
+[docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
+[docs.sinks.vector]: ./usage/configuration/sinks/vector.md
+[docs.sources.file]: ./usage/configuration/sources/file.md
+[docs.sources.journald]: ./usage/configuration/sources/journald.md
+[docs.sources.kafka]: ./usage/configuration/sources/kafka.md
+[docs.sources.readme]: ./usage/configuration/sources/README.md
+[docs.sources.statsd]: ./usage/configuration/sources/statsd.md
+[docs.sources.stdin]: ./usage/configuration/sources/stdin.md
+[docs.sources.syslog]: ./usage/configuration/sources/syslog.md
+[docs.sources.tcp]: ./usage/configuration/sources/tcp.md
+[docs.sources.udp]: ./usage/configuration/sources/udp.md
+[docs.sources.vector]: ./usage/configuration/sources/vector.md
+[docs.transforms.add_fields]: ./usage/configuration/transforms/add_fields.md
+[docs.transforms.add_tags]: ./usage/configuration/transforms/add_tags.md
+[docs.transforms.coercer]: ./usage/configuration/transforms/coercer.md
+[docs.transforms.field_filter]: ./usage/configuration/transforms/field_filter.md
+[docs.transforms.grok_parser]: ./usage/configuration/transforms/grok_parser.md
+[docs.transforms.json_parser]: ./usage/configuration/transforms/json_parser.md
+[docs.transforms.log_to_metric]: ./usage/configuration/transforms/log_to_metric.md
+[docs.transforms.lua]: ./usage/configuration/transforms/lua.md
+[docs.transforms.readme]: ./usage/configuration/transforms/README.md
+[docs.transforms.regex_parser]: ./usage/configuration/transforms/regex_parser.md
+[docs.transforms.remove_fields]: ./usage/configuration/transforms/remove_fields.md
+[docs.transforms.remove_tags]: ./usage/configuration/transforms/remove_tags.md
+[docs.transforms.sampler]: ./usage/configuration/transforms/sampler.md
+[docs.transforms.split]: ./usage/configuration/transforms/split.md
+[docs.transforms.tokenizer]: ./usage/configuration/transforms/tokenizer.md
+[docs.use-cases.readme]: ./use-cases/README.md
+[urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
+[urls.vector_community]: https://vector.dev/community
+[urls.vector_downloads]: https://packages.timber.io/vector
+[urls.vector_releases]: https://github.com/timberio/vector/releases
+[urls.vector_repo]: https://github.com/timberio/vector
+[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open

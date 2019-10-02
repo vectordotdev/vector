@@ -12,53 +12,25 @@ description: Streams `log` events to another downstream Vector instance.
 
 # vector sink
 
-![][images.vector_sink]
+![][assets.vector_sink]
 
 
-The `vector` sink [streams](#streaming) [`log`][docs.log_event] events to another downstream Vector instance.
+The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  # REQUIRED - General
   type = "vector" # must be: "vector"
   inputs = ["my-source-id"]
   address = "92.12.333.224:5000"
-  
-  # OPTIONAL - General
-  healthcheck = true # default
-  
-  # OPTIONAL - Buffer
-  [sinks.my_sink_id.buffer]
-    type = "memory" # default, enum: "memory" or "disk"
-    when_full = "block" # default, enum: "block" or "drop_newest"
-    max_size = 104900000 # no default, bytes, relevant when type = "disk"
-    num_items = 500 # default, events, relevant when type = "memory"
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sinks.<sink-id>]
-  # REQUIRED - General
-  type = "vector"
-  inputs = ["<string>", ...]
-  address = "<string>"
-
-  # OPTIONAL - General
-  healthcheck = <bool>
-
-  # OPTIONAL - Buffer
-  [sinks.<sink-id>.buffer]
-    type = {"memory" | "disk"}
-    when_full = {"block" | "drop_newest"}
-    max_size = <int>
-    num_items = <int>
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.vector_sink]
   #
@@ -130,28 +102,12 @@ The `vector` sink [streams](#streaming) [`log`][docs.log_event] events to anothe
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "vector"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.config_composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `address` | `string` | The downstream Vector address.<br />`required` `example: "92.12.333.224:5000"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **OPTIONAL** - Buffer | | |
-| `buffer.type` | `string` | The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.<br />`default: "memory"` `enum: "memory" or "disk"` |
-| `buffer.when_full` | `string` | The behavior when the buffer becomes full.<br />`default: "block"` `enum: "block" or "drop_newest"` |
-| `buffer.max_size` | `int` | The maximum size of the buffer on the disk. Only relevant when type = "disk"<br />`no default` `example: 104900000` `unit: bytes` |
-| `buffer.num_items` | `int` | The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"<br />`default: 500` `unit: events` |
-
 ## How It Works
 
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -159,7 +115,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Health Checks
@@ -186,38 +142,34 @@ event-by-event basis. It does not batch data.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `vector_sink` issues][url.vector_sink_issues].
-2. If encountered a bug, please [file a bug report][url.new_vector_sink_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_vector_sink_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `vector_sink` issues][urls.vector_sink_issues].
+2. If encountered a bug, please [file a bug report][urls.new_vector_sink_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_vector_sink_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.vector_sink_issues] - [enhancements][url.vector_sink_enhancements] - [bugs][url.vector_sink_bugs]
-* [**Source code**][url.vector_sink_source]
+* [**Issues**][urls.vector_sink_issues] - [enhancements][urls.vector_sink_enhancements] - [bugs][urls.vector_sink_bugs]
+* [**Source code**][urls.vector_sink_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.config_composition]: ../../../usage/configuration/README.md#composition
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.event]: ../../../about/data-model/README.md#event
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.sources]: ../../../usage/configuration/sources
-[docs.transforms]: ../../../usage/configuration/transforms
+[assets.vector_sink]: ../../../assets/vector-sink.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.vector_sink]: ../../../assets/vector-sink.svg
-[url.new_vector_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+bug
-[url.new_vector_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+enhancement
-[url.vector_chat]: https://chat.vector.dev
-[url.vector_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22+label%3A%22Type%3A+bug%22
-[url.vector_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22+label%3A%22Type%3A+enhancement%22
-[url.vector_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22
-[url.vector_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/vector.rs
+[urls.new_vector_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+bug
+[urls.new_vector_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+enhancement
+[urls.vector_chat]: https://chat.vector.dev
+[urls.vector_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22+label%3A%22Type%3A+bug%22
+[urls.vector_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22+label%3A%22Type%3A+enhancement%22
+[urls.vector_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+vector%22
+[urls.vector_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/vector.rs

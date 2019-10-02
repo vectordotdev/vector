@@ -18,6 +18,7 @@ use rusoto_s3::{
     S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::convert::TryInto;
 use std::time::Duration;
 use tower::{Service, ServiceBuilder};
@@ -45,10 +46,10 @@ pub struct S3SinkConfig {
     pub filename_extension: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
+    pub encoding: Encoding,
     pub batch_size: Option<usize>,
     pub compression: Compression,
     pub batch_timeout: Option<u64>,
-    pub encoding: Option<Encoding>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -59,29 +60,27 @@ pub struct S3SinkConfig {
     pub request_retry_backoff_secs: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Text,
     Ndjson,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Compression {
+    #[derivative(Default)]
     Gzip,
     None,
 }
 
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::Gzip
-    }
-}
-
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, acker: Acker) -> Result<(super::RouterSink, super::Healthcheck), String> {
+    fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = S3Sink::new(self, acker)?;
         let healthcheck = S3Sink::healthcheck(self)?;
 
@@ -93,8 +92,18 @@ impl SinkConfig for S3SinkConfig {
     }
 }
 
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid credentials"))]
+    InvalidCredentials,
+    #[snafu(display("Unknown bucket: {:?}", bucket))]
+    UnknownBucket { bucket: String },
+    #[snafu(display("Unknown status code: {}", status))]
+    UnknownStatus { status: http::StatusCode },
+}
+
 impl S3Sink {
-    pub fn new(config: &S3SinkConfig, acker: Acker) -> Result<super::RouterSink, String> {
+    pub fn new(config: &S3SinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
         let timeout = config.request_timeout_secs.unwrap_or(60);
         let in_flight_limit = config.request_in_flight_limit.unwrap_or(25);
         let rate_limit_duration = config.request_rate_limit_duration_secs.unwrap_or(1);
@@ -124,9 +133,8 @@ impl S3Sink {
             Template::from("date=%F/")
         };
 
-        let region = config.region.clone();
         let s3 = S3Sink {
-            client: Self::create_client(region.try_into()?),
+            client: Self::create_client(config.region.clone().try_into()?),
             bucket: config.bucket.clone(),
             gzip: compression,
             filename_time_format,
@@ -152,9 +160,8 @@ impl S3Sink {
         Ok(Box::new(sink))
     }
 
-    pub fn healthcheck(config: &S3SinkConfig) -> Result<super::Healthcheck, String> {
-        let region = config.region.clone();
-        let client = Self::create_client(region.try_into()?);
+    pub fn healthcheck(config: &S3SinkConfig) -> crate::Result<super::Healthcheck> {
+        let client = Self::create_client(config.region.clone().try_into()?);
 
         let request = HeadBucketRequest {
             bucket: config.bucket.clone(),
@@ -162,13 +169,16 @@ impl S3Sink {
 
         let response = client.head_bucket(request);
 
+        let bucket = config.bucket.clone();
         let healthcheck = response.map_err(|err| match err {
             HeadBucketError::Unknown(response) => match response.status {
-                http::status::StatusCode::FORBIDDEN => "Invalid credentials".to_string(),
-                http::status::StatusCode::NOT_FOUND => "Unknown bucket".to_string(),
-                status => format!("Unknown error: Status code: {}", status),
+                http::status::StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                http::status::StatusCode::NOT_FOUND => {
+                    HealthcheckError::UnknownBucket { bucket }.into()
+                }
+                status => HealthcheckError::UnknownStatus { status }.into(),
             },
-            err => err.to_string(),
+            err => err.into(),
         });
 
         Ok(Box::new(healthcheck))
@@ -286,7 +296,7 @@ fn generate_key(
 fn encode_event(
     event: Event,
     key_prefix: &Template,
-    encoding: &Option<Encoding>,
+    encoding: &Encoding,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
@@ -299,14 +309,14 @@ fn encode_event(
         .ok()?;
 
     let log = event.into_log();
-    let bytes = match (encoding, log.is_structured()) {
-        (&Some(Encoding::Ndjson), _) | (_, true) => serde_json::to_vec(&log.unflatten())
+    let bytes = match encoding {
+        Encoding::Ndjson => serde_json::to_vec(&log.unflatten())
             .map(|mut b| {
                 b.push(b'\n');
                 b
             })
             .expect("Failed to encode event as json, this is a bug!"),
-        (&Some(Encoding::Text), _) | (_, false) => {
+        &Encoding::Text => {
             let mut bytes = log
                 .get(&event::MESSAGE)
                 .map(|v| v.as_bytes().to_vec())
@@ -327,10 +337,11 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn s3_encode_event_non_structured() {
+    fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(message.clone().into(), &batch_time_format, &None).unwrap();
+        let bytes =
+            encode_event(message.clone().into(), &batch_time_format, &Encoding::Text).unwrap();
 
         let encoded_message = message + "\n";
         let (bytes, _) = bytes.into_parts();
@@ -338,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn s3_encode_event_structured() {
+    fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event
@@ -346,7 +357,7 @@ mod tests {
             .insert_explicit("key".into(), "value".into());
 
         let batch_time_format = Template::from("date=%F");
-        let bytes = encode_event(event, &batch_time_format, &None).unwrap();
+        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson).unwrap();
 
         let (bytes, _) = bytes.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -382,6 +393,7 @@ mod integration_tests {
     use super::*;
     use crate::buffers::Acker;
     use crate::{
+        assert_downcast_matches,
         event::Event,
         region::RegionOrEndpoint,
         sinks::aws_s3::{S3Sink, S3SinkConfig},
@@ -587,7 +599,11 @@ mod integration_tests {
             ..config()
         };
         let healthcheck = S3Sink::healthcheck(&config).unwrap();
-        assert_eq!(rt.block_on(healthcheck).unwrap_err(), "Unknown bucket");
+        assert_downcast_matches!(
+            rt.block_on(healthcheck).unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::UnknownBucket{ .. }
+        );
     }
 
     fn client() -> S3Client {

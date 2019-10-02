@@ -1,5 +1,5 @@
 module PostProcessors
-  # Checks that all components defined in the /.metadata.toml file are
+  # Checks that all components defined in the /.meta directory are
   # present in the docs folder and that there are no superflous documents.
   class ComponentPresenceChecker
     class << self
@@ -29,7 +29,7 @@ module PostProcessors
       if (extra = @doc_names - @component_names).any?
         raise <<~EOF
         The following #{@type} have documentation files but are not
-        defined in the /.metadata.toml file. Please remove them from
+        defined in the /.meta directory. Please remove them from
 
         /docs/usage/configuration/#{@type}/*
 

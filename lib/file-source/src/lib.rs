@@ -25,7 +25,7 @@ mod test {
     // This suite of tests is structured as an interpreter of file system
     // actions. You'll find two interpreters here, `experiment` and
     // `experiment_no_truncations`. These differ in one key respect: the later
-    // does not interpret the 'trunction' instruction.
+    // does not interpret the 'truncation' instruction.
     //
     // What do I mean by all this? Well, what we're trying to do is validate the
     // behaviour of the file_watcher in the presence of arbitrary file-system
@@ -46,7 +46,7 @@ mod test {
     // (SUT), being a file_watcher pointed at a certain directory on-disk. In
     // this way we can drive the behaviour of file_watcher. Validation requires
     // a model, which we scattered between the interpreters -- as the model
-    // varies slightly in the presense of truncation vs. not -- and FWFile.
+    // varies slightly in the presence of truncation vs. not -- and FWFile.
     struct FWFile {
         contents: Vec<u8>,
         read_idx: usize,
@@ -86,13 +86,13 @@ mod test {
             self.reads_available += 1;
         }
 
-        /// Read a line from storage, if a line is availabe to be read.
+        /// Read a line from storage, if a line is available to be read.
         pub fn read_line(&mut self) -> Option<String> {
             // FWFile mimics a unix file being read in a buffered fashion,
             // driven by file_watcher. We _have_ to keep on top of where the
             // reader's read index -- called read_idx -- is between reads and
             // the size of the file -- called previous_read_size -- in the event
-            // of trunction.
+            // of truncation.
             //
             // If we detect in file_watcher that a truncation has happened then
             // the buffered reader is seeked back to 0. This is performed in
@@ -116,7 +116,7 @@ mod test {
             // Here's where we do truncation detection. When our file has
             // shrunk, restart the search at zero index. If the file is the
             // same size -- implying that it's either not changed or was
-            // truncated and then filled back in before a read could occurr
+            // truncated and then filled back in before a read could occur
             // -- we return None. Else, start searching at the present
             // read_idx.
             let max = self.contents.len();
@@ -186,7 +186,7 @@ mod test {
     // disk. This is _good_ in the sense that we reduce the total number of file
     // system reads and potentially retain data that would otherwise be lost
     // during a truncation but is bad on account of we cannot guarantee _which_
-    // writes are lost in the presense of truncation.
+    // writes are lost in the presence of truncation.
     //
     // What we can do, though, is drive our FWFile model and the SUT at the same
     // time, recording the total number of reads/writes. The SUT reads should be

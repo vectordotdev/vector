@@ -1,0 +1,26 @@
+[transforms.add_tags]
+allow_you_to_description = "add one or more metric tags"
+function_categories = ["change_tags"]
+guides = []
+input_types = ["metric"]
+output_types = ["metric"]
+resources = []
+
+[transforms.add_tags.options.tags]
+type = "table"
+null = false
+description = """\
+A table of key/value pairs representing the tags to be added to the \
+metric.\
+"""
+
+[transforms.add_tags.options.tags.options."*"]
+type = "*"
+null = false
+examples = [
+  {name = "my_tag", value = "my value"},
+  {name = "my_env_tag", value = "${ENV_VAR}"},
+]
+description = """\
+A key/value pair representing the new tag to be added.\
+"""

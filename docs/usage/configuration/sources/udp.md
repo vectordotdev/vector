@@ -12,43 +12,24 @@ description: Ingests data through the UDP protocol and outputs `log` events.
 
 # udp source
 
-![][images.udp_source]
+![][assets.udp_source]
 
 
-The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.log_event] events.
+The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (example)" %}
+{% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  # REQUIRED - General
   type = "udp" # must be: "udp"
   address = "0.0.0.0:9000"
-  
-  # OPTIONAL - General
-  max_length = 102400 # default, bytes
-  
-  # OPTIONAL - Context
-  host_key = "host" # default
+
+  # For a complete list of options see the "advanced" tab above.
 ```
 {% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (schema)" %}
-```coffeescript
-[sources.<source-id>]
-  # REQUIRED - General
-  type = "udp"
-  address = "<string>"
-
-  # OPTIONAL - General
-  max_length = <int>
-
-  # OPTIONAL - Context
-  host_key = "<string>"
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (specification)" %}
+{% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.udp_source]
   #
@@ -88,18 +69,6 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Options
-
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "udp"` |
-| `address` | `string` | The address to bind the socket to.<br />`required` `example: "0.0.0.0:9000"` |
-| **OPTIONAL** - General | | |
-| `max_length` | `int` | The maximum bytes size of incoming messages before they are discarded.<br />`default: 102400` `unit: bytes` |
-| **OPTIONAL** - Context | | |
-| `host_key` | `string` | The key name added to each event representing the current host. See [Context](#context) for more info.<br />`default: "host"` |
-
 ## Examples
 
 Given the following input line:
@@ -112,7 +81,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.log_event] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be emitted with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -124,7 +93,9 @@ A [`log` event][docs.log_event] will be emitted with the following structure:
 }
 ```
 
-The "timestamp" and `"host"` keys were automatically added as context. You can further parse the `"message"` key with a [transform][docs.transforms], such as the [`regeex` transform][docs.regex_parser_transform].
+The "timestamp" and `"host"` keys were automatically added as context. You can
+further parse the `"message"` key with a [transform][docs.transforms], such as
+the [`regex_parser` transform][docs.transforms.regex_parser].
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
@@ -139,7 +110,7 @@ options.
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
-[**best effort** delivery guarantee][docs.best_effort_delivery].
+[**best effort** delivery guarantee][docs.guarantees#best-effort-delivery].
 
 ### Environment Variables
 
@@ -147,7 +118,7 @@ Environment variables are supported through all of Vector's configuration.
 Simply add `${MY_ENV_VAR}` in your Vector configuration file and the variable
 will be replaced before being evaluated.
 
-You can learn more in the [Environment Variables][docs.configuration.environment-variables]
+You can learn more in the [Environment Variables][docs.configuration#environment-variables]
 section.
 
 ### Line Delimiters
@@ -157,36 +128,36 @@ Each line is read until a new line delimiter (the `0xA` byte) is found.
 ## Troubleshooting
 
 The best place to start with troubleshooting is to check the
-[Vector logs][docs.monitoring_logs]. This is typically located at
+[Vector logs][docs.monitoring#logs]. This is typically located at
 `/var/log/vector.log`, then proceed to follow the
 [Troubleshooting Guide][docs.troubleshooting].
 
 If the [Troubleshooting Guide][docs.troubleshooting] does not resolve your
 issue, please:
 
-1. Check for any [open `udp_source` issues][url.udp_source_issues].
-2. If encountered a bug, please [file a bug report][url.new_udp_source_bug].
-3. If encountered a missing feature, please [file a feature request][url.new_udp_source_enhancement].
-4. If you need help, [join our chat/forum community][url.vector_chat]. You can post a question and search previous questions.
+1. Check for any [open `udp_source` issues][urls.udp_source_issues].
+2. If encountered a bug, please [file a bug report][urls.new_udp_source_bug].
+3. If encountered a missing feature, please [file a feature request][urls.new_udp_source_enhancement].
+4. If you need help, [join our chat/forum community][urls.vector_chat]. You can post a question and search previous questions.
 
 ## Resources
 
-* [**Issues**][url.udp_source_issues] - [enhancements][url.udp_source_enhancements] - [bugs][url.udp_source_bugs]
-* [**Source code**][url.udp_source_source]
+* [**Issues**][urls.udp_source_issues] - [enhancements][urls.udp_source_enhancements] - [bugs][urls.udp_source_bugs]
+* [**Source code**][urls.udp_source_source]
 
 
-[docs.best_effort_delivery]: ../../../about/guarantees.md#best-effort-delivery
-[docs.configuration.environment-variables]: ../../../usage/configuration#environment-variables
-[docs.log_event]: ../../../about/data-model/log.md
-[docs.monitoring_logs]: ../../../usage/administration/monitoring.md#logs
-[docs.regex_parser_transform]: ../../../usage/configuration/transforms/regex_parser.md
+[assets.udp_source]: ../../../assets/udp-source.svg
+[docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
+[docs.data-model.log]: ../../../about/data-model/log.md
+[docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
+[docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
-[images.udp_source]: ../../../assets/udp-source.svg
-[url.new_udp_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+bug
-[url.new_udp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+enhancement
-[url.udp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+bug%22
-[url.udp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+enhancement%22
-[url.udp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22
-[url.udp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
-[url.vector_chat]: https://chat.vector.dev
+[urls.new_udp_source_bug]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+bug
+[urls.new_udp_source_enhancement]: https://github.com/timberio/vector/issues/new?labels=source%3A+udp&labels=Type%3A+enhancement
+[urls.udp_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+bug%22
+[urls.udp_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22+label%3A%22Type%3A+enhancement%22
+[urls.udp_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+udp%22
+[urls.udp_source_source]: https://github.com/timberio/vector/tree/master/src/sources/udp.rs
+[urls.vector_chat]: https://chat.vector.dev
