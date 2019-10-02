@@ -43,7 +43,6 @@ impl SourceConfig for KubernetesConfig {
         // as possible to set a default behavior for all container related sources.
         // This will help with interchangeability.
 
-        // Only logs created at, or after this moment are logged.
         let now = TimeFilter::new();
 
         // File source
@@ -214,7 +213,7 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
     // Drop so that it's possible to detect if message is in json format
     config.drop_invalid = true;
 
-    // Drop field
+    config.drop_field = true;
 
     let mut json_parser: JsonParser = config.into();
 
