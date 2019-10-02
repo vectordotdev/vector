@@ -235,7 +235,7 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
                     event::TIMESTAMP.clone(),
                     timestamp.with_timezone(&Utc).into(),
                 ),
-                Err(error) => warn!(message="Non rfc3339 timestamp",error=%error),
+                Err(error) => warn!(message = "Non rfc3339 timestamp.", %error),
             }
         } else {
             warn!(message = "Missing field.", field = %atom_time);
