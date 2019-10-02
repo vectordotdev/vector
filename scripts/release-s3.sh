@@ -36,8 +36,8 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Uploaded archives"
 
   # Verify that the files exist and can be downloaded
-  curl https://packages.timber.io/vector/nightly/$today/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/today.tar.gz"
-  curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/latest.tar.gz"
+  curl https://packages.timber.io/vector/nightly/$today/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/today.tar.gz" --fail
+  curl https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/latest.tar.gz" --fail
 elif [[ "$CHANNEL" == "latest" ]]; then
   # Upload the specific version
   echo "Uploading all artifacts to s3://packages.timber.io/vector/$VERSION/"
@@ -51,8 +51,8 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   echo "Uploaded archives"
 
   # Verify that the files exist and can be downloaded
-  curl https://packages.timber.io/vector/$VERSION/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/$VERSION.tar.gz"
-  curl https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/latest.tar.gz"
+  curl https://packages.timber.io/vector/$VERSION/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/$VERSION.tar.gz" --fail
+  curl https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-musl.tar.gz --output "$td/latest.tar.gz" --fail
 fi
 
 #
