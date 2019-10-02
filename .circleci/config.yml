@@ -406,18 +406,20 @@ jobs:
             echo "Releasing $VERSION..."
             make release-s3
 
+  sync-install:
+    docker:
+      - image: timberiodev/vector-releaser:latest
+    steps:
+      - checkout
+      - run:
+          name: Sync install.sh
+          command: make sync-install
+
 #
 # Workflow Macros
 #
 
-test-filters: &test-filters
-  filters:
-    branches:
-      only: /.*/
-    tags:
-      ignore: /.*/
-
-tag-workflow-filters: &tag-workflow-filters
+release-filters: &release-filters
   filters:
     branches:
       ignore: /.*/
@@ -452,6 +454,21 @@ require-verifies: &require-verifies
     - verify-ubuntu-16-04
     - verify-ubuntu-18-04
     - verify-ubuntu-19-04
+
+sync-filters: &sync-filters
+  filters:
+    branches:
+      only: master
+    tags:
+      ignore: /.*/
+
+test-filters: &test-filters
+  filters:
+    branches:
+      only: /.*/
+    tags:
+      ignore: /.*/
+
 
 #
 # Workflows
@@ -539,77 +556,83 @@ workflows:
       - release-s3:
           <<: *require-verifies
 
-  tag:
+  release:
     jobs:
       - check-code:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - check-fmt:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - check-generate:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - test-stable:
-          <<: *tag-workflow-filters
+          <<: *release-filters
       - build-x86_64-unknown-linux-gnu-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-checks-and-tests
       - package-rpm:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-builds
       - verify-amazon-linux-1:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-amazon-linux-2:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-centos-7:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-deb-8:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-deb-9:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-deb-10:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-ubuntu-16-04:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-ubuntu-18-04:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - verify-ubuntu-19-04:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-packages
       - release-deb:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-verifies
       - release-github:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-verifies
       - release-rpm:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-verifies
       - release-s3:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           <<: *require-verifies
       # Installs directly from S3
       - release-docker:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           requires:
             - release-s3
       # Installs directly from S3
       - release-homebrew:
-          <<: *tag-workflow-filters
+          <<: *release-filters
           requires:
             - release-s3
+
+  sync:
+    jobs:
+      - sync-install:
+          <<: *sync-filters
+
 experimental:
   notify:
     branches:
