@@ -345,31 +345,31 @@ jobs:
       <<: *verify-install
 
   verify-install-on-deb-8:
-     docker:
+    docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
       <<: *verify-install
 
   verify-install-on-deb-9:
-     docker:
+    docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
       <<: *verify-install
 
   verify-install-on-deb-10:
-     docker:
+    docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
       <<: *verify-install
 
   verify-install-on-unbuntu-16-04:
-     docker:
+    docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
       <<: *verify-install
 
   verify-install-on-unbuntu-18-04:
-     docker:
+    docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
       <<: *verify-install
