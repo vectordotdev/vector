@@ -1,6 +1,9 @@
 use crate::{
     event::{self, Event, ValueKind},
-    sources::file::{FileConfig, FingerprintingConfig},
+    sources::{
+        file::{FileConfig, FingerprintingConfig},
+        Source,
+    },
     topology::config::{DataType, GlobalOptions, SourceConfig, TransformConfig},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
@@ -35,7 +38,7 @@ impl SourceConfig for KubernetesConfig {
         name: &str,
         globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
-    ) -> crate::Result<super::Source> {
+    ) -> crate::Result<Source> {
         // Kubernetes source uses 'file source' and various transforms to implement
         // gathering of logs over Kubernetes CRI supported container runtimes.
 
@@ -113,7 +116,7 @@ impl TimeFilter {
 fn file_source(
     kube_name: &str,
     globals: &GlobalOptions,
-) -> crate::Result<(mpsc::Receiver<Event>, super::Source)> {
+) -> crate::Result<(mpsc::Receiver<Event>, Source)> {
     let mut config = FileConfig::default();
 
     // TODO: Having a configurable option for excluding namespaces, seams to be usefull.

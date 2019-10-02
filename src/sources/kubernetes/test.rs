@@ -2,9 +2,7 @@
 //       that is to be tested is present.
 #![cfg(feature = "kubernetes-integration-tests")]
 
-#[macro_use]
-extern crate tracing;
-
+use crate::test_util::trace_init;
 use k8s_openapi::api::apps::v1::{DaemonSetSpec, DaemonSetStatus};
 use k8s_openapi::api::core::v1::{PodSpec, PodStatus};
 use kube::{
@@ -19,7 +17,6 @@ use serde::de::DeserializeOwned;
 use std::borrow::Borrow;
 use std::thread;
 use std::time::Duration;
-use vector::test_util::trace_init;
 
 static NAMESPACE_MARKER: &'static str = "$(TEST_NAMESPACE)";
 static USER_NAMESPACE_MARKER: &'static str = "$(USER_TEST_NAMESPACE)";
