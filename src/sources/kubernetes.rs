@@ -297,6 +297,16 @@ fn transform_file() -> Result<Box<dyn Transform>, String> {
 mod tests {
     use super::*;
 
+    fn has<V: Into<ValueKind>>(event: &Event, field: &str, data: V) {
+        assert_eq!(
+            event
+                .as_log()
+                .get(&field.into())
+                .expect(format!("field: {:?} not present", field).as_str()),
+            &data.into()
+        );
+    }
+
     #[test]
     fn file_path_transform() {
         let mut event = Event::new_empty_log();
@@ -304,14 +314,39 @@ mod tests {
 
         let mut transform = transform_file().unwrap();
 
-        assert_eq!(
-            transform
-                .transform(event)
-                .expect("Transformed")
-                .as_log()
-                .get(&"container_name".into())
-                .expect("container_name present"),
-            &ValueKind::from("busybox")
+        let event = transform.transform(event).expect("Transformed");
+
+        has(&event, "container_name", "busybox");
+        has(
+            &event,
+            "pod_uid",
+            "default_busybox-echo-5bdc7bfd99-m996l_e2782fb0-ba64-4289-acd5-68c4f5b0d27e",
+        );
+    }
+
+    #[test]
+    fn cri_message_transform() {
+        let mut event = Event::new_empty_log();
+        event.as_mut_log().insert_explicit(
+            "message".into(),
+            "2019-10-02T13:21:36.927620189+02:00 stdout F 12"
+                .to_owned()
+                .into(),
+        );
+
+        let mut transform = transform_cri_message().unwrap();
+
+        let event = transform.transform(event).expect("Transformed");
+
+        has(&event, event::MESSAGE.as_ref(), "12");
+        has(&event, "multiline_tag", "F");
+        has(&event, "stream", "stdout");
+        has(
+            &event,
+            event::TIMESTAMP.as_ref(),
+            DateTime::parse_from_rfc3339("2019-10-02T13:21:36.927620189+02:00")
+                .unwrap()
+                .with_timezone(&Utc),
         );
     }
 }
