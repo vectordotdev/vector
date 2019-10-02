@@ -176,7 +176,7 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
             }
 
             request
-        })?;
+        });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

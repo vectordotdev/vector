@@ -29,7 +29,7 @@ impl HttpService {
         HttpServiceBuilder::new()
     }
 
-    pub fn new<F>(request_builder: F) -> crate::Result<Self>
+    pub fn new<F>(request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -53,7 +53,7 @@ impl HttpServiceBuilder {
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(self, request_builder: F) -> crate::Result<HttpService>
+    pub fn build<F>(self, request_builder: F) -> HttpService
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -69,10 +69,10 @@ impl HttpServiceBuilder {
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        Ok(HttpService {
+        HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-        })
+        }
     }
 
     /// Set the number of threads used by the `HttpService`
@@ -184,8 +184,7 @@ mod test {
             builder.method(Method::POST);
             builder.uri(uri.clone());
             builder.body(body.into()).unwrap()
-        })
-        .unwrap();
+        });
 
         let req = service.call(request);
 

@@ -279,7 +279,7 @@ fn es(
                     }
                 }
             }
-        })?;
+        });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
