@@ -8,18 +8,19 @@ install-rust: &install-rust
     command: |
       curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
 
+install-vector: &install-vector
+  run:
+    name: Execute install.sh
+    command: sudo distribution/install.sh -y
+
 restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
     at: target/artifacts
 
 verify-install: &verify-install
-  - checkout
-  - run:
-      name: Execute install.sh
-      command: sudo distribution/install.sh -y
-  - run:
-      name: Verify installation
-      command: vector --version
+  run:
+    name: Verify installation
+    command: vector --version
 
 #
 # Main document
@@ -330,49 +331,65 @@ jobs:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-1
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-amazon-linux-2:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-2
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-cent-os-7:
     docker:
       - image: centos:7
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-deb-8:
     docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-deb-9:
     docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-deb-10:
     docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-unbuntu-16-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   verify-install-on-unbuntu-18-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
-        <<: *verify-install
+      - checkout
+      - *install-vector
+      - *verify-install
 
   #
   # Verifying the systemd service script
