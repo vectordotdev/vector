@@ -75,9 +75,6 @@ package-rpm: ## Create a .rpm package from artifacts created via `build`
 release-commit: ## Commits release changes
 	@scripts/release-commit.rb
 
-release-deb: ## Release .deb via Package Cloud
-	@scripts/release-deb.sh
-
 release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
 
@@ -95,9 +92,6 @@ release-meta: ## Prepares the release metadata
 release-rollback:
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/release-rollback.rb
-
-release-rpm: ## Release .rpm via Package Cloud
-	@scripts/release-rpm.sh
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh

@@ -28,12 +28,9 @@ RUN pip3 install --upgrade awscli
 RUN wget https://github.com/timberio/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz
 RUN tar -xvf grease-1.0.1-linux-amd64.tar.gz
 ENV PATH="$PATH:/grease/bin"
-
-# Package Cloud is used to host deb, rpm, and other packages
 ENV LC_ALL en_US.UTF-8
 
 RUN gem install rake
-RUN gem install package_cloud
 
 # Docker is used to upload Vector docker images
 RUN apt-get remove docker docker-engine docker.io

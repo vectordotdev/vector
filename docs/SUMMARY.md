@@ -25,9 +25,9 @@
   * [Platforms][docs.installation.platforms.readme]
     * [Docker][docs.platforms.docker]
   * [Package Managers][docs.installation.package-managers.readme]
-    * [APT][docs.package-managers.apt]
+    * [DPKG][docs.package-managers.dpkg]
     * [Homebrew][docs.package-managers.homebrew]
-    * [YUM][docs.package-managers.yum]
+    * [RPM][docs.package-managers.rpm]
   * [Operating Systems][docs.installation.operating-systems.readme]
     * [Amazon Linux][docs.operating-systems.amazon-linux]
     * [CentOS][docs.operating-systems.centos]
@@ -156,9 +156,9 @@
 [docs.operating-systems.macos]: ./setup/installation/operating-systems/macos.md
 [docs.operating-systems.rhel]: ./setup/installation/operating-systems/rhel.md
 [docs.operating-systems.ubuntu]: ./setup/installation/operating-systems/ubuntu.md
-[docs.package-managers.apt]: ./setup/installation/package-managers/apt.md
+[docs.package-managers.dpkg]: ./setup/installation/package-managers/dpkg.md
 [docs.package-managers.homebrew]: ./setup/installation/package-managers/homebrew.md
-[docs.package-managers.yum]: ./setup/installation/package-managers/yum.md
+[docs.package-managers.rpm]: ./setup/installation/package-managers/rpm.md
 [docs.performance]: ./performance.md
 [docs.platforms.docker]: ./setup/installation/platforms/docker.md
 [docs.roles.agent]: ./setup/deployment/roles/agent.md
