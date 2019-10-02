@@ -279,7 +279,7 @@ jobs:
       - checkout
       - run:
           name: Execute install.sh
-          command: distribution/install.sh -y
+          command: sudo distribution/install.sh -y
       - run:
           name: Verify installation
           command: vector --version
@@ -294,8 +294,7 @@ jobs:
           command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
       - run:
           name: Verify Systemd starts the service
-          command: |
-            sudo systemctl start vector
+          command: sudo systemctl start vector
 
   verify-ubuntu-16-04:
     docker:
