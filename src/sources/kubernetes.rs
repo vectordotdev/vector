@@ -238,7 +238,7 @@ fn transform_json_message() -> impl FnMut(Event) -> Option<Event> + Send {
                 Err(error) => warn!(message="Non rfc3339 timestamp",error=%error),
             }
         } else {
-            warn!(message = "Missing field", field = %atom_time);
+            warn!(message = "Missing field.", field = %atom_time);
         }
 
         // log -> message
