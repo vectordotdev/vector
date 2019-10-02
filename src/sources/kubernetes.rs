@@ -61,7 +61,7 @@ impl SourceConfig for KubernetesConfig {
             .forward(out.sink_map_err(drop))
             .map(|_| ())
             .join(file_source)
-            .map(|((), ())| ());
+            .map(drop);
 
         Ok(Box::new(source))
     }
