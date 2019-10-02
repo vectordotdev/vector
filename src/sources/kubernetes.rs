@@ -107,7 +107,7 @@ impl TimeFilter {
             if ts >= &self.start {
                 return Some(event);
             }
-            trace!(message = "Recieved older log", from = %ts.to_rfc3339());
+            trace!(message = "Recieved older log.", from = %ts.to_rfc3339());
         }
         None
     }
