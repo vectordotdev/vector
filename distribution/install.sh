@@ -160,12 +160,12 @@ install_from_archive() {
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/latest/vector-latest-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_ROOT}/latest/vector-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
 
-    local _file="${_dir}/vector-latest-${_archive_arch}.tar.gz"
+    local _file="${_dir}/vector-${_archive_arch}.tar.gz"
 
     ensure mkdir -p "$_dir"
 
