@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-   name: logging
+   name: telemetry
    
 ---
 # ConfigMap which contains vector.toml configuration for pods.
@@ -10,7 +10,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: vector-config
-  namespace: logging
+  namespace: telemetry
 data:
   vector-agent-config: |
     # VECTOR.TOML
@@ -35,7 +35,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: vector-agent
-  namespace: logging
+  namespace: telemetry
 spec:
   minReadySeconds: 1
   selector:
