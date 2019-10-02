@@ -11,7 +11,7 @@ operating_systems = [
   {name = "Ubuntu", id = "ubuntu"}
 ]
 package_managers = [
-  {name = "APT", id = "apt"},
+  {name = "DPKG", id = "dpkg"},
   {name = "Homebrew", id = "homebrew"},
-  {name = "YUM", id = "yum"},
+  {name = "RPM", id = "rpm"},
 ]

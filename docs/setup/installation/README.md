@@ -34,9 +34,9 @@ specific platform below.
 
 ## Package Managers
 
-{% page-ref page="package-managers/apt.md" %}
+{% page-ref page="package-managers/dpkg.md" %}
 {% page-ref page="package-managers/homebrew.md" %}
-{% page-ref page="package-managers/yum.md" %}
+{% page-ref page="package-managers/rpm.md" %}
 
 ## Operating Systems
 
@@ -60,15 +60,15 @@ specific platform below.
 Please see the [updating guide][docs.updating]. Alternatively, each installation
 page will include an "Updating" section describing how to update for that
 specific method. For example, see the
-[APT updating section][docs.package-managers.apt#updating].
+[DPKG updating section][docs.package-managers.dpkg#updating].
 
 ### How do I install previous Vector versions?
 
 Each installation page will include a "Versions" section describing how to
 install specific versions. For example, see the
-[APT versions section][docs.package-managers.apt#versions].
+[DPKG versions section][docs.package-managers.dpkg#versions].
 
 
-[docs.package-managers.apt#updating]: ../../setup/installation/package-managers/apt.md#updating
-[docs.package-managers.apt#versions]: ../../setup/installation/package-managers/apt.md#versions
+[docs.package-managers.dpkg#updating]: ../../setup/installation/package-managers/dpkg.md#updating
+[docs.package-managers.dpkg#versions]: ../../setup/installation/package-managers/dpkg.md#versions
 [docs.updating]: ../../usage/administration/updating.md

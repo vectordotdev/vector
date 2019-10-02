@@ -14,9 +14,9 @@ description: Install Vector through your package manager
 
 Vector offers installation instructions for the following package managers:
 
-{% page-ref page="apt.md" %}
+{% page-ref page="dpkg.md" %}
 {% page-ref page="homebrew.md" %}
-{% page-ref page="yum.md" %}
+{% page-ref page="rpm.md" %}
 
 ## Alternatives
 

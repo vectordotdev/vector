@@ -1,5 +1,5 @@
 ---
-description: Install Vector through the YUM package manager
+description: Install Vector through the RPM package manager
 ---
 
 <!--
@@ -7,39 +7,16 @@ description: Install Vector through the YUM package manager
 
      To make changes please edit the template located at:
 
-     scripts/generate/templates/docs/setup/installation/package-managers/yum.md.erb
+     scripts/generate/templates/docs/setup/installation/package-managers/rpm.md.erb
 -->
 
-# YUM Package Manager
+# RPM Package Manager
 
-Vector can be installed through the [YUM package manager][urls.yum] which is
+Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
 
 ## Install
 
-{% tabs %}
-{% tab title="yum" %}
-Start by adding the Timber GPG key and repository:
-
-```bash
-curl -s https://packagecloud.io/install/repositories/timberio/packages/script.rpm.sh | sudo bash
-```
-
-Install Vector:
-
-```bash
-sudo yum install vector
-```
-
-Start Vector:
-
-```bash
-sudo systemctl start vector
-```
-
-That's it! Proceed to [configure](#configuring) Vector for your use case.
-{% endtab %}
-{% tab title="rpm" %}
 Download the [Vector `.rpm file`][urls.vector_downloads.latest/vector-x86_64.rpm]
 
 ```bash
@@ -59,8 +36,6 @@ sudo systemctl start vector
 ```
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
-{% endtab %}
-{% endtabs %}
 
 ## Configuring
 
@@ -83,27 +58,22 @@ Vector can be managed through the [Systemd][urls.systemd] service manager:
 ## Uninstalling
 
 ```bash
-yum remove vector
+sudo rpm -e vector
 ```
 
 ## Updating
 
-```bash
-sudo yum upgrade vector
-```
+Follow the [install](#install) steps again.
 
 ## Versions
 
 Historical Vector versions can be found in the [releases][urls.vector_releases].
-Once you've found the version you'd like to install you can specify it with:
-
-```bash
-sudo yum install vector-X.X.X
-```
+Once you've found the version you'd like to install you can re-follow the
+[install](#install) steps with the URL to the Vector `.rpm` file.
 
 
 [docs.configuration]: ../../../usage/configuration
+[urls.rpm]: https://rpm.org/
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_downloads.latest/vector-x86_64.rpm]: https://packages.timber.io/vector/latest/vector-x86_64.rpm
 [urls.vector_releases]: https://github.com/timberio/vector/releases
-[urls.yum]: http://yum.baseurl.org/
