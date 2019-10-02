@@ -97,14 +97,14 @@ main() {
                     ;;
             esac
         done
-    fi
 
-    # Print a divider to separate the Vector installer output and the
-    # package manager installer output.
-    if [ -n "$_package_manager" ]; then
-        echo ""
-        echo "$_divider"
-        echo ""
+        # Print a divider to separate the Vector installer output and the
+        # package manager installer output.
+        if [ -n "$_package_manager" ]; then
+            echo ""
+            echo "$_divider"
+            echo ""
+        fi
     fi
 
     case "$_package_manager" in
@@ -205,6 +205,8 @@ install_from_archive() {
 
 install_from_deb() {
     need_cmd dpkg
+    need_cmd mktemp
+    need_cmd mkdir
 
     get_architecture || return 1
     local _arch="$RETVAL"
@@ -242,7 +244,9 @@ install_from_deb() {
 }
 
 install_from_rpm() {
-    need_cmd dpkg
+    need_cmd mktemp
+    need_cmd mkdir
+    need_cmd rpm
 
     get_architecture || return 1
     local _arch="$RETVAL"

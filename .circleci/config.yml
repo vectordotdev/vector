@@ -391,6 +391,14 @@ jobs:
       - *install-vector
       - *verify-install
 
+  verify-install-on-unbuntu-19-04:
+    docker:
+      - image: timberiodev/vector-verifier-ubuntu-19-04:latest
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
   #
   # Verifying the systemd service script
   #
