@@ -11,7 +11,7 @@ install-rust: &install-rust
 install-vector: &install-vector
   run:
     name: Execute install.sh
-    command: sudo distribution/install.sh -y
+    command: distribution/install.sh -y
 
 restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
@@ -343,7 +343,7 @@ jobs:
       - *install-vector
       - *verify-install
 
-  verify-install-on-cent-os-7:
+  verify-install-on-centos-7:
     docker:
       - image: centos:7
     steps:
