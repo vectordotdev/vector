@@ -55,6 +55,7 @@ enum TlsError {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsOptions {
     pub verify_certificate: Option<bool>,
+    pub verify_hostname: Option<bool>,
     pub ca_path: Option<PathBuf>,
     pub crt_path: Option<PathBuf>,
     pub key_path: Option<PathBuf>,
@@ -68,12 +69,17 @@ impl TlsOptions {
                 "`verify_certificate` in {} sink is DISABLED, this may lead to security vulnerabilities", sink
             );
         }
+        if self.verify_hostname == Some(false) {
+            warn!(
+                "`verify_hostname` in {} sink is DISABLED, this may lead to security vulnerabilities", sink);
+        }
     }
 }
 
 /// Directly usable settings for TLS connectors
 pub struct TlsSettings {
-    verify_certificate: bool,
+    accept_invalid_certificates: bool,
+    accept_invalid_hostnames: bool,
     authority: Option<Certificate>,
     identity: Option<Identity>,
 }
@@ -106,7 +112,8 @@ impl TryFrom<&TlsOptions> for TlsSettings {
         };
 
         Ok(Self {
-            verify_certificate: options.verify_certificate.unwrap_or(true),
+            accept_invalid_certificates: !options.verify_certificate.unwrap_or(true),
+            accept_invalid_hostnames: !options.verify_hostname.unwrap_or(true),
             authority,
             identity,
         })
@@ -126,7 +133,8 @@ pub trait TlsConnectorExt {
 
 impl TlsConnectorExt for TlsConnectorBuilder {
     fn use_tls_settings(&mut self, settings: TlsSettings) -> &mut Self {
-        self.danger_accept_invalid_certs(!settings.verify_certificate);
+        self.danger_accept_invalid_certs(settings.accept_invalid_certificates);
+        self.danger_accept_invalid_hostnames(settings.accept_invalid_hostnames);
         if let Some(certificate) = settings.authority {
             self.add_root_certificate(certificate);
         }
