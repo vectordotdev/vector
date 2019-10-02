@@ -106,11 +106,11 @@ main() {
     fi
 
     case "$_package_manager" in
-        apt)
-            apt-get install -y vector
+        dpkg)
+            install_from_deb
             ;;
-        yum)
-            yum install -y vector
+        rpm)
+            install_from_rpm
             ;;
         homebrew)
             brew tap timberio/brew
@@ -123,10 +123,10 @@ main() {
 }
 
 get_package_manager() {
-    if check_cmd "apt-get"; then
-        echo "apt"
-    elif check_cmd "yum"; then
-        echo "yum"
+    if check_cmd "dpkg"; then
+        echo "dpkg"
+    elif check_cmd "rpm"; then
+        echo "rpm"
     elif check_cmd "brew"; then
         echo "homebrew"
     fi
@@ -169,7 +169,7 @@ install_from_archive() {
 
     ensure mkdir -p "$_dir"
 
-    printf "$_prompt Downloading Vector..."
+    printf "$_prompt Downloading Vector via $_url"
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
@@ -199,6 +199,82 @@ install_from_archive() {
     ignore rmdir "$_dir"
 
     return "$_retval"
+}
+
+install_from_deb() {
+    need_cmd dpkg
+
+    get_architecture || return 1
+    local _arch="$RETVAL"
+    assert_nz "$_arch" "arch"
+
+    local _package_arch=""
+    case "$_arch" in
+        x86_64-*)
+            _package_arch="amd64"
+            ;;
+        *)
+            err "unsupported arch: $_arch"
+            ;;
+    esac
+
+    local _url="${PACKAGE_ROOT}/latest/vector-${_package_arch}.deb"
+    local _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+    local _file="${_dir}/vector-${_package_arch}.deb"
+
+    ensure mkdir -p "$_dir"
+
+    printf "$_prompt Downloading Vector via $_url"
+    ensure downloader "$_url" "$_file"
+    printf " ✓\n"
+
+    printf "$_prompt Installing Vector via dpkg..."
+    ensure dpkg -i $_file
+
+    printf "$_prompt Install succeeded! 🚀\n"
+    printf "$_prompt To start Vector:\n"
+    printf "\n"
+    printf "$_indent sudo systemctl start vector\n"
+    printf "\n"
+    printf "$_prompt More information at https://docs.vector.dev\n"
+}
+
+install_from_rpm() {
+    need_cmd dpkg
+
+    get_architecture || return 1
+    local _arch="$RETVAL"
+    assert_nz "$_arch" "arch"
+
+    local _package_arch=""
+    case "$_arch" in
+        x86_64-*)
+            _package_arch="x86_64"
+            ;;
+        *)
+            err "unsupported arch: $_arch"
+            ;;
+    esac
+
+    local _url="${PACKAGE_ROOT}/latest/vector-${_package_arch}.rpm"
+    local _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
+    local _file="${_dir}/vector-${_package_arch}.rpm"
+
+    ensure mkdir -p "$_dir"
+
+    printf "$_prompt Downloading Vector via $_url"
+    ensure downloader "$_url" "$_file"
+    printf " ✓\n"
+
+    printf "$_prompt Installing Vector via rpm..."
+    ensure rpm -i $_file
+
+    printf "$_prompt Install succeeded! 🚀\n"
+    printf "$_prompt To start Vector:\n"
+    printf "\n"
+    printf "$_indent sudo systemctl start vector\n"
+    printf "\n"
+    printf "$_prompt More information at https://docs.vector.dev\n"
 }
 
 # ------------------------------------------------------------------------------
