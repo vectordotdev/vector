@@ -3,13 +3,9 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
-use tokio::{
-    codec::FramedRead,
-    io::{stdin, AsyncRead},
-};
+use std::{io, thread};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -40,7 +36,11 @@ impl SourceConfig for StdinConfig {
         _globals: &GlobalOptions,
         out: mpsc::Sender<Event>,
     ) -> crate::Result<super::Source> {
-        Ok(stdin_source(stdin(), self.clone(), out))
+        Ok(stdin_source(
+            io::BufReader::new(io::stdin()),
+            self.clone(),
+            out,
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -48,24 +48,46 @@ impl SourceConfig for StdinConfig {
     }
 }
 
-pub fn stdin_source<S>(stream: S, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
+pub fn stdin_source<R>(mut stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
 where
-    S: AsyncRead + Send + 'static,
+    R: Send + io::BufRead + 'static,
 {
     Box::new(future::lazy(move || {
         info!("Capturing STDIN");
 
         let host_key = config.host_key.clone().unwrap_or(event::HOST.to_string());
         let hostname = hostname::get_hostname();
+        let (mut tx, rx) = futures::sync::mpsc::channel(10240000000);
 
-        let source = FramedRead::new(
-            stream,
-            BytesDelimitedCodec::new_with_max_length(b'\n', config.max_length),
-        )
-        .map(move |line| create_event(line, &host_key, &hostname))
-        .map_err(|e| error!("error reading line: {:?}", e))
-        .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-        .map(|_| info!("finished sending"));
+        thread::spawn(move || {
+            println!("Loaded thread");
+            loop {
+                let mut buf = String::new();
+                match stdin.read_line(&mut buf) {
+                    Err(e) => {
+                        error!("Error reading from source: stdin: {}", e);
+                        break;
+                    }
+                    Ok(0) => {
+                        break;
+                    }
+                    _ => (),
+                }
+                while let Err(e) = tx.try_send(buf.clone()) {
+                    if e.is_full() {
+                        continue;
+                    }
+                    error!("Error sending : {}", e);
+                    break;
+                }
+            }
+        });
+
+        let source = rx
+            .map(move |line| create_event(Bytes::from(line.trim()), &host_key, &hostname))
+            .map_err(|e| error!("error reading line: {:?}", e))
+            .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
+            .map(|_| info!("finished sending"));
 
         source
     }))
