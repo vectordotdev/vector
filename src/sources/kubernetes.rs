@@ -58,7 +58,7 @@ impl SourceConfig for KubernetesConfig {
             .filter_map(move |event| transform_file.transform(event))
             .filter_map(move |event| parse_message(event))
             .filter_map(move |event| now.filter(event))
-            .forward(out.sink_map_err(|_| ()))
+            .forward(out.sink_map_err(drop))
             .map(|_| ())
             .join(file_source)
             .map(|((), ())| ());
