@@ -110,7 +110,6 @@ spec:
       - name: vector
         image: ktff/vector:latest
         imagePullPolicy: Always
-        args: ["-c","/etc/vector/vector.toml"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/

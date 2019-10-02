@@ -70,7 +70,6 @@ spec:
         # TODO: update to a proper version which contains kubernetes source.
         image: timberio/vector:0.4.0-alpine
         imagePullPolicy: Always
-        args: ["-c","/etc/vector/vector.toml"]
         volumeMounts:
         - name: var-log
           mountPath: /var/log/
