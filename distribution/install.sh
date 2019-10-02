@@ -73,25 +73,27 @@ main() {
 
     # Confirm with the user before proceeding to install Vector through a
     # package manager. Otherwise, we install from an archive.
-    if [ "$prompt" = "yes" ] && [ -n "$_package_manager" ]; then
-        echo "$_prompt How would you like to install vector?"
-        echo ""
-        echo "$_indent 1) Through the $_package_manager package manger (recommended)"
-        echo "$_indent 2) Directly from a pre-built archive"
+    if [ "$prompt" = "yes" ]; then
+        if [ -n "$_package_manager" ]; then
+            echo "$_prompt We'll be installing Vector via the $_package_manager package at https://packages.timber.io/vector/latest/"
+        else
+            echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/latest/"
+        fi
+
+        echo "$_prompt Ready to proceed? (y/n)"
         echo ""
 
         while true; do
             read -p "$_prompt " _choice </dev/tty
             case $_choice in
-                1)
-                    break
+                n)
+                    err "exiting"
                     ;;
-                2)
-                    _package_manager=""
+                y)
                     break
                     ;;
                 *)
-                    echo "Please enter 1 or 2."
+                    echo "Please enter y or n."
                     ;;
             esac
         done
