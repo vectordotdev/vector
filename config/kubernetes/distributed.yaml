@@ -67,7 +67,8 @@ spec:
              path: vector.toml
       containers:
       - name: vector
-        image: timberio/vector:latest
+        # TODO: update to a proper version which contains kubernetes source.
+        image: timberio/vector:0.4.0-alpine
         imagePullPolicy: Always
         args: ["-c","/etc/vector/vector.toml"]
         volumeMounts:
