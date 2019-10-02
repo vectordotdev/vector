@@ -640,6 +640,13 @@ workflows:
       - verify-rpm-artifact-on-centos-7:
           <<: *require-packages
 
+      # Syncing
+
+      - sync-install:
+          <<: *sync-filters
+          requires:
+            - verify-install
+
   nightly:
     triggers:
       - schedule:
@@ -806,15 +813,6 @@ workflows:
           <<: *release-filters
           requires:
             - release-s3
-
-  sync:
-    jobs:
-      - verify-install:
-          <<: *sync-filters
-      - sync-install:
-          <<: *sync-filters
-          requires:
-            - verify-install
 
 experimental:
   notify:
