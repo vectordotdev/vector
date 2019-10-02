@@ -330,49 +330,49 @@ jobs:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-1
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-amazon-linux-2:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-2
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-cent-os-7:
     docker:
       - image: centos:7
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-deb-8:
     docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-deb-9:
     docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-deb-10:
     docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-unbuntu-16-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   verify-install-on-unbuntu-18-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
-      <<: *verify-install
+        <<: *verify-install
 
   #
   # Verifying the systemd service script
