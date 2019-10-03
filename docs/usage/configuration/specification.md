@@ -57,6 +57,15 @@ data_dir = "/var/lib/vector"
 # Sources specify data sources and are responsible for ingesting data into
 # Vector.
 
+# Ingests data through extract logs from the docker daemon and outputs `log` events.
+[sources.docker]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "docker"
+  type = "docker"
+
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]
   #

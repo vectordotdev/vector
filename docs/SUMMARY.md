@@ -50,6 +50,7 @@
 
 * [Configuration][docs.configuration.readme]
   * [Sources][docs.sources.readme]
+    * [docker source][docs.sources.docker]
     * [file source][docs.sources.file]
     * [journald source][docs.sources.journald]
     * [kafka source][docs.sources.kafka]
@@ -182,6 +183,7 @@
 [docs.sinks.statsd]: ./usage/configuration/sinks/statsd.md
 [docs.sinks.tcp]: ./usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ./usage/configuration/sinks/vector.md
+[docs.sources.docker]: ./usage/configuration/sources/docker.md
 [docs.sources.file]: ./usage/configuration/sources/file.md
 [docs.sources.journald]: ./usage/configuration/sources/journald.md
 [docs.sources.kafka]: ./usage/configuration/sources/kafka.md

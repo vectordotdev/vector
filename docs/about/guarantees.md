@@ -25,6 +25,7 @@ and [source][docs.sources].
 | Name | Description |
 |:-----|:------------|
 | **Sources** | |
+| [`docker` source][docs.sources.docker] | `best_effort` |
 | [`file` source][docs.sources.file] | `best_effort` |
 | [`journald` source][docs.sources.journald] | `best_effort` |
 | [`kafka` source][docs.sources.kafka] | `at_least_once` |
@@ -131,6 +132,7 @@ keep you in the loop if this ever changes.
 [docs.sinks.tcp]: ../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../usage/configuration/sinks/vector.md
 [docs.sinks]: ../usage/configuration/sinks
+[docs.sources.docker]: ../usage/configuration/sources/docker.md
 [docs.sources.file]: ../usage/configuration/sources/file.md
 [docs.sources.journald]: ../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../usage/configuration/sources/kafka.md
