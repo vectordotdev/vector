@@ -172,6 +172,54 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
     # * required
     # * no default
     user = "username"
+
+  #
+  # Tls
+  #
+
+  [sinks.clickhouse_sink.tls]
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
