@@ -335,6 +335,16 @@ jobs:
   # Verifying the install script
   #
 
+  verify-install-on-internet:
+    machine: true
+    steps:
+      - run:
+          name: Install vector
+          command: curl https://sh.vector.dev -sSf | sh -s -- -y
+      - run:
+          name: Verify installation
+          command: vector --version
+
   verify-install-on-amazon-linux-1:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-1
@@ -416,7 +426,7 @@ jobs:
       - *verify-install
 
   #
-  # Verifying the systemd service script
+  # Verifying systemd script
   #
 
   verify-systemd-on-debian:
@@ -706,6 +716,17 @@ workflows:
           <<: *require-packages
       - release-s3:
           <<: *require-verifications
+
+  remote-checks:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - verify-install-on-internet
 
   release:
     jobs:
