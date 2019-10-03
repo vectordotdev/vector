@@ -97,7 +97,7 @@ release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
 sync-install:
-	@aws s3 cp distribution/install.sh s3://sh.vector.dev
+	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
 version: ## Get the current Vector version
 	@echo $(_version)
