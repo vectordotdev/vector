@@ -383,6 +383,14 @@ jobs:
       - *install-vector
       - *verify-install
 
+  verify-install-on-mac:
+    macos:
+      xcode: "9.0"
+    steps:
+      - checkout
+      - *install-vector
+      - *verify-install
+
   verify-install-on-unbuntu-16-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
@@ -532,6 +540,7 @@ require-verifications: &require-verifications
     - verify-install-on-deb-8
     - verify-install-on-deb-9
     - verify-install-on-deb-10
+    - verify-install-on-mac
     - verify-install-on-unbuntu-16-04
     - verify-install-on-unbuntu-18-04
     - verify-install-on-unbuntu-19-04
@@ -609,6 +618,8 @@ workflows:
           <<: *require-packages
       - verify-install-on-deb-10:
           <<: *require-packages
+      - verify-install-on-mac:
+          <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
       - verify-install-on-unbuntu-18-04:
@@ -678,6 +689,8 @@ workflows:
       - verify-install-on-deb-9:
           <<: *require-packages
       - verify-install-on-deb-10:
+          <<: *require-packages
+      - verify-install-on-mac:
           <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
@@ -751,6 +764,8 @@ workflows:
       - verify-install-on-deb-9:
           <<: *require-packages
       - verify-install-on-deb-10:
+          <<: *require-packages
+      - verify-install-on-mac:
           <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
