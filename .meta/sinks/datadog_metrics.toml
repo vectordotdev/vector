@@ -16,7 +16,8 @@ description = "A prefix that will be added to all metric names."
 [sinks.datadog_metrics.options.host]
 type = "string"
 examples = ["https://api.datadoghq.com", "https://api.datadoghq.eu"]
-null = false
+null = true
+default = "https://api.datadoghq.com"
 description = "Datadog endpoint to send metrics to."
 
 [sinks.datadog_metrics.options.api_key]

@@ -33,7 +33,6 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
   type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"]
   api_key = "3111111111111111aaaaaaaaaaaaaaaa"
-  host = "https://api.datadoghq.com"
   namespace = "service"
 
   # For a complete list of options see the "advanced" tab above.
@@ -62,13 +61,6 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
   # * no default
   api_key = "3111111111111111aaaaaaaaaaaaaaaa"
 
-  # Datadog endpoint to send metrics to.
-  # 
-  # * required
-  # * no default
-  host = "https://api.datadoghq.com"
-  host = "https://api.datadoghq.eu"
-
   # A prefix that will be added to all metric names.
   # 
   # * required
@@ -80,6 +72,13 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
   # * optional
   # * default: true
   healthcheck = true
+
+  # Datadog endpoint to send metrics to.
+  # 
+  # * optional
+  # * default: "https://api.datadoghq.com"
+  host = "https://api.datadoghq.com"
+  host = "https://api.datadoghq.eu"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -92,10 +91,10 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
 | `type` | `string` | The component type<br />`required` `must be: "datadog_metrics"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `api_key` | `string` | Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)<br />`required` `example: (see above)` |
-| `host` | `string` | Datadog endpoint to send metrics to.<br />`required` `example: "https://api.datadoghq.com"` |
 | `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
 | **OPTIONAL** | | |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+| `host` | `string` | Datadog endpoint to send metrics to.<br />`default: "https://api.datadoghq.com"` |
 
 ## How It Works
 

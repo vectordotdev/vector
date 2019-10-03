@@ -2,13 +2,12 @@ use crate::{
     buffers::Acker,
     event::{Event, Metric},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{Error as HttpError, HttpRetryLogic, HttpService, Response as HttpResponse},
         retries::FixedRetryPolicy,
         BatchServiceSink, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{Future, Poll};
 use http::{uri::InvalidUri, Method, StatusCode, Uri};
@@ -177,8 +176,8 @@ impl DatadogSvc {
 }
 
 impl Service<Vec<Event>> for DatadogSvc {
-    type Response = hyper::Response<Bytes>;
-    type Error = hyper::error::Error;
+    type Response = HttpResponse;
+    type Error = HttpError;
     type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
