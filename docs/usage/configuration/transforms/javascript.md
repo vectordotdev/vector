@@ -24,6 +24,18 @@ as it will help shape the roadmap of this component.
 
 The `javascript` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded JavaScript engine.
 
+## Data types correspondence
+
+There is a one-to-one correspondence between each Vector's data type and a JavaScript type:
+
+| Vector datatype | JavaScript datatype | Note |
+|-----------------+---------------------+------|
+| `Bytes`         | `String`            | Bytes sequences that are not valid UTF-8 are converted to UTF-8 in a lossy way |
+| `Integer`       | [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)  | Attempt to return from JavaScript BigInt that is not between -2^63..2^63-1 will result in an error |
+| `Float`         | `Number`            | Integers of form `123` without decimal point have type `Number` in JavaScript and will be convertd to `Float` when returned from JavaScript |
+| `Boolean`       | `Boolean`           |      |
+| `Timestamp`     | `Date`              | JavaScript dates precision is 1 millisecond, while Vector timestamps precision is 1 nanosecond |
+
 ## Config File
 
 {% code-tabs %}
