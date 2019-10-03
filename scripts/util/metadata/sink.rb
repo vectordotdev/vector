@@ -123,6 +123,15 @@ class Sink < Component
       # Standard TLS options
       options = {}
 
+      if tls_options.include?("+enabled")
+        options["enabled"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => false,
+          "description" => "Enable TLS during connections to the remote."
+        }
+      end
+
       options["ca_path"] = {
         "type" => "string",
         "null" => true,

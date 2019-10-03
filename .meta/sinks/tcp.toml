@@ -5,6 +5,7 @@ egress_method = "streaming"
 healthcheck = true
 input_types = ["log"]
 write_to_description = "a TCP connection"
+tls_options = ["+enabled"]
 
 [sinks.tcp.options.address]
 type = "string"
@@ -18,49 +19,3 @@ category = "Requests"
 enum = ["json", "text"]
 null = false
 description = "The encoding format used to serialize the events before flushing."
-
-[sinks.tcp.options.tls]
-type = "table"
-null = true
-description = "Options for TLS support"
-
-[sinks.tcp.options.tls.options.enabled]
-type = "bool"
-null = true
-default = false
-description = "Enable TLS during connections to the remote."
-
-[sinks.tcp.options.tls.options.verify]
-type = "bool"
-null = true
-default = true
-description = """If `true`, Vector will force certificate validation. \
-Do NOT set this to `false` unless you know the risks of not verifying \
-the remote certificate."""
-
-[sinks.tcp.options.tls.options.ca_file]
-type = "string"
-null = true
-description = "Absolute path to additional CA certificate file, in PEM format."
-examples = ["/path/to/certificate_authority.crt"]
-
-[sinks.tcp.options.tls.options.crt_file]
-type = "string"
-null = true
-description = """Absolute path to certificate file used to identify this \
-connection, in PEM format. If this is set, `key_file` must also be set."""
-examples = ["/path/to/host_certificate.crt"]
-
-[sinks.tcp.options.tls.options.key_file]
-type = "string"
-null = true
-description = """Absolute path to key file used to identify this \
-connection, in PEM format. If this is set, `crt_file` must also be set."""
-examples = ["/path/to/host_certificate.key"]
-
-[sinks.tcp.options.tls.options.key_phrase]
-type = "string"
-null = true
-description = """Pass phrase to unlock the encrypted key file. \
-This has no effect unless `key_file` above is set."""
-examples = ["PassWord1"]

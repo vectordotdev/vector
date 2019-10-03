@@ -126,39 +126,48 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
     # * default: false
     enabled = false
 
-    # If `true`, Vector will force certificate validation. Do NOT set this to
-    # `false` unless you know the risks of not verifying the remote certificate.
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
     # 
     # * optional
     # * default: true
-    verify = true
+    verify_certificate = true
 
-    # Absolute path to additional CA certificate file, in PEM format.
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
     # 
     # * optional
-    # * no default
-    ca_file = "/path/to/certificate_authority.crt"
-
-    # Absolute path to certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_file` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_file = "/path/to/host_certificate.crt"
-
-    # Absolute path to key file used to identify this connection, in PEM format. If
-    # this is set, `crt_file` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_file = "/path/to/host_certificate.key"
-
-    # Pass phrase to unlock the encrypted key file. This has no effect unless
-    # `key_file` above is set.
-    # 
-    # * optional
-    # * no default
-    key_phrase = "PassWord1"
+    # * default: true
+    verify_hostname = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
