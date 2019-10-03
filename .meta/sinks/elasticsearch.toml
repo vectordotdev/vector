@@ -90,3 +90,43 @@ type = "string"
 examples = ["us-east-1"]
 null = true
 description = "When using the AWS provider, the [AWS region][urls.aws_cw_logs_regions] of the target Elasticsearch instance."
+
+[sinks.elasticsearch.options.tls]
+type = "table"
+null = true
+description = "Options for TLS (HTTPS) connections"
+
+[sinks.elasticsearch.options.tls.options.verify]
+type = "bool"
+null = true
+default = true
+description = """If `true`, Vector will force certificate validation. \
+Do NOT set this to `false` unless you know the risks of not verifying \
+the remote certificate."""
+
+[sinks.elasticsearch.options.tls.options.ca_path]
+type = "string"
+null = true
+description = "Absolute path to an additional CA certificate file, in PEM format."
+examples = ["/path/to/certificate_authority.crt"]
+
+[sinks.elasticsearch.options.tls.options.crt_path]
+type = "string"
+null = true
+description = """Absolute path to certificate file used to identify this \
+connection, in PEM format. If this is set, `key_path` must also be set."""
+examples = ["/path/to/host_certificate.crt"]
+
+[sinks.elasticsearch.options.tls.options.key_path]
+type = "string"
+null = true
+description = """Absolute path to key file used to identify this \
+connection, in PEM format. If this is set, `crt_path` must also be set."""
+examples = ["/path/to/host_certificate.key"]
+
+[sinks.elasticsearch.options.tls.options.key_pass]
+type = "string"
+null = true
+description = """Pass phrase to unlock the encrypted key file. \
+This has no effect unless `key_path` above is set."""
+examples = ["PassWord1"]

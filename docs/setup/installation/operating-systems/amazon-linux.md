@@ -6,7 +6,7 @@ description: Install Vector on Amazon Linux
 
 Vector can be installed on Amazon Linux through the following methods:
 
-{% page-ref page="../package-managers/yum.md" %}
+{% page-ref page="../package-managers/rpm.md" %}
 
 {% page-ref page="../manual/from-archives.md" %}
 

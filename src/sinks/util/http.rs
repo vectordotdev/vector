@@ -1,4 +1,7 @@
-use super::retries::RetryLogic;
+use super::{
+    retries::RetryLogic,
+    tls::{TlsConnectorExt, TlsSettings},
+};
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
 use http::StatusCode;
@@ -26,7 +29,7 @@ impl HttpService {
         HttpServiceBuilder::new()
     }
 
-    pub fn new<F>(request_builder: F) -> Self
+    pub fn new<F>(request_builder: F) -> crate::Result<Self>
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -35,50 +38,52 @@ impl HttpService {
 }
 
 /// A builder for `HttpService`s
+#[derive(Default)]
 pub struct HttpServiceBuilder {
     threads: usize,
-    verify_certificate: bool,
+    tls_settings: Option<TlsSettings>,
 }
 
 impl HttpServiceBuilder {
     fn new() -> Self {
         Self {
             threads: 4,
-            verify_certificate: true,
+            ..Default::default()
         }
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(&self, request_builder: F) -> HttpService
+    pub fn build<F>(self, request_builder: F) -> crate::Result<HttpService>
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
         let mut http = HttpConnector::new(self.threads);
         http.enforce_http(false);
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(!self.verify_certificate)
-            .build()
-            .expect("TLS initialization failed");
+        let mut tls = native_tls::TlsConnector::builder();
+        if let Some(settings) = self.tls_settings {
+            tls.use_tls_settings(settings);
+        }
+        let tls = tls.build().expect("TLS initialization failed");
         let https = HttpsConnector::from((http, tls));
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        HttpService {
+        Ok(HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-        }
+        })
     }
 
     /// Set the number of threads used by the `HttpService`
-    pub fn threads(&mut self, threads: usize) -> &mut Self {
+    pub fn threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
     }
 
-    /// Verify the remote server's certificate
-    pub fn verify_certificate(&mut self, verify: bool) -> &mut Self {
-        self.verify_certificate = verify;
+    /// Set the standard TLS settings
+    pub fn tls_settings(mut self, settings: TlsSettings) -> Self {
+        self.tls_settings = Some(settings);
         self
     }
 }
@@ -179,7 +184,8 @@ mod test {
             builder.method(Method::POST);
             builder.uri(uri.clone());
             builder.body(body.into()).unwrap()
-        });
+        })
+        .unwrap();
 
         let req = service.call(request);
 
