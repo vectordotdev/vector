@@ -1,11 +1,20 @@
-FROM buildpack-deps:stretch-curl
+FROM debian:buster AS builder
 
-ENV VECTOR_VERSION latest
-RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" && \
-    case "${dpkgArch##*-}" in \
-      amd64) ARCH='amd64';; \
-      *)     echo "Unsupported architecture: ${dpkgArch}"; exit 1;; \
-    esac && \
-    wget --no-verbose https://packages.timber.io/vector/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-${ARCH}.deb && \
-    dpkg -i vector-${VECTOR_VERSION}-${ARCH}.deb && \
-    rm -f vector_${VECTOR_VERSION}-${ARCH}.deb
+# The `x.y.z` version of vector to fetch from packages.timber.io
+ENV VERSION nightly/latest
+
+WORKDIR /vector
+
+RUN apt-get update && apt-get install -y wget
+
+# TODO: Use https instead of http
+RUN wget https://packages.timber.io/vector/${VERSION}/vector-x86_64-unknown-linux-gnu.tar.gz
+
+RUN tar -xvf vector-x86_64-unknown-linux-gnu.tar.gz
+RUN mv vector-x86_64-unknown-linux-gnu/bin bin
+
+FROM debian:buster-slim
+
+COPY --from=builder /vector/bin/* /usr/local/bin/
+
+ENTRYPOINT ["/usr/local/bin/vector"]

@@ -38,7 +38,7 @@ check-generate: ## Checks for pending `make generate` changes
 
 generate: ## Generates files across the repo using the data in /.meta
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
-	@export VERSION=$(_latest_version); scripts/generate.rb
+	@scripts/generate.rb
 
 fmt: ## Format code
 	@cargo fmt
