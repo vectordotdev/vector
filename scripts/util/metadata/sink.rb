@@ -160,19 +160,21 @@ class Sink < Component
         "description" => "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set."
       }
 
-      options["verify_certificate"] = {
-        "type" => "bool",
-        "null" => true,
-        "default" => true,
-        "description" => "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
-      }
+      if !tls_options.include?("-verify")
+        options["verify_certificate"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => true,
+          "description" => "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
+        }
 
-      options["verify_hostname"] = {
-        "type" => "bool",
-        "null" => true,
-        "default" => true,
-        "description" => "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
-      }
+        options["verify_hostname"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => true,
+          "description" => "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
+        }
+      end
 
       @options.tls = Option.new({
         "name" => "tls",
