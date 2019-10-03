@@ -119,6 +119,13 @@ templates = Templates.new(TEMPLATES_DIR, metadata)
 #
 
 metadata.components.each do |component|
+  # Base .md file to ensure links to the new source work
+  md_path = "#{DOCS_ROOT}/usage/configuration/#{component.type.pluralize}/#{component.name}.md"
+
+  if !File.exists?(md_path)
+    File.open(md_path, 'w+') { |file| file.write("") }
+  end
+
   # Configuration templates
   template_path = "#{TEMPLATES_DIR}/docs/usage/configuration/#{component.type.pluralize}/#{component.name}.md.erb"
 
