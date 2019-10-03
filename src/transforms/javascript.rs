@@ -109,6 +109,11 @@ enum ProcessError {
         value
     ))]
     JavascriptNestedArraysError { field: String, value: Vec<JsValue> },
+    #[snafu(display(
+        "BigInts returned from JavaScript should fit into 64-bit signed integers, got {}",
+        value
+    ))]
+    JavascriptBigintOverflowError { value: quick_js::BigInt },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -311,7 +316,7 @@ fn encode(event: Event) -> JsValue {
                 key.to_string(),
                 match value {
                     ValueKind::Bytes(v) => JsValue::String(String::from_utf8_lossy(v).to_string()),
-                    ValueKind::Integer(v) => JsValue::Float(*v as f64), // JS `Number`s are floats
+                    ValueKind::Integer(v) => JsValue::BigInt((*v).into()),
                     ValueKind::Float(v) => JsValue::Float(*v),
                     ValueKind::Boolean(v) => JsValue::Bool(*v),
                     ValueKind::Timestamp(v) => JsValue::Date(*v),
@@ -352,26 +357,33 @@ fn object_to_event(object: HashMap<String, JsValue>) -> crate::Result<Event> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
     for (k, v) in object.into_iter() {
-        let v = match v {
-            JsValue::Null => continue,
-            JsValue::Bool(v) => ValueKind::Boolean(v),
-            JsValue::Int(v) => ValueKind::Integer(v as i64),
-            JsValue::Float(v) => ValueKind::Float(v),
-            JsValue::String(v) => ValueKind::Bytes(v.into()),
-            JsValue::Date(v) => ValueKind::Timestamp(v),
-            JsValue::Object(v) => {
-                return Err(Box::new(ProcessError::JavascriptNestedObjectsError {
-                    field: k,
-                    value: v,
-                }));
-            }
-            JsValue::Array(v) => {
-                return Err(Box::new(ProcessError::JavascriptNestedArraysError {
-                    field: k,
-                    value: v,
-                }))
-            }
-        };
+        let v =
+            match v {
+                JsValue::Null => continue,
+                JsValue::Bool(v) => ValueKind::Boolean(v),
+                JsValue::BigInt(v) => {
+                    let int = v.as_i64().ok_or(Box::new(
+                        ProcessError::JavascriptBigintOverflowError { value: v },
+                    ))?;
+                    ValueKind::Integer(int)
+                }
+                JsValue::Int(v) => ValueKind::Float(v as f64),
+                JsValue::Float(v) => ValueKind::Float(v),
+                JsValue::String(v) => ValueKind::Bytes(v.into()),
+                JsValue::Date(v) => ValueKind::Timestamp(v),
+                JsValue::Object(v) => {
+                    return Err(Box::new(ProcessError::JavascriptNestedObjectsError {
+                        field: k,
+                        value: v,
+                    }));
+                }
+                JsValue::Array(v) => {
+                    return Err(Box::new(ProcessError::JavascriptNestedArraysError {
+                        field: k,
+                        value: v,
+                    }))
+                }
+            };
         log.insert_implicit(k.into(), v.into());
     }
     Ok(event)
@@ -629,7 +641,7 @@ mod tests {
     fn javascript_transform_add_field_integer() {
         let mut js = make_js(
             r#"
-            event => ({...event, field: 123})
+            event => ({...event, field: 123n})
             "#,
         );
 
@@ -638,6 +650,24 @@ mod tests {
         let mut expected_event = source_event.clone();
         let expected_log = expected_event.as_mut_log();
         expected_log.insert_implicit("field".into(), 123.into());
+
+        let transformed_event = js.transform(source_event);
+        assert_eq!(transformed_event, Some(expected_event));
+    }
+
+    #[test]
+    fn javascript_transform_add_field_float_without_decimals() {
+        let mut js = make_js(
+            r#"
+            event => ({...event, field: 123})
+            "#,
+        );
+
+        let source_event = make_event();
+
+        let mut expected_event = source_event.clone();
+        let expected_log = expected_event.as_mut_log();
+        expected_log.insert_implicit("field".into(), 123.0.into());
 
         let transformed_event = js.transform(source_event);
         assert_eq!(transformed_event, Some(expected_event));
@@ -702,7 +732,7 @@ mod tests {
     fn javascript_transform_no_nested_objects() {
         let mut js = make_js(
             r#"
-            event => ({...event, field: {a: 3, b: 4}})
+            event => ({...event, field: {a: 3n, b: 4n}})
             "#,
         );
 
@@ -715,7 +745,7 @@ mod tests {
     fn javascript_transform_no_nested_arrays() {
         let mut js = make_js(
             r#"
-            event => ({...event, field: [1,2,3]})
+            event => ({...event, field: [1n,2n,3n]})
             "#,
         );
 
@@ -791,7 +821,7 @@ mod tests {
     fn javascript_transform_output_multiple_events() {
         let mut js = make_js(
             r#"
-            event => [{...event, a: 3}, {...event, b: 4}]
+            event => [{...event, a: 3n}, {...event, b: 4n}]
             "#,
         );
 
@@ -817,7 +847,7 @@ mod tests {
     fn javascript_transform_with_state() {
         let mut js = make_js_with_handler(
             r#"
-            let count = 0
+            let count = 0n
             const handler = event => ({...event, count: ++count})
             "#,
             "handler",
