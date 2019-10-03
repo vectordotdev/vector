@@ -542,7 +542,6 @@ require-verifications: &require-verifications
     - verify-install-on-deb-8
     - verify-install-on-deb-9
     - verify-install-on-deb-10
-    - verify-install-on-internet
     - verify-install-on-unbuntu-16-04
     - verify-install-on-unbuntu-18-04
     - verify-install-on-unbuntu-19-04
@@ -620,8 +619,6 @@ workflows:
           <<: *require-packages
       - verify-install-on-deb-10:
           <<: *require-packages
-      - verify-install-on-internet:
-          <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
       - verify-install-on-unbuntu-18-04:
@@ -692,8 +689,6 @@ workflows:
           <<: *require-packages
       - verify-install-on-deb-10:
           <<: *require-packages
-      - verify-install-on-internet:
-          <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
       - verify-install-on-unbuntu-18-04:
@@ -708,6 +703,17 @@ workflows:
           <<: *require-packages
       - release-s3:
           <<: *require-verifications
+
+  remote-checks:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - verify-install-on-internet
 
   release:
     jobs:
@@ -766,8 +772,6 @@ workflows:
       - verify-install-on-deb-9:
           <<: *require-packages
       - verify-install-on-deb-10:
-          <<: *require-packages
-      - verify-install-on-internet:
           <<: *require-packages
       - verify-install-on-unbuntu-16-04:
           <<: *require-packages
