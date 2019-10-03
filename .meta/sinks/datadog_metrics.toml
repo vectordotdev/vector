@@ -1,0 +1,26 @@
+[sinks.datadog_metrics]
+beta = true
+buffer = false
+delivery_guarantee = "best_effort"
+egress_method = "streaming"
+healthcheck = true
+input_types = ["metric"]
+write_to_description = "[Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
+
+[sinks.datadog_metrics.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = "A prefix that will be added to all metric names."
+
+[sinks.datadog_metrics.options.host]
+type = "string"
+examples = ["https://api.datadoghq.com", "https://api.datadoghq.eu"]
+null = false
+description = "Datadog endpoint to send metrics to."
+
+[sinks.datadog_metrics.options.api_key]
+type = "string"
+examples = ["3111111111111111aaaaaaaaaaaaaaaa"]
+null = false
+description = "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"

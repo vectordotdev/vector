@@ -306,6 +306,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks.blackhole]: ../../usage/configuration/sinks/blackhole.md
 [docs.sinks.clickhouse]: ../../usage/configuration/sinks/clickhouse.md
 [docs.sinks.console]: ../../usage/configuration/sinks/console.md
+[docs.sinks.datadog_metrics]: ../../usage/configuration/sinks/datadog_metrics.md
 [docs.sinks.elasticsearch]: ../../usage/configuration/sinks/elasticsearch.md
 [docs.sinks.file]: ../../usage/configuration/sinks/file.md
 [docs.sinks.http]: ../../usage/configuration/sinks/http.md
@@ -350,6 +351,7 @@ All TOML values types are supported. For convenience this includes:
 [urls.aws_s3]: https://aws.amazon.com/s3/
 [urls.clickhouse]: https://clickhouse.yandex/
 [urls.clickhouse_http]: https://clickhouse.yandex/docs/en/interfaces/http/
+[urls.datadog]: https://www.datadoghq.com
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.kafka]: https://kafka.apache.org/

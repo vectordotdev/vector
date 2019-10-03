@@ -2049,6 +2049,47 @@ end
   # * type: bool
   healthcheck = true
 
+# Streams `metric` events to Datadog metrics service using HTTP API.
+[sinks.datadog_metrics]
+  # The component type
+  # 
+  # * required
+  # * no default
+  # * must be: "datadog_metrics"
+  type = "datadog_metrics"
+
+  # A list of upstream source or transform IDs. See Config Composition for more
+  # info.
+  # 
+  # * required
+  # * no default
+  inputs = ["my-source-id"]
+
+  # Datadog API key
+  # 
+  # * required
+  # * no default
+  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
+
+  # Datadog endpoint to send metrics to.
+  # 
+  # * required
+  # * no default
+  host = "https://api.datadoghq.com"
+  host = "https://api.datadoghq.eu"
+
+  # A prefix that will be added to all metric names.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # Enables/disables the sink healthcheck upon start.
+  # 
+  # * optional
+  # * default: true
+  healthcheck = true
+
 # Batches `log` events to Elasticsearch via the `_bulk` API endpoint.
 [sinks.elasticsearch]
   #

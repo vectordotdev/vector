@@ -1,0 +1,23 @@
+<%- component = metadata.sinks.datadog_metrics -%>
+
+<%= component_header(component) %>
+
+## Config File
+
+<%= component_config_example(component) %>
+
+## Options
+
+<%= options_table(component.options.to_h.values.sort) %>
+
+## How It Works [[sort]]
+
+<%= component_sections(component) %>
+
+## Troubleshooting
+
+<%= component_troubleshooting(component) %>
+
+## Resources
+
+<%= component_resources(component) %> 
