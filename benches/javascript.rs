@@ -90,15 +90,14 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig {
+                    let transform = transforms::field_filter::FieldFilterConfig {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
                     .build()
-                    .unwrap()
-                },
-                |mut transform| {
-                    let num = (0..num_events)
+                    .unwrap();
+
+                    let events: Vec<Event> = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
                             event
@@ -106,6 +105,12 @@ fn field_filter(c: &mut Criterion) {
                                 .insert_explicit("the_field".into(), (i % 10).to_string().into());
                             event
                         })
+                        .collect();
+                    (transform, events)
+                },
+                |(mut transform, events)| {
+                    let num = events
+                        .into_iter()
                         .filter_map(|r| transform.transform(r))
                         .count();
                     assert_eq!(num, num_events / 10);
@@ -118,10 +123,9 @@ fn field_filter(c: &mut Criterion) {
                     let config = r#"
                     source = "event => (event.the_field !== '0') ? null : event"
                     "#;
-                    JavaScript::new(toml::from_str(config).unwrap()).unwrap()
-                },
-                |mut transform| {
-                    let num = (0..num_events)
+                    let transform = JavaScript::new(toml::from_str(config).unwrap()).unwrap();
+
+                    let events: Vec<Event> = (0..num_events)
                         .map(|i| {
                             let mut event = Event::new_empty_log();
                             event
@@ -129,6 +133,12 @@ fn field_filter(c: &mut Criterion) {
                                 .insert_explicit("the_field".into(), (i % 10).to_string().into());
                             event
                         })
+                        .collect();
+                    (transform, events)
+                },
+                |(mut transform, events)| {
+                    let num = events
+                        .into_iter()
                         .filter_map(|r| transform.transform(r))
                         .count();
                     assert_eq!(num, num_events / 10);
