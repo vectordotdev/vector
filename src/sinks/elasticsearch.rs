@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::{TlsConnectorExt, TlsOptions},
+        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
@@ -79,7 +79,7 @@ impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, acker)?;
+        let sink = es(self, common, acker);
 
         Ok((sink, healthcheck))
     }
@@ -94,7 +94,7 @@ struct ElasticSearchCommon {
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
-    tls_options: TlsOptions,
+    tls_settings: TlsSettings,
 }
 
 #[derive(Debug, Snafu)]
@@ -148,12 +148,18 @@ impl ElasticSearchCommon {
             }
         };
 
+        let tls_settings = config
+            .tls
+            .as_ref()
+            .unwrap_or(&Default::default())
+            .try_into()?;
+
         Ok(Self {
             host: config.host.clone(),
             authorization,
             region,
             credentials,
-            tls_options: config.tls.clone().unwrap_or(Default::default()),
+            tls_settings,
         })
     }
 
@@ -170,7 +176,7 @@ impl ElasticSearchCommon {
         let mut http = HttpConnector::new(1);
         http.enforce_http(false);
         let tls = TlsConnector::builder()
-            .use_tls_settings((&self.tls_options).try_into()?)
+            .use_tls_settings(self.tls_settings.clone())
             .build()?;
         let https = HttpsConnector::from((http, tls));
         Ok(Client::builder().build(https))
@@ -181,7 +187,7 @@ fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
     acker: Acker,
-) -> crate::Result<super::RouterSink> {
+) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -230,7 +236,7 @@ fn es(
     }
 
     let http_service = HttpService::builder()
-        .tls_settings((&common.tls_options).try_into()?)
+        .tls_settings(common.tls_settings.clone())
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
@@ -296,7 +302,7 @@ fn es(
         )
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
-    Ok(Box::new(sink))
+    Box::new(sink)
 }
 
 fn encode_event(
