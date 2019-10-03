@@ -63,7 +63,7 @@ fn add_fields(c: &mut Criterion) {
                 || {
                     let config = format!(
                         r#"
-                        event => {{ event['{}'] = '{}'; return event }}
+                        source = "event => {{ event['{}'] = '{}'; return event }}"
                         "#,
                         key, value
                     );
@@ -116,7 +116,7 @@ fn field_filter(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let config = r#"
-                    event => (event.the_field !== '0') ? null : event
+                    source = "event => (event.the_field !== '0') ? null : event"
                     "#;
                     JavaScript::new(toml::from_str(config).unwrap()).unwrap()
                 },
