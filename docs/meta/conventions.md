@@ -127,8 +127,8 @@ represent variable string values.
 Avoid saying "click here", instead, you should turn the relevant word\(s\)
 into a link. For example:
 
-* **Good:** See the [How It Works](conventions.md#links) section.
-* **Bad:** Click [here](conventions.md#links) to learn more.
+* **Good:** See the [How It Works][docs.conventions#links] section.
+* **Bad:** Click [here][docs.conventions#links] to learn more.
 
 ### Options
 
@@ -262,6 +262,7 @@ Here a few examples to help illustrate this point:
 
 
 [docs.administration]: ../usage/administration
+[docs.conventions#links]: ../meta/conventions.md#links
 [docs.guides]: ../usage/guides
 [docs.sinks]: ../usage/configuration/sinks
 [docs.sources]: ../usage/configuration/sources

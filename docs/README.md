@@ -1,6 +1,6 @@
 # What Is Vector?
 
-![](assets/components.svg)
+![][assets.components]
 
 Vector is a [high-performance][docs.performance], [open-source][urls.vector_repo]
 observability data router. It makes [collecting][docs.sources],
@@ -17,6 +17,7 @@ serving both as a light-weight [agent][docs.roles.agent] and a highly efficient
 from A to B.
 
 
+[assets.components]: ./assets/components.svg
 [docs.administration]: ./usage/administration
 [docs.correctness]: ./correctness.md
 [docs.deployment]: ./setup/deployment

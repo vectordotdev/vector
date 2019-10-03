@@ -320,5 +320,4 @@ mod tests {
             From::<&str>::from(&output[5][0])
         );
     }
-
 }

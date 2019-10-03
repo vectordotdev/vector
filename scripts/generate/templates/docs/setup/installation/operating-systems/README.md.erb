@@ -1,0 +1,19 @@
+---
+description: Install Vector on your operating system
+---
+
+# Operating Systems
+
+Vector offers installation instructions for the following operating systems:
+
+<%- metadata.installation.operating_systems.each do |operating_system| -%>
+{% page-ref page="<%= operating_system.id %>.md" %}
+<%- end -%>
+
+## Alternatives
+
+If you do not see your operating system you can consider:
+
+{% page-ref page="../manual/from-archives.md" %}
+
+{% page-ref page="../manual/from-source.md" %}

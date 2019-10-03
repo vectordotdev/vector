@@ -119,7 +119,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
         }
 
         request
-    });
+    })?;
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

@@ -1,24 +1,24 @@
 ---
-description: Install Vector through the YUM package manager
+description: Install Vector through the RPM package manager
 ---
 
-# YUM Package Manager
+# RPM Package Manager
 
-Vector can be installed through the [YUM package manager][urls.yum] which is
+Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
 
 ## Install
 
-Start by adding the Timber GPG key and repository:
+Download the [Vector `.rpm file`][urls.vector_downloads.latest/vector-x86_64.rpm]
 
 ```bash
-curl -s https://packagecloud.io/install/repositories/timberio/packages/script.rpm.sh | sudo bash
+curl -O <%= metadata.links.fetch("urls.vector_downloads.latest/vector-x86_64.rpm") %>
 ```
 
-Install Vector:
+Then install the Vector `.rpm` package directly:
 
 ```bash
-sudo yum install vector
+sudo rpm -i vector-x86_64.rpm
 ```
 
 Start Vector:
@@ -50,16 +50,15 @@ Vector can be managed through the [Systemd][urls.systemd] service manager:
 ## Uninstalling
 
 ```bash
-yum remove vector
+sudo rpm -e vector
 ```
 
 ## Updating
 
-```bash
-sudo yum upgrade vector
-```
+Follow the [install](#install) steps again.
 
+## Versions
 
-[docs.configuration]: ../../../usage/configuration
-[urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
-[urls.yum]: http://yum.baseurl.org/
+Historical Vector versions can be found in the [releases][urls.vector_releases].
+Once you've found the version you'd like to install you can re-follow the
+[install](#install) steps with the URL to the Vector `.rpm` file.

@@ -10,7 +10,7 @@ making it quick and easy. We'll start with the simplest of examples: accepting
 an event via the [`stdin` source][docs.sources.stdin], and then printing it out
 via the [`console` sink][docs.sinks.console].
 
-![](../../assets/getting-started-guide.svg)
+![][assets.getting-started-guide]
 
 ## 1. Install Vector
 
@@ -111,6 +111,7 @@ of Vector. From here, you can start to think about the various
 you'll need to combine to create your pipelines.
 
 
+[assets.getting-started-guide]: ../../assets/getting-started-guide.svg
 [docs.concepts]: ../../about/concepts.md
 [docs.configuration]: ../../usage/configuration
 [docs.event]: ../../setup/getting-started/sending-your-first-event.md

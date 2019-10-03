@@ -1,7 +1,4 @@
-# Nightly Rust is used because at the moment only nightly uses recent enough
-# LLVM version that supports libc++ with musl. It can be changed to a stable
-# version after Rust 1.38 release.
-ARG RUST_VERSION=nightly-2019-08-24
+ARG RUST_VERSION=1.38.0
 # The version of musl should be the same as the one Rust is compiled with.
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
@@ -10,10 +7,10 @@ ARG MUSL_VERSION=1.1.22
 # used by Rust. For each Rust version it can be found here
 # https://github.com/rust-lang/rust/tree/master/src as the commit hash of the
 # submodule "llvm-project".
-ARG LLVM_GIT_COMMIT=48818e9f5d0f2d5978a9b43ad1a2e8d0b83f6aa0
+ARG LLVM_GIT_COMMIT=71fe7ec06b85f612fc0e4eb4134c7a7d0f23fac5
 # Used by libc++. Programs compiled with this version should work with other
 # kernel versions too. See https://wiki.gentoo.org/wiki/Linux-headers#FAQ.
-ARG LINUX_HEADERS_VERSION=5.2.9
+ARG LINUX_HEADERS_VERSION=5.3.1
 # OpenSSL needs to be compiled against MUSL too, so we install it from source.
 ARG OPENSSL_VERSION=1.0.2t
 
@@ -88,7 +85,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf \
 ENV OPENSSL_DIR=$SRC_DIR/openssl-$OPENSSL_VERSION
 
 # Install build dependencies.
-RUN apt-get update && apt-get -y install curl ninja-build cmake python3-distutils
+RUN apt-get update && apt-get -y install rsync ninja-build cmake python3-distutils
 
 ARG LIBS_PREFIX
 
