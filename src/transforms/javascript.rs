@@ -165,6 +165,8 @@ impl JavaScript {
     pub fn new(config: JavaScriptConfig) -> crate::Result<Self> {
         let (input, thread_input) = mpsc::sync_channel(0);
         let (thread_output, output) = mpsc::sync_channel(0);
+
+        let dispatcher = tracing::dispatcher::get_default(|d| d.clone());
         thread::spawn(move || {
             let processor = JavaScriptProcessor::new(config);
             let processor = match processor {
@@ -180,21 +182,25 @@ impl JavaScript {
                         .expect("Unable to send data from JavaScript thread");
                 }
             };
-            for event in thread_input {
-                match event {
-                    ProcessorInput::Event(event) => {
-                        let mut output_events = Vec::new();
-                        let result = processor.process(&mut output_events, event);
-                        if let Err(err) = result {
-                            eprintln!("Error in JavaScript transform; discarding event\n{}", err)
+
+            let dispatcher = dispatcher;
+            tracing::dispatcher::with_default(&dispatcher, || {
+                for event in thread_input {
+                    match event {
+                        ProcessorInput::Event(event) => {
+                            let mut output_events = Vec::new();
+                            let result = processor.process(&mut output_events, event);
+                            if let Err(error) = result {
+                                warn!(message = "Error in JavaScript transform; discarding event", error = ?error)
+                            }
+                            thread_output
+                                .send(ProcessorOutput::Events(output_events))
+                                .expect("Unable to send data from JavaScript thread");
                         }
-                        thread_output
-                            .send(ProcessorOutput::Events(output_events))
-                            .expect("Unable to send data from JavaScript thread");
+                        ProcessorInput::Stop => break,
                     }
-                    ProcessorInput::Stop => break,
                 }
-            }
+            });
         });
         match output
             .recv()
