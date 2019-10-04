@@ -32,6 +32,8 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"
   inputs = ["my-source-id"]
+  namespace = "service"
+  region = "us-east-1"
 
   # For a complete list of options see the "advanced" tab above.
 ```
@@ -52,6 +54,18 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
   # * required
   # * no default
   inputs = ["my-source-id"]
+
+  # A namespace that will isolate different metrics from each other.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # The AWS region of the target CloudWatch stream resides.
+  # 
+  # * required
+  # * no default
+  region = "us-east-1"
 
   # Custom endpoint for use with AWS-compatible services.
   # 
@@ -75,6 +89,8 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_metrics"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `namespace` | `string` | A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.<br />`required` `example: "service"` |
+| `region` | `string` | The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.<br />`required` `example: "us-east-1"` |
 | **OPTIONAL** | | |
 | `endpoint` | `string` | Custom endpoint for use with AWS-compatible services.<br />`no default` `example: "127.0.0.0:5000"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
@@ -130,6 +146,29 @@ vector --config /etc/vector/vector.toml --require-healthy
 And finally, if you'd like to disable health checks entirely for this sink
 you can set the `healthcheck` option to `false`.
 
+### Metric Types
+
+CloudWatch Metrics types are organized not by their semantics, but by storage properties:
+- Statistic Sets
+- Data Points
+
+In Vector only the latter is used to allow lossless statistics calculations on CloudWatch side.
+
+The following matrix outlines how Vector metric types are mapped into CloudWatch metrics types.
+
+| Vector Metrics | CloudWatch Metrics |
+|----------------|--------------------|
+| Counter        | Data Point         |
+| Gauge          | Data Point         |
+| Gauge Delta [1]| Data Point         |
+| Histogram      | Data Point         |
+| Set            | N/A                |
+
+1. Gauge values are persisted between flushes. On Vector start up each gauge is assumed to have
+zero (0.0) value, that can be updated explicitly by the consequent absolute (not delta) gauge
+observation, or by delta increments/decrements. Delta gauges are considered an advanced feature
+useful in distributed setting, however it should be used with care.
+
 ### Streaming
 
 The `aws_cloudwatch_metrics` sink streams data on a real-time
@@ -174,6 +213,7 @@ issue, please:
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_metrics]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html
+[urls.aws_cw_metrics_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cw_region
 [urls.aws_cw_metrics_service_limits]: https://docs.aws.amazon.com/en_pv/AmazonCloudWatch/latest/monitoring/cloudwatch_limits.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_metrics_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_metrics&labels=Type%3A+bug
