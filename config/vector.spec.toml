@@ -1766,6 +1766,23 @@ end
   # * unit: seconds
   retry_backoff_secs = 9223372036854775807
 
+  #
+  # Basic auth
+  #
+
+  [sinks.clickhouse.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
+
 # Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
 [sinks.console]
   # The component type

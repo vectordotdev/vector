@@ -156,18 +156,22 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   # * unit: seconds
   retry_backoff_secs = 9223372036854775807
 
-  [sinks.clickhouse_sink.basic_auth]
-  # The basic authentication password.
-  # 
-  # * required
-  # * no default
-  password = "password"
+  #
+  # Basic auth
+  #
 
-  # The basic authentication user name.
-  # 
-  # * required
-  # * no default
-  user = "username"
+  [sinks.clickhouse_sink.basic_auth]
+    # The basic authentication password.
+    # 
+    # * required
+    # * no default
+    password = "password"
+
+    # The basic authentication user name.
+    # 
+    # * required
+    # * no default
+    user = "username"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
