@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::{FixedRetryPolicy, RetryLogic},
-        tls::TlsOptions,
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -18,7 +18,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::borrow::Cow;
-use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -103,7 +102,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     );
 
     let uri = encode_uri(&host, &database, &table)?;
-    let tls_settings = config.tls.unwrap_or(Default::default()).try_into()?;
+    let tls_settings = TlsSettings::from_options(&config.tls, "clickhouse")?;
 
     let http_service =
         HttpService::builder()

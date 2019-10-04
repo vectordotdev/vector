@@ -19,7 +19,6 @@ use hyper::{Body, Request};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -91,14 +90,7 @@ pub struct BasicAuth {
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
-        if let Some(ref tls) = self.tls {
-            tls.check_warnings("http");
-        }
-        let tls: TlsSettings = self
-            .tls
-            .as_ref()
-            .unwrap_or(&Default::default())
-            .try_into()?;
+        let tls = TlsSettings::from_options(&self.tls, "http")?;
         let sink = http(self.clone(), acker, tls.clone())?;
 
         match self.healthcheck_uri.clone() {

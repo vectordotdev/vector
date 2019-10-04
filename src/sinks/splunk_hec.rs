@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::TlsOptions,
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -17,7 +17,6 @@ use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 use tower::ServiceBuilder;
@@ -110,7 +109,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .context(super::UriParseError)?;
     let token = Bytes::from(format!("Splunk {}", token));
 
-    let tls_settings = config.tls.unwrap_or(Default::default()).try_into()?;
+    let tls_settings = TlsSettings::from_options(&config.tls, "splunk_hec")?;
 
     let http_service =
         HttpService::builder()

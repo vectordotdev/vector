@@ -13,7 +13,6 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
 use tokio::{
@@ -85,7 +84,10 @@ impl SinkConfig for TcpSinkConfig {
         let tls = match self.tls {
             Some(ref tls) => {
                 if tls.enabled.unwrap_or(false) {
-                    Some((&tls.options).try_into()?)
+                    Some(TlsSettings::from_options(
+                        &Some(tls.options.clone()),
+                        "tcp",
+                    )?)
                 } else {
                     None
                 }

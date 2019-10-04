@@ -6,7 +6,6 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
@@ -62,20 +61,6 @@ pub struct TlsOptions {
     pub key_pass: Option<String>,
 }
 
-impl TlsOptions {
-    pub fn check_warnings(&self, sink: &str) {
-        if self.verify_certificate == Some(false) {
-            warn!(
-                "`verify_certificate` in {} sink is DISABLED, this may lead to security vulnerabilities", sink
-            );
-        }
-        if self.verify_hostname == Some(false) {
-            warn!(
-                "`verify_hostname` in {} sink is DISABLED, this may lead to security vulnerabilities", sink);
-        }
-    }
-}
-
 /// Directly usable settings for TLS connectors
 #[derive(Clone, Default)]
 pub struct TlsSettings {
@@ -92,9 +77,21 @@ struct IdentityStore {
     key: PKey<Private>,
 }
 
-impl TryFrom<&TlsOptions> for TlsSettings {
-    type Error = crate::Error;
-    fn try_from(options: &TlsOptions) -> Result<Self, Self::Error> {
+impl TlsSettings {
+    pub fn from_options(options: &Option<TlsOptions>, sink: &str) -> crate::Result<Self> {
+        let default = TlsOptions::default();
+        let options = options.as_ref().unwrap_or(&default);
+
+        if options.verify_certificate == Some(false) {
+            warn!(
+                "`verify_certificate` in {} sink is DISABLED, this may lead to security vulnerabilities", sink
+            );
+        }
+        if options.verify_hostname == Some(false) {
+            warn!(
+                "`verify_hostname` in {} sink is DISABLED, this may lead to security vulnerabilities", sink);
+        }
+
         if options.crt_path.is_some() != options.key_path.is_some() {
             return Err(TlsError::MissingCrtKeyFile.into());
         }
@@ -131,13 +128,6 @@ impl TryFrom<&TlsOptions> for TlsSettings {
             authority,
             identity,
         })
-    }
-}
-
-impl TryFrom<TlsOptions> for TlsSettings {
-    type Error = crate::Error;
-    fn try_from(options: TlsOptions) -> Result<Self, Self::Error> {
-        Self::try_from(&options)
     }
 }
 

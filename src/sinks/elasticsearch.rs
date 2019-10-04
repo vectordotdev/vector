@@ -114,11 +114,6 @@ impl ElasticSearchCommon {
             host: config.host.clone(),
         })?;
 
-        config
-            .tls
-            .as_ref()
-            .map(|tls| tls.check_warnings("elasticsearch"));
-
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
             format!("Basic {}", base64::encode(token.as_bytes()))
@@ -145,11 +140,7 @@ impl ElasticSearchCommon {
             }
         };
 
-        let tls_settings = config
-            .tls
-            .as_ref()
-            .unwrap_or(&Default::default())
-            .try_into()?;
+        let tls_settings = TlsSettings::from_options(&config.tls, "elasticsearch")?;
 
         Ok(Self {
             host: config.host.clone(),
