@@ -29,6 +29,7 @@ pub struct ClickhouseConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -37,8 +38,6 @@ pub struct ClickhouseConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
-
-    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
 }
 
 #[typetag::serde(name = "clickhouse")]
