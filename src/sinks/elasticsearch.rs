@@ -3,9 +3,9 @@ use crate::{
     event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
@@ -14,12 +14,9 @@ use crate::{
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
 use hyper::{
-    client::HttpConnector,
     header::{HeaderName, HeaderValue},
-    Body, Client, Request,
+    Body, Request,
 };
-use hyper_tls::HttpsConnector;
-use native_tls::TlsConnector;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -170,16 +167,6 @@ impl ElasticSearchCommon {
         builder.method(method);
         builder.uri(&uri);
         (uri, builder)
-    }
-
-    fn make_client(&self) -> crate::Result<Client<HttpsConnector<HttpConnector>>> {
-        let mut http = HttpConnector::new(1);
-        http.enforce_http(false);
-        let tls = TlsConnector::builder()
-            .use_tls_settings(self.tls_settings.clone())
-            .build()?;
-        let https = HttpsConnector::from((http, tls));
-        Ok(Client::builder().build(https))
     }
 }
 
@@ -359,8 +346,7 @@ fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        common
-            .make_client()?
+        https_client(common.tls_settings.clone())?
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
@@ -455,6 +441,7 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         event,
+        sinks::util::http::https_client,
         sinks::util::tls::{open_read, TlsOptions},
         test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
@@ -617,8 +604,7 @@ mod integration_tests {
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
         let common = ElasticSearchCommon::parse_config(config).expect("Config error");
-        common
-            .make_client()
+        https_client(common.tls_settings)
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())

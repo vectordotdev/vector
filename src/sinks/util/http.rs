@@ -7,6 +7,7 @@ use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use native_tls::TlsConnector;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -86,6 +87,16 @@ impl HttpServiceBuilder {
         self.tls_settings = Some(settings);
         self
     }
+}
+
+pub fn https_client(
+    tls: TlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>>> {
+    let mut http = HttpConnector::new(1);
+    http.enforce_http(false);
+    let tls = TlsConnector::builder().use_tls_settings(tls).build()?;
+    let https = HttpsConnector::from((http, tls));
+    Ok(hyper::Client::builder().build(https))
 }
 
 impl Service<Vec<u8>> for HttpService {
