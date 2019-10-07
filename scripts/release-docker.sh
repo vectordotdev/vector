@@ -8,7 +8,27 @@
 
 set -eu
 
+# saner programming env: these switches turn some bugs into errors
+set -o errexit -o pipefail -o noclobber -o nounset
+
 CHANNEL=$(scripts/util/release-channel.sh)
+
+#
+# Functions
+#
+
+verify() {
+  container_id=$(docker run -d $1)
+  sleep 2
+  state=$(docker inspect $container_id -f {{.State.Running}})
+
+  if [[ "$state" != "true" ]]; then
+    echo "Docker container failed to start"
+    exit 1
+  fi
+
+  docker stop $container_id
+}
 
 #
 # Build
@@ -16,28 +36,43 @@ CHANNEL=$(scripts/util/release-channel.sh)
 
 echo "Building timberio/vector:* Docker images"
 
-docker build -t timberio/vector:$VERSION-alpine distribution/docker/alpine
-docker build -t timberio/vector:$VERSION-debian distribution/docker/debian
 
 if [[ "$CHANNEL" == "latest" ]]; then
-  docker build -t timberio/vector:latest-alpine distribution/docker/alpine
-  docker build -t timberio/vector:latest-debian distribution/docker/debian
+  docker build --build-arg version=$VERSION --tag timberio/vector:$VERSION-alpine distribution/docker/alpine
+  docker build --build-arg version=$VERSION --tag timberio/vector:latest-alpine distribution/docker/alpine
+  docker build --build-arg version=$VERSION --tag timberio/vector:$VERSION-debian distribution/docker/debian
+  docker build --build-arg version=$VERSION --tag timberio/vector:latest-debian distribution/docker/debian
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  docker build -t timberio/vector:nightly-alpine distribution/docker/alpine
-  docker build -t timberio/vector:nightly-debian distribution/docker/debian
+  docker build --build-arg version=$VERSION --tag timberio/vector:nightly-alpine distribution/docker/alpine
+  docker build --build-arg version=$VERSION --tag timberio/vector:nightly-debian distribution/docker/debian
 fi
 
 #
-# Pushing
+# Verify
+#
+
+if [[ "$CHANNEL" == "latest" ]]; then
+  verify timberio/vector:$VERSION-alpine
+  verify timberio/vector:latest-alpine
+  verify timberio/vector:$VERSION-debian
+  verify timberio/vector:latest-debian
+elif [[ "$CHANNEL" == "nightly" ]]; then
+  verify timberio/vector:nightly-alpine
+  verify timberio/vector:nightly-debian
+fi
+
+#
+# Push
 #
 
 echo "Pushing timberio/vector Docker images"
+
 docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-docker push timberio/vector:$VERSION-alpine
-docker push timberio/vector:$VERSION-debian
 
 if [[ "$CHANNEL" == "latest" ]]; then
+  docker push timberio/vector:$VERSION-alpine
   docker push timberio/vector:latest-alpine
+  docker push timberio/vector:$VERSION-debian
   docker push timberio/vector:latest-debian
 elif [[ "$CHANNEL" == "nightly" ]]; then
   docker push timberio/vector:nightly-alpine

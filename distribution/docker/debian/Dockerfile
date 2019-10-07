@@ -1,20 +1,18 @@
 FROM debian:buster AS builder
 
 # The `x.y.z` version of vector to fetch from packages.timber.io
-ENV VERSION nightly/latest
+ARG version=nightly/latest
 
 WORKDIR /vector
 
 RUN apt-get update && apt-get install -y wget
 
-# TODO: Use https instead of http
-RUN wget https://packages.timber.io/vector/${VERSION}/vector-x86_64-unknown-linux-gnu.tar.gz
-
-RUN tar -xvf vector-x86_64-unknown-linux-gnu.tar.gz
-RUN mv vector-x86_64-unknown-linux-gnu/bin bin
+RUN wget https://packages.timber.io/vector/${version}/vector-amd64.deb
 
 FROM debian:buster-slim
 
-COPY --from=builder /vector/bin/* /usr/local/bin/
+COPY --from=builder /vector/vector-amd64.deb /vector-amd64.deb
+RUN dpkg -i vector-amd64.deb
+RUN rm /vector-amd64.deb
 
-ENTRYPOINT ["/usr/local/bin/vector"]
+ENTRYPOINT ["/usr/bin/vector"]
