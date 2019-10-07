@@ -160,12 +160,12 @@ fn load_certificate(filename: &Path) -> crate::Result<Certificate> {
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
     match pass_phrase {
-        None => {
-            Ok(PKey::private_key_from_pem(&data)
-                .with_context(|| PrivateKeyParseError { filename })?)
-        }
+        None => Ok(PKey::private_key_from_der(&data)
+            .or_else(|_| PKey::private_key_from_pem(&data))
+            .with_context(|| PrivateKeyParseError { filename })?),
         Some(phrase) => Ok(
-            PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
+            PKey::private_key_from_pkcs8_passphrase(&data, phrase.as_bytes())
+                .or_else(|_| PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes()))
                 .with_context(|| PrivateKeyParseError { filename })?,
         ),
     }

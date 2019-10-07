@@ -241,7 +241,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
