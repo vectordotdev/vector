@@ -445,6 +445,9 @@ jobs:
     steps:
       - *restore-artifacts-from-workspace
       - run:
+          name: Install systemd
+          command: sudo apt-get install systemd
+      - run:
           name: Install .deb package
           command: sudo dpkg -i $(find target/artifacts/ -name *-amd64.deb)
       - run:
