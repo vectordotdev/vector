@@ -185,7 +185,8 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   #
 
   [sinks.splunk_hec_sink.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default

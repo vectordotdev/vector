@@ -151,7 +151,9 @@ impl TlsConnectorExt for TlsConnectorBuilder {
 /// Load a `native_tls::Certificate` from a named file
 fn load_certificate(filename: &Path) -> crate::Result<Certificate> {
     let data = open_read(filename, "certificate")?;
-    Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
+    Ok(Certificate::from_der(&data)
+        .or_else(|_| Certificate::from_pem(&data))
+        .with_context(|| CertificateParseError { filename })?)
 }
 
 /// Load a private key from a named file

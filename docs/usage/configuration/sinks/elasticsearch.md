@@ -243,7 +243,8 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   #
 
   [sinks.elasticsearch_sink.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default

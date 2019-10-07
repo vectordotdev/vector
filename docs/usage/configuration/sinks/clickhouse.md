@@ -178,7 +178,8 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
   #
 
   [sinks.clickhouse_sink.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default

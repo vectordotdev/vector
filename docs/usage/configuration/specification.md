@@ -1848,7 +1848,8 @@ end
   #
 
   [sinks.clickhouse.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
@@ -2135,7 +2136,8 @@ end
   #
 
   [sinks.elasticsearch.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
@@ -2409,7 +2411,8 @@ end
   #
 
   [sinks.http.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
@@ -2554,7 +2557,8 @@ end
     # * default: false
     enabled = false
 
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
@@ -2772,7 +2776,8 @@ end
   #
 
   [sinks.splunk_hec.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
@@ -2940,7 +2945,8 @@ end
     # * default: false
     enabled = false
 
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default

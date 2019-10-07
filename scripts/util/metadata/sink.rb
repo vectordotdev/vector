@@ -136,7 +136,7 @@ class Sink < Component
         "type" => "string",
         "null" => true,
         "examples" => ["/path/to/certificate_authority.crt"],
-        "description" => "Absolute path to an additional CA certificate file, in PEM format."
+        "description" => "Absolute path to an additional CA certificate file, in DER or PEM format (X.509)."
       }
 
       options["crt_path"] = {

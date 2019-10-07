@@ -126,7 +126,8 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
     # * default: false
     enabled = false
 
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
