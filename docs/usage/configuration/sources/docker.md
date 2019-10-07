@@ -46,7 +46,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
   type = "docker"
 
   # A list of container ids to match against when filtering running containers.
-  # This will attempt to match the container id from the begining meaning you do
+  # This will attempt to match the container id from the beginning meaning you do
   # not need to include the whole id but just the first few characters. If no
   # containers ids are provided, all containers will be included.
   # 
@@ -56,7 +56,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
   include_containers = "ffd2bc2cb74a"
 
   #  A list of container object labels to match against when filtering running
-  # containers. This should follow the described label's synatx described in
+  # containers. This should follow the described label's synatx in
   # https://docs.docker.com/config/labels-custom-metadata/.
   # 
   # * optional
@@ -74,8 +74,8 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "docker"` |
 | **OPTIONAL** | | |
-| `include_containers` | `[string]` | A list of container ids to match against when filtering running containers. This will attempt to match the container id from the begining meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.<br />`no default` `example: "<container-id>"` |
-| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx described in https://docs.docker.com/config/labels-custom-metadata/.<br />`no default` `example: "latest"` |
+| `include_containers` | `[string]` | A list of container ids to match against when filtering running containers. This will attempt to match the container id from the beginning meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.<br />`no default` `example: "<container-id>"` |
+| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in https://docs.docker.com/config/labels-custom-metadata/.<br />`no default` `example: "latest"` |
 
 ## How It Works
 
