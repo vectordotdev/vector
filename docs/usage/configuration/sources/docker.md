@@ -1,5 +1,5 @@
 ---
-description: Ingests data through extract logs from the docker daemon and outputs `log` events.
+description: Ingests data through the docker engine daemon and outputs `log` events.
 ---
 
 <!--
@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][urls.new_docker_source_issue]
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `docker` source ingests data through extract logs from the docker daemon and outputs [`log`][docs.data-model.log] events.
+The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events.
 
 ## Config File
 
@@ -44,6 +44,25 @@ The `docker` source ingests data through extract logs from the docker daemon and
   # * no default
   # * must be: "docker"
   type = "docker"
+
+  # A list of container ids to match against when filtering running containers.
+  # This will attempt to match the container id from the begining meaning you do
+  # not need to include the whole id but just the first few characters. If no
+  # containers ids are provided, all containers will be included.
+  # 
+  # * optional
+  # * no default
+  include_containers = "<container-id>"
+  include_containers = "ffd2bc2cb74a"
+
+  #  A list of container object labels to match against when filtering running
+  # containers. This should follow the described label's synatx described in
+  # https://docs.docker.com/config/labels-custom-metadata/.
+  # 
+  # * optional
+  # * no default
+  include_labels = "latest"
+  include_labels = "alpine"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -54,6 +73,9 @@ The `docker` source ingests data through extract logs from the docker daemon and
 |:-----|:-----:|:------------|
 | **REQUIRED** | | |
 | `type` | `string` | The component type<br />`required` `must be: "docker"` |
+| **OPTIONAL** | | |
+| `include_containers` | `[string]` | A list of container ids to match against when filtering running containers. This will attempt to match the container id from the begining meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.<br />`no default` `example: "<container-id>"` |
+| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx described in https://docs.docker.com/config/labels-custom-metadata/.<br />`no default` `example: "latest"` |
 
 ## How It Works
 

@@ -32,28 +32,31 @@ type DockerEvent = shiplift::rep::Event;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DockerConfig {
-    include_containers: Vec<String>,
-    include_labels: Vec<String>,
+    include_containers: Option<Vec<String>>,
+    include_labels: Option<Vec<String>>,
 }
 
 impl DockerConfig {
-    fn container_name_included<'a, I: IntoIterator<Item = &'a str>>(
+    fn container_name_included<'a>(
         &self,
         id: &str,
-        names: I,
+        names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
-        let include_empty = self.include_containers.is_empty();
-        let id_flag = self
-            .include_containers
-            .iter()
-            .any(|include| id.starts_with(include));
-        let name_flag = names.into_iter().any(|name| {
-            self.include_containers
+        if let Some(include_containers) = &self.include_containers {
+            let id_flag = include_containers
                 .iter()
-                .any(|include| name.starts_with(include))
-        });
+                .any(|include| id.starts_with(include));
 
-        include_empty || id_flag || name_flag
+            let name_flag = names.into_iter().any(|name| {
+                include_containers
+                    .iter()
+                    .any(|include| name.starts_with(include))
+            });
+
+            id_flag || name_flag
+        } else {
+            true
+        }
     }
 }
 
@@ -123,23 +126,22 @@ impl DockerSourceCore {
                 .collect(),
         );
 
-        // by docker API, using both type of include results in AND between them
+        // Apply include filters
+        let mut filters = Vec::new();
 
-        // Include-name
-        let include_name = self
-            .config
-            .include_containers
-            .iter()
-            .map(|s| EventFilter::Container(s.to_owned()));
+        if let Some(include_containers) = &self.config.include_containers {
+            filters.extend(
+                include_containers
+                    .iter()
+                    .map(|s| EventFilter::Container(s.clone())),
+            );
+        }
 
-        // Include-label
-        let include_label = self
-            .config
-            .include_labels
-            .iter()
-            .map(|s| EventFilter::Label(s.to_owned()));
+        if let Some(include_labels) = &self.config.include_labels {
+            filters.extend(include_labels.iter().map(|l| EventFilter::Label(l.clone())));
+        }
 
-        options.filter(include_name.chain(include_label).collect());
+        options.filter(filters);
 
         self.docker.events(&options.build())
     }
@@ -214,6 +216,8 @@ impl DockerSource {
                 .core
                 .config
                 .include_labels
+                .clone()
+                .unwrap_or(Vec::new())
                 .iter()
                 .map(|s| ContainerFilter::LabelName(s.clone()))
                 .collect(),
@@ -225,8 +229,22 @@ impl DockerSource {
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = self.esb.core.config.include_containers.is_empty()
-            && self.esb.core.config.include_labels.is_empty();
+        let exclude_self = self
+            .esb
+            .core
+            .config
+            .include_containers
+            .clone()
+            .unwrap_or(Vec::new())
+            .is_empty()
+            && self
+                .esb
+                .core
+                .config
+                .include_labels
+                .clone()
+                .unwrap_or(Vec::new())
+                .is_empty();
 
         // HOSTNAME hint
         // It may contain shortened container id.
@@ -739,8 +757,8 @@ mod tests {
         let (sender, recv) = mpsc::channel(100);
         rt.spawn(
             DockerConfig {
-                include_containers: vec![name.to_owned()],
-                include_labels: label.into().map(|l| vec![l.to_owned()]).unwrap_or_default(),
+                include_containers: Some(vec![name.to_owned()]),
+                include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
                 ..DockerConfig::default()
             }
             .build("default", &GlobalOptions::default(), sender)

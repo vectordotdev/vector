@@ -108,7 +108,7 @@ Or view [platform specific installation instructions][docs.installation].
 
 | Name  | Description |
 |:------|:------------|
-| [**`docker`**][docs.sources.docker] | Ingests data through extract logs from the docker daemon and outputs [`log`][docs.data-model.log] events. |
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |

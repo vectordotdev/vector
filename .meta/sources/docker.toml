@@ -4,4 +4,30 @@ delivery_guarantee = "best_effort"
 guides = []
 output_types = ["log"]
 resources = []
-through_description = "extract logs from the docker daemon"
+through_description = "the docker engine daemon"
+
+[sources.docker.options.include_containers]
+type = "[string]"
+examples = [
+    "<container-id>",
+    "ffd2bc2cb74a"
+]
+null = true
+description = """\
+A list of container ids to match against when filtering running containers. This \
+will attempt to match the container id from the begining meaning you do not need \
+to include the whole id but just the first few characters. If no containers ids are \
+provided, all containers will be included.\
+"""
+
+[sources.docker.options.include_labels]
+type = "[string]"
+examples = [
+    "latest",
+    "alpine"
+]
+null = true
+description = """ \
+A list of container object labels to match against when filtering running containers. This \
+should follow the described label's synatx described in https://docs.docker.com/config/labels-custom-metadata/. \
+"""
