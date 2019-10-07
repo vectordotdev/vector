@@ -9,8 +9,14 @@ service_limits_short_link = "aws_cw_metrics_service_limits"
 service_provider = "AWS"
 write_to_description = "[AWS CloudWatch Metrics][urls.aws_cw_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)"
 
-[sinks.aws_cloudwatch_logs.options.region]
+[sinks.aws_cloudwatch_metrics.options.namespace]
+type = "string"
+examples = ["service"]
+null = false
+description = "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
+
+[sinks.aws_cloudwatch_metrics.options.region]
 type = "string"
 examples = ["us-east-1"]
 null = false
-description = "The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides."
+description = "The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides."

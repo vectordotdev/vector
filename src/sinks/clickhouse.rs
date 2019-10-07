@@ -9,6 +9,7 @@ use crate::{
     topology::config::{DataType, SinkConfig},
 };
 use futures::{Future, Sink};
+use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -28,6 +29,7 @@ pub struct ClickhouseConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -42,13 +44,27 @@ pub struct ClickhouseConfig {
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = clickhouse(self.clone(), acker)?;
-        let healtcheck = healthcheck(self.host.clone());
+        let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
 
         Ok((sink, healtcheck))
     }
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ClickHouseBasicAuthConfig {
+    pub password: String,
+    pub user: String,
+}
+
+impl ClickHouseBasicAuthConfig {
+    fn apply(&self, header_map: &mut http::header::HeaderMap) {
+        let auth = headers::Authorization::basic(&self.user, &self.password);
+        header_map.typed_insert(auth)
     }
 }
 
@@ -72,6 +88,8 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
+    let basic_auth = config.basic_auth.clone();
+
     let policy = FixedRetryPolicy::new(
         retry_attempts,
         Duration::from_secs(retry_backoff_secs),
@@ -93,7 +111,13 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
             builder.header("Content-Encoding", "gzip");
         }
 
-        builder.body(body).unwrap()
+        let mut request = builder.body(body).unwrap();
+
+        if let Some(auth) = &basic_auth {
+            auth.apply(request.headers_mut());
+        }
+
+        request
     })?;
 
     let service = ServiceBuilder::new()
@@ -119,10 +143,14 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     Ok(Box::new(sink))
 }
 
-fn healthcheck(host: String) -> super::Healthcheck {
+fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", host);
-    let request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+
+    if let Some(auth) = &basic_auth {
+        auth.apply(request.headers_mut());
+    }
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);

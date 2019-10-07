@@ -89,7 +89,7 @@ description = "A custom parameter to be added to each Elasticsearch request."
 type = "string"
 examples = ["us-east-1"]
 null = true
-description = "When using the AWS provider, the [AWS region][urls.aws_cw_logs_regions] of the target Elasticsearch instance."
+description = "When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance."
 
 [sinks.elasticsearch.options.tls]
 type = "table"
