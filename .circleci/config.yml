@@ -452,7 +452,9 @@ jobs:
           command: sudo systemctl start vector
       - run:
           name: Verify that the Vector service has started
-          command: sudo systemctl is-active --quiet vector
+          command: |
+            sleep 5
+            sudo systemctl is-active vector
 
   #
   # Release
