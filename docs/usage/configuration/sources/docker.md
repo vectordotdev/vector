@@ -79,6 +79,14 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 
 ## How It Works
 
+### Connecting to the Docker daemon
+
+Vector will automatically attempt to connect to the docker daemon for you. In most
+situations if your current user is able to run `docker ps` then Vector will be able to
+connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
+use the other default docker environment variables if they are set. For more infomration on how to
+connect to the docker daemon can be found here https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option.
+
 ### Delivery Guarantee
 
 Due to the nature of this component, it offers a
