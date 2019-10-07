@@ -143,7 +143,7 @@ class Sink < Component
         "type" => "string",
         "null" => true,
         "examples" => ["/path/to/host_certificate.crt"],
-        "description" => "Absolute path to a certificate file used to identify this connection, in PEM format. If this is set, `key_path` must also be set."
+        "description" => "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509). If this is set, `key_path` must also be set."
       }
 
       options["key_path"] = {

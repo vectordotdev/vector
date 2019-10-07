@@ -174,7 +174,9 @@ fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey
 /// Load an X.509 certificate from a named file
 fn load_x509(filename: &Path) -> crate::Result<X509> {
     let data = open_read(filename, "certificate")?;
-    Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
+    Ok(X509::from_der(&data)
+        .or_else(|_| X509::from_pem(&data))
+        .with_context(|| X509ParseError { filename })?)
 }
 
 fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {

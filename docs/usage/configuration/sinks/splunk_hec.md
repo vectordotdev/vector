@@ -192,8 +192,8 @@ The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509). If this is set, `key_path` must also be set.
     # 
     # * optional
     # * no default
