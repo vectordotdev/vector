@@ -433,7 +433,7 @@ mod integration_tests {
     use crate::{
         event,
         sinks::util::http::https_client,
-        sinks::util::tls::{open_read, TlsOptions},
+        sinks::util::tls::TlsOptions,
         test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
         Event,
@@ -442,6 +442,8 @@ mod integration_tests {
     use futures::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
+    use std::fs::File;
+    use std::io::Read;
 
     #[test]
     fn structures_events_correctly() {
@@ -551,13 +553,15 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");
 
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
         let http_client = reqwest::Client::builder()
-            .add_root_certificate(
-                reqwest::Certificate::from_pem(
-                    &open_read("tests/data/Vector_CA.crt", "certificate").unwrap(),
-                )
-                .expect("Could not parse test CA"),
-            )
+            .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
         let client = SyncClientBuilder::new()

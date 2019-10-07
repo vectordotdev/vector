@@ -155,14 +155,14 @@ impl TlsConnectorExt for TlsConnectorBuilder {
 }
 
 /// Load a `native_tls::Certificate` from a named file
-pub fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<Certificate> {
+fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<Certificate> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate")?;
     Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
 }
 
 /// Load a private key from a named file
-pub fn load_key<T: AsRef<Path> + Debug>(
+fn load_key<T: AsRef<Path> + Debug>(
     filename: T,
     pass_phrase: &Option<String>,
 ) -> crate::Result<PKey<Private>> {
@@ -181,34 +181,13 @@ pub fn load_key<T: AsRef<Path> + Debug>(
 }
 
 /// Load an X.509 certificate from a named file
-pub fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<X509> {
+fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<X509> {
     let filename = filename.as_ref();
     let data = open_read(filename, "certificate")?;
     Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
 }
 
-/// Load a key and certificate from a pair of files and build a PKCS#12 archive from them
-pub fn load_build_pkcs12<P1, P2>(
-    key_path: P1,
-    key_pass: &Option<String>,
-    crt_path: P2,
-) -> crate::Result<Pkcs12>
-where
-    P1: AsRef<Path> + Debug,
-    P2: AsRef<Path> + Debug,
-{
-    let crt_name = crt_path.as_ref().to_string_lossy();
-    let key = load_key(key_path, key_pass)?;
-    let crt = load_x509(crt_path.as_ref())?;
-    Ok(Pkcs12::builder()
-        .build("", &crt_name, &key, &crt)
-        .context(Pkcs12Error)?)
-}
-
-pub fn open_read<F: AsRef<Path> + Debug>(
-    filename: F,
-    note: &'static str,
-) -> crate::Result<Vec<u8>> {
+fn open_read<F: AsRef<Path> + Debug>(filename: F, note: &'static str) -> crate::Result<Vec<u8>> {
     let mut text = Vec::<u8>::new();
     let filename = filename.as_ref();
 
