@@ -448,8 +448,11 @@ jobs:
           name: Install .deb package
           command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
       - run:
-          name: Verify Systemd starts the service
+          name: Start the Vector service
           command: sudo systemctl start vector
+      - run:
+          name: Verify that the Vector service has started
+          command: sudo systemctl is-active --quiet vector
 
   #
   # Release
