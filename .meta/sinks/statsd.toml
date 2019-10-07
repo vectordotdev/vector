@@ -1,6 +1,4 @@
 [sinks.statsd]
-batch_size = 1432
-batch_timeout = 1
 beta = true
 buffer = false
 delivery_guarantee = "best_effort"

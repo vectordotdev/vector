@@ -1283,6 +1283,18 @@ end
   # * no default
   inputs = ["my-source-id"]
 
+  # A namespace that will isolate different metrics from each other.
+  # 
+  # * required
+  # * no default
+  namespace = "service"
+
+  # The AWS region of the target CloudWatch stream resides.
+  # 
+  # * required
+  # * no default
+  region = "us-east-1"
+
   # Custom endpoint for use with AWS-compatible services.
   # 
   # * optional
