@@ -446,7 +446,7 @@ jobs:
       - *restore-artifacts-from-workspace
       - run:
           name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+          command: sudo dpkg -i $(find target/artifacts/ -name *-amd64.deb)
       - run:
           name: Start the Vector service
           command: sudo systemctl start vector
