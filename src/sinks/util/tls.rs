@@ -70,13 +70,6 @@ pub struct TlsSettings {
     identity: Option<Vec<u8>>, // native_tls::Identity doesn't implement Clone yet
 }
 
-#[derive(Clone)]
-struct IdentityStore {
-    name: String,
-    crt: X509,
-    key: PKey<Private>,
-}
-
 impl TlsSettings {
     pub fn from_options(options: &Option<TlsOptions>, sink: &str) -> crate::Result<Self> {
         let default = TlsOptions::default();
