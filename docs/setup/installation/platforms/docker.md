@@ -12,7 +12,7 @@ description: Using Vector on Docker
 
 # Docker
 
-Vector maintains the [`timberio/vector-*` Docker images][urls.docker_hub_vector]
+Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
 available on [Docker Hub][urls.docker_hub_vector].
 
 ## Usage
