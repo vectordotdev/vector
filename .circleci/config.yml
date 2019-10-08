@@ -445,11 +445,19 @@ jobs:
     steps:
       - *restore-artifacts-from-workspace
       - run:
-          name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+          name: Install systemd
+          command: sudo apt-get install systemd
       - run:
-          name: Verify Systemd starts the service
+          name: Install .deb package
+          command: sudo dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Start the Vector service
           command: sudo systemctl start vector
+      - run:
+          name: Verify that the Vector service has started
+          command: |
+            sleep 5
+            sudo systemctl is-active vector
 
   #
   # Release
@@ -569,6 +577,7 @@ require-verifications: &require-verifications
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
+    - verify-systemd-on-debian
 
 sync-filters: &sync-filters
   filters:
@@ -656,6 +665,8 @@ workflows:
           <<: *require-packages
       - verify-rpm-artifact-on-centos-7:
           <<: *require-packages
+      - verify-systemd-on-debian:
+          <<: *require-packages
 
       # Syncing
 
@@ -729,6 +740,8 @@ workflows:
       - verify-rpm-artifact-on-amazon-linux-2:
           <<: *require-packages
       - verify-rpm-artifact-on-centos-7:
+          <<: *require-packages
+      - verify-systemd-on-debian:
           <<: *require-packages
       - release-s3:
           <<: *require-verifications
@@ -819,6 +832,9 @@ workflows:
           <<: *release-filters
           <<: *require-packages
       - verify-rpm-artifact-on-centos-7:
+          <<: *release-filters
+          <<: *require-packages
+      - verify-systemd-on-debian:
           <<: *release-filters
           <<: *require-packages
 
