@@ -112,8 +112,6 @@ metadata =
     error!(e.message)
   end
 
-templates = Templates.new(TEMPLATES_DIR, metadata)
-
 #
 # Create missing component templates
 #
@@ -138,6 +136,8 @@ end
 #
 # Render templates
 #
+
+templates = Templates.new(TEMPLATES_DIR, metadata)
 
 Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.

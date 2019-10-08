@@ -8,7 +8,7 @@ Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides it's own "Updating" section:
 
 1. Platforms
-   1. [Updating Docker][docs.docker#updating]
+   1. [Updating Docker][docs.platforms.docker#updating]
 2. Package Managers
    1. [Updating with DPKG][docs.dpkg#updating]
    2. [Updating with Homebrew][docs.homebrew#updating]
@@ -39,10 +39,10 @@ to account for spikes and updating.
 
 
 [assets.updating-upstream]: ../../assets/updating-upstream.svg
-[docs.docker#updating]: ../../setup/installation/platforms/docker.md#updating
 [docs.dpkg#updating]: ../../setup/installation/package-managers/dpkg.md#updating
 [docs.from_archives#updating]: ../../setup/installation/manual/from-archives.md#updating
 [docs.homebrew#updating]: ../../setup/installation/package-managers/homebrew.md#updating
 [docs.installation]: ../../setup/installation
+[docs.platforms.docker#updating]: ../../setup/installation/platforms/docker.md#updating
 [docs.rpm#updating]: ../../setup/installation/package-managers/rpm.md#updating
 [docs.topologies]: ../../setup/deployment/topologies.md

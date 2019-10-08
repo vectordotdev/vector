@@ -24,6 +24,7 @@ that receive data over the network, like the [`vector`][docs.sources.vector],
 
 | Name  | Description |
 |:------|:------------|
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
@@ -43,6 +44,7 @@ that receive data over the network, like the [`vector`][docs.sources.vector],
 [docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.roles.agent]: ../../../setup/deployment/roles/agent.md
 [docs.roles.service]: ../../../setup/deployment/roles/service.md
+[docs.sources.docker]: ../../../usage/configuration/sources/docker.md
 [docs.sources.file]: ../../../usage/configuration/sources/file.md
 [docs.sources.journald]: ../../../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../../../usage/configuration/sources/kafka.md

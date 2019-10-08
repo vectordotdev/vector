@@ -115,6 +115,8 @@ jobs:
       - image: yandex/clickhouse-server:19
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Test
           command: cargo test --all --features docker -- --test-threads 4
