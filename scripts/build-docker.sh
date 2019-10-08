@@ -18,16 +18,19 @@ CHANNEL=$(scripts/util/release-channel.sh)
 #
 
 verify() {
-  container_id=$(docker run -d $1)
+  tag=$1
+  container_id=$(docker run -d $tag)
   sleep 2
   state=$(docker inspect $container_id -f {{.State.Running}})
 
   if [[ "$state" != "true" ]]; then
-    echo "Docker container failed to start"
+    echo "Docker container $tag failed to start"
     exit 1
   fi
 
   docker stop $container_id
+
+  echo "Docker container $tag started successfully"
 }
 
 #
