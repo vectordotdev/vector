@@ -67,8 +67,11 @@ pub struct TlsSettings {
     accept_invalid_certificates: bool,
     accept_invalid_hostnames: bool,
     authority: Option<Certificate>,
-    identity: Option<Vec<u8>>, // native_tls::Identity doesn't implement Clone yet
+    identity: Option<IdentityStore>, // native_tls::Identity doesn't implement Clone yet
 }
+
+#[derive(Clone)]
+pub struct IdentityStore(Vec<u8>);
 
 impl TlsSettings {
     pub fn from_options(options: &Option<TlsOptions>, sink: &str) -> crate::Result<Self> {
@@ -111,7 +114,7 @@ impl TlsSettings {
                 // checking.
                 let _identity = Identity::from_pkcs12(&identity, "").context(TlsIdentityError)?;
 
-                Some(identity)
+                Some(IdentityStore(identity))
             }
         };
 
@@ -140,7 +143,8 @@ impl TlsConnectorExt for TlsConnectorBuilder {
             // it here and expect the results will not fail. This can
             // all be reworked when `native_tls::Identity` gains the
             // Clone impl.
-            let identity = Identity::from_pkcs12(&identity, "").expect("Could not build identity");
+            let identity =
+                Identity::from_pkcs12(&identity.0, "").expect("Could not build identity");
             self.identity(identity);
         }
         self
