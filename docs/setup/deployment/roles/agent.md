@@ -18,8 +18,8 @@ citizen, limiting its resource usage and efficiently forwarding data.
 #### In a platform context
 
 If you're deploying Vector in a [platform context][docs.platforms], such as
-[Docker][docs.docker], then data collection is handled for you as part of
-installation, please proceed to the next section.
+[Docker][docs.platforms.docker], then data collection is handled for you as
+part of installation, please proceed to the next section.
 
 #### Not in a platform context
 
@@ -112,8 +112,8 @@ where it left off.
 
 
 [assets.agent]: ../../../assets/agent.svg
-[docs.docker]: ../../../setup/installation/platforms/docker.md
 [docs.performance]: ../../../performance.md
+[docs.platforms.docker]: ../../../setup/installation/platforms/docker.md
 [docs.platforms]: ../../../setup/installation/platforms
 [docs.reloading]: ../../../usage/administration/reloading.md
 [docs.roles.service]: ../../../setup/deployment/roles/service.md

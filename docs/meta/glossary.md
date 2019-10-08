@@ -70,7 +70,7 @@ measurement. This is a type of [Vector event][docs.data-model.metric].
 ## Platform
 
 "Platform" refers to a [platform][docs.platforms] that Vector can be deployed
-on, such as [Docker][docs.docker].
+on, such as [Docker][docs.platforms.docker].
 
 ## Reducer
 
@@ -147,9 +147,9 @@ reducing cost, etc.
 [docs.data-model.log]: ../about/data-model/log.md
 [docs.data-model.metric]: ../about/data-model/metric.md
 [docs.data_model]: ../about/data-model
-[docs.docker]: ../setup/installation/platforms/docker.md
 [docs.guides]: ../usage/guides
 [docs.performance]: ../performance.md
+[docs.platforms.docker]: ../setup/installation/platforms/docker.md
 [docs.platforms]: ../setup/installation/platforms
 [docs.roles]: ../setup/deployment/roles
 [docs.sinks]: ../usage/configuration/sinks

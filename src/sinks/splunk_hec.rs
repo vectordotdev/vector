@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -45,6 +46,8 @@ pub struct HecSinkConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -106,21 +109,26 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .context(super::UriParseError)?;
     let token = Bytes::from(format!("Splunk {}", token));
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = Request::builder();
-        builder.method(Method::POST);
-        builder.uri(uri.clone());
+    let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-        builder.header("Content-Type", "application/json");
+    let http_service =
+        HttpService::builder()
+            .tls_settings(tls_settings)
+            .build(move |body: Vec<u8>| {
+                let mut builder = Request::builder();
+                builder.method(Method::POST);
+                builder.uri(uri.clone());
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                builder.header("Content-Type", "application/json");
 
-        builder.header("Authorization", token.clone());
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        builder.body(body).unwrap()
-    })?;
+                builder.header("Authorization", token.clone());
+
+                builder.body(body).unwrap()
+            });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)

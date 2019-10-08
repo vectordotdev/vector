@@ -136,32 +136,32 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
     # * default: false
     enabled = false
 
-    # Absolute path to additional CA certificate file, in JKS format.
+    # Absolute path to an additional CA certificate file, in PEM format.
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to certificate file used to identify this connection, in JKS
-    # format. If this is set, `key_file` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to key file used to identify this connection, in JKS format. If
-    # this is set, `crt_file` must also be set.
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
     key_path = "/path/to/host_certificate.key"
 
-    # Pass phrase to unlock the encrypted key file. This has no effect unless
-    # `key_file` above is set.
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
     # 
     # * optional
     # * no default
-    key_phrase = "PassWord1"
+    key_pass = "PassWord1"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

@@ -1,15 +1,16 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
-    sinks::util::{tls, SinkExt},
+    sinks::util::{
+        tls::{TlsConnectorExt, TlsOptions, TlsSettings},
+        SinkExt,
+    },
     topology::config::{DataType, SinkConfig},
 };
 use bytes::Bytes;
 use futures::{
     future, stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend,
 };
-use native_tls::{Certificate, Identity};
-use openssl::pkcs12::Pkcs12;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -50,15 +51,12 @@ pub enum Encoding {
     Json,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct TlsConfig {
     pub enabled: Option<bool>,
-    pub verify: Option<bool>,
-    pub crt_file: Option<String>,
-    pub key_file: Option<String>,
-    pub key_phrase: Option<String>,
-    pub ca_file: Option<String>,
+    #[serde(flatten)]
+    pub options: TlsOptions,
 }
 
 impl TcpSinkConfig {
@@ -86,26 +84,7 @@ impl SinkConfig for TcpSinkConfig {
         let tls = match self.tls {
             Some(ref tls) => {
                 if tls.enabled.unwrap_or(false) {
-                    if tls.key_file.is_some() != tls.crt_file.is_some() {
-                        return Err(Box::new(BuildError::MissingCrtKeyFile));
-                    }
-                    let add_ca = match &tls.ca_file {
-                        None => None,
-                        Some(filename) => Some(tls::load_certificate(filename)?),
-                    };
-                    let identity = match &tls.crt_file {
-                        None => None,
-                        Some(filename) => Some(tls::load_build_pkcs12(
-                            tls.key_file.as_ref().unwrap(), // Safe due to check above
-                            &tls.key_phrase,
-                            filename,
-                        )?),
-                    };
-                    Some(TcpSinkTls {
-                        verify: tls.verify.unwrap_or(true),
-                        add_ca,
-                        identity,
-                    })
+                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
                 } else {
                     None
                 }
@@ -133,7 +112,7 @@ impl SinkConfig for TcpSinkConfig {
 pub struct TcpSink {
     hostname: String,
     addr: SocketAddr,
-    tls: Option<TcpSinkTls>,
+    tls: Option<TlsSettings>,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
 }
@@ -151,33 +130,8 @@ type TcpOrTlsStream = MaybeTlsStream<
     FramedWrite<TlsStream<TcpStream>, BytesCodec>,
 >;
 
-#[derive(Default)]
-pub struct TcpSinkTls {
-    verify: bool,
-    add_ca: Option<Certificate>,
-    identity: Option<Pkcs12>,
-}
-
-impl TcpSinkTls {
-    fn make_connector(&self) -> crate::Result<TlsConnector> {
-        let mut connector = native_tls::TlsConnector::builder();
-        connector.danger_accept_invalid_certs(!self.verify);
-        if let Some(ref certificate) = self.add_ca {
-            connector.add_root_certificate(certificate.clone());
-        }
-        if let Some(ref identity) = self.identity {
-            let identity = Identity::from_pkcs12(&identity.to_der().context(DerExportError)?, "")
-                .context(TlsIdentityError)?;
-            connector.identity(identity);
-        }
-        Ok(TlsConnector::from(
-            connector.build().context(TlsBuildError)?,
-        ))
-    }
-}
-
 impl TcpSink {
-    pub fn new(hostname: String, addr: SocketAddr, tls: Option<TcpSinkTls>) -> Self {
+    pub fn new(hostname: String, addr: SocketAddr, tls: Option<TlsSettings>) -> Self {
         Self {
             hostname,
             addr,
@@ -223,9 +177,13 @@ impl TcpSink {
                         debug!(message = "connected", addr = &field::display(&addr));
                         self.backoff = Self::fresh_backoff();
                         match self.tls {
-                            Some(ref tls) => match tls.make_connector() {
+                            Some(ref tls) => match native_tls::TlsConnector::builder()
+                                .use_tls_settings(tls.clone())
+                                .build()
+                                .context(TlsBuildError)
+                            {
                                 Ok(connector) => TcpSinkState::TlsConnecting(
-                                    connector.connect(&self.hostname, socket),
+                                    TlsConnector::from(connector).connect(&self.hostname, socket),
                                 ),
                                 Err(err) => {
                                     error!(message = "unable to establish TLS connection.", error = %err);
@@ -329,7 +287,7 @@ pub fn raw_tcp(
     addr: SocketAddr,
     acker: Acker,
     encoding: Encoding,
-    tls: Option<TcpSinkTls>,
+    tls: Option<TlsSettings>,
 ) -> super::RouterSink {
     Box::new(
         TcpSink::new(hostname, addr, tls)

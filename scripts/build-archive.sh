@@ -88,21 +88,21 @@ rm -rf $archive_dir
 mkdir -p $archive_dir
 
 # Copy root level files
-cp -a README.md $archive_dir
-cp -a LICENSE $archive_dir
+cp -av README.md $archive_dir
+cp -av LICENSE $archive_dir
 
 # Copy the vector binary to /bin
 mkdir -p $archive_dir/bin
-cp -a $target_dir/release/vector $archive_dir/bin
+cp -av $target_dir/release/vector $archive_dir/bin
 
 # Copy the entire config dir to /config
 cp -rv config $archive_dir/config
 
 # Copy /etc usefule files
 mkdir -p $archive_dir/etc/systemd
-cp -a distribution/systemd/vector.service $archive_dir/etc/systemd
+cp -av distribution/systemd/vector.service $archive_dir/etc/systemd
 mkdir -p $archive_dir/etc/init.d
-cp -a distribution/init.d/vector $archive_dir/etc/init.d
+cp -av distribution/init.d/vector $archive_dir/etc/init.d
 
 # Build the release tar
 _old_dir=$(pwd)

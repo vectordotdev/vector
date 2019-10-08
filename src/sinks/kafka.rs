@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     event::{self, Event},
+    sinks::util::tls::TlsOptions,
     sinks::util::MetadataFuture,
     topology::config::{DataType, SinkConfig},
 };
@@ -16,6 +17,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
@@ -23,6 +25,8 @@ use string_cache::DefaultAtom as Atom;
 enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: rdkafka::error::KafkaError },
+    #[snafu(display("invalid path: {:?}", path))]
+    InvalidPath { path: PathBuf },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -44,10 +48,8 @@ pub enum Encoding {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct KafkaSinkTlsConfig {
     enabled: Option<bool>,
-    ca_path: Option<String>,
-    crt_path: Option<String>,
-    key_path: Option<String>,
-    key_phrase: Option<String>,
+    #[serde(flatten)]
+    options: TlsOptions,
 }
 
 pub struct KafkaSink {
@@ -77,7 +79,7 @@ impl SinkConfig for KafkaSinkConfig {
 }
 
 impl KafkaSinkConfig {
-    fn to_rdkafka(&self) -> rdkafka::ClientConfig {
+    fn to_rdkafka(&self) -> crate::Result<rdkafka::ClientConfig> {
         let mut client_config = rdkafka::ClientConfig::new();
         let bs = self.bootstrap_servers.join(",");
         client_config.set("bootstrap.servers", &bs);
@@ -87,26 +89,31 @@ impl KafkaSinkConfig {
                 "security.protocol",
                 if enabled { "ssl" } else { "plaintext" },
             );
-            if let Some(ref path) = tls.ca_path {
-                client_config.set("ssl.ca.location", path);
+            if let Some(ref path) = tls.options.ca_path {
+                client_config.set("ssl.ca.location", pathbuf_to_string(&path)?);
             }
-            if let Some(ref path) = tls.crt_path {
-                client_config.set("ssl.certificate.location", path);
+            if let Some(ref path) = tls.options.crt_path {
+                client_config.set("ssl.certificate.location", pathbuf_to_string(&path)?);
             }
-            if let Some(ref path) = tls.key_path {
-                client_config.set("ssl.keystore.location", path);
+            if let Some(ref path) = tls.options.key_path {
+                client_config.set("ssl.keystore.location", pathbuf_to_string(&path)?);
             }
-            if let Some(ref phrase) = tls.key_phrase {
-                client_config.set("ssl.keystore.password", phrase);
+            if let Some(ref pass) = tls.options.key_pass {
+                client_config.set("ssl.keystore.password", pass);
             }
         }
-        client_config
+        Ok(client_config)
     }
+}
+
+fn pathbuf_to_string(path: &PathBuf) -> crate::Result<&str> {
+    path.to_str()
+        .ok_or_else(|| BuildError::InvalidPath { path: path.into() }.into())
 }
 
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
-        let producer = config.to_rdkafka().create().context(KafkaCreateFailed)?;
+        let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer,
             topic: config.topic,
@@ -196,7 +203,7 @@ impl Sink for KafkaSink {
 }
 
 fn healthcheck(config: KafkaSinkConfig) -> super::Healthcheck {
-    let consumer: BaseConsumer = config.to_rdkafka().create().unwrap();
+    let consumer: BaseConsumer = config.to_rdkafka().unwrap().create().unwrap();
 
     let check = poll_fn(move || {
         tokio_threadpool::blocking(|| {
@@ -278,6 +285,7 @@ mod tests {
 mod integration_test {
     use super::*;
     use crate::buffers::Acker;
+    use crate::sinks::util::tls::TlsOptions;
     use crate::test_util::{block_on, random_lines_with_stream, random_string, wait_for};
     use futures::Sink;
     use rdkafka::{
@@ -299,8 +307,10 @@ mod integration_test {
             "localhost:9091",
             Some(KafkaSinkTlsConfig {
                 enabled: Some(true),
-                ca_path: Some(TEST_CA.into()),
-                ..Default::default()
+                options: TlsOptions {
+                    ca_path: Some(TEST_CA.into()),
+                    ..Default::default()
+                },
             }),
         );
     }

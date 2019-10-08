@@ -66,6 +66,9 @@ build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
 
+build-docker: ## Build the Vector docker images, but do not push
+	@scripts/build-docker.sh
+
 package-deb: ## Create a .deb package from artifacts created via `build`
 	@scripts/package-deb.sh
 

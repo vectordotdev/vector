@@ -97,7 +97,7 @@ prometheus = "0.4.2"
 hyper = "0.12.18"
 hyper-tls = "0.3.1"
 native-tls = "0.2.3"
-openssl = "0.10.23"
+openssl = "0.10.25"
 openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
@@ -127,6 +127,7 @@ exitcode = "1.1.2"
 snafu = "0.4.3"
 url = "1.7"
 base64 = "0.10.1"
+shiplift = { git = "https://github.com/LucioFranco/shiplift", branch = "timber" }
 owning_ref = "0.4.0"
 
 [build-dependencies]
@@ -158,6 +159,7 @@ docker = [
   "kinesis-integration-tests",
   "s3-integration-tests",
   "splunk-integration-tests",
+  "docker-integration-tests"
 ]
 cloudwatch-logs-integration-tests = []
 cloudwatch-metrics-integration-tests = []
@@ -167,6 +169,7 @@ kafka-integration-tests = []
 kinesis-integration-tests = []
 s3-integration-tests = []
 splunk-integration-tests = []
+docker-integration-tests = []
 
 [[bench]]
 name = "bench"

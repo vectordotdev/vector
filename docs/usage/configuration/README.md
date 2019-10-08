@@ -82,6 +82,7 @@ data_dir = "/var/lib/vector"
 
 | Name  | Description |
 |:------|:------------|
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
@@ -314,6 +315,7 @@ All TOML values types are supported. For convenience this includes:
 [docs.sinks.tcp]: ../../usage/configuration/sinks/tcp.md
 [docs.sinks.vector]: ../../usage/configuration/sinks/vector.md
 [docs.sinks]: ../../usage/configuration/sinks
+[docs.sources.docker]: ../../usage/configuration/sources/docker.md
 [docs.sources.file]: ../../usage/configuration/sources/file.md
 [docs.sources.journald]: ../../usage/configuration/sources/journald.md
 [docs.sources.kafka]: ../../usage/configuration/sources/kafka.md

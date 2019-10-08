@@ -11,7 +11,7 @@ install-rust: &install-rust
 install-vector: &install-vector
   run:
     name: Execute install.sh
-    command: distribution/install.sh -y
+    command: HOMEBREW_NO_AUTO_UPDATE=1 distribution/install.sh -y
 
 restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
@@ -115,6 +115,8 @@ jobs:
       - image: yandex/clickhouse-server:19
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Test
           command: cargo test --all --features docker -- --test-threads 4
@@ -122,7 +124,7 @@ jobs:
           path: ./test-results
 
   #
-  # Building - Archives
+  # Building
   #
 
   build-x86_64-apple-darwin-archive:
@@ -216,7 +218,7 @@ jobs:
             - "*.rpm"
 
   #
-  # Verifying the deb artifact
+  # Verifying
   #
 
   verify-deb-artifact-on-deb-8:
@@ -291,49 +293,20 @@ jobs:
           name: Verify installation
           command: vector --version
 
-  #
-  # Verifying the rpm artifact
-  #
-
-  verify-rpm-artifact-on-amazon-linux-1:
+  verify-docker:
     docker:
-      - image: timberiodev/vector-verifier-amazonlinux-1
+      - image: timberiodev/vector-releaser:latest
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-rpm-artifact-on-amazon-linux-2:
-    docker:
-      - image: timberiodev/vector-verifier-amazonlinux-2
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-rpm-artifact-on-centos-7:
-    docker:
-      - image: centos:7
-    steps:
-      - *restore-artifacts-from-workspace
-      - run:
-          name: Install .rpm package
-          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  #
-  # Verifying the install script
-  #
+          name: Build & verify Docker
+          command: |
+            export VERSION=$(make version)
+            make build-docker
+          no_output_timeout: 30m
 
   verify-install-on-internet:
     machine: true
@@ -436,6 +409,42 @@ jobs:
       - *install-vector
       - *verify-install
 
+  verify-rpm-artifact-on-amazon-linux-1:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-1
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-rpm-artifact-on-amazon-linux-2:
+    docker:
+      - image: timberiodev/vector-verifier-amazonlinux-2
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  verify-rpm-artifact-on-centos-7:
+    docker:
+      - image: centos:7
+    steps:
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Install .rpm package
+          command: rpm -i $(find target/artifacts/ -name *-x86_64.rpm)
+      - run:
+          name: Verify installation
+          command: vector --version
+
   #
   # Verifying systemd script
   #
@@ -445,11 +454,19 @@ jobs:
     steps:
       - *restore-artifacts-from-workspace
       - run:
-          name: Install .deb package
-          command: dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+          name: Install systemd
+          command: sudo apt-get install systemd
       - run:
-          name: Verify Systemd starts the service
+          name: Install .deb package
+          command: sudo dpkg -i $(find target/artifacts/ -name *-amd64.deb)
+      - run:
+          name: Start the Vector service
           command: sudo systemctl start vector
+      - run:
+          name: Verify that the Vector service has started
+          command: |
+            sleep 5
+            sudo systemctl is-active vector
 
   #
   # Release
@@ -467,7 +484,6 @@ jobs:
           name: Release Docker
           command: |
             export VERSION=$(make version)
-            echo "Releasing $VERSION..."
             make release-docker
           no_output_timeout: 30m
 
@@ -530,15 +546,12 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
-require-checks-and-tests: &require-checks-and-tests
+require-builds: &require-builds
   requires:
     - check-code
     - check-fmt
     - check-generate
     - test-stable
-
-require-builds: &require-builds
-  requires:
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
@@ -555,6 +568,7 @@ require-verifications: &require-verifications
     - verify-deb-artifact-on-ubuntu-16-04
     - verify-deb-artifact-on-ubuntu-18-04
     - verify-deb-artifact-on-ubuntu-19-04
+    - verify-docker
     - verify-install-on-amazon-linux-1
     - verify-install-on-amazon-linux-2
     - verify-install-on-centos-7
@@ -569,6 +583,7 @@ require-verifications: &require-verifications
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
+    - verify-systemd-on-debian
 
 sync-filters: &sync-filters
   filters:
@@ -606,11 +621,11 @@ workflows:
       # Building & packaging
 
       - build-x86_64-unknown-linux-gnu-archive:
-          <<: *require-checks-and-tests
+          <<: *test-filters
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *require-checks-and-tests
+          <<: *test-filters
       - build-x86_64-apple-darwin-archive:
-          <<: *require-checks-and-tests
+          <<: *test-filters
       - package-rpm:
           <<: *require-builds
 
@@ -627,6 +642,8 @@ workflows:
       - verify-deb-artifact-on-ubuntu-18-04:
           <<: *require-packages
       - verify-deb-artifact-on-ubuntu-19-04:
+          <<: *require-packages
+      - verify-docker:
           <<: *require-packages
       - verify-install-on-amazon-linux-1:
           <<: *require-packages
@@ -655,6 +672,8 @@ workflows:
       - verify-rpm-artifact-on-amazon-linux-2:
           <<: *require-packages
       - verify-rpm-artifact-on-centos-7:
+          <<: *require-packages
+      - verify-systemd-on-debian:
           <<: *require-packages
 
       # Syncing
@@ -679,12 +698,9 @@ workflows:
 
       # Building & packaging
 
-      - build-x86_64-unknown-linux-gnu-archive:
-          <<: *require-checks-and-tests
-      - build-x86_64-unknown-linux-musl-archive:
-          <<: *require-checks-and-tests
-      - build-x86_64-apple-darwin-archive:
-          <<: *require-checks-and-tests
+      - build-x86_64-unknown-linux-gnu-archive
+      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-apple-darwin-archive
       - package-rpm:
           <<: *require-builds
 
@@ -701,6 +717,8 @@ workflows:
       - verify-deb-artifact-on-ubuntu-18-04:
           <<: *require-packages
       - verify-deb-artifact-on-ubuntu-19-04:
+          <<: *require-packages
+      - verify-docker:
           <<: *require-packages
       - verify-install-on-amazon-linux-1:
           <<: *require-packages
@@ -730,6 +748,10 @@ workflows:
           <<: *require-packages
       - verify-rpm-artifact-on-centos-7:
           <<: *require-packages
+      - verify-systemd-on-debian:
+          <<: *require-packages
+      - release-docker:
+          <<: *require-verifications
       - release-s3:
           <<: *require-verifications
 
@@ -759,13 +781,10 @@ workflows:
 
       - build-x86_64-unknown-linux-gnu-archive:
           <<: *release-filters
-          <<: *require-checks-and-tests
       - build-x86_64-unknown-linux-musl-archive:
           <<: *release-filters
-          <<: *require-checks-and-tests
       - build-x86_64-apple-darwin-archive:
           <<: *release-filters
-          <<: *require-checks-and-tests
       - package-rpm:
           <<: *release-filters
           <<: *require-builds
@@ -790,27 +809,41 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           <<: *release-filters
           <<: *require-packages
+      - verify-docker:
+          <<: *release-filters
+          <<: *require-packages
       - verify-install-on-amazon-linux-1:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-amazon-linux-2:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-centos-7:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-deb-8:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-deb-9:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-deb-10:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-mac-archive:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-mac-homebrew:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-unbuntu-16-04:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-unbuntu-18-04:
+          <<: *release-filters
           <<: *require-packages
       - verify-install-on-unbuntu-19-04:
+          <<: *release-filters
           <<: *require-packages
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *release-filters
@@ -821,21 +854,21 @@ workflows:
       - verify-rpm-artifact-on-centos-7:
           <<: *release-filters
           <<: *require-packages
+      - verify-systemd-on-debian:
+          <<: *release-filters
+          <<: *require-packages
 
       # Releasing
 
+      - release-docker:
+          <<: *release-filters
+          <<: *require-verifications
       - release-github:
           <<: *release-filters
           <<: *require-verifications
       - release-s3:
           <<: *release-filters
           <<: *require-verifications
-
-      # Must come after S3 since Docker installs directly from S3
-      - release-docker:
-          <<: *release-filters
-          requires:
-            - release-s3
 
       # Must come after S3 since Homebrew installs from S3
       - release-homebrew:

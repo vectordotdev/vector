@@ -175,6 +175,10 @@ class Templates
     end
   end
 
+  def docker_docs
+    render("_partials/_docker_docs.md")
+  end
+
   def encoding_description(encoding)
     case encoding
     when "json"

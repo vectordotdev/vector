@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::{FixedRetryPolicy, RetryLogic},
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -38,6 +39,8 @@ pub struct ClickhouseConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+
+    pub tls: Option<TlsOptions>,
 }
 
 #[typetag::serde(name = "clickhouse")]
@@ -99,26 +102,30 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     );
 
     let uri = encode_uri(&host, &database, &table)?;
+    let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(uri.clone());
+    let http_service =
+        HttpService::builder()
+            .tls_settings(tls_settings)
+            .build(move |body: Vec<u8>| {
+                let mut builder = hyper::Request::builder();
+                builder.method(Method::POST);
+                builder.uri(uri.clone());
 
-        builder.header("Content-Type", "application/x-ndjson");
+                builder.header("Content-Type", "application/x-ndjson");
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        let mut request = builder.body(body).unwrap();
+                let mut request = builder.body(body).unwrap();
 
-        if let Some(auth) = &basic_auth {
-            auth.apply(request.headers_mut());
-        }
+                if let Some(auth) = &basic_auth {
+                    auth.apply(request.headers_mut());
+                }
 
-        request
-    })?;
+                request
+            });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
