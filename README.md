@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/community">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.4.0<a/>
+    <a href="https://vector.dev/community">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.5.0<a/>
   </strong>
 </p>
 
@@ -49,7 +49,7 @@ simple and unified.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.4.0][urls.v0.4.0], [changelog][urls.vector_changelog]
+* [**Releases**][urls.vector_releases] - [v0.5.0][urls.v0.5.0], [changelog][urls.vector_changelog]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -283,7 +283,7 @@ the License.
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
+[urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

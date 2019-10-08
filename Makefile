@@ -36,6 +36,8 @@ check-generate: ## Checks for pending `make generate` changes
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/check-generate.sh
 
+CHECK_URLS=false
+export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/generate.rb
@@ -45,7 +47,7 @@ fmt: ## Format code
 
 release: ## Release a new Vector version
 	@$(MAKE) release-meta
-	@$(MAKE) generate
+	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
 run: ## Starts Vector in development mode

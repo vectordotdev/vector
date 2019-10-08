@@ -53,7 +53,6 @@ data_dir = "/var/lib/vector"
   # 
   # * optional
   # * no default
-  include_containers = "<container-id>"
   include_containers = "ffd2bc2cb74a"
 
   #  A list of container object labels to match against when filtering running
@@ -62,8 +61,7 @@ data_dir = "/var/lib/vector"
   # 
   # * optional
   # * no default
-  include_labels = "latest"
-  include_labels = "alpine"
+  include_labels = "key=value"
 
 # Ingests data through one or more local files and outputs `log` events.
 [sources.file]

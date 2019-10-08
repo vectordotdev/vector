@@ -77,6 +77,7 @@ def url_valid?(url)
   # it serves directories.
   when /^https:\/\/packages\.timber\.io\/vector[^.]*$/
     true
+
   else
     uri = URI.parse(url)
     req = Net::HTTP.new(uri.host, uri.port)
@@ -197,9 +198,13 @@ end
 # Check URLs
 #
 
-title("Checking URLs...")
-
-check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+check_urls =
+  if ENV.key?("CHECK_URLS")
+    ENV.fetch("CHECK_URLS") == "true"
+  else
+    title("Checking URLs...")
+    get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+  end
 
 if check_urls
   Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|
