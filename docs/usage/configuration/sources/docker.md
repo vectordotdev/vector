@@ -56,8 +56,8 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
   include_containers = "ffd2bc2cb74a"
 
   #  A list of container object labels to match against when filtering running
-  # containers. This should follow the described label's synatx in
-  # https://docs.docker.com/config/labels-custom-metadata/.
+  # containers. This should follow the described label's synatx in docker object
+  # labels docs.
   # 
   # * optional
   # * no default
@@ -75,7 +75,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 | `type` | `string` | The component type<br />`required` `must be: "docker"` |
 | **OPTIONAL** | | |
 | `include_containers` | `[string]` | A list of container ids to match against when filtering running containers. This will attempt to match the container id from the beginning meaning you do not need to include the whole id but just the first few characters. If no containers ids are provided, all containers will be included.<br />`no default` `example: "<container-id>"` |
-| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in https://docs.docker.com/config/labels-custom-metadata/.<br />`no default` `example: "latest"` |
+| `include_labels` | `[string]` | A list of container object labels to match against when filtering running containers. This should follow the described label's synatx in [docker object labels docs][urls.docker_object_labels].<br />`no default` `example: "latest"` |
 
 ## How It Works
 
@@ -84,8 +84,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 Vector will automatically attempt to connect to the docker daemon for you. In most
 situations if your current user is able to run `docker ps` then Vector will be able to
 connect. Vector will also respect if `DOCKER_HOST` and `DOCKER_VERIFY_TLS` are set. Vector will also
-use the other default docker environment variables if they are set. For more infomration on how to
-connect to the docker daemon can be found here https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option.
+use the other default docker environment variables if they are set. See the [Docker daemon docs][urls.docker_daemon].
 
 ### Delivery Guarantee
 
@@ -128,6 +127,8 @@ issue, please:
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[urls.docker_daemon]: https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option
+[urls.docker_object_labels]: https://docs.docker.com/config/labels-custom-metadata/
 [urls.docker_source_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22+label%3A%22Type%3A+bug%22
 [urls.docker_source_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22+label%3A%22Type%3A+enhancement%22
 [urls.docker_source_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22source%3A+docker%22

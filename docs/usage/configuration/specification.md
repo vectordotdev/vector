@@ -77,8 +77,8 @@ data_dir = "/var/lib/vector"
   include_containers = "ffd2bc2cb74a"
 
   #  A list of container object labels to match against when filtering running
-  # containers. This should follow the described label's synatx in
-  # https://docs.docker.com/config/labels-custom-metadata/.
+  # containers. This should follow the described label's synatx in docker object
+  # labels docs.
   # 
   # * optional
   # * no default
