@@ -122,7 +122,7 @@ Vector includes service files in case you need them:
 To install Vector into Init.d run:
 
 ```bash
-cp -a distribution/init.d/vector /etc/init.d
+cp -av distribution/init.d/vector /etc/init.d
 ```
 
 #### Systemd
@@ -130,7 +130,7 @@ cp -a distribution/init.d/vector /etc/init.d
 To install Vector into Systemd run:
 
 ```bash
-cp -a distribution/systemd/vector /etc/systemd/system
+cp -av distribution/systemd/vector /etc/systemd/system
 ```
 
 ### Updating
