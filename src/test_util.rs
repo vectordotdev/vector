@@ -38,8 +38,8 @@ pub fn next_addr() -> SocketAddr {
 pub fn trace_init() {
     let env = std::env::var("TEST_LOG").unwrap_or_else(|_| "off".to_string());
 
-    let subscriber = tracing_fmt::FmtSubscriber::builder()
-        .with_filter(tracing_fmt::filter::EnvFilter::from(env))
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(env)
         .finish();
     let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
 }

@@ -4,7 +4,7 @@ use super::{
 };
 use bytes::Bytes;
 use futures::{Future, Poll, Stream};
-use http::StatusCode;
+use http::{Request, StatusCode};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use native_tls::TlsConnector;
@@ -14,14 +14,14 @@ use tokio::executor::DefaultExecutor;
 use tower::Service;
 use tower_hyper::client::Client;
 use tracing::field;
-use tracing_tower_http::InstrumentedHttpService;
+use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub type RequestBuilder = Box<dyn Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send>;
 pub type Response = hyper::Response<Bytes>;
 
 #[derive(Clone)]
 pub struct HttpService {
-    inner: InstrumentedHttpService<Client<HttpsConnector<HttpConnector>, Vec<u8>>>,
+    inner: InstrumentedService<Client<HttpsConnector<HttpConnector>, Vec<u8>>, Request<Vec<u8>>>,
     request_builder: Arc<RequestBuilder>,
 }
 
@@ -69,7 +69,7 @@ impl HttpServiceBuilder {
         let client = hyper::Client::builder()
             .executor(DefaultExecutor::current())
             .build(https);
-        let inner = InstrumentedHttpService::new(Client::with_client(client));
+        let inner = Client::with_client(client).instrument(info_span!("http"));
         HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),

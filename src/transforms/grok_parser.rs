@@ -83,6 +83,7 @@ impl Transform for GrokParser {
                                 message = "Could not convert types.",
                                 name = &name[..],
                                 %error,
+                                rate_limit_secs = 30,
                             );
                         }
                     }

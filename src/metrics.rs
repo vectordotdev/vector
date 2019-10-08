@@ -1,7 +1,7 @@
 use futures::Future;
 use hotmic::{
     snapshot::{Snapshot, TypedMeasurement},
-    Controller, Receiver, Sink,
+    Controller, Receiver,
 };
 use hyper::{
     server::conn::AddrStream,
@@ -11,8 +11,10 @@ use hyper::{
 use std::net::SocketAddr;
 use tracing::field;
 
+pub type Sink = hotmic::Sink<&'static str>;
+
 /// Build the metrics receiver, controller and sink
-pub fn build() -> (Controller, Sink<&'static str>) {
+pub fn build() -> (Controller, Sink) {
     let mut receiver = Receiver::builder().build();
     let controller = receiver.get_controller();
     let sink = receiver.get_sink();

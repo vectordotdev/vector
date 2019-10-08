@@ -20,6 +20,7 @@ pub mod sources;
 pub mod template;
 pub mod test_util;
 pub mod topology;
+pub mod trace;
 pub mod transforms;
 pub mod types;
 

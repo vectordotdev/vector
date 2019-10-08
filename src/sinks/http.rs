@@ -9,7 +9,7 @@ use crate::{
     },
     topology::config::{DataType, SinkConfig},
 };
-use futures::{future, Future, Sink};
+use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
 use http::{
     header::{self, HeaderName, HeaderValue},
@@ -191,7 +191,7 @@ fn http(
             batch_size,
             Duration::from_secs(batch_timeout),
         )
-        .with(move |event| encode_event(event, &encoding));
+        .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))
 }
@@ -257,22 +257,30 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
         .expect("bug building uri"))
 }
 
-fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let event = event.into_log();
 
     let mut body = match encoding {
-        Encoding::Text => event
-            .get(&event::MESSAGE)
-            .map(|v| v.to_string_lossy().into_bytes())
-            .unwrap_or(Vec::new()),
+        Encoding::Text => {
+            if let Some(v) = event.get(&event::MESSAGE) {
+                v.to_string_lossy().into_bytes()
+            } else {
+                warn!(
+                    message = "Event missing the message key; Dropping event.",
+                    rate_limit_secs = 30,
+                );
+                return None;
+            }
+        }
 
         Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
-            .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,
+            .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+            .ok()?,
     };
 
     body.push(b'\n');
 
-    Ok(body)
+    Some(body)
 }
 
 #[cfg(test)]

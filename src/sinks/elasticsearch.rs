@@ -291,10 +291,11 @@ fn encode_event(
 ) -> Option<Vec<u8>> {
     let index = index
         .render_string(&event)
-        .map_err(|keys| {
+        .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
-                ?keys
+                message = "Keys do not exist on the event; Dropping event.",
+                ?missing_keys,
+                rate_limit_secs = 30,
             );
         })
         .ok()?;

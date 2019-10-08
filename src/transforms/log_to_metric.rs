@@ -235,11 +235,11 @@ impl Transform for LogToMetric {
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound) => {}
-                Err(TransformError::ParseError(message)) => {
-                    trace!("failed to parse {:?}", message);
+                Err(TransformError::ParseError(error)) => {
+                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
                 }
-                Err(TransformError::RenderError(message)) => {
-                    trace!("{:?}", message);
+                Err(TransformError::RenderError(error)) => {
+                    debug!(message = "Unable to render.", %error, rate_limit_secs = 30);
                 }
             }
         }

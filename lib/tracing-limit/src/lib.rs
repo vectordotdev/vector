@@ -9,7 +9,7 @@ use std::{
 };
 use tracing_core::{
     callsite::Identifier,
-    field::{Field, Value, Visit},
+    field::{display, Field, Value, Visit},
     subscriber::Interest,
     Event, Metadata, Subscriber,
 };
@@ -40,7 +40,7 @@ impl Limit {
 
         let fields = metadata.fields();
 
-        let message = tracing_core::field::display(message);
+        let message = display(message);
 
         if let Some(message_field) = fields.field("message") {
             let values = [
@@ -104,43 +104,45 @@ where
     }
 
     fn enabled(&self, metadata: &Metadata, ctx: Context<S>) -> bool {
-        let events = self.events.read().expect("lock poisoned!");
-        let id = metadata.callsite();
+        if ctx.enabled(metadata) {
+            let events = self.events.read().expect("lock poisoned!");
+            let id = metadata.callsite();
 
-        if events.contains_key(&id) {
-            // check if the event exists within the map, if it does
-            // that means we are currently rate limiting it.
-            if let Some(state) = events.get(&id) {
-                let start = state.start.unwrap_or_else(|| Instant::now());
+            if events.contains_key(&id) {
+                // check if the event exists within the map, if it does
+                // that means we are currently rate limiting it.
+                if let Some(state) = events.get(&id) {
+                    let start = state.start.unwrap_or_else(|| Instant::now());
 
-                if start.elapsed().as_secs() < state.limit {
-                    if state.count.load(Ordering::Acquire) == 1 {
-                        let message = format!("{:?} is being rate limited.", state.message);
+                    if start.elapsed().as_secs() < state.limit {
+                        if state.count.load(Ordering::Acquire) == 1 {
+                            let message = format!("{:?} is being rate limited.", state.message);
 
-                        self.create_event(&id, &ctx, message);
+                            self.create_event(&id, &ctx, message);
+                        }
+
+                        let prev = state.count.fetch_add(1, Ordering::Relaxed);
+
+                        if prev == 0 {
+                            return true;
+                        }
+                    } else {
+                        drop(events);
+
+                        let mut events = self.events.write().expect("lock poisoned!");
+
+                        if let Some(state) = events.remove(&id) {
+                            let message = format!(
+                                "{:?} {:?} events were rate limited.",
+                                state.count, state.message
+                            );
+
+                            self.create_event(&id, &ctx, message);
+                        }
                     }
 
-                    let prev = state.count.fetch_add(1, Ordering::Relaxed);
-
-                    if prev == 0 {
-                        return true;
-                    }
-                } else {
-                    drop(events);
-
-                    let mut events = self.events.write().expect("lock poisoned!");
-
-                    if let Some(state) = events.remove(&id) {
-                        let message = format!(
-                            "{:?} {:?} events were rate limited.",
-                            state.count, state.message
-                        );
-
-                        self.create_event(&id, &ctx, message);
-                    }
+                    return false;
                 }
-
-                return false;
             }
         }
 
@@ -189,6 +191,12 @@ struct LimitVisitor {
 
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
+        if field.name() == RATE_LIMIT_FIELD {
+            self.limit = Some(value as usize);
+        }
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_FIELD {
             self.limit = Some(value as usize);
         }

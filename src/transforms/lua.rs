@@ -90,10 +90,7 @@ impl Transform for Lua {
         match self.process(event) {
             Ok(event) => event,
             Err(err) => {
-                error!(
-                    "Error in lua script; discarding event.\n{}",
-                    format_error(&err)
-                );
+                error!(message = "Error in lua script; discarding event.", error = %format_error(&err), rate_limit_secs = 30);
                 None
             }
         }

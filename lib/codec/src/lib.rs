@@ -96,6 +96,7 @@ impl Decoder for BytesDelimitedCodec {
                         message = "discarding frame larger than max_length",
                         buf_len = buf.len(),
                         max_len = self.max_length,
+                        rate_limit_secs = 30
                     );
                     Ok(None)
                 } else {

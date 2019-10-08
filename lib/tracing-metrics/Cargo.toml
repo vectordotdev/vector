@@ -15,5 +15,4 @@ futures = "0.1.25"
 tokio = "0.1.21"
 hyper = "0.12.18"
 tracing-futures = { git = "https://github.com/tokio-rs/tracing" }
-tracing-fmt = { git = "https://github.com/tokio-rs/tracing" }
-tracing-env-logger = { git = "https://github.com/tokio-rs/tracing" }
+tracing-subscriber = "0.1.2"

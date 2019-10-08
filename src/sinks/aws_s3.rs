@@ -303,7 +303,8 @@ fn encode_event(
         .map_err(|missing_keys| {
             warn!(
                 message = "Keys do not exist on the event. Dropping event.",
-                ?missing_keys
+                ?missing_keys,
+                rate_limit_secs = 30,
             );
         })
         .ok()?;
