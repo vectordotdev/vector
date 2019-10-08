@@ -100,7 +100,7 @@ impl TlsSettings {
         let identity = match options.crt_path {
             None => None,
             Some(ref crt_path) => {
-                let name = crt_path.to_string_lossy().to_string();
+                let name = crt_path.to_string_lossy();
                 let crt = load_x509(crt_path)?;
                 let key_path = options.key_path.as_ref().unwrap();
                 let key = load_key(&key_path, &options.key_pass)?;
