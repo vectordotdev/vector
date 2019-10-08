@@ -44,13 +44,13 @@ cp -av target/artifacts/vector-amd64.deb distribution/docker/debian
 echo "Building timberio/vector:* Docker images"
 
 if [[ "$CHANNEL" == "latest" ]]; then
-  docker build --build-arg version=$VERSION --tag timberio/vector:$VERSION-alpine distribution/docker/alpine
-  docker build --build-arg version=$VERSION --tag timberio/vector:latest-alpine distribution/docker/alpine
-  docker build --build-arg version=$VERSION --tag timberio/vector:$VERSION-debian distribution/docker/debian
-  docker build --build-arg version=$VERSION --tag timberio/vector:latest-debian distribution/docker/debian
+  docker build --tag timberio/vector:$VERSION-alpine distribution/docker/alpine
+  docker build --tag timberio/vector:latest-alpine distribution/docker/alpine
+  docker build --tag timberio/vector:$VERSION-debian distribution/docker/debian
+  docker build --tag timberio/vector:latest-debian distribution/docker/debian
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  docker build --build-arg version=$VERSION --tag timberio/vector:nightly-alpine distribution/docker/alpine
-  docker build --build-arg version=$VERSION --tag timberio/vector:nightly-debian distribution/docker/debian
+  docker build --tag timberio/vector:nightly-alpine distribution/docker/alpine
+  docker build --tag timberio/vector:nightly-debian distribution/docker/debian
 fi
 
 #
