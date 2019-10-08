@@ -15,7 +15,7 @@ CHANNEL=$(scripts/util/release-channel.sh)
 #
 
 td=$(mktemp -d)
-cp -a "target/artifacts/." "$td"
+cp -av "target/artifacts/." "$td"
 ls $td
 
 #
