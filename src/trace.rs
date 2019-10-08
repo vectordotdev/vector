@@ -11,10 +11,9 @@ use tracing_subscriber::{layer::SubscriberExt, FmtSubscriber};
 pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
-pub fn init(debug: bool, color: bool, levels: &str, metrics: Option<metrics::Sink>) {
+pub fn init(color: bool, levels: &str, metrics: Option<metrics::Sink>) {
     let subscriber = FmtSubscriber::builder()
         .with_ansi(color)
-        .with_target(debug)
         .with_env_filter(levels)
         .finish()
         .with(Limit::default());

@@ -51,10 +51,6 @@ struct Opts {
     #[structopt(short, long, parse(from_occurrences))]
     quiet: u8,
 
-    /// Enable internal debug mode which adds more internal metadata to logs, metrics, etc.
-    #[structopt(long)]
-    debug: bool,
-
     /// Control when ANSI terminal formatting is used.
     ///
     /// By default `vector` will try and detect if `stdout` is a terminal, if it is
@@ -128,7 +124,6 @@ fn main() {
     let (metrics_controller, metrics_sink) = metrics::build();
 
     trace::init(
-        opts.debug,
         color,
         levels.as_str(),
         opts.metrics_addr.map(|_| metrics_sink),
