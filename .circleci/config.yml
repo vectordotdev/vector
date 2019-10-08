@@ -481,7 +481,6 @@ jobs:
           command: |
             export VERSION=$(make version)
             make release-docker
-          no_output_timeout: 30m
 
   release-github:
     docker:
