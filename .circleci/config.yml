@@ -297,8 +297,8 @@ jobs:
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
-      - *restore-artifacts-from-workspace
       - checkout
+      - *restore-artifacts-from-workspace
       - run:
           name: Build & verify Docker
           command: |
@@ -469,11 +469,17 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - checkout
+      - *restore-artifacts-from-workspace
+      - run:
+          name: Build Docker
+          command: |
+            export VERSION=$(make version)
+            make build-docker
+          no_output_timeout: 30m
       - run:
           name: Release Docker
           command: |
             export VERSION=$(make version)
-            echo "Releasing $VERSION..."
             make release-docker
           no_output_timeout: 30m
 
