@@ -84,10 +84,7 @@ impl SinkConfig for TcpSinkConfig {
         let tls = match self.tls {
             Some(ref tls) => {
                 if tls.enabled.unwrap_or(false) {
-                    Some(TlsSettings::from_options(
-                        &Some(tls.options.clone()),
-                        "tcp",
-                    )?)
+                    Some(TlsSettings::from_options(&Some(tls.options.clone()))?)
                 } else {
                     None
                 }

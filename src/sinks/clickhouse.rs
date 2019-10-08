@@ -102,7 +102,7 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     );
 
     let uri = encode_uri(&host, &database, &table)?;
-    let tls_settings = TlsSettings::from_options(&config.tls, "clickhouse")?;
+    let tls_settings = TlsSettings::from_options(&config.tls)?;
 
     let http_service =
         HttpService::builder()

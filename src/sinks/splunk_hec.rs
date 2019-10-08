@@ -109,7 +109,7 @@ pub fn hec(config: HecSinkConfig, acker: Acker) -> crate::Result<super::RouterSi
         .context(super::UriParseError)?;
     let token = Bytes::from(format!("Splunk {}", token));
 
-    let tls_settings = TlsSettings::from_options(&config.tls, "splunk_hec")?;
+    let tls_settings = TlsSettings::from_options(&config.tls)?;
 
     let http_service =
         HttpService::builder()

@@ -90,7 +90,7 @@ pub struct BasicAuth {
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
-        let tls = TlsSettings::from_options(&self.tls, "http")?;
+        let tls = TlsSettings::from_options(&self.tls)?;
         let sink = http(self.clone(), acker, tls.clone())?;
 
         match self.healthcheck_uri.clone() {

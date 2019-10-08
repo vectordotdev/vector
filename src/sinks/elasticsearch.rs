@@ -140,7 +140,7 @@ impl ElasticSearchCommon {
             }
         };
 
-        let tls_settings = TlsSettings::from_options(&config.tls, "elasticsearch")?;
+        let tls_settings = TlsSettings::from_options(&config.tls)?;
 
         Ok(Self {
             host: config.host.clone(),

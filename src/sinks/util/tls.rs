@@ -74,18 +74,15 @@ pub struct TlsSettings {
 pub struct IdentityStore(Vec<u8>);
 
 impl TlsSettings {
-    pub fn from_options(options: &Option<TlsOptions>, sink: &str) -> crate::Result<Self> {
+    pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
         let default = TlsOptions::default();
         let options = options.as_ref().unwrap_or(&default);
 
         if options.verify_certificate == Some(false) {
-            warn!(
-                "`verify_certificate` in {} sink is DISABLED, this may lead to security vulnerabilities", sink
-            );
+            warn!("`verify_certificate` is DISABLED, this may lead to security vulnerabilities");
         }
         if options.verify_hostname == Some(false) {
-            warn!(
-                "`verify_hostname` in {} sink is DISABLED, this may lead to security vulnerabilities", sink);
+            warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
         }
 
         if options.crt_path.is_some() != options.key_path.is_some() {
