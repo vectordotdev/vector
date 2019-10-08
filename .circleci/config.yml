@@ -536,15 +536,12 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
-require-checks-and-tests: &require-checks-and-tests
+require-builds: &require-builds
   requires:
     - check-code
     - check-fmt
     - check-generate
     - test-stable
-
-require-builds: &require-builds
-  requires:
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
     - build-x86_64-apple-darwin-archive
