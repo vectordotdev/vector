@@ -1,5 +1,7 @@
 FROM alpine:3.10.1 AS builder
 
+WORKDIR /vector
+
 COPY vector-x86_64-unknown-linux-musl.tar.gz .
 RUN tar -xvf vector-x86_64-unknown-linux-musl.tar.gz --strip-components=2
 
