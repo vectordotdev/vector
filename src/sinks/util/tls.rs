@@ -152,18 +152,13 @@ impl TlsConnectorExt for TlsConnectorBuilder {
 }
 
 /// Load a `native_tls::Certificate` from a named file
-fn load_certificate<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<Certificate> {
-    let filename = filename.as_ref();
+fn load_certificate(filename: &Path) -> crate::Result<Certificate> {
     let data = open_read(filename, "certificate")?;
     Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
 }
 
 /// Load a private key from a named file
-fn load_key<T: AsRef<Path> + Debug>(
-    filename: T,
-    pass_phrase: &Option<String>,
-) -> crate::Result<PKey<Private>> {
-    let filename = filename.as_ref();
+fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
     match pass_phrase {
         None => {
@@ -178,15 +173,13 @@ fn load_key<T: AsRef<Path> + Debug>(
 }
 
 /// Load an X.509 certificate from a named file
-fn load_x509<T: AsRef<Path> + Debug>(filename: T) -> crate::Result<X509> {
-    let filename = filename.as_ref();
+fn load_x509(filename: &Path) -> crate::Result<X509> {
     let data = open_read(filename, "certificate")?;
     Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
 }
 
-fn open_read<F: AsRef<Path> + Debug>(filename: F, note: &'static str) -> crate::Result<Vec<u8>> {
+fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {
     let mut text = Vec::<u8>::new();
-    let filename = filename.as_ref();
 
     File::open(filename)
         .with_context(|| FileOpenFailed { note, filename })?
