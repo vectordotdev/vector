@@ -471,16 +471,11 @@ jobs:
       - checkout
       - *restore-artifacts-from-workspace
       - run:
-          name: Build Docker
-          command: |
-            export VERSION=$(make version)
-            make build-docker
-          no_output_timeout: 30m
-      - run:
           name: Release Docker
           command: |
             export VERSION=$(make version)
             make release-docker
+          no_output_timeout: 30m
 
   release-github:
     docker:

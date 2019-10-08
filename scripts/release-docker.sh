@@ -14,6 +14,12 @@ set -o errexit -o pipefail -o noclobber -o nounset
 CHANNEL=$(scripts/util/release-channel.sh)
 
 #
+# Build
+#
+
+./build-docker.sh
+
+#
 # Push
 #
 
