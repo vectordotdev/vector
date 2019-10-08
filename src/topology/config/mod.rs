@@ -20,9 +20,16 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
-#[derive(Default)]
 pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
+}
+
+impl Default for GlobalOptions {
+    fn default() -> GlobalOptions {
+        GlobalOptions {
+            data_dir: Some(PathBuf::from("/var/lib/vector/")),
+        }
+    }
 }
 
 #[derive(Debug, Snafu)]
