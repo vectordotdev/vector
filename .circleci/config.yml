@@ -311,7 +311,7 @@ jobs:
     steps:
       - run:
           name: Install vector
-          command: sudo curl https://sh.vector.dev -sSf | sh -s -- -y
+          command: curl https://sh.vector.dev -sSf | sh -s -- -y
       - run:
           name: Verify installation
           command: vector --version
