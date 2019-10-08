@@ -11,7 +11,7 @@ install-rust: &install-rust
 install-vector: &install-vector
   run:
     name: Execute install.sh
-    command: distribution/install.sh -y
+    command: HOMEBREW_NO_AUTO_UPDATE=1 distribution/install.sh -y
 
 restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
