@@ -7,6 +7,7 @@ use futures::{Future, Poll, Stream};
 use http::StatusCode;
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use native_tls::TlsConnector;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tokio::executor::DefaultExecutor;
@@ -29,7 +30,7 @@ impl HttpService {
         HttpServiceBuilder::new()
     }
 
-    pub fn new<F>(request_builder: F) -> crate::Result<Self>
+    pub fn new<F>(request_builder: F) -> Self
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -53,7 +54,7 @@ impl HttpServiceBuilder {
     }
 
     /// Build the configured `HttpService`
-    pub fn build<F>(self, request_builder: F) -> crate::Result<HttpService>
+    pub fn build<F>(self, request_builder: F) -> HttpService
     where
         F: Fn(Vec<u8>) -> hyper::Request<Vec<u8>> + Sync + Send + 'static,
     {
@@ -69,10 +70,10 @@ impl HttpServiceBuilder {
             .executor(DefaultExecutor::current())
             .build(https);
         let inner = InstrumentedHttpService::new(Client::with_client(client));
-        Ok(HttpService {
+        HttpService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-        })
+        }
     }
 
     /// Set the number of threads used by the `HttpService`
@@ -86,6 +87,16 @@ impl HttpServiceBuilder {
         self.tls_settings = Some(settings);
         self
     }
+}
+
+pub fn https_client(
+    tls: TlsSettings,
+) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>>> {
+    let mut http = HttpConnector::new(1);
+    http.enforce_http(false);
+    let tls = TlsConnector::builder().use_tls_settings(tls).build()?;
+    let https = HttpsConnector::from((http, tls));
+    Ok(hyper::Client::builder().build(https))
 }
 
 impl Service<Vec<u8>> for HttpService {
@@ -184,8 +195,7 @@ mod test {
             builder.method(Method::POST);
             builder.uri(uri.clone());
             builder.body(body.into()).unwrap()
-        })
-        .unwrap();
+        });
 
         let req = service.call(request);
 

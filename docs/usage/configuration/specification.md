@@ -1843,6 +1843,54 @@ end
     # * no default
     user = "username"
 
+  #
+  # Tls
+  #
+
+  [sinks.clickhouse.tls]
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
+
 # Streams `log` and `metric` events to the console, `STDOUT` or `STDERR`.
 [sinks.console]
   # The component type
@@ -2087,39 +2135,48 @@ end
   #
 
   [sinks.elasticsearch.tls]
-    # If `true`, Vector will force certificate validation. Do NOT set this to
-    # `false` unless you know the risks of not verifying the remote certificate.
-    # 
-    # * optional
-    # * default: true
-    verify = true
-
     # Absolute path to an additional CA certificate file, in PEM format.
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to certificate file used to identify this connection, in PEM
+    # Absolute path to a certificate file used to identify this connection, in PEM
     # format. If this is set, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to key file used to identify this connection, in PEM format. If
-    # this is set, `crt_path` must also be set.
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
     key_path = "/path/to/host_certificate.key"
 
-    # Pass phrase to unlock the encrypted key file. This has no effect unless
-    # `key_path` above is set.
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
     # 
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
 
 # Streams `log` events to a file.
 [sinks.file]
@@ -2220,15 +2277,6 @@ end
   # * optional
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  # When making a connection to a HTTPS server, this controls if the TLS
-  # certificate presented by the server will be verified. Do not set this unless
-  # you know what you are doing. Turning this off introduces significant
-  # vulnerabilities.
-  # 
-  # * optional
-  # * default: true
-  verify_certificate = true
 
   #
   # Batching
@@ -2356,6 +2404,54 @@ end
     # * no default
     X-Powered-By = "Vector"
 
+  #
+  # Tls
+  #
+
+  [sinks.http.tls]
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
+
 # Streams `log` events to Apache Kafka via the Kafka protocol.
 [sinks.kafka]
   #
@@ -2458,32 +2554,32 @@ end
     # * default: false
     enabled = false
 
-    # Absolute path to additional CA certificate file, in JKS format.
+    # Absolute path to an additional CA certificate file, in PEM format.
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to certificate file used to identify this connection, in JKS
-    # format. If this is set, `key_file` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to key file used to identify this connection, in JKS format. If
-    # this is set, `crt_file` must also be set.
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
     key_path = "/path/to/host_certificate.key"
 
-    # Pass phrase to unlock the encrypted key file. This has no effect unless
-    # `key_file` above is set.
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
     # 
     # * optional
     # * no default
-    key_phrase = "PassWord1"
+    key_pass = "PassWord1"
 
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
@@ -2671,6 +2767,54 @@ end
     # * unit: events
     num_items = 500
 
+  #
+  # Tls
+  #
+
+  [sinks.splunk_hec.tls]
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
+
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
   # The component type
@@ -2796,39 +2940,48 @@ end
     # * default: false
     enabled = false
 
-    # If `true`, Vector will force certificate validation. Do NOT set this to
-    # `false` unless you know the risks of not verifying the remote certificate.
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
     # 
     # * optional
     # * default: true
-    verify = true
+    verify_certificate = true
 
-    # Absolute path to additional CA certificate file, in PEM format.
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
     # 
     # * optional
-    # * no default
-    ca_file = "/path/to/certificate_authority.crt"
-
-    # Absolute path to certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_file` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_file = "/path/to/host_certificate.crt"
-
-    # Absolute path to key file used to identify this connection, in PEM format. If
-    # this is set, `crt_file` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_file = "/path/to/host_certificate.key"
-
-    # Pass phrase to unlock the encrypted key file. This has no effect unless
-    # `key_file` above is set.
-    # 
-    # * optional
-    # * no default
-    key_phrase = "PassWord1"
+    # * default: true
+    verify_hostname = true
 
 # Streams `log` events to another downstream Vector instance.
 [sinks.vector]

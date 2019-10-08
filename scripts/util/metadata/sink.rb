@@ -12,6 +12,7 @@ class Sink < Component
     :healthcheck,
     :service_limits_short_link,
     :service_provider,
+    :tls,
     :write_to_description
 
   def initialize(hash)
@@ -25,6 +26,7 @@ class Sink < Component
     @input_types = hash.fetch("input_types")
     @service_limits_short_link = hash["service_limits_short_link"]
     @service_provider = hash["service_provider"]
+    tls_options = hash["tls_options"]
     @write_to_description = hash.fetch("write_to_description")
 
     if (invalid_types = @input_types - EVENT_TYPES) != []
@@ -115,6 +117,72 @@ class Sink < Component
 
     if @service_limits_short_link
       @resources << OpenStruct.new({"name" => "Service Limits", "short_link" => @service_limits_short_link})
+    end
+
+    if tls_options
+      # Standard TLS options
+      options = {}
+
+      if tls_options.include?("+enabled")
+        options["enabled"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => false,
+          "description" => "Enable TLS during connections to the remote."
+        }
+      end
+
+      options["ca_path"] = {
+        "type" => "string",
+        "null" => true,
+        "examples" => ["/path/to/certificate_authority.crt"],
+        "description" => "Absolute path to an additional CA certificate file, in PEM format."
+      }
+
+      options["crt_path"] = {
+        "type" => "string",
+        "null" => true,
+        "examples" => ["/path/to/host_certificate.crt"],
+        "description" => "Absolute path to a certificate file used to identify this connection, in PEM format. If this is set, `key_path` must also be set."
+      }
+
+      options["key_path"] = {
+        "type" => "string",
+        "null" => true,
+        "examples" => ["/path/to/host_certificate.key"],
+        "description" => "Absolute path to a certificate key file used to identify this connection, in PEM format. If this is set, `crt_path` must also be set."
+      }
+
+      options["key_pass"] = {
+        "type" => "string",
+        "null" => true,
+        "examples" => ["PassWord1"],
+        "description" => "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set."
+      }
+
+      if !tls_options.include?("-verify")
+        options["verify_certificate"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => true,
+          "description" => "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
+        }
+
+        options["verify_hostname"] = {
+          "type" => "bool",
+          "null" => true,
+          "default" => true,
+          "description" => "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
+        }
+      end
+
+      @options.tls = Option.new({
+        "name" => "tls",
+        "description" => "Configures the TLS options for connections from this sink.",
+        "options" => options,
+        "null" => true,
+        "type" => "table"
+      })
     end
   end
 

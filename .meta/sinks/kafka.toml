@@ -6,6 +6,7 @@ healthcheck = true
 input_types = ["log"]
 service_provider = "Confluent"
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
+tls_options = ["+enabled", "-verify"]
 
 [sinks.kafka.options.bootstrap_servers]
 type = "[string]"
@@ -37,41 +38,3 @@ type = "string"
 examples = ["topic-1234"]
 null = false
 description = "The Kafka topic name to write events to."
-
-[sinks.kafka.options.tls]
-type = "table"
-null = true
-description = "Options for TLS support"
-
-[sinks.kafka.options.tls.options.enabled]
-type = "bool"
-null = true
-default = false
-description = "Enable TLS during connections to the remote."
-
-[sinks.kafka.options.tls.options.ca_path]
-type = "string"
-null = true
-description = "Absolute path to additional CA certificate file, in JKS format."
-examples = ["/path/to/certificate_authority.crt"]
-
-[sinks.kafka.options.tls.options.crt_path]
-type = "string"
-null = true
-description = """Absolute path to certificate file used to identify this \
-connection, in JKS format. If this is set, `key_file` must also be set."""
-examples = ["/path/to/host_certificate.crt"]
-
-[sinks.kafka.options.tls.options.key_path]
-type = "string"
-null = true
-description = """Absolute path to key file used to identify this \
-connection, in JKS format. If this is set, `crt_file` must also be set."""
-examples = ["/path/to/host_certificate.key"]
-
-[sinks.kafka.options.tls.options.key_phrase]
-type = "string"
-null = true
-description = """Pass phrase to unlock the encrypted key file. \
-This has no effect unless `key_file` above is set."""
-examples = ["PassWord1"]

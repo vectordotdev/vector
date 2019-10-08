@@ -14,6 +14,7 @@ retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
+tls_options = []
 
 [sinks.clickhouse.options.compression]
 type = "string"

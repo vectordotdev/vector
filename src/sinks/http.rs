@@ -2,9 +2,9 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::TlsOptions,
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
@@ -15,12 +15,10 @@ use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
 };
-use hyper::{Body, Client, Request};
-use hyper_tls::HttpsConnector;
+use hyper::{Body, Request};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::TryInto;
 use std::time::Duration;
 use tower::ServiceBuilder;
 
@@ -60,7 +58,7 @@ pub struct HttpSinkConfig {
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
 
-    pub verify_certificate: Option<bool>,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -92,13 +90,15 @@ pub struct BasicAuth {
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
-        let sink = http(self.clone(), acker)?;
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let sink = http(self.clone(), acker, tls.clone())?;
 
-        if let Some(healthcheck_uri) = self.healthcheck_uri.clone() {
-            let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone())?;
-            Ok((sink, healthcheck))
-        } else {
-            Ok((sink, Box::new(future::ok(()))))
+        match self.healthcheck_uri.clone() {
+            Some(healthcheck_uri) => {
+                let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone(), tls)?;
+                Ok((sink, healthcheck))
+            }
+            None => Ok((sink, Box::new(future::ok(())))),
         }
     }
 
@@ -107,7 +107,11 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+fn http(
+    config: HttpSinkConfig,
+    acker: Acker,
+    tls_settings: TlsSettings,
+) -> crate::Result<super::RouterSink> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -134,49 +138,44 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    let tls_options = TlsOptions {
-        verify_certificate: config.verify_certificate,
-        ..Default::default()
-    };
-    tls_options.check_warnings("http");
+    let http_service =
+        HttpService::builder()
+            .tls_settings(tls_settings)
+            .build(move |body: Vec<u8>| {
+                let mut builder = hyper::Request::builder();
 
-    let http_service = HttpService::builder()
-        .tls_settings(tls_options.try_into()?)
-        .build(move |body: Vec<u8>| {
-            let mut builder = hyper::Request::builder();
+                let method = match method {
+                    HttpMethod::Post => Method::POST,
+                    HttpMethod::Put => Method::PUT,
+                };
 
-            let method = match method {
-                HttpMethod::Post => Method::POST,
-                HttpMethod::Put => Method::PUT,
-            };
+                builder.method(method);
 
-            builder.method(method);
+                builder.uri(uri.clone());
 
-            builder.uri(uri.clone());
+                match encoding {
+                    Encoding::Text => builder.header("Content-Type", "text/plain"),
+                    Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
+                };
 
-            match encoding {
-                Encoding::Text => builder.header("Content-Type", "text/plain"),
-                Encoding::Ndjson => builder.header("Content-Type", "application/x-ndjson"),
-            };
-
-            if gzip {
-                builder.header("Content-Encoding", "gzip");
-            }
-
-            if let Some(headers) = &headers {
-                for (header, value) in headers.iter() {
-                    builder.header(header.as_str(), value.as_str());
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
                 }
-            }
 
-            let mut request = builder.body(body).unwrap();
+                if let Some(headers) = &headers {
+                    for (header, value) in headers.iter() {
+                        builder.header(header.as_str(), value.as_str());
+                    }
+                }
 
-            if let Some(auth) = &basic_auth {
-                auth.apply(request.headers_mut());
-            }
+                let mut request = builder.body(body).unwrap();
 
-            request
-        })?;
+                if let Some(auth) = &basic_auth {
+                    auth.apply(request.headers_mut());
+                }
+
+                request
+            });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
@@ -197,7 +196,11 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
     Ok(Box::new(sink))
 }
 
-fn healthcheck(uri: String, auth: Option<BasicAuth>) -> crate::Result<super::Healthcheck> {
+fn healthcheck(
+    uri: String,
+    auth: Option<BasicAuth>,
+    tls_settings: TlsSettings,
+) -> crate::Result<super::Healthcheck> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -205,8 +208,7 @@ fn healthcheck(uri: String, auth: Option<BasicAuth>) -> crate::Result<super::Hea
         auth.apply(request.headers_mut());
     }
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let client = https_client(tls_settings)?;
 
     let healthcheck = client
         .request(request)

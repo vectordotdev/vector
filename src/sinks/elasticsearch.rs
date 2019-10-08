@@ -3,9 +3,9 @@ use crate::{
     event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
-        tls::{TlsConnectorExt, TlsOptions},
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     template::Template,
@@ -14,12 +14,9 @@ use crate::{
 use futures::{stream::iter_ok, Future, Sink};
 use http::{uri::InvalidUri, Method, Uri};
 use hyper::{
-    client::HttpConnector,
     header::{HeaderName, HeaderValue},
-    Body, Client, Request,
+    Body, Request,
 };
-use hyper_tls::HttpsConnector;
-use native_tls::TlsConnector;
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
 use rusoto_credential::{AwsCredentials, CredentialsError};
@@ -79,7 +76,7 @@ impl SinkConfig for ElasticSearchConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let healthcheck = healthcheck(&common)?;
-        let sink = es(self, common, acker)?;
+        let sink = es(self, common, acker);
 
         Ok((sink, healthcheck))
     }
@@ -94,7 +91,7 @@ struct ElasticSearchCommon {
     authorization: Option<String>,
     region: Option<Region>,
     credentials: Option<AwsCredentials>,
-    tls_options: TlsOptions,
+    tls_settings: TlsSettings,
 }
 
 #[derive(Debug, Snafu)]
@@ -116,11 +113,6 @@ impl ElasticSearchCommon {
         uri.parse::<Uri>().with_context(|| InvalidHost {
             host: config.host.clone(),
         })?;
-
-        config
-            .tls
-            .as_ref()
-            .map(|tls| tls.check_warnings("elasticsearch"));
 
         let authorization = config.basic_auth.as_ref().map(|auth| {
             let token = format!("{}:{}", auth.user, auth.password);
@@ -148,12 +140,14 @@ impl ElasticSearchCommon {
             }
         };
 
+        let tls_settings = TlsSettings::from_options(&config.tls)?;
+
         Ok(Self {
             host: config.host.clone(),
             authorization,
             region,
             credentials,
-            tls_options: config.tls.clone().unwrap_or(Default::default()),
+            tls_settings,
         })
     }
 
@@ -165,23 +159,13 @@ impl ElasticSearchCommon {
         builder.uri(&uri);
         (uri, builder)
     }
-
-    fn make_client(&self) -> crate::Result<Client<HttpsConnector<HttpConnector>>> {
-        let mut http = HttpConnector::new(1);
-        http.enforce_http(false);
-        let tls = TlsConnector::builder()
-            .use_tls_settings((&self.tls_options).try_into()?)
-            .build()?;
-        let https = HttpsConnector::from((http, tls));
-        Ok(Client::builder().build(https))
-    }
 }
 
 fn es(
     config: &ElasticSearchConfig,
     common: ElasticSearchCommon,
     acker: Acker,
-) -> crate::Result<super::RouterSink> {
+) -> super::RouterSink {
     let id_key = config.id_key.clone();
     let mut gzip = match config.compression.unwrap_or(Compression::Gzip) {
         Compression::None => false,
@@ -230,7 +214,7 @@ fn es(
     }
 
     let http_service = HttpService::builder()
-        .tls_settings((&common.tls_options).try_into()?)
+        .tls_settings(common.tls_settings.clone())
         .build(move |body: Vec<u8>| {
             let (uri, mut builder) = common.request_builder(Method::POST, &path_query);
 
@@ -279,7 +263,7 @@ fn es(
                     }
                 }
             }
-        })?;
+        });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
@@ -296,7 +280,7 @@ fn es(
         )
         .with_flat_map(move |e| iter_ok(encode_event(e, &index, &doc_type, &id_key)));
 
-    Ok(Box::new(sink))
+    Box::new(sink)
 }
 
 fn encode_event(
@@ -353,8 +337,7 @@ fn healthcheck(common: &ElasticSearchCommon) -> crate::Result<super::Healthcheck
     let request = builder.body(Body::empty())?;
 
     Ok(Box::new(
-        common
-            .make_client()?
+        https_client(common.tls_settings.clone())?
             .request(request)
             .map_err(|err| err.into())
             .and_then(|response| match response.status() {
@@ -449,7 +432,8 @@ mod integration_tests {
     use crate::buffers::Acker;
     use crate::{
         event,
-        sinks::util::tls::{open_read, TlsOptions},
+        sinks::util::http::https_client,
+        sinks::util::tls::TlsOptions,
         test_util::{block_on, random_events_with_stream, random_string},
         topology::config::SinkConfig,
         Event,
@@ -458,6 +442,8 @@ mod integration_tests {
     use futures::{Future, Sink};
     use hyper::{Body, Request};
     use serde_json::{json, Value};
+    use std::fs::File;
+    use std::io::Read;
 
     #[test]
     fn structures_events_correctly() {
@@ -567,13 +553,15 @@ mod integration_tests {
         // make sure writes all all visible
         block_on(flush(&config)).expect("Flushing writes failed");
 
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
         let http_client = reqwest::Client::builder()
-            .add_root_certificate(
-                reqwest::Certificate::from_pem(
-                    &open_read("tests/data/Vector_CA.crt", "certificate").unwrap(),
-                )
-                .expect("Could not parse test CA"),
-            )
+            .add_root_certificate(test_ca)
             .build()
             .expect("Could not build HTTP client");
         let client = SyncClientBuilder::new()
@@ -611,8 +599,7 @@ mod integration_tests {
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
         let common = ElasticSearchCommon::parse_config(config).expect("Config error");
-        common
-            .make_client()
+        https_client(common.tls_settings)
             .expect("Could not build client to flush")
             .request(request)
             .map_err(|source| dbg!(source).into())
