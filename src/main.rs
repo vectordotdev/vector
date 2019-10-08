@@ -102,8 +102,6 @@ fn main() {
     };
 
     let levels = if let Ok(level) = std::env::var("LOG") {
-        // let additional_level = ",".to_owned() + level.as_str();
-        // additional_level
         level
     } else {
         [
