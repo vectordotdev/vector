@@ -34,8 +34,8 @@ verify() {
 # Prepare
 #
 
-cp -av vector-x86_64-unknown-linux-musl.tar.gz distribution/docker/alpine
-cp -av vector-amd64.deb distribution/docker/debian
+cp -av target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz distribution/docker/alpine
+cp -av target/artifacts/vector-amd64.deb distribution/docker/debian
 
 #
 # Build
