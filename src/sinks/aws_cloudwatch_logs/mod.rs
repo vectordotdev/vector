@@ -282,9 +282,7 @@ impl CloudwatchLogsSvc {
 
         match &self.encoding {
             &Encoding::Json => {
-                let bytes = serde_json::to_vec(&log.unflatten()).unwrap();
-                let message = String::from_utf8(bytes).unwrap();
-
+                let message = serde_json::to_string(&log.unflatten()).unwrap();
                 InputLogEvent { message, timestamp }
             }
             &Encoding::Text => {
@@ -369,7 +367,8 @@ fn partition(
         Err(missing_keys) => {
             warn!(
                 message = "keys in group template do not exist on the event; dropping event.",
-                ?missing_keys
+                ?missing_keys,
+                rate_limit_secs = 30
             );
             return None;
         }
@@ -380,7 +379,8 @@ fn partition(
         Err(missing_keys) => {
             warn!(
                 message = "keys in stream template do not exist on the event; dropping event.",
-                ?missing_keys
+                ?missing_keys,
+                rate_limit_secs = 30
             );
             return None;
         }

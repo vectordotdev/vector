@@ -39,6 +39,8 @@ if release_exists?(release)
     EOF
   )
 else
+  title("Committing and tagging release")
+  
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
   commands =

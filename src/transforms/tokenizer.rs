@@ -95,7 +95,8 @@ impl Transform for Tokenizer {
                         debug!(
                             message = "Could not convert types.",
                             name = &name[..],
-                            %error
+                            %error,
+                            rate_limit_secs = 30
                         );
                     }
                 }

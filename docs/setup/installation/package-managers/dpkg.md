@@ -1,5 +1,5 @@
 ---
-description: Install Vector through the APT package manager
+description: Install Vector through the DKG package manager
 ---
 
 <!--
@@ -7,39 +7,16 @@ description: Install Vector through the APT package manager
 
      To make changes please edit the template located at:
 
-     scripts/generate/templates/docs/setup/installation/package-managers/apt.md.erb
+     scripts/generate/templates/docs/setup/installation/package-managers/dpkg.md.erb
 -->
 
-# APT Package Manager
+# DPKG Package Manager
 
-Vector can be installed through the [APT package manager][urls.apt] which is
+Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
 
 ## Install
 
-{% tabs %}
-{% tab title="apt-get" %}
-Start by adding the Timber GPG key and repository:
-
-```bash
-curl -s https://packagecloud.io/install/repositories/timberio/packages/script.deb.sh | sudo bash
-```
-
-Install Vector:
-
-```bash
-sudo apt-get install vector
-```
-
-Start Vector:
-
-```bash
-sudo systemctl start vector
-```
-
-That's it! Proceed to [configure](#configuring) Vector for your use case.
-{% endtab %}
-{% tab title="dpkg" %}
 Download the [Vector `.deb file`][urls.vector_downloads.latest/vector-amd64.deb]:
 
 ```bash
@@ -59,8 +36,6 @@ sudo systemctl start vector
 ```
 
 That's it! Proceed to [configure](#configuring) Vector for your use case.
-{% endtab %}
-{% endtabs %}
 
 
 ## Configuring
@@ -84,29 +59,22 @@ Vector can be managed through the [Systemd][urls.systemd] service manager:
 ## Uninstalling
 
 ```bash
-apt-get remove vector
+sudo dpkg -r vector
 ```
 
 ## Updating
 
-Simply run the same `apt-get install` command
-
-```bash
-sudo apt-get install vector
-```
+Follow the [install](#install) steps again.
 
 ## Versions
 
 Historical Vector versions can be found in the [releases][urls.vector_releases].
-Once you've found the version you'd like to install you can specify it with:
-
-```bash
-sudo apt-get install vector=X.X.X
-```
+Once you've found the version you'd like to install you can re-follow the
+[install](#install) steps with the URL to the Vector `.deb` file.
 
 
 [docs.configuration]: ../../../usage/configuration
-[urls.apt]: https://wiki.debian.org/Apt
+[urls.dpkg]: https://wiki.debian.org/dpkg
 [urls.systemd]: https://www.freedesktop.org/wiki/Software/systemd/
 [urls.vector_downloads.latest/vector-amd64.deb]: https://packages.timber.io/vector/latest/vector-amd64.deb
 [urls.vector_releases]: https://github.com/timberio/vector/releases

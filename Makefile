@@ -36,6 +36,8 @@ check-generate: ## Checks for pending `make generate` changes
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/check-generate.sh
 
+CHECK_URLS=false
+export CHECK_URLS
 generate: ## Generates files across the repo using the data in /.meta
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/generate.rb
@@ -45,7 +47,7 @@ fmt: ## Format code
 
 release: ## Release a new Vector version
 	@$(MAKE) release-meta
-	@$(MAKE) generate
+	@$(MAKE) generate CHECK_URLS=false
 	@$(MAKE) release-commit
 
 run: ## Starts Vector in development mode
@@ -66,6 +68,9 @@ build-archive: ## Build a Vector archive for a given $TARGET and $VERSION
 build-ci-docker-images: ## Build the various Docker images used for CI
 	@scripts/build-ci-docker-images.sh
 
+build-docker: ## Build the Vector docker images, but do not push
+	@scripts/build-docker.sh
+
 package-deb: ## Create a .deb package from artifacts created via `build`
 	@scripts/package-deb.sh
 
@@ -74,9 +79,6 @@ package-rpm: ## Create a .rpm package from artifacts created via `build`
 
 release-commit: ## Commits release changes
 	@scripts/release-commit.rb
-
-release-deb: ## Release .deb via Package Cloud
-	@scripts/release-deb.sh
 
 release-docker: ## Release to Docker Hub
 	@scripts/release-docker.sh
@@ -96,11 +98,11 @@ release-rollback:
 	@bundle install --gemfile=scripts/Gemfile > /dev/null
 	@scripts/release-rollback.rb
 
-release-rpm: ## Release .rpm via Package Cloud
-	@scripts/release-rpm.sh
-
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
+
+sync-install:
+	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
 version: ## Get the current Vector version
 	@echo $(_version)

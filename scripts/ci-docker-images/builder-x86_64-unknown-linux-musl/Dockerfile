@@ -274,7 +274,7 @@ ARG LIBS_PREFIX
 COPY --from=libs-builder $LIBS_PREFIX $LIBS_PREFIX
 ENV PATH="$LIBS_PREFIX/bin:$PATH"
 
-RUN apt-get update && apt-get install -y build-essential pkg-config
+RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git
 
 # Because the system GCC and binutils are shadowed by aliases, we need to
 # instruct Cargo and cc crate to use GCC on the host system. They are used to

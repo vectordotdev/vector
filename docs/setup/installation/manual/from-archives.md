@@ -112,7 +112,7 @@ Vector archives ship with service files in case you need them:
 To install Vector into Init.d run:
 
 ```bash
-cp -a etc/init.d/vector /etc/init.d
+cp -av etc/init.d/vector /etc/init.d
 ```
 
 #### Systemd
@@ -120,7 +120,7 @@ cp -a etc/init.d/vector /etc/init.d
 To install Vector into Systemd run:
 
 ```bash
-cp -a etc/systemd/vector /etc/systemd/system
+cp -av etc/systemd/vector /etc/systemd/system
 ```
 
 ### Updating

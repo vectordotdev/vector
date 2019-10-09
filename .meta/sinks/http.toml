@@ -15,6 +15,7 @@ request_in_flight_limit = 10
 request_timeout_secs = 30
 service_provider = "Elastic"
 write_to_description = "a generic HTTP endpoint"
+tls_options = []
 
 [sinks.http.options.basic_auth]
 type = "table"
@@ -72,12 +73,3 @@ type = "string"
 examples = ["https://10.22.212.22:9000/endpoint"]
 null = false
 description = "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
-
-[sinks.http.options.verify_certificate]
-type = "bool"
-null = true
-default = true
-description = """When making a connection to a HTTPS server, this \
-controls if the TLS certificate presented by the server will be \
-verified. Do not set this unless you know what you are doing. Turning \
-this off introduces significant vulnerabilities."""
