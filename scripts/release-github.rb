@@ -48,11 +48,6 @@ if release.pre?
   flags << "--pre"
 end
 
-puts "\n\n\n\n"
-puts notes
-puts "\n\n\n\n"
-raise "fds"
-
 command = "grease create-release timberio/vector v#{VERSION} $#{SHA1} #{flags.join(" ")}"
 
 say(
