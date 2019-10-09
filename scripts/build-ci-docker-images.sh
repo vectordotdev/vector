@@ -53,6 +53,7 @@ all_images=(
 	releaser
 	verifier-amazonlinux-1
 	verifier-amazonlinux-2
+  verifier-centos-7
 	verifier-deb-8
 	verifier-deb-9
 	verifier-deb-10

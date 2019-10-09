@@ -259,7 +259,7 @@ jobs:
 
   verify-deb-artifact-on-ubuntu-16-04:
     docker:
-      - image: timberiodev/vector-verifier-ubuntu-16-04
+      - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -271,7 +271,7 @@ jobs:
 
   verify-deb-artifact-on-ubuntu-18-04:
     docker:
-      - image: timberiodev/vector-verifier-ubuntu-18-04
+      - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -283,7 +283,7 @@ jobs:
 
   verify-deb-artifact-on-ubuntu-19-04:
     docker:
-      - image: timberiodev/vector-verifier-ubuntu-19-04
+      - image: timberiodev/vector-verifier-ubuntu-19-04:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -320,7 +320,7 @@ jobs:
 
   verify-install-on-amazon-linux-1:
     docker:
-      - image: timberiodev/vector-verifier-amazonlinux-1
+      - image: timberiodev/vector-verifier-amazonlinux-1:latest
     steps:
       - checkout
       - *install-vector
@@ -328,7 +328,7 @@ jobs:
 
   verify-install-on-amazon-linux-2:
     docker:
-      - image: timberiodev/vector-verifier-amazonlinux-2
+      - image: timberiodev/vector-verifier-amazonlinux-2:latest
     steps:
       - checkout
       - *install-vector
@@ -336,7 +336,7 @@ jobs:
 
   verify-install-on-centos-7:
     docker:
-      - image: centos:7
+      - image: timberiodev/vector-verifier-centos-7:latest
     steps:
       - checkout
       - *install-vector
@@ -411,7 +411,7 @@ jobs:
 
   verify-rpm-artifact-on-amazon-linux-1:
     docker:
-      - image: timberiodev/vector-verifier-amazonlinux-1
+      - image: timberiodev/vector-verifier-amazonlinux-1:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
@@ -423,7 +423,7 @@ jobs:
 
   verify-rpm-artifact-on-amazon-linux-2:
     docker:
-      - image: timberiodev/vector-verifier-amazonlinux-2
+      - image: timberiodev/vector-verifier-amazonlinux-2:latest
     steps:
       - *restore-artifacts-from-workspace
       - run:
