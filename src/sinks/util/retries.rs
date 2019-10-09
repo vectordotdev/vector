@@ -8,8 +8,6 @@ use std::{
 use tokio::timer::Delay;
 use tower::{retry::Policy, timeout::error::Elapsed};
 
-const MAX_BACKOFF: Duration = Duration::from_secs(10);
-
 pub trait RetryLogic: Clone {
     type Error: std::error::Error + Send + Sync + 'static;
     type Response;
@@ -24,7 +22,9 @@ pub trait RetryLogic: Clone {
 #[derive(Debug, Clone)]
 pub struct FixedRetryPolicy<L: RetryLogic> {
     remaining_attempts: usize,
-    durations: Vec<Duration>,
+    previous_duration: Duration,
+    current_duration: Duration,
+    max_duration: Duration,
     logic: L,
 }
 
@@ -37,25 +37,27 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
     pub fn new(remaining_attempts: usize, backoff: Duration, logic: L) -> Self {
         FixedRetryPolicy {
             remaining_attempts,
-            durations: vec![Duration::from_secs(0), backoff],
+            previous_duration: Duration::from_secs(0),
+            current_duration: backoff,
+            max_duration: Duration::from_secs(10),
             logic,
         }
     }
 
     fn advance(&self) -> FixedRetryPolicy<L> {
-        debug_assert!(self.durations.len() == 2);
-        let next_duration: Duration = self.durations.iter().sum();
+        let next_duration: Duration = self.previous_duration + self.current_duration;
 
         FixedRetryPolicy {
             remaining_attempts: self.remaining_attempts - 1,
-            durations: vec![self.durations[1], cmp::min(next_duration, MAX_BACKOFF)],
+            previous_duration: self.current_duration,
+            current_duration: cmp::min(next_duration, self.max_duration),
+            max_duration: self.max_duration,
             logic: self.logic.clone(),
         }
     }
 
     fn backoff(&self) -> Duration {
-        debug_assert!(self.durations.len() == 2);
-        self.durations[1]
+        self.current_duration
     }
 
     fn build_retry(&self) -> RetryPolicyFuture<L> {
