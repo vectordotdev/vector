@@ -14,7 +14,7 @@ CHANNEL=$(scripts/util/release-channel.sh)
 # Build
 #
 
-./build-docker.sh
+./scripts/build-docker.sh
 
 #
 # Push

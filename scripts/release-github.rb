@@ -41,7 +41,7 @@ flags = ["--debug", "--assets 'target/artifacts/*'"]
 
 notes = templates.release_notes(release)
 notes = PostProcessors::LinkDefiner.define!(notes.clone, "", metadata.links)
-notes = notes.gsub("'", "'" => "\\'")
+notes = notes.gsub("'", "")
 flags << "--notes '#{notes}'"
 
 if release.pre?

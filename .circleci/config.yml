@@ -17,7 +17,7 @@ restore-artifacts-from-workspace: &restore-artifacts-from-workspace
   attach_workspace:
     at: target/artifacts
 
-verify-install: &verify-install
+test-install-script: &test-install-script
   run:
     name: Verify installation
     command: vector --version
@@ -188,6 +188,20 @@ jobs:
             - "*-x86_64-unknown-linux-musl.tar.gz"
 
   #
+  # Checks
+  #
+
+  check-remote-install-script:
+    machine: true
+    steps:
+      - run:
+          name: Install vector
+          command: curl https://sh.vector.dev -sSf | sh -s -- -y
+      - run:
+          name: Verify installation
+          command: vector --version
+
+  #
   # Packaging
   #
 
@@ -308,73 +322,63 @@ jobs:
             make build-docker
           no_output_timeout: 30m
 
-  verify-install-on-internet:
-    machine: true
-    steps:
-      - run:
-          name: Install vector
-          command: curl https://sh.vector.dev -sSf | sh -s -- -y
-      - run:
-          name: Verify installation
-          command: vector --version
-
-  verify-install-on-amazon-linux-1:
+  test-install-script-on-amazon-linux-1:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-1:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-amazon-linux-2:
+  test-install-script-on-amazon-linux-2:
     docker:
       - image: timberiodev/vector-verifier-amazonlinux-2:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-centos-7:
+  test-install-script-on-centos-7:
     docker:
       - image: timberiodev/vector-verifier-centos-7:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-deb-8:
+  test-install-script-on-deb-8:
     docker:
       - image: timberiodev/vector-verifier-deb-8:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-deb-9:
+  test-install-script-on-deb-9:
     docker:
       - image: timberiodev/vector-verifier-deb-9:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-deb-10:
+  test-install-script-on-deb-10:
     docker:
       - image: timberiodev/vector-verifier-deb-10:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-mac-archive:
+  test-install-script-on-mac-archive:
     macos:
       xcode: "9.0"
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-mac-homebrew:
+  test-install-script-on-mac-homebrew:
     macos:
       xcode: "9.0"
     steps:
@@ -383,31 +387,38 @@ jobs:
           name: Install Homebrew
           command: /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-unbuntu-16-04:
+  test-install-script-on-unbuntu-16-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-16-04:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-unbuntu-18-04:
+  test-install-script-on-unbuntu-18-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-18-04:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
 
-  verify-install-on-unbuntu-19-04:
+  test-install-script-on-unbuntu-19-04:
     docker:
       - image: timberiodev/vector-verifier-ubuntu-19-04:latest
     steps:
       - checkout
       - *install-vector
-      - *verify-install
+      - *test-install-script
+
+  test-install-script-without-sudo:
+    machine: true
+    steps:
+      - checkout
+      - *install-vector
+      - *test-install-script
 
   verify-rpm-artifact-on-amazon-linux-1:
     docker:
@@ -551,6 +562,18 @@ require-builds: &require-builds
     - check-code
     - check-fmt
     - check-generate
+    - test-install-script-on-amazon-linux-1
+    - test-install-script-on-amazon-linux-2
+    - test-install-script-on-centos-7
+    - test-install-script-on-deb-8
+    - test-install-script-on-deb-9
+    - test-install-script-on-deb-10
+    - test-install-script-on-mac-archive
+    - test-install-script-on-mac-homebrew
+    - test-install-script-on-unbuntu-16-04
+    - test-install-script-on-unbuntu-18-04
+    - test-install-script-on-unbuntu-19-04
+    - test-install-script-without-sudo
     - test-stable
     - build-x86_64-unknown-linux-gnu-archive
     - build-x86_64-unknown-linux-musl-archive
@@ -569,17 +592,6 @@ require-verifications: &require-verifications
     - verify-deb-artifact-on-ubuntu-18-04
     - verify-deb-artifact-on-ubuntu-19-04
     - verify-docker
-    - verify-install-on-amazon-linux-1
-    - verify-install-on-amazon-linux-2
-    - verify-install-on-centos-7
-    - verify-install-on-deb-8
-    - verify-install-on-deb-9
-    - verify-install-on-deb-10
-    - verify-install-on-mac-archive
-    - verify-install-on-mac-homebrew
-    - verify-install-on-unbuntu-16-04
-    - verify-install-on-unbuntu-18-04
-    - verify-install-on-unbuntu-19-04
     - verify-rpm-artifact-on-amazon-linux-1
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
@@ -618,6 +630,33 @@ workflows:
       - test-stable:
           <<: *test-filters
 
+      # Install script testing
+
+      - test-install-script-on-amazon-linux-1:
+          <<: *test-filters
+      - test-install-script-on-amazon-linux-2:
+          <<: *test-filters
+      - test-install-script-on-centos-7:
+          <<: *test-filters
+      - test-install-script-on-deb-8:
+          <<: *test-filters
+      - test-install-script-on-deb-9:
+          <<: *test-filters
+      - test-install-script-on-deb-10:
+          <<: *test-filters
+      - test-install-script-on-mac-archive:
+          <<: *test-filters
+      - test-install-script-on-mac-homebrew:
+          <<: *test-filters
+      - test-install-script-on-unbuntu-16-04:
+          <<: *test-filters
+      - test-install-script-on-unbuntu-18-04:
+          <<: *test-filters
+      - test-install-script-on-unbuntu-19-04:
+          <<: *test-filters
+      - test-install-script-without-sudo:
+          <<: *test-filters
+
       # Building & packaging
 
       - build-x86_64-unknown-linux-gnu-archive:
@@ -644,28 +683,6 @@ workflows:
       - verify-deb-artifact-on-ubuntu-19-04:
           <<: *require-packages
       - verify-docker:
-          <<: *require-packages
-      - verify-install-on-amazon-linux-1:
-          <<: *require-packages
-      - verify-install-on-amazon-linux-2:
-          <<: *require-packages
-      - verify-install-on-centos-7:
-          <<: *require-packages
-      - verify-install-on-deb-8:
-          <<: *require-packages
-      - verify-install-on-deb-9:
-          <<: *require-packages
-      - verify-install-on-deb-10:
-          <<: *require-packages
-      - verify-install-on-mac-archive:
-          <<: *require-packages
-      - verify-install-on-mac-homebrew:
-          <<: *require-packages
-      - verify-install-on-unbuntu-16-04:
-          <<: *require-packages
-      - verify-install-on-unbuntu-18-04:
-          <<: *require-packages
-      - verify-install-on-unbuntu-19-04:
           <<: *require-packages
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *require-packages
@@ -696,6 +713,21 @@ workflows:
       - check-generate
       - test-stable
 
+      # Install script testing
+
+      - test-install-script-on-amazon-linux-1
+      - test-install-script-on-amazon-linux-2
+      - test-install-script-on-centos-7
+      - test-install-script-on-deb-8
+      - test-install-script-on-deb-9
+      - test-install-script-on-deb-10
+      - test-install-script-on-mac-archive
+      - test-install-script-on-mac-homebrew
+      - test-install-script-on-unbuntu-16-04
+      - test-install-script-on-unbuntu-18-04
+      - test-install-script-on-unbuntu-19-04
+      - test-install-script-without-sudo
+
       # Building & packaging
 
       - build-x86_64-unknown-linux-gnu-archive
@@ -720,28 +752,6 @@ workflows:
           <<: *require-packages
       - verify-docker:
           <<: *require-packages
-      - verify-install-on-amazon-linux-1:
-          <<: *require-packages
-      - verify-install-on-amazon-linux-2:
-          <<: *require-packages
-      - verify-install-on-centos-7:
-          <<: *require-packages
-      - verify-install-on-deb-8:
-          <<: *require-packages
-      - verify-install-on-deb-9:
-          <<: *require-packages
-      - verify-install-on-deb-10:
-          <<: *require-packages
-      - verify-install-on-mac-archive:
-          <<: *require-packages
-      - verify-install-on-mac-homebrew:
-          <<: *require-packages
-      - verify-install-on-unbuntu-16-04:
-          <<: *require-packages
-      - verify-install-on-unbuntu-18-04:
-          <<: *require-packages
-      - verify-install-on-unbuntu-19-04:
-          <<: *require-packages
       - verify-rpm-artifact-on-amazon-linux-1:
           <<: *require-packages
       - verify-rpm-artifact-on-amazon-linux-2:
@@ -764,7 +774,7 @@ workflows:
               only: master
 
     jobs:
-      - verify-install-on-internet
+      - check-remote-install-script
 
   release:
     jobs:
@@ -775,6 +785,33 @@ workflows:
       - check-generate:
           <<: *release-filters
       - test-stable:
+          <<: *release-filters
+
+      # Install script testing
+
+      - test-install-script-on-amazon-linux-1:
+          <<: *release-filters
+      - test-install-script-on-amazon-linux-2:
+          <<: *release-filters
+      - test-install-script-on-centos-7:
+          <<: *release-filters
+      - test-install-script-on-deb-8:
+          <<: *release-filters
+      - test-install-script-on-deb-9:
+          <<: *release-filters
+      - test-install-script-on-deb-10:
+          <<: *release-filters
+      - test-install-script-on-mac-archive:
+          <<: *release-filters
+      - test-install-script-on-mac-homebrew:
+          <<: *release-filters
+      - test-install-script-on-unbuntu-16-04:
+          <<: *release-filters
+      - test-install-script-on-unbuntu-18-04:
+          <<: *release-filters
+      - test-install-script-on-unbuntu-19-04:
+          <<: *release-filters
+      - test-install-script-without-sudo:
           <<: *release-filters
 
       # Building & packaging
@@ -810,39 +847,6 @@ workflows:
           <<: *release-filters
           <<: *require-packages
       - verify-docker:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-amazon-linux-1:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-amazon-linux-2:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-centos-7:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-deb-8:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-deb-9:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-deb-10:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-mac-archive:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-mac-homebrew:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-unbuntu-16-04:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-unbuntu-18-04:
-          <<: *release-filters
-          <<: *require-packages
-      - verify-install-on-unbuntu-19-04:
           <<: *release-filters
           <<: *require-packages
       - verify-rpm-artifact-on-amazon-linux-1:
