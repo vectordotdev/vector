@@ -8,9 +8,6 @@
 
 set -eu
 
-# saner programming env: these switches turn some bugs into errors
-set -o errexit -o pipefail -o noclobber -o nounset
-
 CHANNEL=$(scripts/util/release-channel.sh)
 
 #
