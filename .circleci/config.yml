@@ -562,12 +562,14 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
-require-packages: &require-packages
+release-requires: &require-verifications
   requires:
-    - package-rpm
-
-require-verifications: &require-verifications
-  requires:
+    - check-code
+    - check-fmt
+    - check-generate
+    - test-stable
+    - build-x86_64-unknown-linux-musl-archive
+    - build-x86_64-apple-darwin-archive
     - verify-deb-artifact-on-deb-8
     - verify-deb-artifact-on-deb-9
     - verify-deb-artifact-on-deb-10
@@ -579,20 +581,6 @@ require-verifications: &require-verifications
     - verify-rpm-artifact-on-amazon-linux-2
     - verify-rpm-artifact-on-centos-7
     - verify-systemd-on-debian
-
-sync-filters: &sync-filters
-  filters:
-    branches:
-      only: master
-    tags:
-      ignore: /.*/
-
-test-filters: &test-filters
-  filters:
-    branches:
-      only: /.*/
-    tags:
-      ignore: /.*/
 
 
 #
@@ -681,13 +669,13 @@ workflows:
 
       - release-docker:
           <<: *release-filters
-          <<: *require-verifications
+          <<: *release-requires
       - release-github:
           <<: *release-filters
-          <<: *require-verifications
+          <<: *release-requires
       - release-s3:
           <<: *release-filters
-          <<: *require-verifications
+          <<: *release-requires
 
       # Must come after S3 since Homebrew installs from S3
       - release-homebrew:
