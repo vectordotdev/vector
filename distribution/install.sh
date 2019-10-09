@@ -233,7 +233,6 @@ install_from_deb() {
     printf " ✓\n"
 
     printf "$_prompt Installing Vector via dpkg..."
-
     ensure_with_sudo dpkg -i $_file
 
     printf "$_prompt Install succeeded! 🚀\n"
