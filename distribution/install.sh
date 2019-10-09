@@ -233,7 +233,7 @@ install_from_deb() {
     printf " ✓\n"
 
     printf "$_prompt Installing Vector via dpkg..."
-    ensure dpkg -i $_file
+    ensure sudo dpkg -i $_file
 
     printf "$_prompt Install succeeded! 🚀\n"
     printf "$_prompt To start Vector:\n"
@@ -273,7 +273,7 @@ install_from_rpm() {
     printf " ✓\n"
 
     printf "$_prompt Installing Vector via rpm..."
-    ensure rpm -i $_file
+    ensure sudo rpm -i $_file
 
     printf "$_prompt Install succeeded! 🚀\n"
     printf "$_prompt To start Vector:\n"
