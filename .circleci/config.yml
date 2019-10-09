@@ -562,7 +562,7 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
-release-requires: &require-verifications
+release-requires: &require-requires
   requires:
     - check-code
     - check-fmt
