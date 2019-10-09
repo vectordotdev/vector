@@ -137,6 +137,11 @@ where
             self.poll_complete()?;
 
             if self.sending.len() > 5 {
+                debug!(
+                    message = "Too many open batches; applying back pressure.",
+                    max_batch_size = 5,
+                    rate_limit_secs = 10
+                );
                 return Ok(AsyncSink::NotReady(item));
             }
         }
@@ -149,6 +154,11 @@ where
 
                 if let Some(batch) = self.partitions.get_mut(&partition) {
                     if batch.len() >= self.config.max_size {
+                        debug!(
+                            message = "Buffer full; applying back pressure.",
+                            max_size = %self.config.max_size,
+                            rate_limit_secs = 10
+                        );
                         return Ok(AsyncSink::NotReady(item));
                     } else {
                         batch.push(item);

@@ -1,0 +1,62 @@
+## Usage
+
+```bash
+docker run timberio/vector:latest-alpine
+```
+
+* The `vector` binary is located at `/usr/local/bin/vector`, which should be in your `$PATH`.
+* The default [configuration file][docs.configuration] is located at `/etc/vector/vector.toml`.
+
+## Configuring
+
+The Vector Docker images ship with a [default `/etc/vector/vector.toml` configuration file][urls.default_configuration].
+To use your own configuration file:
+
+1. Create your own [Vector configuration file][docs.configuration] and save it
+   as `vector.toml`.
+
+2. Run the Vector Docker image with the following command:
+
+   ```bash
+   docker run -v $PWD/vector.toml:/etc/vector/vector.toml:ro timberio/vector:latest-alpine
+   ```
+
+   Modify `$PWD` to the directory where you store your local `vector.toml` file.
+
+## Image Variants
+
+### timberio/vector:&lt;version&gt;-alpine
+
+This image is based on the [`alpine` Docker image][urls.docker_alpine], which is
+a Linux distribution built around musl libc and BusyBox. It is considerably
+smaller in size than other Docker images and statically links libraries. This
+is the image we recommend due to it's small size and reliability.
+
+### timberio/vector:&lt;version&gt;-debian
+
+This image is based on the [`debian-slim` image][urls.docker_debian],
+which is a smaller, more compact variant of the [`debian` image][urls.docker_debian].
+
+## Versions
+
+Vector's Docker images include a special `latest` version that will be updated
+whenever Vector is [released][urls.vector_releases]. All other
+[releases][urls.vector_releases] are available via the `X.X.X` tag:
+
+```bash
+docker run timberio/vector:X.X.X-alpine
+```
+
+## Updating
+
+Simply run the with the `latest` tag:
+
+```bash
+docker run timberio/vector:latest-alpine
+```
+
+Or specify the exact version:
+
+```bash
+docker run timberio/vector:X.X.X-alpine
+```

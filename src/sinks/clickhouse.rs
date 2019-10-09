@@ -4,11 +4,13 @@ use crate::{
     sinks::util::{
         http::{HttpRetryLogic, HttpService, Response},
         retries::{FixedRetryPolicy, RetryLogic},
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
 use futures::{Future, Sink};
+use headers::HeaderMapExt;
 use http::StatusCode;
 use http::{Method, Uri};
 use hyper::{Body, Client, Request};
@@ -28,6 +30,7 @@ pub struct ClickhouseConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: Option<u64>,
     pub compression: Option<Compression>,
+    pub basic_auth: Option<ClickHouseBasicAuthConfig>,
 
     // Tower Request based configuration
     pub request_in_flight_limit: Option<usize>,
@@ -36,19 +39,35 @@ pub struct ClickhouseConfig {
     pub request_rate_limit_num: Option<u64>,
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
+
+    pub tls: Option<TlsOptions>,
 }
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let sink = clickhouse(self.clone(), acker)?;
-        let healtcheck = healthcheck(self.host.clone());
+        let healtcheck = healthcheck(self.host.clone(), self.basic_auth.clone());
 
         Ok((sink, healtcheck))
     }
 
     fn input_type(&self) -> DataType {
         DataType::Log
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ClickHouseBasicAuthConfig {
+    pub password: String,
+    pub user: String,
+}
+
+impl ClickHouseBasicAuthConfig {
+    fn apply(&self, header_map: &mut http::header::HeaderMap) {
+        let auth = headers::Authorization::basic(&self.user, &self.password);
+        header_map.typed_insert(auth)
     }
 }
 
@@ -72,6 +91,8 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     let retry_attempts = config.request_retry_attempts.unwrap_or(usize::max_value());
     let retry_backoff_secs = config.request_retry_backoff_secs.unwrap_or(1);
 
+    let basic_auth = config.basic_auth.clone();
+
     let policy = FixedRetryPolicy::new(
         retry_attempts,
         Duration::from_secs(retry_backoff_secs),
@@ -81,20 +102,30 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     );
 
     let uri = encode_uri(&host, &database, &table)?;
+    let tls_settings = TlsSettings::from_options(&config.tls)?;
 
-    let http_service = HttpService::new(move |body: Vec<u8>| {
-        let mut builder = hyper::Request::builder();
-        builder.method(Method::POST);
-        builder.uri(uri.clone());
+    let http_service =
+        HttpService::builder()
+            .tls_settings(tls_settings)
+            .build(move |body: Vec<u8>| {
+                let mut builder = hyper::Request::builder();
+                builder.method(Method::POST);
+                builder.uri(uri.clone());
 
-        builder.header("Content-Type", "application/x-ndjson");
+                builder.header("Content-Type", "application/x-ndjson");
 
-        if gzip {
-            builder.header("Content-Encoding", "gzip");
-        }
+                if gzip {
+                    builder.header("Content-Encoding", "gzip");
+                }
 
-        builder.body(body).unwrap()
-    });
+                let mut request = builder.body(body).unwrap();
+
+                if let Some(auth) = &basic_auth {
+                    auth.apply(request.headers_mut());
+                }
+
+                request
+            });
 
     let service = ServiceBuilder::new()
         .concurrency_limit(in_flight_limit)
@@ -119,10 +150,14 @@ fn clickhouse(config: ClickhouseConfig, acker: Acker) -> crate::Result<super::Ro
     Ok(Box::new(sink))
 }
 
-fn healthcheck(host: String) -> super::Healthcheck {
+fn healthcheck(host: String, basic_auth: Option<ClickHouseBasicAuthConfig>) -> super::Healthcheck {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", host);
-    let request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+
+    if let Some(auth) = &basic_auth {
+        auth.apply(request.headers_mut());
+    }
 
     let https = HttpsConnector::new(4).expect("TLS initialization failed");
     let client = Client::builder().build(https);

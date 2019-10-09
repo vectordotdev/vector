@@ -33,7 +33,7 @@ cp -av distribution/init.d/. /root/rpmbuild/SOURCES/init.d
 cp -av distribution/systemd/. /root/rpmbuild/SOURCES/systemd
 
 # Copy the archive into the sources dir
-cp -a $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
+cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
 # Calling rpmbuild with --target tells RPM everything it needs to know

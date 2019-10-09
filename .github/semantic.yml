@@ -6,6 +6,7 @@ types:
   - docs
   - enhancement
   - feat
+  - fix
   - perf
 
 scopes:
@@ -24,6 +25,7 @@ scopes:
   - testing
   - topology
   # sources
+  - docker source
   - file source
   - journald source
   - kafka source

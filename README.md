@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://chat.vector.dev">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.4.0<a/>
+    <a href="https://vector.dev/community">Chat/Forum<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://vector.dev/mailing_list/">Mailing List<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;<a href="https://docs.vector.dev/setup/installation">Install 0.5.0<a/>
   </strong>
 </p>
 
@@ -49,7 +49,7 @@ simple and unified.
 #### Resources
 
 * [**Community**][urls.vector_community] - [chat/forum][urls.vector_chat], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.4.0][urls.v0.4.0], [changelog][urls.vector_changelog]
+* [**Releases**][urls.vector_releases] - [v0.5.0][urls.v0.5.0], [changelog][urls.vector_changelog]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 
 
@@ -108,6 +108,7 @@ Or view [platform specific installation instructions][docs.installation].
 
 | Name  | Description |
 |:------|:------------|
+| [**`docker`**][docs.sources.docker] | Ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events. |
 | [**`file`**][docs.sources.file] | Ingests data through one or more local files and outputs [`log`][docs.data-model.log] events. |
 | [**`journald`**][docs.sources.journald] | Ingests data through log records from journald and outputs [`log`][docs.data-model.log] events. |
 | [**`kafka`**][docs.sources.kafka] | Ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events. |
@@ -230,6 +231,7 @@ the License.
 [docs.sinks.tcp]: https://docs.vector.dev/usage/configuration/sinks/tcp
 [docs.sinks.vector]: https://docs.vector.dev/usage/configuration/sinks/vector
 [docs.sinks]: https://docs.vector.dev/usage/configuration/sinks
+[docs.sources.docker]: https://docs.vector.dev/usage/configuration/sources/docker
 [docs.sources.file]: https://docs.vector.dev/usage/configuration/sources/file
 [docs.sources.journald]: https://docs.vector.dev/usage/configuration/sources/journald
 [docs.sources.kafka]: https://docs.vector.dev/usage/configuration/sources/kafka
@@ -281,7 +283,7 @@ the License.
 [urls.splunk_hec]: http://dev.splunk.com/view/event-collector/SP-CAAAE6M
 [urls.statsd]: https://github.com/statsd/statsd
 [urls.test_harness]: https://github.com/timberio/vector-test-harness/
-[urls.v0.4.0]: https://github.com/timberio/vector/releases/tag/v0.4.0
+[urls.v0.5.0]: https://github.com/timberio/vector/releases/tag/v0.5.0
 [urls.vector_changelog]: https://github.com/timberio/vector/blob/master/CHANGELOG.md
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_community]: https://vector.dev/community

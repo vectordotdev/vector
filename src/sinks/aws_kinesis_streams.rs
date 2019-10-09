@@ -210,11 +210,20 @@ fn encode_event(
     partition_key_field: &Option<Atom>,
     encoding: &Encoding,
 ) -> Option<PutRecordsRequestEntry> {
-    let partition_key = partition_key_field
-        .as_ref()
-        .and_then(|k| event.as_log().get(&k))
-        .map(|v| v.to_string_lossy())
-        .unwrap_or_else(gen_partition_key);
+    let partition_key = if let Some(partition_key_field) = partition_key_field {
+        if let Some(v) = event.as_log().get(&partition_key_field) {
+            v.to_string_lossy()
+        } else {
+            warn!(
+                message = "Partition key does not exist; Dropping event.",
+                %partition_key_field,
+                rate_limit_secs = 30,
+            );
+            return None;
+        }
+    } else {
+        gen_partition_key()
+    };
 
     let partition_key = if partition_key.len() >= 256 {
         partition_key[..256].to_string()

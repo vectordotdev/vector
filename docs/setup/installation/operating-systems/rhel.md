@@ -6,7 +6,7 @@ description: Install Vector on Red Hat Enterprise Linux
 
 Vector can be installed on Red Hat Enterprise Linux through the following methods:
 
-{% page-ref page="../package-managers/yum.md" %}
+{% page-ref page="../package-managers/rpm.md" %}
 
 {% page-ref page="../manual/from-archives.md" %}
 

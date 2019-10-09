@@ -95,15 +95,6 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   # * no default
   healthcheck_uri = "https://10.22.212.22:9000/_health"
 
-  # When making a connection to a HTTPS server, this controls if the TLS
-  # certificate presented by the server will be verified. Do not set this unless
-  # you know what you are doing. Turning this off introduces significant
-  # vulnerabilities.
-  # 
-  # * optional
-  # * default: true
-  verify_certificate = true
-
   #
   # Batching
   #
@@ -229,6 +220,54 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
     # * required
     # * no default
     X-Powered-By = "Vector"
+
+  #
+  # Tls
+  #
+
+  [sinks.http_sink.tls]
+    # Absolute path to an additional CA certificate file, in PEM format.
+    # 
+    # * optional
+    # * no default
+    ca_path = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in PEM
+    # format. If this is set, `key_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    crt_path = "/path/to/host_certificate.crt"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # PEM format. If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_pass` above is set.
+    # 
+    # * optional
+    # * no default
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host. Do NOT set this to `false` unless you understand the risks of
+    # not verifying the remote certificate.
+    # 
+    # * optional
+    # * default: true
+    verify_certificate = true
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    # 
+    # * optional
+    # * default: true
+    verify_hostname = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

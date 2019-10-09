@@ -77,6 +77,7 @@ def url_valid?(url)
   # it serves directories.
   when /^https:\/\/packages\.timber\.io\/vector[^.]*$/
     true
+
   else
     uri = URI.parse(url)
     req = Net::HTTP.new(uri.host, uri.port)
@@ -112,13 +113,18 @@ metadata =
     error!(e.message)
   end
 
-templates = Templates.new(TEMPLATES_DIR, metadata)
-
 #
 # Create missing component templates
 #
 
 metadata.components.each do |component|
+  # Base .md file to ensure links to the new source work
+  md_path = "#{DOCS_ROOT}/usage/configuration/#{component.type.pluralize}/#{component.name}.md"
+
+  if !File.exists?(md_path)
+    File.open(md_path, 'w+') { |file| file.write("") }
+  end
+
   # Configuration templates
   template_path = "#{TEMPLATES_DIR}/docs/usage/configuration/#{component.type.pluralize}/#{component.name}.md.erb"
 
@@ -131,6 +137,8 @@ end
 #
 # Render templates
 #
+
+templates = Templates.new(TEMPLATES_DIR, metadata)
 
 Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
   to_a.
@@ -190,9 +198,13 @@ end
 # Check URLs
 #
 
-title("Checking URLs...")
-
-check_urls = get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+check_urls =
+  if ENV.key?("CHECK_URLS")
+    ENV.fetch("CHECK_URLS") == "true"
+  else
+    title("Checking URLs...")
+    get("Would you like to check & verify URLs?", ["y", "n"]) == "y"
+  end
 
 if check_urls
   Parallel.map(metadata.links.values.to_a.sort, in_threads: 50) do |id, value|

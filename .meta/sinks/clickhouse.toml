@@ -14,6 +14,7 @@ retry_backoff_secs = 1
 request_in_flight_limit = 5
 request_timeout_secs = 30
 write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]"
+tls_options = []
 
 [sinks.clickhouse.options.compression]
 type = "string"
@@ -40,3 +41,20 @@ type = "string"
 examples = ["mydatabase"]
 null = true
 description = "The database that contains the stable that data will be inserted into."
+
+[sinks.clickhouse.options.basic_auth]
+type = "table"
+null = true
+description = "Options for basic authentication."
+
+[sinks.clickhouse.options.basic_auth.options.password]
+type = "string"
+examples = ["password"]
+null = false
+description = "The basic authentication password."
+
+[sinks.clickhouse.options.basic_auth.options.user]
+type = "string"
+examples = ["username"]
+null = false
+description = "The basic authentication user name."

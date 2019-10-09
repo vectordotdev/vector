@@ -26,7 +26,6 @@ require 'net/http'
 # method.
 class Links
   VECTOR_ROOT = "https://github.com/timberio/vector"
-  VECTOR_BRANCH_ROOT = "https://github.com/timberio/vector/tree/v0.3"
   VECTOR_COMMIT_ROOT = "#{VECTOR_ROOT}/commit"
   VECTOR_ISSUES_ROOT = "#{VECTOR_ROOT}/issues"
   VECTOR_PRS_ROOT = "#{VECTOR_ROOT}/pull"

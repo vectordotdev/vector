@@ -1,5 +1,6 @@
 use futures::Future;
 
+pub mod docker;
 pub mod file;
 pub mod journald;
 #[cfg(feature = "rdkafka")]

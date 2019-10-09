@@ -2,20 +2,20 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     sinks::util::{
-        http::{HttpRetryLogic, HttpService},
+        http::{https_client, HttpRetryLogic, HttpService},
         retries::FixedRetryPolicy,
+        tls::{TlsOptions, TlsSettings},
         BatchServiceSink, Buffer, Compression, SinkExt,
     },
     topology::config::{DataType, SinkConfig},
 };
-use futures::{future, Future, Sink};
+use futures::{future, stream::iter_ok, Future, Sink};
 use headers::HeaderMapExt;
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Uri,
 };
-use hyper::{Body, Client, Request};
-use hyper_tls::HttpsConnector;
+use hyper::{Body, Request};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -58,7 +58,7 @@ pub struct HttpSinkConfig {
     pub request_retry_attempts: Option<usize>,
     pub request_retry_backoff_secs: Option<u64>,
 
-    pub verify_certificate: Option<bool>,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -90,13 +90,15 @@ pub struct BasicAuth {
 impl SinkConfig for HttpSinkConfig {
     fn build(&self, acker: Acker) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         validate_headers(&self.headers)?;
-        let sink = http(self.clone(), acker)?;
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let sink = http(self.clone(), acker, tls.clone())?;
 
-        if let Some(healthcheck_uri) = self.healthcheck_uri.clone() {
-            let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone())?;
-            Ok((sink, healthcheck))
-        } else {
-            Ok((sink, Box::new(future::ok(()))))
+        match self.healthcheck_uri.clone() {
+            Some(healthcheck_uri) => {
+                let healthcheck = healthcheck(healthcheck_uri, self.basic_auth.clone(), tls)?;
+                Ok((sink, healthcheck))
+            }
+            None => Ok((sink, Box::new(future::ok(())))),
         }
     }
 
@@ -105,7 +107,11 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+fn http(
+    config: HttpSinkConfig,
+    acker: Acker,
+    tls_settings: TlsSettings,
+) -> crate::Result<super::RouterSink> {
     let uri = build_uri(&config.uri)?;
 
     let gzip = match config.compression.unwrap_or(Compression::None) {
@@ -125,7 +131,6 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
     let headers = config.headers.clone();
     let basic_auth = config.basic_auth.clone();
     let method = config.method.clone().unwrap_or(HttpMethod::Post);
-    let verify = config.verify_certificate.unwrap_or(true);
 
     let policy = FixedRetryPolicy::new(
         retry_attempts,
@@ -133,15 +138,9 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
         HttpRetryLogic,
     );
 
-    if !verify {
-        warn!(
-            message = "`verify_certificate` in http sink is DISABLED, this may lead to security vulnerabilities"
-        );
-    }
-
     let http_service =
         HttpService::builder()
-            .verify_certificate(verify)
+            .tls_settings(tls_settings)
             .build(move |body: Vec<u8>| {
                 let mut builder = hyper::Request::builder();
 
@@ -192,12 +191,16 @@ fn http(config: HttpSinkConfig, acker: Acker) -> crate::Result<super::RouterSink
             batch_size,
             Duration::from_secs(batch_timeout),
         )
-        .with(move |event| encode_event(event, &encoding));
+        .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
     Ok(Box::new(sink))
 }
 
-fn healthcheck(uri: String, auth: Option<BasicAuth>) -> crate::Result<super::Healthcheck> {
+fn healthcheck(
+    uri: String,
+    auth: Option<BasicAuth>,
+    tls_settings: TlsSettings,
+) -> crate::Result<super::Healthcheck> {
     let uri = build_uri(&uri)?;
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -205,8 +208,7 @@ fn healthcheck(uri: String, auth: Option<BasicAuth>) -> crate::Result<super::Hea
         auth.apply(request.headers_mut());
     }
 
-    let https = HttpsConnector::new(4).expect("TLS initialization failed");
-    let client = Client::builder().build(https);
+    let client = https_client(tls_settings)?;
 
     let healthcheck = client
         .request(request)
@@ -255,22 +257,30 @@ fn build_uri(raw: &str) -> crate::Result<Uri> {
         .expect("bug building uri"))
 }
 
-fn encode_event(event: Event, encoding: &Encoding) -> Result<Vec<u8>, ()> {
+fn encode_event(event: Event, encoding: &Encoding) -> Option<Vec<u8>> {
     let event = event.into_log();
 
     let mut body = match encoding {
-        Encoding::Text => event
-            .get(&event::MESSAGE)
-            .map(|v| v.to_string_lossy().into_bytes())
-            .unwrap_or(Vec::new()),
+        Encoding::Text => {
+            if let Some(v) = event.get(&event::MESSAGE) {
+                v.to_string_lossy().into_bytes()
+            } else {
+                warn!(
+                    message = "Event missing the message key; Dropping event.",
+                    rate_limit_secs = 30,
+                );
+                return None;
+            }
+        }
 
         Encoding::Ndjson => serde_json::to_vec(&event.unflatten())
-            .map_err(|e| panic!("Unable to encode into JSON: {}", e))?,
+            .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+            .ok()?,
     };
 
     body.push(b'\n');
 
-    Ok(body)
+    Some(body)
 }
 
 #[cfg(test)]
