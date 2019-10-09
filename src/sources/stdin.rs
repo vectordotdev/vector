@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -48,7 +48,7 @@ impl SourceConfig for StdinConfig {
     }
 }
 
-pub fn stdin_source<R>(mut stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
+pub fn stdin_source<R>(stdin: R, config: StdinConfig, out: mpsc::Sender<Event>) -> super::Source
 where
     R: Send + io::BufRead + 'static,
 {
