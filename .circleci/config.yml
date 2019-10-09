@@ -146,7 +146,7 @@ jobs:
           paths:
             - "*-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-unknown-linux-gnu-archive:
+  build-x86_64-unknown-linux-gnu-archive-and-deb-package:
     docker:
       - image: timberiodev/vector-builder-x86_64-unknown-linux-gnu:latest
     resource_class: xlarge
@@ -550,34 +550,17 @@ jobs:
 # Workflow Macros
 #
 
+all-filters: &all-filters
+  filters:
+    tags:
+      only: /v.*/
+
 release-filters: &release-filters
   filters:
     branches:
       ignore: /.*/
     tags:
       only: /v.*/
-
-require-builds: &require-builds
-  requires:
-    - check-code
-    - check-fmt
-    - check-generate
-    - test-install-script-on-amazon-linux-1
-    - test-install-script-on-amazon-linux-2
-    - test-install-script-on-centos-7
-    - test-install-script-on-deb-8
-    - test-install-script-on-deb-9
-    - test-install-script-on-deb-10
-    - test-install-script-on-mac-archive
-    - test-install-script-on-mac-homebrew
-    - test-install-script-on-unbuntu-16-04
-    - test-install-script-on-unbuntu-18-04
-    - test-install-script-on-unbuntu-19-04
-    - test-install-script-without-sudo
-    - test-stable
-    - build-x86_64-unknown-linux-gnu-archive
-    - build-x86_64-unknown-linux-musl-archive
-    - build-x86_64-apple-darwin-archive
 
 require-packages: &require-packages
   requires:
@@ -619,87 +602,7 @@ test-filters: &test-filters
 workflows:
   version: 2
 
-  test:
-    jobs:
-      - check-code:
-          <<: *test-filters
-      - check-fmt:
-          <<: *test-filters
-      - check-generate:
-          <<: *test-filters
-      - test-stable:
-          <<: *test-filters
-
-      # Install script testing
-
-      - test-install-script-on-amazon-linux-1:
-          <<: *test-filters
-      - test-install-script-on-amazon-linux-2:
-          <<: *test-filters
-      - test-install-script-on-centos-7:
-          <<: *test-filters
-      - test-install-script-on-deb-8:
-          <<: *test-filters
-      - test-install-script-on-deb-9:
-          <<: *test-filters
-      - test-install-script-on-deb-10:
-          <<: *test-filters
-      - test-install-script-on-mac-archive:
-          <<: *test-filters
-      - test-install-script-on-mac-homebrew:
-          <<: *test-filters
-      - test-install-script-on-unbuntu-16-04:
-          <<: *test-filters
-      - test-install-script-on-unbuntu-18-04:
-          <<: *test-filters
-      - test-install-script-on-unbuntu-19-04:
-          <<: *test-filters
-      - test-install-script-without-sudo:
-          <<: *test-filters
-
-      # Building & packaging
-
-      - build-x86_64-unknown-linux-gnu-archive:
-          <<: *test-filters
-      - build-x86_64-unknown-linux-musl-archive:
-          <<: *test-filters
-      - build-x86_64-apple-darwin-archive:
-          <<: *test-filters
-      - package-rpm:
-          <<: *require-builds
-
-      # Verifying
-
-      - verify-deb-artifact-on-deb-8:
-          <<: *require-packages
-      - verify-deb-artifact-on-deb-9:
-          <<: *require-packages
-      - verify-deb-artifact-on-deb-10:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-16-04:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-18-04:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-19-04:
-          <<: *require-packages
-      - verify-docker:
-          <<: *require-packages
-      - verify-rpm-artifact-on-amazon-linux-1:
-          <<: *require-packages
-      - verify-rpm-artifact-on-amazon-linux-2:
-          <<: *require-packages
-      - verify-rpm-artifact-on-centos-7:
-          <<: *require-packages
-      - verify-systemd-on-debian:
-          <<: *require-packages
-
-      # Syncing
-
-      - sync-install:
-          <<: *sync-filters
-          <<: *require-verifications
-
-  nightly:
+  vector:
     triggers:
       - schedule:
           cron: "0 0 * * *"
@@ -708,161 +611,80 @@ workflows:
               only: master
 
     jobs:
-      - check-code
-      - check-fmt
-      - check-generate
-      - test-stable
 
-      # Install script testing
+      # Check and test
 
-      - test-install-script-on-amazon-linux-1
-      - test-install-script-on-amazon-linux-2
-      - test-install-script-on-centos-7
-      - test-install-script-on-deb-8
-      - test-install-script-on-deb-9
-      - test-install-script-on-deb-10
-      - test-install-script-on-mac-archive
-      - test-install-script-on-mac-homebrew
-      - test-install-script-on-unbuntu-16-04
-      - test-install-script-on-unbuntu-18-04
-      - test-install-script-on-unbuntu-19-04
-      - test-install-script-without-sudo
-
-      # Building & packaging
-
-      - build-x86_64-unknown-linux-gnu-archive
-      - build-x86_64-unknown-linux-musl-archive
-      - build-x86_64-apple-darwin-archive
-      - package-rpm:
-          <<: *require-builds
-
-      # Verifying
-
-      - verify-deb-artifact-on-deb-8:
-          <<: *require-packages
-      - verify-deb-artifact-on-deb-9:
-          <<: *require-packages
-      - verify-deb-artifact-on-deb-10:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-16-04:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-18-04:
-          <<: *require-packages
-      - verify-deb-artifact-on-ubuntu-19-04:
-          <<: *require-packages
-      - verify-docker:
-          <<: *require-packages
-      - verify-rpm-artifact-on-amazon-linux-1:
-          <<: *require-packages
-      - verify-rpm-artifact-on-amazon-linux-2:
-          <<: *require-packages
-      - verify-rpm-artifact-on-centos-7:
-          <<: *require-packages
-      - verify-systemd-on-debian:
-          <<: *require-packages
-      - release-docker:
-          <<: *require-verifications
-      - release-s3:
-          <<: *require-verifications
-
-  remote-checks:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only: master
-
-    jobs:
-      - check-remote-install-script
-
-  release:
-    jobs:
       - check-code:
-          <<: *release-filters
+          <<: *all-filters
       - check-fmt:
-          <<: *release-filters
+          <<: *all-filters
       - check-generate:
-          <<: *release-filters
+          <<: *all-filters
       - test-stable:
-          <<: *release-filters
+          <<: *all-filters
 
-      # Install script testing
+      # Build
 
-      - test-install-script-on-amazon-linux-1:
-          <<: *release-filters
-      - test-install-script-on-amazon-linux-2:
-          <<: *release-filters
-      - test-install-script-on-centos-7:
-          <<: *release-filters
-      - test-install-script-on-deb-8:
-          <<: *release-filters
-      - test-install-script-on-deb-9:
-          <<: *release-filters
-      - test-install-script-on-deb-10:
-          <<: *release-filters
-      - test-install-script-on-mac-archive:
-          <<: *release-filters
-      - test-install-script-on-mac-homebrew:
-          <<: *release-filters
-      - test-install-script-on-unbuntu-16-04:
-          <<: *release-filters
-      - test-install-script-on-unbuntu-18-04:
-          <<: *release-filters
-      - test-install-script-on-unbuntu-19-04:
-          <<: *release-filters
-      - test-install-script-without-sudo:
-          <<: *release-filters
-
-      # Building & packaging
-
-      - build-x86_64-unknown-linux-gnu-archive:
-          <<: *release-filters
+      - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
+          <<: *all-filters
       - build-x86_64-unknown-linux-musl-archive:
-          <<: *release-filters
+          <<: *all-filters
       - build-x86_64-apple-darwin-archive:
-          <<: *release-filters
+          <<: *all-filters
       - package-rpm:
-          <<: *release-filters
-          <<: *require-builds
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
-      # Verifying
+      # Verify
 
       - verify-deb-artifact-on-deb-8:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-deb-9:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-deb-10:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-16-04:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-18-04:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-19-04:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-docker:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive
       - verify-rpm-artifact-on-amazon-linux-1:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - package-rpm
       - verify-rpm-artifact-on-amazon-linux-2:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - package-rpm
       - verify-rpm-artifact-on-centos-7:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - package-rpm
       - verify-systemd-on-debian:
-          <<: *release-filters
-          <<: *require-packages
+          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
-      # Releasing
+      # Release
 
       - release-docker:
           <<: *release-filters
@@ -879,6 +701,51 @@ workflows:
           <<: *release-filters
           requires:
             - release-s3
+
+  install-script:
+    jobs:
+      - test-install-script-on-amazon-linux-1
+      - test-install-script-on-amazon-linux-2
+      - test-install-script-on-centos-7
+      - test-install-script-on-deb-8
+      - test-install-script-on-deb-9
+      - test-install-script-on-deb-10
+      - test-install-script-on-mac-archive
+      - test-install-script-on-mac-homebrew
+      - test-install-script-on-unbuntu-16-04
+      - test-install-script-on-unbuntu-18-04
+      - test-install-script-on-unbuntu-19-04
+      - test-install-script-without-sudo
+
+      - sync-install:
+          filters:
+            branches:
+              only: master
+
+          requires:
+            - test-install-script-on-amazon-linux-1
+            - test-install-script-on-amazon-linux-2
+            - test-install-script-on-centos-7
+            - test-install-script-on-deb-8
+            - test-install-script-on-deb-9
+            - test-install-script-on-deb-10
+            - test-install-script-on-mac-archive
+            - test-install-script-on-mac-homebrew
+            - test-install-script-on-unbuntu-16-04
+            - test-install-script-on-unbuntu-18-04
+            - test-install-script-on-unbuntu-19-04
+            - test-install-script-without-sudo
+
+  remote-checks:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - check-remote-install-script
 
 experimental:
   notify:
