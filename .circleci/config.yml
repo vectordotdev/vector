@@ -177,7 +177,7 @@ jobs:
     steps:
       - run:
           name: Install Git
-          command: apt-get install libssl-dev git
+          command: apt-get install -y --no-install-recommends libssl-dev git
       - checkout
       - run:
           name: Build archive
