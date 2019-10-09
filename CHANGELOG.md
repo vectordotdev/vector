@@ -9,7 +9,7 @@
 ---
 
 * [**Unreleased**](#unreleased) - [download][urls.vector_nightly_builds], [install][docs.installation.manual], [compare][urls.compare_v0.5.0...master]
-* [**0.5.0**](#050---oct-8-2019) - [download][urls.v0.5.0], [install][docs.installation], [compare][urls.compare_v0.4.0...v0.5.0]
+* [**0.5.0**](#050---oct-9-2019) - [download][urls.v0.5.0], [install][docs.installation], [compare][urls.compare_v0.4.0...v0.5.0]
 
 ---
 
@@ -20,7 +20,7 @@ Vector follows the [conventional commits specification][urls.conventional_commit
 * [Compare `v0.5.0` to `master`][urls.compare_v0.5.0...master]
 * [Download nightly builds][urls.vector_nightly_builds]
 
-## [0.5.0][urls.v0.5.0] - Oct 8, 2019
+## [0.5.0][urls.v0.5.0] - Oct 9, 2019
 
 ### New features
 
