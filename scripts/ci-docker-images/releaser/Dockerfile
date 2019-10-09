@@ -2,8 +2,8 @@ FROM ubuntu:18.04
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
-RUN apt-get update
-RUN apt-get install -y software-properties-common
+RUN apt-get update && \
+  apt-get install -y software-properties-common
 RUN add-apt-repository -y ppa:git-core/ppa
 
 RUN apt-get update && \

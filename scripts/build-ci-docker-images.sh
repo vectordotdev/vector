@@ -45,17 +45,18 @@ function extend_cross_base_image() {
 # The following images are basic Docker images that do not extend a
 # cross base image.
 all_images=(
-	builder-x86_64-unknown-linux-gnu
-	builder-x86_64-unknown-linux-musl
-	checker
-	packager-deb
-	packager-rpm
-	releaser
-	verifier-amazonlinux-1
-	verifier-amazonlinux-2
-	verifier-deb-8
-	verifier-deb-9
-	verifier-deb-10
+	# builder-x86_64-unknown-linux-gnu
+	# builder-x86_64-unknown-linux-musl
+	# checker
+	# packager-deb
+	# packager-rpm
+	# releaser
+	# verifier-amazonlinux-1
+	# verifier-amazonlinux-2
+ #  verifier-centos-7
+	# verifier-deb-8
+	# verifier-deb-9
+	# verifier-deb-10
 	verifier-ubuntu-16-04
 	verifier-ubuntu-18-04
 	verifier-ubuntu-19-04
