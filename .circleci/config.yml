@@ -557,8 +557,6 @@ all-filters: &all-filters
 
 release-filters: &release-filters
   filters:
-    branches:
-      ignore: /.*/
     tags:
       only: /v.*/
 
