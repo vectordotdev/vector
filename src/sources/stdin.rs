@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -60,33 +60,35 @@ where
         let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 
         thread::spawn(move || {
-            println!("Loaded thread");
-            loop {
-                let mut buf = String::new();
-                match stdin.read_line(&mut buf) {
+            for line in stdin.lines() {
+                let mut buf = BytesMut::new();
+                match line {
                     Err(e) => {
-                        error!("Error reading from source: stdin: {}", e);
+                        error!(message = "Unable to read from source.", error = %e);
                         break;
                     }
-                    Ok(0) => {
-                        break;
+                    Ok(string_data) => {
+                        buf.extend_from_slice(string_data.as_bytes());
+                        ()
                     }
-                    _ => (),
                 }
-                while let Err(e) = tx.try_send(buf.clone()) {
+                let msg = buf.freeze();
+                while let Err(e) = tx.try_send(msg.clone()) {
                     if e.is_full() {
                         continue;
                     }
-                    error!("Error sending : {}", e);
+                    error!(message = "Unable to send event.", error = %e);
                     break;
                 }
             }
         });
 
         let source = rx
-            .map(move |line| create_event(Bytes::from(line.trim()), &host_key, &hostname))
+            .map(move |line| create_event(line, &host_key, &hostname))
             .map_err(|e| error!("error reading line: {:?}", e))
-            .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
+            .forward(
+                out.sink_map_err(|e| error!(message = "Unable to send event to out.", error = %e)),
+            )
             .map(|_| info!("finished sending"));
 
         source
