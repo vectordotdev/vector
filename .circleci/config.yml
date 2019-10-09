@@ -603,13 +603,6 @@ workflows:
   version: 2
 
   vector:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only: master
-
     jobs:
 
       # Check and test
