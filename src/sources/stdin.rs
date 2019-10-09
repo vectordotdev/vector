@@ -60,26 +60,26 @@ where
         let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 
         thread::spawn(move || {
+            let mut buf = Box::new(BytesMut::new());
             for line in stdin.lines() {
-                let mut buf = BytesMut::new();
                 match line {
                     Err(e) => {
                         error!(message = "Unable to read from source.", error = %e);
                         break;
                     }
                     Ok(string_data) => {
-                        buf.extend_from_slice(string_data.as_bytes());
+                        &mut buf.extend_from_slice(string_data.as_bytes());
                         ()
                     }
                 }
-                let msg = buf.freeze();
-                while let Err(e) = tx.try_send(msg.clone()) {
+                while let Err(e) = tx.try_send(buf.clone().freeze()) {
                     if e.is_full() {
                         continue;
                     }
                     error!(message = "Unable to send event.", error = %e);
                     break;
                 }
+                &mut buf.clear();
             }
         });
 
