@@ -48,6 +48,11 @@ enum TlsError {
     },
     #[snafu(display("Could not build PKCS#12 archive for identity: {}", source))]
     Pkcs12Error { source: openssl::error::ErrorStack },
+    #[snafu(display("Could not parse identity in {:?}: {}", filename, source))]
+    IdentityParseError {
+        filename: PathBuf,
+        source: native_tls::Error,
+    },
 }
 
 /// Standard TLS connector options
@@ -71,7 +76,7 @@ pub struct TlsSettings {
 }
 
 #[derive(Clone)]
-pub struct IdentityStore(Vec<u8>);
+pub struct IdentityStore(Vec<u8>, String);
 
 impl TlsSettings {
     pub fn from_options(options: &Option<TlsOptions>) -> crate::Result<Self> {
@@ -85,7 +90,7 @@ impl TlsSettings {
             warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
         }
 
-        if options.crt_path.is_some() != options.key_path.is_some() {
+        if options.key_path.is_some() && options.crt_path.is_none() {
             return Err(TlsError::MissingCrtKeyFile.into());
         }
 
@@ -97,21 +102,33 @@ impl TlsSettings {
         let identity = match options.crt_path {
             None => None,
             Some(ref crt_path) => {
-                let name = crt_path.to_string_lossy();
-                let crt = load_x509(crt_path)?;
-                let key_path = options.key_path.as_ref().unwrap();
-                let key = load_key(&key_path, &options.key_pass)?;
-                let pkcs12 = Pkcs12::builder()
-                    .build("", &name, &key, &crt)
-                    .context(Pkcs12Error)?;
-                let identity = pkcs12.to_der().context(DerExportError)?;
+                let name = crt_path.to_string_lossy().to_string();
+                let cert_data = open_read(crt_path, "certificate")?;
+                let key_pass: &str = options.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-                // Build the resulting Identity, but don't store it, as
-                // it cannot be cloned.  This is just for error
-                // checking.
-                let _identity = Identity::from_pkcs12(&identity, "").context(TlsIdentityError)?;
+                match Identity::from_pkcs12(&cert_data, key_pass) {
+                    Ok(_) => Some(IdentityStore(cert_data, key_pass.to_string())),
+                    Err(err) => {
+                        if options.key_path.is_some() {
+                            return Err(err.into());
+                        }
+                        let crt = load_x509(crt_path)?;
+                        let key_path = options.key_path.as_ref().unwrap();
+                        let key = load_key(&key_path, &options.key_pass)?;
+                        let pkcs12 = Pkcs12::builder()
+                            .build("", &name, &key, &crt)
+                            .context(Pkcs12Error)?;
+                        let identity = pkcs12.to_der().context(DerExportError)?;
 
-                Some(IdentityStore(identity))
+                        // Build the resulting Identity, but don't store it, as
+                        // it cannot be cloned.  This is just for error
+                        // checking.
+                        let _identity =
+                            Identity::from_pkcs12(&identity, "").context(TlsIdentityError)?;
+
+                        Some(IdentityStore(identity, "".into()))
+                    }
+                }
             }
         };
 
@@ -141,29 +158,31 @@ impl TlsConnectorExt for TlsConnectorBuilder {
             // all be reworked when `native_tls::Identity` gains the
             // Clone impl.
             let identity =
-                Identity::from_pkcs12(&identity.0, "").expect("Could not build identity");
+                Identity::from_pkcs12(&identity.0, &identity.1).expect("Could not build identity");
             self.identity(identity);
         }
         self
     }
 }
 
-/// Load a `native_tls::Certificate` from a named file
+/// Load a `native_tls::Certificate` (X.509) from a named file
 fn load_certificate(filename: &Path) -> crate::Result<Certificate> {
     let data = open_read(filename, "certificate")?;
-    Ok(Certificate::from_pem(&data).with_context(|| CertificateParseError { filename })?)
+    Ok(Certificate::from_der(&data)
+        .or_else(|_| Certificate::from_pem(&data))
+        .with_context(|| CertificateParseError { filename })?)
 }
 
 /// Load a private key from a named file
 fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey<Private>> {
     let data = open_read(filename, "key")?;
     match pass_phrase {
-        None => {
-            Ok(PKey::private_key_from_pem(&data)
-                .with_context(|| PrivateKeyParseError { filename })?)
-        }
+        None => Ok(PKey::private_key_from_der(&data)
+            .or_else(|_| PKey::private_key_from_pem(&data))
+            .with_context(|| PrivateKeyParseError { filename })?),
         Some(phrase) => Ok(
-            PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes())
+            PKey::private_key_from_pkcs8_passphrase(&data, phrase.as_bytes())
+                .or_else(|_| PKey::private_key_from_pem_passphrase(&data, phrase.as_bytes()))
                 .with_context(|| PrivateKeyParseError { filename })?,
         ),
     }
@@ -172,7 +191,9 @@ fn load_key(filename: &Path, pass_phrase: &Option<String>) -> crate::Result<PKey
 /// Load an X.509 certificate from a named file
 fn load_x509(filename: &Path) -> crate::Result<X509> {
     let data = open_read(filename, "certificate")?;
-    Ok(X509::from_pem(&data).with_context(|| X509ParseError { filename })?)
+    Ok(X509::from_der(&data)
+        .or_else(|_| X509::from_pem(&data))
+        .with_context(|| X509ParseError { filename })?)
 }
 
 fn open_read(filename: &Path, note: &'static str) -> crate::Result<Vec<u8>> {

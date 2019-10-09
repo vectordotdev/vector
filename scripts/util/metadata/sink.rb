@@ -136,21 +136,21 @@ class Sink < Component
         "type" => "string",
         "null" => true,
         "examples" => ["/path/to/certificate_authority.crt"],
-        "description" => "Absolute path to an additional CA certificate file, in PEM format."
+        "description" => "Absolute path to an additional CA certificate file, in DER or PEM format (X.509)."
       }
 
       options["crt_path"] = {
         "type" => "string",
         "null" => true,
         "examples" => ["/path/to/host_certificate.crt"],
-        "description" => "Absolute path to a certificate file used to identify this connection, in PEM format. If this is set, `key_path` must also be set."
+        "description" => "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set."
       }
 
       options["key_path"] = {
         "type" => "string",
         "null" => true,
         "examples" => ["/path/to/host_certificate.key"],
-        "description" => "Absolute path to a certificate key file used to identify this connection, in PEM format. If this is set, `crt_path` must also be set."
+        "description" => "Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set."
       }
 
       options["key_pass"] = {

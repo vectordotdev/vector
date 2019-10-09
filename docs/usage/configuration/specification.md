@@ -1846,21 +1846,23 @@ end
   #
 
   [sinks.clickhouse.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
@@ -2133,21 +2135,23 @@ end
   #
 
   [sinks.elasticsearch.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
@@ -2407,21 +2411,23 @@ end
   #
 
   [sinks.http.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
@@ -2552,21 +2558,23 @@ end
     # * default: false
     enabled = false
 
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
@@ -2770,21 +2778,23 @@ end
   #
 
   [sinks.splunk_hec.tls]
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
@@ -2938,21 +2948,23 @@ end
     # * default: false
     enabled = false
 
-    # Absolute path to an additional CA certificate file, in PEM format.
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509).
     # 
     # * optional
     # * no default
     ca_path = "/path/to/certificate_authority.crt"
 
-    # Absolute path to a certificate file used to identify this connection, in PEM
-    # format. If this is set, `key_path` must also be set.
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
+    # archive, `key_path` must also be set.
     # 
     # * optional
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
     # Absolute path to a certificate key file used to identify this connection, in
-    # PEM format. If this is set, `crt_path` must also be set.
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
     # 
     # * optional
     # * no default
