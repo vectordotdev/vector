@@ -175,6 +175,9 @@ jobs:
       - image: timberiodev/vector-builder-x86_64-unknown-linux-musl:latest
     resource_class: xlarge
     steps:
+      - run:
+          name: Install Git
+          command: apt-get install libssl-dev git
       - checkout
       - run:
           name: Build archive
