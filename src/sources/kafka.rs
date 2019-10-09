@@ -3,12 +3,11 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
 use bytes::Bytes;
-use chrono::{Duration, Utc};
 use futures::{future, sync::mpsc, Future, Poll, Sink, Stream};
 use owning_ref::OwningHandle;
 use rdkafka::{
     config::ClientConfig,
-    consumer::{CommitMode, Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
+    consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
     error::KafkaResult,
     message::{BorrowedMessage, Message},
 };
@@ -84,22 +83,8 @@ fn kafka_source(
             }),
         };
 
-        let mut prev_commit_dt = Utc::now();
-        let commit_interval = Duration::milliseconds(config.commit_interval_ms as i64);
         stream
             .then(move |message| {
-                // commit offset for the previous messages only after the next message is received
-                // to ensure that "at least once" delivery happened
-                let now = Utc::now();
-                // XXX: if there are N threads, then the offsets will be commited
-                // once per commit_interval_ms / N on average
-                if now - prev_commit_dt >= commit_interval {
-                    consumer_ref
-                        .commit_consumer_state(CommitMode::Sync)
-                        .map_err(|e| error!(message = "Cannot commit offsets", error = ?e))?;
-                    prev_commit_dt = now;
-                }
-
                 match message {
                     Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
                     Ok(Err(e)) => Err(error!(message = "Kafka returned error", error = ?e)),
@@ -145,7 +130,11 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
         .set("auto.offset.reset", &config.auto_offset_reset)
         .set("session.timeout.ms", &config.session_timeout_ms.to_string())
         .set("enable.partition.eof", "false")
-        .set("enable.auto.commit", "false")
+        .set("enable.auto.commit", "true")
+        .set(
+            "auto.commit.interval.ms",
+            &config.commit_interval_ms.to_string(),
+        )
         .set("enable.auto.offset.store", "false")
         .set("client.id", "vector")
         .create()
