@@ -1,10 +1,18 @@
 [sinks.datadog_metrics]
+batch_size = 20
+batch_timeout = 1
 beta = true
 buffer = false
 delivery_guarantee = "best_effort"
-egress_method = "streaming"
+egress_method = "batching"
 healthcheck = true
 input_types = ["metric"]
+rate_limit_duration = 1
+rate_limit_num = 5
+retry_attempts = 5
+retry_backoff_secs = 1
+request_in_flight_limit = 5
+request_timeout_secs = 60
 write_to_description = "[Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)"
 
 [sinks.datadog_metrics.options.namespace]

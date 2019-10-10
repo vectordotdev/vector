@@ -127,7 +127,7 @@ impl DatadogSvc {
 
             builder.header("Content-Type", "application/json");
             builder.body(body).unwrap()
-        })?;
+        });
 
         let datadog_http_service = DatadogSvc {
             config,

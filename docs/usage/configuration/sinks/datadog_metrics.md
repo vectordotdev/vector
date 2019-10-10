@@ -1,5 +1,5 @@
 ---
-description: Streams `metric` events to Datadog metrics service using HTTP API.
+description: Batches `metric` events to Datadog metrics service using HTTP API.
 ---
 
 <!--
@@ -22,7 +22,7 @@ We kindly ask that you [add any missing issues][urls.new_datadog_metrics_sink_is
 as it will help shape the roadmap of this component.
 {% endhint %}
 
-The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
+The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-model.metric] events to [Datadog][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics).
 
 ## Config File
 
@@ -41,6 +41,10 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.datadog_metrics_sink]
+  #
+  # General
+  #
+
   # The component type
   # 
   # * required
@@ -79,6 +83,68 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
   # * default: "https://api.datadoghq.com"
   host = "https://api.datadoghq.com"
   host = "https://api.datadoghq.eu"
+
+  #
+  # Batching
+  #
+
+  # The maximum size of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 20
+  # * unit: bytes
+  batch_size = 20
+
+  # The maximum age of a batch before it is flushed.
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  batch_timeout = 1
+
+  #
+  # Requests
+  #
+
+  # The window used for the `request_rate_limit_num` option
+  # 
+  # * optional
+  # * default: 1
+  # * unit: seconds
+  rate_limit_duration = 1
+
+  # The maximum number of requests allowed within the `rate_limit_duration`
+  # window.
+  # 
+  # * optional
+  # * default: 5
+  rate_limit_num = 5
+
+  # The maximum number of in-flight requests allowed at any given time.
+  # 
+  # * optional
+  # * default: 5
+  request_in_flight_limit = 5
+
+  # The maximum time a request can take before being aborted.
+  # 
+  # * optional
+  # * default: 60
+  # * unit: seconds
+  request_timeout_secs = 60
+
+  # The maximum number of retries to make for failed requests.
+  # 
+  # * optional
+  # * default: 5
+  retry_attempts = 5
+
+  # The amount of time to wait before attempting a failed request again.
+  # 
+  # * optional
+  # * default: 5
+  # * unit: seconds
+  retry_backoff_secs = 5
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -87,14 +153,24 @@ The `datadog_metrics` sink [streams](#streaming) [`metric`][docs.data-model.metr
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** | | |
+| **REQUIRED** - General | | |
 | `type` | `string` | The component type<br />`required` `must be: "datadog_metrics"` |
 | `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `api_key` | `string` | Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)<br />`required` `example: (see above)` |
 | `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
-| **OPTIONAL** | | |
+| **OPTIONAL** - General | | |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
 | `host` | `string` | Datadog endpoint to send metrics to.<br />`default: "https://api.datadoghq.com"` |
+| **OPTIONAL** - Batching | | |
+| `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 20` `unit: bytes` |
+| `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: seconds` |
+| **OPTIONAL** - Requests | | |
+| `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
+| `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_in_flight_limit` | `int` | The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
+| `request_timeout_secs` | `int` | The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.<br />`default: 60` `unit: seconds` |
+| `retry_attempts` | `int` | The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` |
+| `retry_backoff_secs` | `int` | The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.<br />`default: 5` `unit: seconds` |
 
 ## How It Works
 
@@ -128,10 +204,53 @@ vector --config /etc/vector/vector.toml --require-healthy
 And finally, if you'd like to disable health checks entirely for this sink
 you can set the `healthcheck` option to `false`.
 
-### Streaming
+### Metric Types
 
-The `datadog_metrics` sink streams data on a real-time
-event-by-event basis. It does not batch data.
+Datadog accepts the following types for [submission via API](https://docs.datadoghq.com/developers/metrics/#submission-types-and-datadog-in-app-types):
+- Count
+- Gauge
+- Rate
+
+The following matrix outlines how Vector metric types are mapped into Datadog metrics types.
+
+| Vector Metrics | Datadog Metrics |
+|----------------|-----------------|
+| Counter        | Count           |
+| Gauge          | Gauge           |
+| Gauge Delta    | N/A             |
+| Histogram      | Count [1]       |
+| Set            | N/A             |
+
+1. Aggregation of Histogram values is not supported at the moment. Histogram values will be sent as is, as raw Count values.
+
+### Rate Limits
+
+Vector offers a few levers to control the rate and volume of requests to the
+downstream service. Start with the `rate_limit_duration` and `rate_limit_num`
+options to ensure Vector does not exceed the specified number of requests in
+the specified window. You can further control the pace at which this window is
+saturated with the `request_in_flight_limit` option, which will guarantee no
+more than the specified number of requests are in-flight at any given time.
+
+Please note, Vector's defaults are carefully chosen and it should be rare that
+you need to adjust these. If you found a good reason to do so please share it
+with the Vector team by [opening an issie][urls.new_datadog_metrics_sink_issue].
+
+### Retry Policy
+
+Vector will retry failed requests (status == `429`, >= `500`, and != `501`).
+Other responses will _not_ be retried. You can control the number of retry
+attempts and backoff rate with the `retry_attempts` and `retry_backoff_secs` options.
+
+### Timeouts
+
+To ensure the pipeline does not halt when a service fails to respond Vector
+will abort requests after `60 seconds`.
+This can be adjsuted with the `request_timeout_secs` option.
+
+It is highly recommended that you do not lower value below the service's
+internal timeout, as this could create orphaned requests, pile on retries,
+and result in deuplicate data downstream.
 
 ## Troubleshooting
 
