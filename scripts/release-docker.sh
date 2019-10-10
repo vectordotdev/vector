@@ -26,8 +26,8 @@ docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 
 if [[ "$CHANNEL" == "latest" ]]; then
   docker push timberio/vector:$VERSION-alpine
-  docker push timberio/vector:latest-alpine
   docker push timberio/vector:$VERSION-debian
+  docker push timberio/vector:latest-alpine
   docker push timberio/vector:latest-debian
 elif [[ "$CHANNEL" == "nightly" ]]; then
   docker push timberio/vector:nightly-alpine
