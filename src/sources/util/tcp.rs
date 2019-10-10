@@ -1,6 +1,7 @@
 use crate::Event;
 use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
+use listenfd::ListenFd;
 use std::{
     io,
     net::SocketAddr,
@@ -10,6 +11,7 @@ use stream_cancel::{StreamExt, Tripwire};
 use tokio::{
     codec::{Decoder, FramedRead},
     net::TcpListener,
+    reactor::Handle,
     timer,
 };
 use tracing::field;
@@ -34,8 +36,18 @@ pub trait TcpSource: Clone + Send + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
+        let mut listenfd = ListenFd::from_env();
+
         let source = future::lazy(move || {
-            let listener = match TcpListener::bind(&addr) {
+            let listener = match listenfd.take_tcp_listener(0) {
+                Ok(Some(listener)) => TcpListener::from_std(listener, &Handle::default()),
+                Ok(None) => TcpListener::bind(&addr),
+                Err(err) => {
+                    error!("Failed to take listen FD: {}", err);
+                    return future::Either::B(future::err(()));
+                }
+            };
+            let listener = match listener {
                 Ok(listener) => listener,
                 Err(err) => {
                     error!("Failed to bind to listener socket: {}", err);
