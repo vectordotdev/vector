@@ -1,3 +1,5 @@
+extern crate maxminddb;
+
 use super::Transform;
 use crate::{
     event::{Event, ValueKind},
@@ -8,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
 use toml::value::Value;
 
+use std::net::IpAddr;
+use std::str::FromStr;
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
@@ -17,7 +22,9 @@ pub struct GeoipConfig {
 }
 
 pub struct Geoip {
-    pub data: IndexMap<String, String>,
+    pub source: Atom,
+    pub database: String,
+    pub target: String,
 }
 
 #[typetag::serde(name = "geoip")]
@@ -41,22 +48,38 @@ impl TransformConfig for GeoipConfig {
 
 impl Geoip {
     pub fn new(source: Atom, database: String, target: String) -> Self {
-        let mut geo_data = IndexMap::new();
-        let k = String::from("foo");
-        let v = String::from("bar");
-
-        geo_data.insert(k, v);
-        Geoip { data: geo_data }
+        Geoip {
+            source: source,
+            database: database,
+            target: target,
+        }
     }
 }
 
 impl Transform for Geoip {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        for (key, value) in self.data.clone() {
-            event
-                .as_mut_log()
-                .insert_explicit(Atom::from(key), value.into());
-        }
+        let ipaddress = event
+            .as_log()
+            .get(&self.source)
+            .map(|s| s.to_string_lossy());
+        if let Some(ipaddress) = &ipaddress {
+            let reader =
+                maxminddb::Reader::open_readfile("/usr/local/share/GeoIP/GeoIP2-City.mmdb")
+                    .unwrap();
+            let ip: IpAddr = FromStr::from_str(ipaddress).unwrap();
+            let city: maxminddb::geoip2::City = reader.lookup(ip).unwrap();
+            let iso_code = city.country.and_then(|cy| cy.iso_code);
+            if let Some(iso_code) = iso_code {
+                event
+                    .as_mut_log()
+                    .insert_explicit(Atom::from("city"), iso_code.into());
+            }
+        } else {
+            debug!(
+                message = "Field does not exist.",
+                field = self.source.as_ref(),
+            );
+        };
 
         Some(event)
     }
@@ -73,7 +96,11 @@ mod tests {
     #[test]
     fn geoip_event() {
         let event = Event::from("augment me");
-        let mut augment = Geoip::new(Atom::from("source"), "path/to/db".to_string(), "geoip".to_string());
+        let mut augment = Geoip::new(
+            Atom::from("source"),
+            "path/to/db".to_string(),
+            "geoip".to_string(),
+        );
 
         let new_event = augment.transform(event).unwrap();
 
