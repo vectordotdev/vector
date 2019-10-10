@@ -1,5 +1,5 @@
 #
-# Run macros
+# Job Macros
 #
 
 install-rust: &install-rust
@@ -560,7 +560,7 @@ release-filters: &release-filters
     tags:
       only: /v.*/
 
-release-requires: &release-requires
+require-tests-checks-and-verifications: &require-tests-checks-and-verifications
   requires:
     - check-code
     - check-fmt
@@ -588,78 +588,128 @@ release-requires: &release-requires
 workflows:
   version: 2
 
-  vector:
+  test:
     jobs:
+      - check-code
+      - check-fmt
+      - check-generate
+      - test-stable
 
-      # Check and test
+      # Build & verify
 
-      - check-code:
-          <<: *all-filters
-      - check-fmt:
-          <<: *all-filters
-      - check-generate:
-          <<: *all-filters
-      - test-stable:
-          <<: *all-filters
-
-      # Build
-
-      - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
-          <<: *all-filters
-      - build-x86_64-unknown-linux-musl-archive:
-          <<: *all-filters
-      - build-x86_64-apple-darwin-archive:
-          <<: *all-filters
-      - package-rpm:
-          <<: *all-filters
+      - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-apple-darwin-archive
+      - package-rpm
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
       # Verify
 
       - verify-deb-artifact-on-deb-8:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-deb-9:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-deb-10:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-16-04:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-18-04:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-deb-artifact-on-ubuntu-19-04:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - verify-docker:
-          <<: *all-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
             - build-x86_64-unknown-linux-musl-archive
       - verify-rpm-artifact-on-amazon-linux-1:
-          <<: *all-filters
           requires:
             - package-rpm
       - verify-rpm-artifact-on-amazon-linux-2:
-          <<: *all-filters
           requires:
             - package-rpm
       - verify-rpm-artifact-on-centos-7:
-          <<: *all-filters
           requires:
             - package-rpm
       - verify-systemd-on-debian:
-          <<: *all-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+
+  release:
+    jobs:
+      - check-code:
+          <<: *release-filters
+      - check-fmt:
+          <<: *release-filters
+      - check-generate:
+          <<: *release-filters
+      - test-stable:
+          <<: *release-filters
+
+      # Build & verify
+
+      - build-x86_64-unknown-linux-gnu-archive-and-deb-package:
+          <<: *release-filters
+      - build-x86_64-unknown-linux-musl-archive:
+          <<: *release-filters
+      - build-x86_64-apple-darwin-archive:
+          <<: *release-filters
+      - package-rpm:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+
+      # Verify
+
+      - verify-deb-artifact-on-deb-8:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-deb-9:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-deb-10:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-16-04:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-18-04:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-19-04:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-docker:
+          <<: *release-filters
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive
+      - verify-rpm-artifact-on-amazon-linux-1:
+          <<: *release-filters
+          requires:
+            - package-rpm
+      - verify-rpm-artifact-on-amazon-linux-2:
+          <<: *release-filters
+          requires:
+            - package-rpm
+      - verify-rpm-artifact-on-centos-7:
+          <<: *release-filters
+          requires:
+            - package-rpm
+      - verify-systemd-on-debian:
+          <<: *release-filters
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
@@ -667,17 +717,91 @@ workflows:
 
       - release-docker:
           <<: *release-filters
-          <<: *release-requires
+          <<: *require-tests-checks-and-verifications
       - release-github:
           <<: *release-filters
-          <<: *release-requires
+          <<: *require-tests-checks-and-verifications
       - release-s3:
           <<: *release-filters
-          <<: *release-requires
+          <<: *require-tests-checks-and-verifications
 
       # Must come after S3 since Homebrew installs from S3
       - release-homebrew:
           <<: *release-filters
+          requires:
+            - release-s3
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only: master
+
+    jobs:
+      - check-code
+      - check-fmt
+      - check-generate
+      - test-stable
+
+      # Build & verify
+
+      - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - build-x86_64-unknown-linux-musl-archive
+      - build-x86_64-apple-darwin-archive
+      - package-rpm
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+
+      # Verify
+
+      - verify-deb-artifact-on-deb-8:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-deb-9:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-deb-10:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-16-04:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-18-04:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-deb-artifact-on-ubuntu-19-04:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+      - verify-docker:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+            - build-x86_64-unknown-linux-musl-archive
+      - verify-rpm-artifact-on-amazon-linux-1:
+          requires:
+            - package-rpm
+      - verify-rpm-artifact-on-amazon-linux-2:
+          requires:
+            - package-rpm
+      - verify-rpm-artifact-on-centos-7:
+          requires:
+            - package-rpm
+      - verify-systemd-on-debian:
+          requires:
+            - build-x86_64-unknown-linux-gnu-archive-and-deb-package
+
+      # Release
+
+      - release-docker:
+          <<: *require-tests-checks-and-verifications
+      - release-github:
+          <<: *require-tests-checks-and-verifications
+      - release-s3:
+          <<: *require-tests-checks-and-verifications
+
+      # Must come after S3 since Homebrew installs from S3
+      - release-homebrew:
           requires:
             - release-s3
 
