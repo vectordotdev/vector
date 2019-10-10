@@ -600,7 +600,7 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
-      - package-rpm
+      - package-rpm:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
@@ -750,7 +750,7 @@ workflows:
       - build-x86_64-unknown-linux-gnu-archive-and-deb-package
       - build-x86_64-unknown-linux-musl-archive
       - build-x86_64-apple-darwin-archive
-      - package-rpm
+      - package-rpm:
           requires:
             - build-x86_64-unknown-linux-gnu-archive-and-deb-package
 
