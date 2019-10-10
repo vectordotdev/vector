@@ -31,6 +31,12 @@ require_relative "generate/core_ext/hash"
 require_relative "generate/core_ext/string"
 
 #
+# Flags
+#
+
+dry_run = ARGV.include?("--dry-run")
+
+#
 # Functions
 #
 
@@ -165,14 +171,18 @@ Dir.glob("#{TEMPLATES_DIR}/**/*.erb", File::FNM_DOTMATCH).
     current_content = File.read(target_path)
 
     if current_content != content
-      action = false ? "Will be changed" : "Changed"
+      action = dry_run ? "Will be changed" : "Changed"
       say("#{action} - #{target_file}", color: :green)
-      File.write(target_path, content)
+      File.write(target_path, content) if !dry_run
     else
-      action = false ? "Will not be changed" : "Not changed"
+      action = dry_run ? "Will not be changed" : "Not changed"
       say("#{action} - #{target_file}", color: :blue)
     end
   end
+
+if dry_run
+  return
+end
 
 #
 # Post process individual docs
