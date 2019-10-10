@@ -23,7 +23,7 @@ package_sha256=$(curl -s $package_url | sha256sum | cut -d " " -f 1)
 new_content=$(cat Formula/vector.rb | \
   sed "s|url \".*\"|url \"$package_url\"|" | \
   sed "s|sha256 \".*\"|sha256 \"$package_sha256\"|" | \
-  sed "s|version \".*\"|version \"$VERSION\"|"
+  sed "s|version \".*\"|version \"$VERSION\"|")
 
 echo "$new_content" > Formula/vector.rb
 
