@@ -58,4 +58,4 @@ say(
   EOF
 )
 
-`#{command}`
+puts `#{command}`
