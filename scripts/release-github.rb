@@ -48,7 +48,7 @@ if release.pre?
   flags << "--pre"
 end
 
-command = "grease create-release timberio/vector v#{VERSION} $#{SHA1} #{flags.join(" ")}"
+command = "grease create-release timberio/vector v#{VERSION} #{SHA1} #{flags.join(" ")}"
 
 say(
   <<~EOF
