@@ -12,24 +12,22 @@ mod vars;
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    #[serde(default)]
-    pub data_dir: Option<PathBuf>,
+    #[serde(flatten)]
+    pub global: GlobalOptions,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
 }
 
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct GlobalOptions {
+    #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
 }
 
-impl Default for GlobalOptions {
-    fn default() -> GlobalOptions {
-        GlobalOptions {
-            data_dir: Some(PathBuf::from("/var/lib/vector/")),
-        }
-    }
+fn default_data_dir() -> Option<PathBuf> {
+    Some(PathBuf::from("/var/lib/vector/"))
 }
 
 #[derive(Debug, Snafu)]
@@ -54,12 +52,6 @@ pub enum DataDirError {
 }
 
 impl GlobalOptions {
-    pub fn from(config: &Config) -> Self {
-        Self {
-            data_dir: config.data_dir.clone(),
-        }
-    }
-
     /// Resolve the `data_dir` option in either the global or local
     /// config, and validate that it exists and is writable.
     pub fn resolve_and_validate_data_dir(
@@ -164,7 +156,7 @@ pub trait TransformConfig: core::fmt::Debug {
 impl Config {
     pub fn empty() -> Self {
         Self {
-            data_dir: None,
+            global: GlobalOptions { data_dir: None },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
@@ -253,4 +245,31 @@ impl Clone for Config {
 
 fn healthcheck_default() -> bool {
     true
+}
+
+#[cfg(test)]
+mod test {
+    use super::Config;
+    use std::path::PathBuf;
+
+    #[test]
+    fn default_data_dir() {
+        let config: Config = toml::from_str(
+            r#"
+      [sources.in]
+      type = "file"
+      include = ["/var/log/messages"]
+
+      [sinks.out]
+      type = "console"
+      inputs = ["in"]
+      "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            Some(PathBuf::from("/var/lib/vector")),
+            config.global.data_dir
+        )
+    }
 }

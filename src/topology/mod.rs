@@ -160,8 +160,8 @@ impl RunningTopology {
         rt: &mut tokio::runtime::Runtime,
         require_healthy: bool,
     ) -> bool {
-        if self.config.data_dir != new_config.data_dir {
-            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.data_dir);
+        if self.config.global.data_dir != new_config.global.data_dir {
+            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
             return false;
         }
 
@@ -537,17 +537,17 @@ mod tests {
 
         let mut old_config = Config::empty();
         old_config.add_source("in", TcpConfig::new(next_addr()));
-        old_config.data_dir = Some(Path::new("/asdf").to_path_buf());
+        old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
         let (mut topology, _crash) = topology::start(old_config, &mut rt, false).unwrap();
 
-        new_config.data_dir = Some(Path::new("/qwerty").to_path_buf());
+        new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology.reload_config_and_respawn(new_config, &mut rt, false);
 
         assert_eq!(
-            topology.config.data_dir,
+            topology.config.global.data_dir,
             Some(Path::new("/asdf").to_path_buf())
         );
     }

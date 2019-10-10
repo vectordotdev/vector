@@ -30,7 +30,7 @@ fn test_buffering() {
         max_size: 10_000,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir.clone());
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -58,7 +58,7 @@ fn test_buffering() {
         max_size: 10_000,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir);
+    config.global.data_dir = Some(data_dir);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -121,7 +121,7 @@ fn test_max_size() {
         max_size,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir.clone());
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -148,7 +148,7 @@ fn test_max_size() {
         max_size,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir);
+    config.global.data_dir = Some(data_dir);
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -192,7 +192,7 @@ fn test_max_size_resume() {
         max_size,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir.clone());
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -246,7 +246,7 @@ fn test_reclaim_disk_space() {
         when_full: Default::default(),
     }
     .into();
-    config.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir.clone());
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -282,7 +282,7 @@ fn test_reclaim_disk_space() {
         max_size: 1_000_000_000,
         when_full: Default::default(),
     };
-    config.data_dir = Some(data_dir.clone());
+    config.global.data_dir = Some(data_dir.clone());
 
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
