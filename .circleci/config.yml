@@ -550,13 +550,10 @@ jobs:
 # Workflow Macros
 #
 
-all-filters: &all-filters
-  filters:
-    tags:
-      only: /v.*/
-
 release-filters: &release-filters
   filters:
+    branches:
+      ignore: /.*/
     tags:
       only: /v.*/
 
