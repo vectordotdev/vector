@@ -15,6 +15,7 @@ pub mod remove_tags;
 pub mod sampler;
 pub mod split;
 pub mod tokenizer;
+pub mod geoip;
 
 pub trait Transform: Send {
     fn transform(&mut self, event: Event) -> Option<Event>;
