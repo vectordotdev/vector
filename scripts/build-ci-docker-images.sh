@@ -22,51 +22,25 @@ function build_image() {
   docker push timberiodev/vector-$tag:latest
 }
 
-# This function:
-#
-# 1. Re-builds a fresh cross base image, tagged with our own name.
-#    Ex: `timberiodev/vector-builder-base-x86_64-apple-darwin`
-# 2. Builds our own target image that extends the new above image.
-#    Ex: `timberiodev/vector-builder-x86_64-apple-darwin`
-#
-# See the README.md in the docker folder for more info.
-function extend_cross_base_image() {
-  local target=$1
-
-  docker build \
-    -t timberiodev/vector-builder-base-$target:latest \
-    -f $target/Dockerfile \
-    github.com/rust-embedded/cross#:docker
-
-  docker push timberiodev/vector-builder-base-$target:latest
-  build_image "builder-$target"
-}
-
 # The following images are basic Docker images that do not extend a
 # cross base image.
 all_images=(
-	builder-x86_64-unknown-linux-gnu
-	builder-x86_64-unknown-linux-musl
-	checker
-	packager-deb
-	packager-rpm
-	releaser
-	verifier-amazonlinux-1
-	verifier-amazonlinux-2
+  builder-x86_64-unknown-linux-gnu
+  builder-x86_64-unknown-linux-musl
+  checker
+  packager-rpm
+  releaser
+  verifier-amazonlinux-1
+  verifier-amazonlinux-2
   verifier-centos-7
-	verifier-deb-8
-	verifier-deb-9
-	verifier-deb-10
-	verifier-ubuntu-16-04
-	verifier-ubuntu-18-04
-	verifier-ubuntu-19-04
+  verifier-deb-8
+  verifier-deb-9
+  verifier-deb-10
+  verifier-ubuntu-16-04
+  verifier-ubuntu-18-04
+  verifier-ubuntu-19-04
 )
 for image in ${*:-${all_images[*]}}
 do
-	build_image $image
+  build_image $image
 done
-
-# The following images extend re-built cross base images. The end result
-# is 2 new containers. See the README.md in the docker folder for more info.
-# extend_cross_image "x86_64-unknown-linux-musl"
-# extend_cross_image "x86_64-unknown-netbsd"

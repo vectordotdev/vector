@@ -100,7 +100,7 @@ jobs:
           KAFKA_SSL_TRUSTSTORE_PASSWORD: NOPASS
           KAFKA_SSL_KEY_PASSWORD: NOPASS
           KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: none
-      - image: timberio/splunk-hec-test:latest
+      - image: timberiodev/splunk-hec-test:latest
       - image: elasticsearch:6.6.2
         environment:
           - discovery.type=single-node

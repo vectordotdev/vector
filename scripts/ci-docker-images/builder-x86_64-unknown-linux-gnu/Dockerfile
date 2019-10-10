@@ -5,17 +5,15 @@ FROM japaric/x86_64-unknown-linux-gnu:latest
 
 # Install the git repository to ensure we get the latest version.
 # This is important for determining the current Vector version number.
-RUN apt-get update
-RUN apt-get install -y software-properties-common python-software-properties
-RUN apt-get update
+RUN apt-get update && \
+  apt-get install -y \
+  software-properties-common \
+  python-software-properties
+
 RUN add-apt-repository -y ppa:git-core/ppa
-RUN apt-get update
 
-# Note: We do not call `apt-get upgrade` because we do not want Vector to
-#       depend on newer versions of libraries. This is just an assumption,
-#       I could be completely wrong with how this works.
-
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
   curl \
   git \
   openssh-server \
