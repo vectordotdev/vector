@@ -40,16 +40,41 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **OPTIONAL** | | |
-| `endpoint` | `string` | Custom endpoint for use with AWS-compatible services.<br />`no default` `example: "127.0.0.0:5000"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| **REQUIRED** | | |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.<br />`required` `example: "service"` |
-| `region` | `string` | The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.<br />`required` `example: "us-east-1"` |
-| `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_metrics"` |
+### endpoint
+
+`no default` `example: "127.0.0.0:5000"`
+
+Custom endpoint for use with AWS-compatible services.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### namespace
+
+`required` `example: "service"`
+
+A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
+
+### region
+
+`required` `example: "us-east-1"`
+
+The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.
+
+### type
+
+`required` `must be: "aws_cloudwatch_metrics"`
+
+The component type
 
 ## How It Works
 

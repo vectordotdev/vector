@@ -36,6 +36,20 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### address
+
+`required` `example: "127.0.0.1:8126"`
+
+UDP socket address to bind to.
+
+### type
+
+`required` `must be: "statsd"`
+
+The component type
+
 ## Input/Output
 
 {% tabs %}

@@ -36,6 +36,26 @@ The `vector` source ingests data through another upstream Vector instance and ou
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### address
+
+`required` `example: "0.0.0.0:9000"`
+
+The TCP address to bind to.
+
+### shutdown_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The timeout before a connection is forcefully closed during shutdown.
+
+### type
+
+`required` `must be: "vector"`
+
+The component type
+
 ## How It Works
 
 ### Delivery Guarantee

@@ -29,6 +29,38 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### address
+
+`required` `example: "0.0.0.0:9000"`
+
+The address to bind the socket to.
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### shutdown_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The timeout before a connection is forcefully closed during shutdown.
+
+### type
+
+`required` `must be: "tcp"`
+
+The component type
+
 ## Input/Output
 
 Given the following input line:

@@ -35,6 +35,28 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### tags.*
+
+#### tags.*
+
+`required` `example: (see above)`
+
+A key/value pair representing the new tag to be added.
+
+### type
+
+`required` `must be: "add_tags"`
+
+The component type
+
 ## How It Works
 
 ### Environment Variables
@@ -76,11 +98,14 @@ Finally, consider the following alternatives:
 
 
 [assets.add_tags_transform]: ../../../assets/add_tags-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_tags]: ../../../usage/configuration/transforms/remove_tags.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.add_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22+label%3A%22Type%3A+bug%22
 [urls.add_tags_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22+label%3A%22Type%3A+enhancement%22

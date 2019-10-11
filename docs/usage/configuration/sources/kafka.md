@@ -38,6 +38,50 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### auto_offset_reset
+
+`default: "largest"`
+
+If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for `auto.offset.reset` option for explanation.
+
+### bootstrap_servers
+
+`required` `example: (see above)`
+
+A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to initially to bootstrap itself.
+
+### group_id
+
+`required` `example: "consumer-group-name"`
+
+The consumer group name to be used to consume events from Kafka.
+
+### key_field
+
+`no default` `example: "user_id"`
+
+The log field name to use for the topic key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event.
+
+### session_timeout_ms
+
+`default: 10000` `unit: milliseconds`
+
+The Kafka session timeout in milliseconds.
+
+### topics
+
+`required` `example: (see above)`
+
+The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.
+
+### type
+
+`required` `must be: "kafka"`
+
+The component type
+
 ## Input/Output
 
 Given the following message in a Kafka topic:

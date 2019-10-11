@@ -28,6 +28,26 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maxiumum bytes size of a message before it is discarded.
+
+### type
+
+`required` `must be: "stdin"`
+
+The component type
+
 ## Input/Output
 
 Given the following input line:

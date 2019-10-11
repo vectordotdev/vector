@@ -29,6 +29,44 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### address
+
+`no default` `example: "0.0.0.0:9000"`
+
+The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp"
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### mode
+
+`required` `enum: "tcp", "udp", and "unix"`
+
+The input mode.
+
+### path
+
+`no default` `example: "/path/to/socket"`
+
+The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"
+
+### type
+
+`required` `must be: "syslog"`
+
+The component type
+
 ## Input/Output
 
 Given the following input line:

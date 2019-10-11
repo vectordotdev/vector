@@ -30,6 +30,38 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### encoding
+
+`no default` `enum: "json" or "text"`
+
+The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### target
+
+`required` `enum: "stdout" or "stderr"`
+
+The [standard stream][urls.standard_streams] to write to.
+
+### type
+
+`required` `must be: "console"`
+
+The component type
+
 ## How It Works
 
 ### Delivery Guarantee
@@ -113,12 +145,15 @@ issue, please:
 
 
 [assets.console_sink]: ../../../assets/console-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.console_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+bug%22
 [urls.console_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+console%22+label%3A%22Type%3A+enhancement%22
@@ -126,4 +161,5 @@ issue, please:
 [urls.console_sink_source]: https://github.com/timberio/vector/tree/master/src/sinks/console.rs
 [urls.new_console_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+bug
 [urls.new_console_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+console&labels=Type%3A+enhancement
+[urls.standard_streams]: https://en.wikipedia.org/wiki/Standard_streams
 [urls.vector_chat]: https://chat.vector.dev

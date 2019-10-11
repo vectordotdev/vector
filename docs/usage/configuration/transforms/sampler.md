@@ -37,6 +37,32 @@ The `sampler` transform accepts [`log`][docs.data-model.log] events and allows y
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### pass_list
+
+`no default` `example: ["[error]", "field2"]`
+
+A list of regular expression patterns to exclude events from sampling. If an event's `"message"` key matches _any_ of these patterns it will _not_ be sampled.
+
+### rate
+
+`required` `example: 10`
+
+The rate at which events will be forwarded, expressed as 1/N. For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
+
+### type
+
+`required` `must be: "sampler"`
+
+The component type
+
 ## How It Works
 
 ### Environment Variables
@@ -77,10 +103,13 @@ Finally, consider the following alternatives:
 
 
 [assets.sampler_transform]: ../../../assets/sampler-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_sampler_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+bug
 [urls.new_sampler_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+sampler&labels=Type%3A+enhancement

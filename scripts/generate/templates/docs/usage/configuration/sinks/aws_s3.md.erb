@@ -6,6 +6,10 @@
 
 <%= component_config_example(component) %>
 
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
 ## Input/Output
 
 The `aws_s3` sink batches [`log`][docs.data-model.log] up to the `batch_size` or

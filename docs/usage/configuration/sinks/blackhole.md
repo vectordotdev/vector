@@ -30,6 +30,32 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### print_amount
+
+`required` `example: 1000`
+
+The number of events that must be received in order to print a summary of activity.
+
+### type
+
+`required` `must be: "blackhole"`
+
+The component type
+
 ## How It Works
 
 ### Delivery Guarantee
@@ -89,11 +115,14 @@ issue, please:
 
 
 [assets.blackhole_sink]: ../../../assets/blackhole-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.blackhole_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+bug%22
 [urls.blackhole_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+blackhole%22+label%3A%22Type%3A+enhancement%22

@@ -30,6 +30,46 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### drop_field
+
+`default: true`
+
+If `true` the `field` will be dropped after parsing.
+
+### field
+
+`default: "message"`
+
+The log field to tokenize.
+
+### field_names
+
+`required` `example: (see above)`
+
+The log field names assigned to the resulting tokens, in order.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "tokenizer"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
 ## Input/Output
 
 Given the following log line:
@@ -168,13 +208,16 @@ Finally, consider the following alternatives:
 
 
 [assets.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_tokenizer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+bug
 [urls.new_tokenizer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+enhancement

@@ -30,6 +30,26 @@ The `remove_tags` transform accepts [`metric`][docs.data-model.metric] events an
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### tags
+
+`required` `example: ["tag1", "tag2"]`
+
+The tag names to drop.
+
+### type
+
+`required` `must be: "remove_tags"`
+
+The component type
+
 ## How It Works
 
 ### Environment Variables
@@ -71,11 +91,14 @@ Finally, consider the following alternatives:
 
 
 [assets.remove_tags_transform]: ../../../assets/remove_tags-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.add_tags]: ../../../usage/configuration/transforms/add_tags.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_remove_tags_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+bug
 [urls.new_remove_tags_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_tags&labels=Type%3A+enhancement

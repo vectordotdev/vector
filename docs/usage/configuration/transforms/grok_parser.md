@@ -30,6 +30,46 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### drop_field
+
+`default: true`
+
+If `true` will drop the specified `field` after parsing.
+
+### field
+
+`default: "message"`
+
+The log field to execute the `pattern` against. Must be a `string` value.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### pattern
+
+`required` `example: (see above)`
+
+The [Grok pattern][urls.grok_patterns]
+
+### type
+
+`required` `must be: "grok_parser"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
 ## How It Works
 
 ### Available Patterns
@@ -125,14 +165,17 @@ Finally, consider the following alternatives:
 
 
 [assets.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

@@ -35,9 +35,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 
 `no default` `example: "/var/lib/vector"`
 
-The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir.
-
- See [Checkpointing](#checkpointing) for more info.
+The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
 
 ### exclude
 
@@ -45,15 +43,11 @@ The directory used to persist file checkpoint positions. By default, the global 
 
 Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*
 
-
-
 ### file_key
 
 `default: "file"`
 
-The key name added to each event with the full path of the file.
-
- See [Context](#context) for more info.
+The key name added to each event with the full path of the file. See [Context](#context) for more info.
 
 ### fingerprinting.*
 
@@ -61,17 +55,13 @@ The key name added to each event with the full path of the file.
 
 `default: 256` `unit: bytes`
 
-The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum"
-
- See [File Identification](#file-identification) for more info.
+The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
 
 #### fingerprinting.ignored_header_bytes
 
 `default: 0` `unit: bytes`
 
-The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum"
-
- See [File Identification](#file-identification) for more info.
+The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
 
 #### fingerprinting.strategy
 
@@ -79,23 +69,17 @@ The number of bytes to skip ahead (or ignore) when generating a unique fingerpri
 
 Whether to use the content of a file to differentiate it (`checksum`) or the storage device and inode (`device_and_inode`). Depending on your log rotation strategy, one may be a better fit than the other.
 
-
-
 ### glob_minimum_cooldown
 
 `default: 1000` `unit: milliseconds`
 
-Delay between file discovery calls. This controls the interval at which Vector searches for files.
-
- See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
+Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
 
 ### host_key
 
 `default: "host"`
 
-The key name added to each event representing the current host.
-
- See [Context](#context) for more info.
+The key name added to each event representing the current host. See [Context](#context) for more info.
 
 ### ignore_older
 
@@ -103,15 +87,11 @@ The key name added to each event representing the current host.
 
 Ignore files with a data modification date that does not exceed this age.
 
-
-
 ### include
 
 `required` `example: ["/var/log/nginx/*.log"]`
 
-Array of file patterns to include. [Globbing](#globbing) is supported.
-
- See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
+Array of file patterns to include. [Globbing](#globbing) is supported. See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
 
 ### max_line_bytes
 
@@ -119,15 +99,11 @@ Array of file patterns to include. [Globbing](#globbing) is supported.
 
 The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.
 
-
-
 ### max_read_bytes
 
 `default: 2048` `unit: bytes`
 
 An approximate limit on the amount of data read from a single file at a given time.
-
-
 
 ### message_start_indicator
 
@@ -135,39 +111,29 @@ An approximate limit on the amount of data read from a single file at a given ti
 
 When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.
 
-
-
 ### multi_line_timeout
 
 `default: 1000` `unit: milliseconds`
 
 When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
 
-
-
 ### oldest_first
 
 `default: false`
 
-Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files.
-
- See [File Read Order](#file-read-order) for more info.
+Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files. See [File Read Order](#file-read-order) for more info.
 
 ### start_at_beginning
 
 `default: false`
 
-When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file.
-
- See [Read Position](#read-position) for more info.
+When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
 
 ### type
 
 `required` `must be: "file"`
 
 The component type
-
-
 
 ## Input/Output
 

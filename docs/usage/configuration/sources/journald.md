@@ -39,6 +39,38 @@ The `journald` source ingests data through log records from journald and outputs
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### current_runtime_only
+
+`default: true`
+
+Include only entries from the current runtime (boot)
+
+### data_dir
+
+`no default` `example: "/var/lib/vector"`
+
+The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir.
+
+### local_only
+
+`default: true`
+
+Include only entries from the local system
+
+### type
+
+`required` `must be: "journald"`
+
+The component type
+
+### units
+
+`default: []`
+
+The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.
+
 ## Input/Output
 
 Given the following journald record:

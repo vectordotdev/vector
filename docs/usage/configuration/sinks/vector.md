@@ -30,6 +30,58 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### address
+
+`required` `example: "92.12.333.224:5000"`
+
+The downstream Vector address.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "vector"`
+
+The component type
+
 ## How It Works
 
 ### Delivery Guarantee
@@ -89,10 +141,14 @@ issue, please:
 
 
 [assets.vector_sink]: ../../../assets/vector-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_vector_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+bug
 [urls.new_vector_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+vector&labels=Type%3A+enhancement

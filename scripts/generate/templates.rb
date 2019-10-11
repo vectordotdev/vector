@@ -6,7 +6,6 @@ require "action_view/helpers/number_helper"
 require_relative "templates/config_example"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
-require_relative "templates/options_sections"
 require_relative "templates/options_table"
 
 # Renders teampltes in the templates sub-dir
@@ -219,7 +218,7 @@ class Templates
       description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
     end
 
-    description << "\n\n[[references:#{option.name}]]"
+    description << "[[references:#{option.name}]]"
 
     description
   end
@@ -272,8 +271,6 @@ class Templates
       raise options.class.inspect
       raise ArgumentError.new("Options must be an Array")
     end
-
-    options_sections = OptionsSections.new(options)
 
     render("_partials/_options_sections.md", binding).strip
   end

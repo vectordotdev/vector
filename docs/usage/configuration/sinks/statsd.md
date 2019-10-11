@@ -39,15 +39,35 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 
 ## Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **OPTIONAL** | | |
-| `address` | `string` | The UDP socket address to send stats to.<br />`default: "127.0.0.1:8125"` |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
-| **REQUIRED** | | |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
-| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
+### address
+
+`default: "127.0.0.1:8125"`
+
+The UDP socket address to send stats to.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### namespace
+
+`required` `example: "service"`
+
+A prefix that will be added to all metric names.
+
+### type
+
+`required` `must be: "statsd"`
+
+The component type
 
 ## Input/Output
 

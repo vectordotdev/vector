@@ -73,10 +73,11 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **OPTIONAL** | | |
-| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.<br />`no default` `example: "/var/lib/vector"` |
+### data_dir
+
+`no default` `example: "/var/lib/vector"`
+
+The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
 
 ## Sources
 

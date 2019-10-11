@@ -30,6 +30,26 @@ The `remove_fields` transform accepts [`log`][docs.data-model.log] events and al
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### fields
+
+`required` `example: ["field1", "field2"]`
+
+The log field names to drop.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "remove_fields"`
+
+The component type
+
 ## How It Works
 
 ### Environment Variables
@@ -71,11 +91,14 @@ Finally, consider the following alternatives:
 
 
 [assets.remove_fields_transform]: ../../../assets/remove_fields-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_remove_fields_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_fields&labels=Type%3A+bug
 [urls.new_remove_fields_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+remove_fields&labels=Type%3A+enhancement

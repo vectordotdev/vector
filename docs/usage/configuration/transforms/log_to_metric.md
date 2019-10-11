@@ -41,6 +41,54 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### metrics.*
+
+#### metrics.field
+
+`required` `example: "duration"`
+
+The log field to use as the metric. See [Null Fields](#null-fields) for more info.
+
+#### metrics.increment_by_value
+
+`default: false`
+
+If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"
+
+#### metrics.name
+
+`required` `example: "duration_total"`
+
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+
+#### metrics.tags.*
+
+##### metrics.tags.*
+
+`required` `example: (see above)`
+
+Key/value pairs representing the metric tags.
+
+#### metrics.type
+
+`required` `enum: "counter", "gauge", "histogram", and "set"`
+
+The metric type.
+
+### type
+
+`required` `must be: "log_to_metric"`
+
+The component type
+
 ## Input/Output
 
 {% tabs %}
@@ -408,11 +456,14 @@ issue, please:
 
 
 [assets.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
 [urls.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22
