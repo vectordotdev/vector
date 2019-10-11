@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     topology::config::{DataType, GlobalOptions, SourceConfig},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use futures::{future, sync::mpsc, Future, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -60,7 +60,6 @@ where
         let (mut tx, rx) = futures::sync::mpsc::channel(1024);
 
         thread::spawn(move || {
-            let mut buf = Box::new(BytesMut::new());
             for line in stdin.lines() {
                 match line {
                     Err(e) => {
@@ -68,18 +67,16 @@ where
                         break;
                     }
                     Ok(string_data) => {
-                        &mut buf.extend_from_slice(string_data.as_bytes());
-                        ()
+                        let msg = Bytes::from(string_data);
+                        while let Err(e) = tx.try_send(msg.clone()) {
+                            if e.is_full() {
+                                continue;
+                            }
+                            error!(message = "Unable to send event.", error = %e);
+                            break;
+                        }
                     }
                 }
-                while let Err(e) = tx.try_send(buf.clone().freeze()) {
-                    if e.is_full() {
-                        continue;
-                    }
-                    error!(message = "Unable to send event.", error = %e);
-                    break;
-                }
-                &mut buf.clear();
             }
         });
 
