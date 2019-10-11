@@ -67,6 +67,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 
   # The unix socket path. *This should be absolute path.*
   # 
+  # * only relevant when mode = "unix"
   # * optional
   # * no default
   path = "/path/to/socket"

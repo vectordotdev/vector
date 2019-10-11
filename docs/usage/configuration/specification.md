@@ -215,6 +215,7 @@ data_dir = "/var/lib/vector"
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     # 
+    # * only relevant when strategy = "checksum"
     # * optional
     # * default: 256
     # * unit: bytes
@@ -223,6 +224,7 @@ data_dir = "/var/lib/vector"
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
     # 
+    # * only relevant when strategy = "checksum"
     # * optional
     # * default: 0
     # * unit: bytes
@@ -406,6 +408,7 @@ data_dir = "/var/lib/vector"
 
   # The unix socket path. *This should be absolute path.*
   # 
+  # * only relevant when mode = "unix"
   # * optional
   # * no default
   path = "/path/to/socket"
@@ -798,6 +801,7 @@ data_dir = "/var/lib/vector"
     # If `true` the metric will be incremented by the `field` value. If `false` the
     # metric will be incremented by 1 regardless of the `field` value.
     # 
+    # * only relevant when type = "counter"
     # * optional
     # * default: false
     increment_by_value = false
@@ -1281,6 +1285,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -1288,6 +1293,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -1477,6 +1483,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -1484,6 +1491,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -1670,6 +1678,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -1677,6 +1686,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -2096,6 +2106,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -2103,6 +2114,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -2383,6 +2395,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -2390,6 +2403,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -2535,6 +2549,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -2542,6 +2557,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -2761,6 +2777,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -2768,6 +2785,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -2925,6 +2943,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -2932,6 +2951,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
@@ -3049,6 +3069,7 @@ end
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -3056,6 +3077,7 @@ end
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events

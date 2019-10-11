@@ -198,6 +198,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 
     # The maximum size of the buffer on the disk.
     # 
+    # * only relevant when type = "disk"
     # * optional
     # * no default
     # * unit: bytes
@@ -205,6 +206,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 
     # The maximum number of events allowed in the buffer.
     # 
+    # * only relevant when type = "memory"
     # * optional
     # * default: 500
     # * unit: events
