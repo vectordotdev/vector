@@ -113,6 +113,10 @@ class Option
     partition_key == true
   end
 
+  def relevant_when_kvs
+    relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
+  end
+
   def required?
     default.nil? && null == false
   end

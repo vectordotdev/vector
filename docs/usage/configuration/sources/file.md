@@ -169,6 +169,7 @@ The `file` source ingests data through one or more local files and outputs [`log
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     # 
+    # * only relevant when strategy = "checksum"
     # * optional
     # * default: 256
     # * unit: bytes
@@ -177,6 +178,7 @@ The `file` source ingests data through one or more local files and outputs [`log
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
     # 
+    # * only relevant when strategy = "checksum"
     # * optional
     # * default: 0
     # * unit: bytes

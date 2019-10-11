@@ -70,8 +70,7 @@ class Templates
       end
 
       if option.relevant_when
-        conditions = option.relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
-        description << " Only relevant when #{conditions.to_sentence}"
+        description << " Only relevant when #{option.relevant_when_kvs.to_sentence}"
       end
 
       description << "[[references:#{option.name}]]"

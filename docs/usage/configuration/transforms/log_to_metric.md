@@ -86,6 +86,7 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
     # If `true` the metric will be incremented by the `field` value. If `false` the
     # metric will be incremented by 1 regardless of the `field` value.
     # 
+    # * only relevant when type = "counter"
     # * optional
     # * default: false
     increment_by_value = false
