@@ -2,11 +2,11 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Histograms" %}
@@ -220,7 +220,7 @@ described below:
 Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `<%= component.name %>` sink it will be dropped, and a rate limited warning
-level log will be emitted.
+level log will be output.
 
 #### Summaries
 

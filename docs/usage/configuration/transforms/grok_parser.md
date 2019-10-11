@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to parse a log field value with
 
 The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok].
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

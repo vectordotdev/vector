@@ -375,6 +375,7 @@ data_dir = "/var/lib/vector"
 
   # The TCP or UDP address to listen on.
   # 
+  # * only relevant when mode = "tcp" or mode = "udp"
   # * optional
   # * no default
   address = "0.0.0.0:9000"

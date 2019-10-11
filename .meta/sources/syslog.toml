@@ -9,6 +9,7 @@ through_description = "the Syslog 5424 protocol"
 type = "string"
 examples = ["0.0.0.0:9000"]
 null = true
+relevant_when = {mode = ["tcp", "udp"]}
 description = "The TCP or UDP address to listen on."
 
 [sources.syslog.options.host_key]

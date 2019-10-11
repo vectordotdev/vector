@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to convert logs into one or mor
 
 The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -41,7 +41,7 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Timings" %}
@@ -78,7 +78,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -135,7 +135,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -192,7 +192,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -257,7 +257,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -332,7 +332,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript

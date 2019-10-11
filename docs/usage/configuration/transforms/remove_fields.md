@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to remove one or more log field
 
 The `remove_fields` transform accepts [`log`][docs.data-model.log] events and allows you to remove one or more log fields.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

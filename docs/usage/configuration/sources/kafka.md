@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -38,7 +38,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following message in a Kafka topic:
 
@@ -50,7 +50,7 @@ Given the following message in a Kafka topic:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

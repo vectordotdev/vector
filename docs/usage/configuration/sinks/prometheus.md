@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -38,7 +38,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Histograms" %}
@@ -271,7 +271,7 @@ described below:
 Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `prometheus` sink it will be dropped, and a rate limited warning
-level log will be emitted.
+level log will be output.
 
 #### Summaries
 

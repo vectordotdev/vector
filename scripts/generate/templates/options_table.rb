@@ -70,7 +70,7 @@ class Templates
       end
 
       if option.relevant_when
-        description << " Only relevant when #{option.relevant_when_kvs.to_sentence}"
+        description << " Only relevant when #{option.relevant_when_kvs.to_sentence(two_words_connector: " or ")}"
       end
 
       description << "[[references:#{option.name}]]"

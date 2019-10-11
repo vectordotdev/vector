@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -39,7 +39,7 @@ The `journald` source ingests data through log records from journald and outputs
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following journald record:
 
@@ -73,7 +73,7 @@ MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

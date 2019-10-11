@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events and allows you to filter events by a log field's value.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

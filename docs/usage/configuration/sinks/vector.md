@@ -17,7 +17,7 @@ description: Streams `log` events to another downstream Vector instance.
 
 The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to another downstream Vector instance.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

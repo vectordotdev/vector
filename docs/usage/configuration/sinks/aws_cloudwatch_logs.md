@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -43,7 +43,7 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 ```http
 POST / HTTP/1.1

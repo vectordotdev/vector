@@ -17,7 +17,7 @@ description: Accepts `metric` events and allows you to remove one or more metric
 
 The `remove_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to remove one or more metric tags.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

@@ -17,7 +17,7 @@ description: Batches `log` events to a generic HTTP endpoint.
 
 The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -39,7 +39,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 The `http` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to a generic HTTP

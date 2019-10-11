@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to parse a log field's value wi
 
 The `regex_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -30,7 +30,7 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following log line:
 
@@ -63,7 +63,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {

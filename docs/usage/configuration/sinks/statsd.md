@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] events to [StatsD][urls.statsd] metrics service.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -49,7 +49,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 | `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
 | `type` | `string` | The component type<br />`required` `must be: "statsd"` |
 
-## Examples
+## Input/Output
 
 The `statsd` sink batches [`metric`][docs.data-model.metric] up to the `batch_size` or `batch_timeout` options. When flushed, metrics will be written in [Multi-metric format][urls.statsd_multi]. For example:
 

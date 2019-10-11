@@ -17,7 +17,7 @@ description: Streams `log` events to a file.
 
 The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a file.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

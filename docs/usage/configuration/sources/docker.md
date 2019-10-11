@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `docker` source ingests data through the docker engine daemon and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

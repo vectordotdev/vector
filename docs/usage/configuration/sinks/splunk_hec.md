@@ -17,7 +17,7 @@ description: Batches `log` events to a Splunk HTTP Event Collector.
 
 The `splunk_hec` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a [Splunk HTTP Event Collector][urls.splunk_hec].
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

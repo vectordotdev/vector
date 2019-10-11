@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to tokenize a field's value by 
 
 The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -30,7 +30,7 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following log line:
 
@@ -57,7 +57,7 @@ fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {

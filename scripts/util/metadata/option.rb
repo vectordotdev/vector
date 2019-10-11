@@ -147,7 +147,15 @@ class Option
   end
 
   def relevant_when_kvs
-    relevant_when.collect { |k,v| "#{k} = #{v.to_toml}" }
+    relevant_when.collect do |k, v|
+      if v.is_a?(Array)
+        v.collect do |sub_v|
+          "#{k} = #{sub_v.to_toml}"
+        end
+      else
+        "#{k} = #{v.to_toml}"
+      end
+    end.flatten
   end
 
   def required?

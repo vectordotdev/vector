@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to add one or more log fields.
 
 The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -41,7 +41,7 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following configuration:
 
@@ -65,7 +65,7 @@ Given the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

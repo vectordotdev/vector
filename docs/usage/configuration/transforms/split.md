@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to split a field's value on a g
 
 The `split` transform accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -30,7 +30,7 @@ The `split` transform accepts [`log`][docs.data-model.log] events and allows you
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following log line:
 
@@ -60,7 +60,7 @@ fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {

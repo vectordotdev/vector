@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -52,7 +52,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 The `aws_s3` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]

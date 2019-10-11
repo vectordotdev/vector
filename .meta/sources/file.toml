@@ -1,5 +1,5 @@
 [sources.file]
-beta = true
+beta = false
 delivery_guarantee = "best_effort"
 guides = []
 output_types = ["log"]

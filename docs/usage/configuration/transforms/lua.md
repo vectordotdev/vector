@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `lua` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -47,7 +47,7 @@ end
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Add fields" %}

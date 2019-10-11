@@ -17,7 +17,7 @@ description: Streams `log` and `metric` events to the console, `STDOUT` or `STDE
 
 The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metric`][docs.data-model.metric] events to the console, `STDOUT` or `STDERR`.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}

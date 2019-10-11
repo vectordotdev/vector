@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to coerce log fields into fixed
 
 The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -29,7 +29,7 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following input event:
 
@@ -67,7 +67,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {

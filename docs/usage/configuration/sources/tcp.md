@@ -17,7 +17,7 @@ description: Ingests data through the TCP protocol and outputs `log` events.
 
 The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -29,7 +29,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 Given the following input line:
 
@@ -41,7 +41,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

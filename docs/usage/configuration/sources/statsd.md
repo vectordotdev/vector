@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `statsd` source ingests data through the StatsD UDP protocol and outputs [`metric`][docs.data-model.metric] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -36,7 +36,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Counter" %}
@@ -46,7 +46,7 @@ Given the following Statsd counter:
 login.invocations:1|c
 ```
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="metric" %}
@@ -70,7 +70,7 @@ Given the following Statsd gauge:
 gas_tank:0.50|g
 ```
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="metric" %}
@@ -94,7 +94,7 @@ Given the following Statsd set:
 unique_users:foo|s
 ```
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="metric" %}
@@ -118,7 +118,7 @@ Given the following Statsd timer:
 login.time:22|ms 
 ```
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following structure:
+A [`metric` event][docs.data-model.metric] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="metric" %}

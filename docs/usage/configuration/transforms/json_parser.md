@@ -17,7 +17,7 @@ description: Accepts `log` events and allows you to parse a log field value as J
 
 The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -30,7 +30,7 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Input/Output
 
 {% tabs %}
 {% tab title="Simple" %}

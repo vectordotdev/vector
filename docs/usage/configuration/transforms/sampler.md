@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `sampler` transform accepts [`log`][docs.data-model.log] events and allows you to sample events with a configurable rate.
 
-## Config File
+## Example
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
