@@ -1,5 +1,5 @@
 use super::fanout::{self, Fanout};
-use crate::{buffers, topology::config::GlobalOptions};
+use crate::buffers;
 use futures::{
     future::{lazy, Either},
     sync::mpsc,
@@ -32,13 +32,11 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
     let mut errors = vec![];
     let mut warnings = vec![];
 
-    let globals = GlobalOptions::from(config);
-
     // Build sources
     for (name, source) in &config.sources {
         let (tx, rx) = mpsc::channel(1000);
 
-        let server = match source.build(&name, &globals, tx) {
+        let server = match source.build(&name, &config.global, tx) {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;
@@ -98,7 +96,7 @@ pub fn build_pieces(config: &super::Config) -> Result<(Pieces, Vec<String>), Vec
         let sink_inputs = &sink.inputs;
         let enable_healthcheck = sink.healthcheck;
 
-        let buffer = sink.buffer.build(&config.data_dir, &name);
+        let buffer = sink.buffer.build(&config.global.data_dir, &name);
         let (tx, rx, acker) = match buffer {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));

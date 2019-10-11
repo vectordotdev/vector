@@ -432,19 +432,18 @@ mod tests {
         let local_dir = tempdir().unwrap();
 
         let mut config = Config::empty();
-        config.data_dir = global_dir.into_path().into();
+        config.global.data_dir = global_dir.into_path().into();
 
         // local path given -- local should win
-        let res = GlobalOptions::from(&config)
+        let res = config
+            .global
             .resolve_and_validate_data_dir(test_default_file_config(&local_dir).data_dir.as_ref())
             .unwrap();
         assert_eq!(res, local_dir.path());
 
         // no local path given -- global fallback should be in effect
-        let res = GlobalOptions::from(&config)
-            .resolve_and_validate_data_dir(None)
-            .unwrap();
-        assert_eq!(res, config.data_dir.unwrap());
+        let res = config.global.resolve_and_validate_data_dir(None).unwrap();
+        assert_eq!(res, config.global.data_dir.unwrap());
     }
 
     #[test]
