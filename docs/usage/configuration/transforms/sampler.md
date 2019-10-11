@@ -33,42 +33,6 @@ The `sampler` transform accepts [`log`][docs.data-model.log] events and allows y
   type = "sampler" # must be: "sampler"
   inputs = ["my-source-id"]
   rate = 10
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.sampler_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "sampler"
-  type = "sampler"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The rate at which events will be forwarded, expressed as 1/N. For example,
-  # `rate = 10` means 1 out of every 10 events will be forwarded and the rest
-  # will be dropped.
-  # 
-  # * required
-  # * no default
-  rate = 10
-
-  # A list of regular expression patterns to exclude events from sampling. If an
-  # event's `"message"` key matches _any_ of these patterns it will _not_ be
-  # sampled.
-  # 
-  # * optional
-  # * no default
-  pass_list = ["[error]", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

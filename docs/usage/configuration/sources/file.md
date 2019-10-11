@@ -24,7 +24,7 @@ as it will help shape the roadmap of this component.
 
 The `file` source ingests data through one or more local files and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Examples
 
 {% code-tabs %}
 {% code-tabs-item title="vector.toml (simple)" %}
@@ -32,162 +32,117 @@ The `file` source ingests data through one or more local files and outputs [`log
 [sources.my_source_id]
   type = "file" # must be: "file"
   include = ["/var/log/nginx/*.log"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.file_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "file"
-  type = "file"
-
-  # Array of file patterns to include. Globbing is supported.
-  # 
-  # * required
-  # * no default
-  include = ["/var/log/nginx/*.log"]
-
-  # The directory used to persist file checkpoint positions. By default, the
-  # global `data_dir` is used. Please make sure the Vector project has write
-  # permissions to this dir.
-  # 
-  # * optional
-  # * no default
-  data_dir = "/var/lib/vector"
-
-  # Array of file patterns to exclude. Globbing is supported. *Takes precedence
-  # over the `include` option.*
-  # 
-  # * optional
-  # * no default
-  exclude = ["/var/log/nginx/access.log"]
-
-  # Delay between file discovery calls. This controls the interval at which
-  # Vector searches for files.
-  # 
-  # * optional
-  # * default: 1000
-  # * unit: milliseconds
-  glob_minimum_cooldown = 1000
-
-  # Ignore files with a data modification date that does not exceed this age.
-  # 
-  # * optional
-  # * no default
-  # * unit: seconds
-  ignore_older = 86400
-
-  # The maximum number of a bytes a line can contain before being discarded. This
-  # protects against malformed lines or tailing incorrect files.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_line_bytes = 102400
-
-  # An approximate limit on the amount of data read from a single file at a given
-  # time.
-  # 
-  # * optional
-  # * default: 2048
-  # * unit: bytes
-  max_read_bytes = 2048
-
-  # When present, Vector will aggregate multiple lines into a single event, using
-  # this pattern as the indicator that the previous lines should be flushed and a
-  # new event started. The pattern will be matched against entire lines as a
-  # regular expression, so remember to anchor as appropriate.
-  # 
-  # * optional
-  # * no default
-  message_start_indicator = "^(INFO|ERROR)"
-
-  # When `message_start_indicator` is present, this sets the amount of time
-  # Vector will buffer lines into a single event before flushing, regardless of
-  # whether or not it has seen a line indicating the start of a new message.
-  # 
-  # * optional
-  # * default: 1000
-  # * unit: milliseconds
-  multi_line_timeout = 1000
-
-  # Instead of balancing read capacity fairly across all watched files,
-  # prioritize draining the oldest files before moving on to read data from
-  # younger files.
-  # 
-  # * optional
-  # * default: false
-  oldest_first = false
-
-  # When `true` Vector will read from the beginning of new files, when `false`
-  # Vector will only read new data added to the file.
-  # 
-  # * optional
-  # * default: false
-  start_at_beginning = false
-
-  #
-  # Context
-  #
-
-  # The key name added to each event with the full path of the file.
-  # 
-  # * optional
-  # * default: "file"
-  file_key = "file"
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
-
-  #
-  # Fingerprinting
-  #
-
-  [sources.file_source.fingerprinting]
-    # Whether to use the content of a file to differentiate it (`checksum`) or the
-    # storage device and inode (`device_and_inode`). Depending on your log rotation
-    # strategy, one may be a better fit than the other.
-    # 
-    # * optional
-    # * default: "checksum"
-    # * enum: "checksum" or "device_and_inode"
-    strategy = "checksum"
-    strategy = "device_and_inode"
-
-    # The number of bytes read off the head of the file to generate a unique
-    # fingerprint.
-    # 
-    # * only relevant when strategy = "checksum"
-    # * optional
-    # * default: 256
-    # * unit: bytes
-    fingerprint_bytes = 256
-
-    # The number of bytes to skip ahead (or ignore) when generating a unique
-    # fingerprint. This is helpful if all files share a common header.
-    # 
-    # * only relevant when strategy = "checksum"
-    # * optional
-    # * default: 0
-    # * unit: bytes
-    ignored_header_bytes = 0
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### `data_dir`
+
+`no default` `example: "/var/lib/vector"`
+
+The directory used to persist file checkpoint positions. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir. See [Checkpointing](#checkpointing) for more info.
+
+### `exclude`
+
+`no default` `example: ["/var/log/nginx/access.log"]`
+
+Array of file patterns to exclude. [Globbing](#globbing) is supported. *Takes precedence over the `include` option.*
+
+### `file_key`
+
+`default: "file"`
+
+The key name added to each event with the full path of the file. See [Context](#context) for more info.
+
+### `fingerprinting`
+
+#### `fingerprinting.fingerprint_bytes`
+
+`default: 256` `unit: bytes`
+
+The number of bytes read off the head of the file to generate a unique fingerprint. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
+
+#### `fingerprinting.ignored_header_bytes`
+
+`default: 0` `unit: bytes`
+
+The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header. Only relevant when strategy = "checksum" See [File Identification](#file-identification) for more info.
+
+#### `fingerprinting.strategy`
+
+`default: "checksum"` `enum: "checksum" or "device_and_inode"`
+
+Whether to use the content of a file to differentiate it (`checksum`) or the storage device and inode (`device_and_inode`). Depending on your log rotation strategy, one may be a better fit than the other.
+
+### `glob_minimum_cooldown`
+
+`default: 1000` `unit: milliseconds`
+
+Delay between file discovery calls. This controls the interval at which Vector searches for files. See [Auto Discovery](#auto-discovery) and [Globbing](#globbing) for more info.
+
+### `host_key`
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### `ignore_older`
+
+`no default` `example: 86400` `unit: seconds`
+
+Ignore files with a data modification date that does not exceed this age.
+
+### `include`
+
+`required` `example: ["/var/log/nginx/*.log"]`
+
+Array of file patterns to include. [Globbing](#globbing) is supported. See [File Read Order](#file-read-order) and [File Rotation](#file-rotation) for more info.
+
+### `max_line_bytes`
+
+`default: 102400` `unit: bytes`
+
+The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files.
+
+### `max_read_bytes`
+
+`default: 2048` `unit: bytes`
+
+An approximate limit on the amount of data read from a single file at a given time.
+
+### `message_start_indicator`
+
+`no default` `example: "^(INFO|ERROR)"`
+
+When present, Vector will aggregate multiple lines into a single event, using this pattern as the indicator that the previous lines should be flushed and a new event started. The pattern will be matched against entire lines as a regular expression, so remember to anchor as appropriate.
+
+### `multi_line_timeout`
+
+`default: 1000` `unit: milliseconds`
+
+When `message_start_indicator` is present, this sets the amount of time Vector will buffer lines into a single event before flushing, regardless of whether or not it has seen a line indicating the start of a new message.
+
+### `oldest_first`
+
+`default: false`
+
+Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files. See [File Read Order](#file-read-order) for more info.
+
+### `start_at_beginning`
+
+`default: false`
+
+When `true` Vector will read from the beginning of new files, when `false` Vector will only read new data added to the file. See [Read Position](#read-position) for more info.
+
+### `type`
+
+`required` `must be: "file"`
+
+The component type
+
+## Input/Output
 
 Given the following input:
 

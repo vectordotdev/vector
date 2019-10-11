@@ -26,49 +26,6 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
   type = "console" # must be: "console"
   inputs = ["my-source-id"]
   target = "stdout" # enum: "stdout" or "stderr"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.console_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "console"
-  type = "console"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The standard stream to write to.
-  # 
-  # * required
-  # * no default
-  # * enum: "stdout" or "stderr"
-  target = "stdout"
-  target = "stderr"
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

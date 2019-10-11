@@ -25,50 +25,6 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 [transforms.my_transform_id]
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.coercer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "coercer"
-  type = "coercer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Types
-  #
-
-  [transforms.coercer_transform.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

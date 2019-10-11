@@ -34,50 +34,6 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
   inputs = ["my-source-id"]
   namespace = "service"
   region = "us-east-1"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.aws_cloudwatch_metrics_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_cloudwatch_metrics"
-  type = "aws_cloudwatch_metrics"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # A namespace that will isolate different metrics from each other.
-  # 
-  # * required
-  # * no default
-  namespace = "service"
-
-  # The AWS region of the target CloudWatch stream resides.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * optional
-  # * no default
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -86,14 +42,14 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_metrics"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.<br />`required` `example: "service"` |
-| `region` | `string` | The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.<br />`required` `example: "us-east-1"` |
 | **OPTIONAL** | | |
 | `endpoint` | `string` | Custom endpoint for use with AWS-compatible services.<br />`no default` `example: "127.0.0.0:5000"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+| **REQUIRED** | | |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `namespace` | `string` | A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.<br />`required` `example: "service"` |
+| `region` | `string` | The [AWS region][urls.aws_cw_metrics_regions] of the target CloudWatch stream resides.<br />`required` `example: "us-east-1"` |
+| `type` | `string` | The component type<br />`required` `must be: "aws_cloudwatch_metrics"` |
 
 ## How It Works
 

@@ -26,68 +26,6 @@ The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allo
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.grok_parser_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "grok_parser"
-  type = "grok_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The Grok pattern
-  # 
-  # * required
-  # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  # If `true` will drop the specified `field` after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to execute the `pattern` against. Must be a `string` value.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.grok_parser_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

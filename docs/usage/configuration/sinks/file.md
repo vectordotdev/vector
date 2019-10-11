@@ -26,55 +26,6 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a f
   type = "file" # must be: "file"
   inputs = ["my-source-id"]
   path = "vector-%Y-%m-%d.log"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.file_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "file"
-  type = "file"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # File name to write events to.
-  # 
-  # * required
-  # * no default
-  path = "vector-%Y-%m-%d.log"
-  path = "application-{{ application_id }}-%Y-%m-%d.log"
-
-  # The encoding format used to serialize the events before appending. The
-  # default is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # The amount of time a file can be idle  and stay open. After not receiving any
-  # events for this timeout, the file will be flushed and closed.
-  # 
-  # * optional
-  # * default: "30"
-  idle_timeout_secs = "30"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

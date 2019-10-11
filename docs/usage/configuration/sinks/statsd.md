@@ -33,44 +33,6 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
   type = "statsd" # must be: "statsd"
   inputs = ["my-source-id"]
   namespace = "service"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.statsd_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "statsd"
-  type = "statsd"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # A prefix that will be added to all metric names.
-  # 
-  # * required
-  # * no default
-  namespace = "service"
-
-  # The UDP socket address to send stats to.
-  # 
-  # * optional
-  # * default: "127.0.0.1:8125"
-  address = "127.0.0.1:8125"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -79,13 +41,13 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
-| **REQUIRED** | | |
-| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
-| `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
 | **OPTIONAL** | | |
 | `address` | `string` | The UDP socket address to send stats to.<br />`default: "127.0.0.1:8125"` |
 | `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start.<br />`default: true` |
+| **REQUIRED** | | |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
+| `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
+| `type` | `string` | The component type<br />`required` `must be: "statsd"` |
 
 ## Examples
 

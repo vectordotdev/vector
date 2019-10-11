@@ -79,11 +79,44 @@ class Option
   end
 
   def <=>(other_option)
-    sort_token <=> other_option.sort_token
+    name <=> other_option.name
   end
 
   def array?(inner_type)
     type == "[#{inner_type}]"
+  end
+
+  def config_file_sort_token
+    first =
+      if table?
+        2
+      elsif required?
+        0
+      else
+        1
+      end
+
+    second =
+      case category
+      when "General"
+        "AA #{category}"
+      when "Requests"
+        "ZZ #{category}"
+      else
+        category
+      end
+
+    third =
+      case name
+      when "inputs"
+        "AAB #{name}"
+      when "strategy", "type"
+        "AAA #{name}"
+      else
+        name
+      end
+
+    [first, second, third]
   end
 
   def context?
@@ -123,39 +156,6 @@ class Option
 
   def simple?
     @simple == true || required?
-  end
-
-  def sort_token
-    first =
-      if table?
-        2
-      elsif required?
-        0
-      else
-        1
-      end
-
-    second =
-      case category
-      when "General"
-        "AA #{category}"
-      when "Requests"
-        "ZZ #{category}"
-      else
-        category
-      end
-
-    third =
-      case name
-      when "inputs"
-        "AAB #{name}"
-      when "type"
-        "AAA #{name}"
-      else
-        name
-      end
-
-    [first, second, third]
   end
 
   def table?

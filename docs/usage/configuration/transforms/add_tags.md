@@ -31,42 +31,6 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
   [transforms.my_transform_id.tags]
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_tags_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_tags"
-  type = "add_tags"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Tags
-  #
-
-  [transforms.add_tags_transform.tags]
-    # A key/value pair representing the new tag to be added.
-    # 
-    # * required
-    # * no default
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

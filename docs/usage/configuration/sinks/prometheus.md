@@ -34,52 +34,6 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
   namespace = "service"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.prometheus_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "prometheus"
-  type = "prometheus"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The address to expose for scraping.
-  # 
-  # * required
-  # * no default
-  address = "0.0.0.0:9598"
-
-  # A prefix that will be added to all metric names.
-  # It should follow Prometheus naming conventions.
-  # 
-  # * required
-  # * no default
-  namespace = "service"
-
-  # Default buckets to use for histogram metrics.
-  # 
-  # * optional
-  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-  # * unit: seconds
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

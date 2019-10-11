@@ -26,32 +26,6 @@ The `remove_fields` transform accepts [`log`][docs.data-model.log] events and al
   type = "remove_fields" # must be: "remove_fields"
   inputs = ["my-source-id"]
   fields = ["field1", "field2"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.remove_fields_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "remove_fields"
-  type = "remove_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The log field names to drop.
-  # 
-  # * required
-  # * no default
-  fields = ["field1", "field2"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

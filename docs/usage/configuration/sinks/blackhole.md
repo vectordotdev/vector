@@ -26,39 +26,6 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
   type = "blackhole" # must be: "blackhole"
   inputs = ["my-source-id"]
   print_amount = 1000
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.blackhole_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "blackhole"
-  type = "blackhole"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The number of events that must be received in order to print a summary of
-  # activity.
-  # 
-  # * required
-  # * no default
-  print_amount = 1000
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

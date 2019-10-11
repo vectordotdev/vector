@@ -37,49 +37,6 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
     my_timestamp_field = 1979-05-27T00:32:00Z
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_fields_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Fields
-  #
-
-  [transforms.add_fields_transform.fields]
-    # A key/value pair representing the new log fields to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
-    # 
-    # * required
-    # * no default
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

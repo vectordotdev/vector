@@ -26,68 +26,6 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.tokenizer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tokenizer"
-  type = "tokenizer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The log field names assigned to the resulting tokens, in order.
-  # 
-  # * required
-  # * no default
-  field_names = ["timestamp", "level", "message"]
-
-  # If `true` the `field` will be dropped after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to tokenize.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.tokenizer_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

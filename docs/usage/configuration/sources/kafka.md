@@ -34,69 +34,6 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
   group_id = "consumer-group-name"
   topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.kafka_source]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "kafka"
-  type = "kafka"
-
-  # A comma-separated list of host and port pairs that are the addresses of the
-  # Kafka brokers in a "bootstrap" Kafka cluster that a Kafka client connects to
-  # initially to bootstrap itself.
-  # 
-  # * required
-  # * no default
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
-
-  # The consumer group name to be used to consume events from Kafka.
-  # 
-  # * required
-  # * no default
-  group_id = "consumer-group-name"
-
-  # The Kafka topics names to read events from. Regex is supported if the topic
-  # begins with `^`.
-  # 
-  # * required
-  # * no default
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
-
-  # If offsets for consumer group do not exist, set them using this strategy.
-  # librdkafka documentation for `auto.offset.reset` option for explanation.
-  # 
-  # * optional
-  # * no default
-  auto_offset_reset = "smallest"
-  auto_offset_reset = "earliest"
-  auto_offset_reset = "beginning"
-  auto_offset_reset = "largest"
-  auto_offset_reset = "latest"
-  auto_offset_reset = "end"
-  auto_offset_reset = "error"
-
-  # The log field name to use for the topic key. If unspecified, the key would
-  # not be added to the log event. If the message has null key, then this field
-  # would not be added to the log event.
-  # 
-  # * optional
-  # * no default
-  key_field = "user_id"
-
-  # The Kafka session timeout in milliseconds.
-  # 
-  # * optional
-  # * no default
-  # * unit: milliseconds
-  session_timeout_ms = 5000
-  session_timeout_ms = 10000
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

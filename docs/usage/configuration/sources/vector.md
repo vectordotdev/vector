@@ -32,32 +32,6 @@ The `vector` source ingests data through another upstream Vector instance and ou
 [sources.my_source_id]
   type = "vector" # must be: "vector"
   address = "0.0.0.0:9000"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.vector_source]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "vector"
-  type = "vector"
-
-  # The TCP address to bind to.
-  # 
-  # * required
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

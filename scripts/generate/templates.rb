@@ -6,6 +6,7 @@ require "action_view/helpers/number_helper"
 require_relative "templates/config_example"
 require_relative "templates/config_schema"
 require_relative "templates/config_spec"
+require_relative "templates/options_sections"
 require_relative "templates/options_table"
 
 # Renders teampltes in the templates sub-dir
@@ -143,6 +144,7 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
+    options = options.sort_by(&:config_file_sort_token)
     example = ConfigExample.new(options)
     render("_partials/_config_example.toml", binding).strip
   end
@@ -154,6 +156,7 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
+    options = options.sort_by(&:config_file_sort_token)
     schema = ConfigSchema.new(options)
     render("_partials/_config_schema.toml", binding).strip
   end
@@ -165,6 +168,7 @@ class Templates
 
     opts[:titles] = true unless opts.key?(:titles)
 
+    options = options.sort_by(&:config_file_sort_token)
     spec = ConfigSpec.new(options)
     content = render("_partials/_config_spec.toml", binding).strip
 
@@ -204,8 +208,74 @@ class Templates
     render("_partials/_full_config_spec.toml", binding).strip
   end
 
+  def option_description(option)
+    description = option.description.strip
+
+    if option.templateable?
+      description << "This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]."
+    end
+
+    if option.relevant_when
+      description << " Only relevant when #{option.relevant_when_kvs.to_sentence}"
+    end
+
+    description << "[[references:#{option.name}]]"
+
+    description
+  end
+
+  def option_tags(option)
+    tags = []
+
+    if option.required?
+      tags << "required"
+    end
+
+    if !option.default.nil?
+      tags << "default: #{option.default.inspect}"
+    elsif option.optional?
+      tags << "no default"
+    end
+
+    if option.default.nil? && option.enum.nil? && option.examples.any?
+      value = option.examples.first.inspect
+
+      if value.length > 30
+        tags << "example: (see above)"
+      else
+        tags << "example: #{value}"
+      end
+    end
+
+    if option.enum
+      escaped_values = option.enum.collect { |enum| enum.to_toml }
+      if escaped_values.length > 1
+        tags << "enum: #{escaped_values.to_sentence(two_words_connector: " or ")}"
+      else
+        tags << "must be: #{escaped_values.first}"
+      end
+    end
+
+    if !option.unit.nil?
+      tags << "unit: #{option.unit}"
+    end
+
+    tags
+  end
+
   def option_names(options)
     options.collect { |option| "`#{option.name}`" }
+  end
+
+  def options_sections(options, depth: 1, path: nil)
+    if !options.is_a?(Array)
+      raise options.class.inspect
+      raise ArgumentError.new("Options must be an Array")
+    end
+
+    options_sections = OptionsSections.new(options)
+
+    render("_partials/_options_sections.md", binding).strip
   end
 
   def options_table(options, opts = {})
