@@ -27,7 +27,7 @@ The `aws_cloudwatch_metrics` sink [streams](#streaming) [`metric`][docs.data-mod
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "aws_cloudwatch_metrics" # must be: "aws_cloudwatch_metrics"

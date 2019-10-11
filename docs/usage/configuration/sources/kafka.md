@@ -27,7 +27,7 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "kafka" # must be: "kafka"

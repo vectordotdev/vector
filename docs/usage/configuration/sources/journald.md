@@ -27,7 +27,7 @@ The `journald` source ingests data through log records from journald and outputs
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED

@@ -20,7 +20,7 @@ The `vector` sink [streams](#streaming) [`log`][docs.data-model.log] events to a
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "vector" # must be: "vector"

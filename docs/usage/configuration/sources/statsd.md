@@ -27,7 +27,7 @@ The `statsd` source ingests data through the StatsD UDP protocol and outputs [`m
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "statsd" # must be: "statsd"

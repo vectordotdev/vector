@@ -20,7 +20,7 @@ The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "tcp" # must be: "tcp"

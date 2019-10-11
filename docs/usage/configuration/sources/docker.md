@@ -27,7 +27,7 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "docker" # must be: "docker"

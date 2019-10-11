@@ -27,7 +27,7 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General

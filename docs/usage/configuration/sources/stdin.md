@@ -20,7 +20,7 @@ The `stdin` source ingests data through standard input (STDIN) and outputs [`log
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "stdin" # must be: "stdin"

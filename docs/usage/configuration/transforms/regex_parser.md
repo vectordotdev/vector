@@ -20,7 +20,7 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "regex_parser" # must be: "regex_parser"

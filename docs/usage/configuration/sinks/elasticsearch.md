@@ -27,7 +27,7 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "elasticsearch" # must be: "elasticsearch"

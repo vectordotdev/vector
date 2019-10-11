@@ -20,7 +20,7 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "kafka" # must be: "kafka"

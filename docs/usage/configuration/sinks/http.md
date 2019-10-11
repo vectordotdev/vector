@@ -20,7 +20,7 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General

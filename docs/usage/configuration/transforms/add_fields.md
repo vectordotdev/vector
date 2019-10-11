@@ -20,7 +20,7 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General

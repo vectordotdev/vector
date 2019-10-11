@@ -27,7 +27,7 @@ The `vector` source ingests data through another upstream Vector instance and ou
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "vector" # must be: "vector"

@@ -20,7 +20,7 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "json_parser" # must be: "json_parser"

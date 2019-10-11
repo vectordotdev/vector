@@ -20,7 +20,7 @@ The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "udp" # must be: "udp"

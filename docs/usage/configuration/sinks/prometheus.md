@@ -27,7 +27,7 @@ The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-mod
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "prometheus" # must be: "prometheus"

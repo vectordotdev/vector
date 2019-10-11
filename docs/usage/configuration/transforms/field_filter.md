@@ -27,7 +27,7 @@ The `field_filter` transform accepts [`log`][docs.data-model.log] and [`metric`]
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "field_filter" # must be: "field_filter"

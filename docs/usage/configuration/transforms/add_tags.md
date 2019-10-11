@@ -20,7 +20,7 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General

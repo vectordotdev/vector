@@ -27,7 +27,7 @@ The `lua` transform accepts [`log`][docs.data-model.log] events and allows you t
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "lua" # must be: "lua"

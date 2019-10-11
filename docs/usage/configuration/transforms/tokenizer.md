@@ -20,7 +20,7 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "tokenizer" # must be: "tokenizer"

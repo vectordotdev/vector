@@ -20,7 +20,7 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General

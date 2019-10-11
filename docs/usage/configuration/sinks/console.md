@@ -20,7 +20,7 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "console" # must be: "console"

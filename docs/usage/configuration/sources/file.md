@@ -20,7 +20,7 @@ The `file` source ingests data through one or more local files and outputs [`log
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "file" # must be: "file"

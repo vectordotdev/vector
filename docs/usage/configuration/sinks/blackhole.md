@@ -20,7 +20,7 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "blackhole" # must be: "blackhole"

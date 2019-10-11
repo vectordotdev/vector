@@ -20,7 +20,7 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "syslog" # must be: "syslog"

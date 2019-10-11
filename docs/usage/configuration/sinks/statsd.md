@@ -27,7 +27,7 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 ## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "statsd" # must be: "statsd"
