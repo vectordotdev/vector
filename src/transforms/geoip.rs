@@ -1,14 +1,13 @@
 extern crate maxminddb;
 
 use super::Transform;
+
 use crate::{
-    event::{Event, ValueKind},
+    event::Event,
     topology::config::{DataType, TransformConfig},
 };
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
-use toml::value::Value;
 
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -58,15 +57,17 @@ impl Geoip {
 
 impl Transform for Geoip {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        println!("Event: {:?}", event.as_log());
         let ipaddress = event
             .as_log()
             .get(&self.source)
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
+            let ip: IpAddr = FromStr::from_str(ipaddress).unwrap();
+            println!("Looking up {}", ip);
             let reader =
                 maxminddb::Reader::open_readfile("/usr/local/share/GeoIP/GeoIP2-City.mmdb")
                     .unwrap();
-            let ip: IpAddr = FromStr::from_str(ipaddress).unwrap();
             let city: maxminddb::geoip2::City = reader.lookup(ip).unwrap();
             let iso_code = city.country.and_then(|cy| cy.iso_code);
             if let Some(iso_code) = iso_code {
@@ -75,6 +76,7 @@ impl Transform for Geoip {
                     .insert_explicit(Atom::from("city"), iso_code.into());
             }
         } else {
+            println!("Something went wrong: {:?}", Some(ipaddress));
             debug!(
                 message = "Field does not exist.",
                 field = self.source.as_ref(),
@@ -88,23 +90,24 @@ impl Transform for Geoip {
 #[cfg(test)]
 mod tests {
     use super::Geoip;
-    use crate::{event::Event, transforms::Transform};
-    use indexmap::IndexMap;
-    use std::collections::HashMap;
+    use crate::{event::Event, transforms::Transform, transforms::json_parser::{JsonParser, JsonParserConfig},};
     use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn geoip_event() {
-        let event = Event::from("augment me");
+        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let event = Event::from(r#"{"remote_addr": "8.8.8.8", "request_path": "foo/bar"}"#);
+        let event = parser.transform(event).unwrap();
+
         let mut augment = Geoip::new(
-            Atom::from("source"),
+            Atom::from("remote_addr"),
             "path/to/db".to_string(),
             "geoip".to_string(),
         );
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Atom::from("foo".to_string());
+        let key = Atom::from("city".to_string());
         let kv = new_event.as_log().get(&key);
 
         let val = "bar".to_string();
