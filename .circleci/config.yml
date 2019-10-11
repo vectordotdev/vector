@@ -792,15 +792,8 @@ workflows:
 
       - release-docker:
           <<: *require-tests-checks-and-verifications
-      - release-github:
-          <<: *require-tests-checks-and-verifications
       - release-s3:
           <<: *require-tests-checks-and-verifications
-
-      # Must come after S3 since Homebrew installs from S3
-      - release-homebrew:
-          requires:
-            - release-s3
 
   install-script:
     jobs:
