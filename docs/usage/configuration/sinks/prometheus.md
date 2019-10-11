@@ -24,67 +24,60 @@ as it will help shape the roadmap of this component.
 
 The `prometheus` sink [exposes](#exposing-and-scraping) [`metric`][docs.data-model.metric] events to [Prometheus][urls.prometheus] metrics service.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "prometheus" # must be: "prometheus"
   inputs = ["my-source-id"]
   address = "0.0.0.0:9598"
   namespace = "service"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.prometheus_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "prometheus"
-  type = "prometheus"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The address to expose for scraping.
-  # 
-  # * required
-  # * no default
-  address = "0.0.0.0:9598"
-
-  # A prefix that will be added to all metric names.
-  # It should follow Prometheus naming conventions.
-  # 
-  # * required
-  # * no default
-  namespace = "service"
-
-  # Default buckets to use for histogram metrics.
-  # 
-  # * optional
-  # * default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-  # * unit: seconds
-  buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### address
+
+`required` `example: "0.0.0.0:9598"`
+
+The address to expose for scraping. See [Exposing & Scraping](#exposing-scraping) for more info.
+
+### buckets
+
+`default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]` `unit: seconds`
+
+Default buckets to use for [histogram][docs.data-model.metric#histogram] metrics. See [Histogram Buckets](#histogram-buckets) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### namespace
+
+`required` `example: "service"`
+
+A prefix that will be added to all metric names.
+It should follow Prometheus [naming conventions][urls.prometheus_metric_naming].
+
+### type
+
+`required` `must be: "prometheus"`
+
+The component type
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Histograms" %}
@@ -317,7 +310,7 @@ described below:
 Prometheus does not have a [`set`][docs.data-model.metric#sets] type. Sets are
 generally specific to [Statsd][urls.statsd_set], and if a set is received in the
 `prometheus` sink it will be dropped, and a rate limited warning
-level log will be emitted.
+level log will be output.
 
 #### Summaries
 
@@ -358,14 +351,18 @@ discussion with your use case if you find this to be a problem.
 
 
 [assets.prometheus_sink]: ../../../assets/prometheus-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric#counters]: ../../../about/data-model/metric.md#counters
 [docs.data-model.metric#gauges]: ../../../about/data-model/metric.md#gauges
+[docs.data-model.metric#histogram]: ../../../about/data-model/metric.md#histogram
 [docs.data-model.metric#histograms]: ../../../about/data-model/metric.md#histograms
 [docs.data-model.metric#sets]: ../../../about/data-model/metric.md#sets
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.issue_387]: https://github.com/timberio/vector/issues/387
 [urls.issue_710]: https://github.com/timberio/vector/issues/710
@@ -377,6 +374,7 @@ discussion with your use case if you find this to be a problem.
 [urls.prometheus_gauge]: https://prometheus.io/docs/concepts/metric_types/#gauge
 [urls.prometheus_high_cardinality]: https://prometheus.io/docs/practices/naming/#labels
 [urls.prometheus_histograms_guide]: https://prometheus.io/docs/practices/histograms/
+[urls.prometheus_metric_naming]: https://prometheus.io/docs/practices/naming/#metric-names
 [urls.prometheus_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+bug%22
 [urls.prometheus_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22+label%3A%22Type%3A+enhancement%22
 [urls.prometheus_sink_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+prometheus%22

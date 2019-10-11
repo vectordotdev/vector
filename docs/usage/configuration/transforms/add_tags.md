@@ -17,10 +17,10 @@ description: Accepts `metric` events and allows you to add one or more metric ta
 
 The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and allows you to add one or more metric tags.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -31,45 +31,31 @@ The `add_tags` transform accepts [`metric`][docs.data-model.metric] events and a
   [transforms.my_transform_id.tags]
     my_tag = "my value"
     my_env_tag = "${ENV_VAR}"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_tags_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_tags"
-  type = "add_tags"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Tags
-  #
-
-  [transforms.add_tags_transform.tags]
-    # A key/value pair representing the new tag to be added.
-    # 
-    # * required
-    # * no default
-    my_tag = "my value"
-    my_env_tag = "${ENV_VAR}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### tags.*
+
+#### tags.*
+
+`required` `example: (see above)`
+
+A key/value pair representing the new tag to be added.
+
+### type
+
+`required` `must be: "add_tags"`
+
+The component type
 
 ## How It Works
 
@@ -112,11 +98,14 @@ Finally, consider the following alternatives:
 
 
 [assets.add_tags_transform]: ../../../assets/add_tags-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_tags]: ../../../usage/configuration/transforms/remove_tags.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.add_tags_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22+label%3A%22Type%3A+bug%22
 [urls.add_tags_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_tags%22+label%3A%22Type%3A+enhancement%22

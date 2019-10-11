@@ -17,80 +17,58 @@ description: Accepts `log` events and allows you to parse a log field value with
 
 The `grok_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value with [Grok][urls.grok].
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "grok_parser" # must be: "grok_parser"
   inputs = ["my-source-id"]
   pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.grok_parser_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "grok_parser"
-  type = "grok_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The Grok pattern
-  # 
-  # * required
-  # * no default
-  pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-
-  # If `true` will drop the specified `field` after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to execute the `pattern` against. Must be a `string` value.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.grok_parser_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### drop_field
+
+`default: true`
+
+If `true` will drop the specified `field` after parsing.
+
+### field
+
+`default: "message"`
+
+The log field to execute the `pattern` against. Must be a `string` value.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### pattern
+
+`required` `example: (see above)`
+
+The [Grok pattern][urls.grok_patterns]
+
+### type
+
+`required` `must be: "grok_parser"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
 
 ## How It Works
 
@@ -187,14 +165,17 @@ Finally, consider the following alternatives:
 
 
 [assets.grok_parser_transform]: ../../../assets/grok_parser-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.grok]: http://grokdebug.herokuapp.com/
 [urls.grok_debugger]: http://grokdebug.herokuapp.com/

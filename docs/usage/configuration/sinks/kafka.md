@@ -17,10 +17,10 @@ description: Streams `log` events to Apache Kafka via the Kafka protocol.
 
 The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol].
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "kafka" # must be: "kafka"
@@ -29,146 +29,111 @@ The `kafka` sink [streams](#streaming) [`log`][docs.data-model.log] events to [A
   encoding = "json" # enum: "json" or "text"
   key_field = "user_id"
   topic = "topic-1234"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.kafka_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "kafka"
-  type = "kafka"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # A list of host and port pairs that the Kafka client should contact to
-  # bootstrap its cluster metadata.
-  # 
-  # * required
-  # * no default
-  bootstrap_servers = ["10.14.22.123:9092", "10.14.23.332:9092"]
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The log field name to use for the topic key. If unspecified, the key will be
-  # randomly generated. If the field does not exist on the log, a blank value
-  # will be used.
-  # 
-  # * required
-  # * no default
-  key_field = "user_id"
-
-  # The Kafka topic name to write events to.
-  # 
-  # * required
-  # * no default
-  topic = "topic-1234"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  #
-  # Buffer
-  #
-
-  [sinks.kafka_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
-  #
-  # Tls
-  #
-
-  [sinks.kafka_sink.tls]
-    # Enable TLS during connections to the remote.
-    # 
-    # * optional
-    # * default: false
-    enabled = false
-
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    # 
-    # * optional
-    # * no default
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    # 
-    # * optional
-    # * no default
-    key_pass = "PassWord1"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### bootstrap_servers
+
+`required` `example: (see above)`
+
+A list of host and port pairs that the Kafka client should contact to bootstrap its cluster metadata.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### encoding
+
+`required` `enum: "json" or "text"`
+
+The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### key_field
+
+`required` `example: "user_id"`
+
+The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used.
+
+### tls.*
+
+#### tls.ca_path
+
+`no default` `example: (see above)`
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+#### tls.crt_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
+
+#### tls.enabled
+
+`default: false`
+
+Enable TLS during connections to the remote.
+
+#### tls.key_pass
+
+`no default` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
+#### tls.key_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+
+### topic
+
+`required` `example: "topic-1234"`
+
+The Kafka topic name to write events to.
+
+### type
+
+`required` `must be: "kafka"`
+
+The component type
 
 ## How It Works
 
@@ -253,11 +218,15 @@ issue, please:
 
 
 [assets.kafka_sink]: ../../../assets/kafka-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.kafka]: https://kafka.apache.org/
 [urls.kafka_protocol]: https://kafka.apache.org/protocol

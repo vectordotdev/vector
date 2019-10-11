@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS S3][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -48,210 +48,159 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
   
   # OPTIONAL - Requests
   compression = "gzip" # default, enum: "gzip" or "none"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.aws_s3_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_s3"
-  type = "aws_s3"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
-  # 
-  # * required
-  # * no default
-  bucket = "my-bucket"
-
-  # The AWS region of the target S3 bucket.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * optional
-  # * no default
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The compression type to use before writing data.
-  # 
-  # * optional
-  # * default: "gzip"
-  # * enum: "gzip" or "none"
-  compression = "gzip"
-  compression = "none"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 300
-  # * unit: seconds
-  batch_timeout = 300
-
-  #
-  # Object Names
-  #
-
-  # Whether or not to append a UUID v4 token to the end of the file. This ensures
-  # there are no name collisions high volume use cases.
-  # 
-  # * optional
-  # * default: true
-  filename_append_uuid = true
-
-  # The extension to use in the object name.
-  # 
-  # * optional
-  # * default: "log"
-  filename_extension = "log"
-
-  # The format of the resulting object file name. `strftime` specifiers are
-  # supported.
-  # 
-  # * optional
-  # * default: "%s"
-  filename_time_format = "%s"
-
-  # A prefix to apply to all object key names. This should be used to partition
-  # your objects, and it's important to end this value with a `/` if you want
-  # this to be the root S3 "folder".
-  # 
-  # * optional
-  # * no default
-  key_prefix = "date=%F/"
-  key_prefix = "date=%F/hour=%H/"
-  key_prefix = "year=%Y/month=%m/day=%d/"
-  key_prefix = "application_id={{ application_id }}/date=%F/"
-
-  #
-  # Buffer
-  #
-
-  [sinks.aws_s3_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### batch_size
+
+`default: 10490000` `unit: bytes`
+
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### batch_timeout
+
+`default: 300` `unit: seconds`
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### bucket
+
+`required` `example: "my-bucket"`
+
+The S3 bucket name. Do not include a leading `s3://` or a trailing `/`.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### compression
+
+`default: "gzip"` `enum: "gzip" or "none"`
+
+The compression type to use before writing data. See [Compression](#compression) for more info.
+
+### encoding
+
+`required` `enum: "ndjson" or "text"`
+
+The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.
+
+### endpoint
+
+`no default` `example: "127.0.0.0:5000"`
+
+Custom endpoint for use with AWS-compatible services.
+
+### filename_append_uuid
+
+`default: true`
+
+Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases. See [Object Naming](#object-naming) for more info.
+
+### filename_extension
+
+`default: "log"`
+
+The extension to use in the object name.
+
+### filename_time_format
+
+`default: "%s"`
+
+The format of the resulting object file name. [`strftime` specifiers][urls.strftime_specifiers] are supported. See [Object Naming](#object-naming) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### key_prefix
+
+`default: "date=%F"`
+
+A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 "folder".This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Object Naming](#object-naming), [Partitioning](#partitioning), and [Template Syntax](#template-syntax) for more info.
+
+### rate_limit_duration
+
+`default: 1` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+
+### rate_limit_num
+
+`default: 5`
+
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+
+### region
+
+`required` `example: "us-east-1"`
+
+The [AWS region][urls.aws_s3_regions] of the target S3 bucket.
+
+### request_in_flight_limit
+
+`default: 5`
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+### request_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+
+### retry_attempts
+
+`default: 5`
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+### retry_backoff_secs
+
+`default: 5` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+### type
+
+`required` `must be: "aws_s3"`
+
+The component type
+
+## Input/Output
 
 The `aws_s3` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]
@@ -580,13 +529,17 @@ issue, please:
 
 [assets.aws_s3_sink]: ../../../assets/aws_s3-sink.svg
 [assets.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_athena]: https://aws.amazon.com/athena/
@@ -594,6 +547,7 @@ issue, please:
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_s3]: https://aws.amazon.com/s3/
+[urls.aws_s3_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 [urls.aws_s3_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 [urls.aws_s3_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+bug%22
 [urls.aws_s3_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_s3%22+label%3A%22Type%3A+enhancement%22

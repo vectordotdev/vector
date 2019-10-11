@@ -2,11 +2,15 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
+## Input/Output
 
 The `aws_kinesis_streams` sink batches [`log`][docs.data-model.log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
 

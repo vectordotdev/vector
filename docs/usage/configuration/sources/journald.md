@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `journald` source ingests data through log records from journald and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
@@ -35,52 +35,43 @@ The `journald` source ingests data through log records from journald and outputs
   
   # OPTIONAL
   units = ["ntpd", "sysinit.target"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.journald_source]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "journald"
-  type = "journald"
-
-  # Include only entries from the current runtime (boot)
-  # 
-  # * optional
-  # * default: true
-  current_runtime_only = true
-
-  # The directory used to persist the journal checkpoint position. By default,
-  # the global `data_dir` is used. Please make sure the Vector project has write
-  # permissions to this dir.
-  # 
-  # * optional
-  # * no default
-  data_dir = "/var/lib/vector"
-
-  # Include only entries from the local system
-  # 
-  # * optional
-  # * default: true
-  local_only = true
-
-  # The list of units names to monitor. If empty or not present, all units are
-  # accepted. Unit names lacking a `"."` will have `".service"` appended to make
-  # them a valid service unit name.
-  # 
-  # * optional
-  # * no default
-  units = ["ntpd", "sysinit.target"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### current_runtime_only
+
+`default: true`
+
+Include only entries from the current runtime (boot)
+
+### data_dir
+
+`no default` `example: "/var/lib/vector"`
+
+The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir.
+
+### local_only
+
+`default: true`
+
+Include only entries from the local system
+
+### type
+
+`required` `must be: "journald"`
+
+The component type
+
+### units
+
+`default: []`
+
+The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `"."` will have `".service"` appended to make them a valid service unit name.
+
+## Input/Output
 
 Given the following journald record:
 
@@ -114,7 +105,7 @@ MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

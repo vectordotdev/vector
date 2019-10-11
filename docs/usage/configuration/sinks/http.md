@@ -17,10 +17,10 @@ description: Batches `log` events to a generic HTTP endpoint.
 
 The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to a generic HTTP endpoint.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -35,248 +35,189 @@ The `http` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] eve
   # OPTIONAL - Batching
   batch_size = 1049000 # default, bytes
   batch_timeout = 5 # default, seconds
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.http_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "http"
-  type = "http"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The encoding format used to serialize the events before flushing. The default
-  # is dynamic based on if the event is structured or not.
-  # 
-  # * required
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # The full URI to make HTTP requests to. This should include the protocol and
-  # host, but can also include the port, path, and any other valid part of a URI.
-  # 
-  # * required
-  # * no default
-  uri = "https://10.22.212.22:9000/endpoint"
-
-  # The compression strategy used to compress the payload before sending.
-  # 
-  # * optional
-  # * no default
-  # * must be: "gzip" (if supplied)
-  compression = "gzip"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # A URI that Vector can request in order to determine the service health.
-  # 
-  # * optional
-  # * no default
-  healthcheck_uri = "https://10.22.212.22:9000/_health"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  batch_timeout = 5
-
-  #
-  # Requests
-  #
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 10
-  rate_limit_num = 10
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 10
-  request_in_flight_limit = 10
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 10
-  retry_attempts = 10
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 10
-  # * unit: seconds
-  retry_backoff_secs = 10
-
-  #
-  # Basic auth
-  #
-
-  [sinks.http_sink.basic_auth]
-    # The basic authentication password.
-    # 
-    # * required
-    # * no default
-    password = "password"
-
-    # The basic authentication user name.
-    # 
-    # * required
-    # * no default
-    user = "username"
-
-  #
-  # Buffer
-  #
-
-  [sinks.http_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
-  #
-  # Headers
-  #
-
-  [sinks.http_sink.headers]
-    # A custom header to be added to each outgoing HTTP request.
-    # 
-    # * required
-    # * no default
-    X-Powered-By = "Vector"
-
-  #
-  # Tls
-  #
-
-  [sinks.http_sink.tls]
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    # 
-    # * optional
-    # * no default
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    # 
-    # * optional
-    # * no default
-    key_pass = "PassWord1"
-
-    # If `true` (the default), Vector will validate the TLS certificate of the
-    # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
-    # 
-    # * optional
-    # * default: true
-    verify_certificate = true
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    # 
-    # * optional
-    # * default: true
-    verify_hostname = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### basic_auth.*
+
+#### basic_auth.password
+
+`required` `example: "password"`
+
+The basic authentication password.
+
+#### basic_auth.user
+
+`required` `example: "username"`
+
+The basic authentication user name.
+
+### batch_size
+
+`default: 1049000` `unit: bytes`
+
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### batch_timeout
+
+`default: 5` `unit: seconds`
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### compression
+
+`no default` `must be: "gzip"`
+
+The compression strategy used to compress the payload before sending. See [Compression](#compression) for more info.
+
+### encoding
+
+`required` `enum: "ndjson" or "text"`
+
+The encoding format used to serialize the events before flushing. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
+
+### headers.*
+
+#### headers.*
+
+`required` `example: (see above)`
+
+A custom header to be added to each outgoing HTTP request.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### healthcheck_uri
+
+`no default` `example: (see above)`
+
+A URI that Vector can request in order to determine the service health. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### rate_limit_duration
+
+`default: 1` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+
+### rate_limit_num
+
+`default: 10`
+
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+
+### request_in_flight_limit
+
+`default: 10`
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+### request_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+
+### retry_attempts
+
+`default: 10`
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+### retry_backoff_secs
+
+`default: 10` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+### tls.*
+
+#### tls.ca_path
+
+`no default` `example: (see above)`
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+#### tls.crt_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
+
+#### tls.key_pass
+
+`no default` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
+#### tls.key_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+
+#### tls.verify_certificate
+
+`default: true`
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+
+#### tls.verify_hostname
+
+`default: true`
+
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+
+### type
+
+`required` `must be: "http"`
+
+The component type
+
+### uri
+
+`required` `example: (see above)`
+
+The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+
+## Input/Output
 
 The `http` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to a generic HTTP
@@ -462,12 +403,16 @@ issue, please:
 
 [assets.http_sink]: ../../../assets/http-sink.svg
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.basic_auth]: https://en.wikipedia.org/wiki/Basic_access_authentication
 [urls.gzip]: https://www.gzip.org/

@@ -24,276 +24,212 @@ as it will help shape the roadmap of this component.
 
 The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "elasticsearch" # must be: "elasticsearch"
   inputs = ["my-source-id"]
   host = "http://10.24.32.122:9000"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.elasticsearch_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "elasticsearch"
-  type = "elasticsearch"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The host of your Elasticsearch cluster. This should be the full URL as shown
-  # in the example.
-  # 
-  # * required
-  # * no default
-  host = "http://10.24.32.122:9000"
-
-  # The `doc_type` for your index data. This is only relevant for Elasticsearch
-  # <= 6.X. If you are using >= 7.0 you do not need to set this option since
-  # Elasticsearch has removed it.
-  # 
-  # * optional
-  # * default: "_doc"
-  doc_type = "_doc"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # Index name to write events to.
-  # 
-  # * optional
-  # * no default
-  index = "vector-%Y-%m-%d"
-  index = "application-{{ application_id }}-%Y-%m-%d"
-
-  # The provider of the Elasticsearch service.
-  # 
-  # * optional
-  # * default: "default"
-  # * enum: "default" or "aws"
-  provider = "default"
-  provider = "aws"
-
-  # When using the AWS provider, the AWS region of the target Elasticsearch
-  # instance.
-  # 
-  # * optional
-  # * no default
-  region = "us-east-1"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 10490000
-  # * unit: bytes
-  batch_size = 10490000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 60
-  # * unit: seconds
-  request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Basic auth
-  #
-
-  [sinks.elasticsearch_sink.basic_auth]
-    # The basic authentication password.
-    # 
-    # * required
-    # * no default
-    password = "password"
-
-    # The basic authentication user name.
-    # 
-    # * required
-    # * no default
-    user = "username"
-
-  #
-  # Buffer
-  #
-
-  [sinks.elasticsearch_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
-
-  #
-  # Headers
-  #
-
-  [sinks.elasticsearch_sink.headers]
-    # A custom header to be added to each outgoing Elasticsearch request.
-    # 
-    # * required
-    # * no default
-    X-Powered-By = "Vector"
-
-  #
-  # Query
-  #
-
-  [sinks.elasticsearch_sink.query]
-    # A custom parameter to be added to each Elasticsearch request.
-    # 
-    # * required
-    # * no default
-    X-Powered-By = "Vector"
-
-  #
-  # Tls
-  #
-
-  [sinks.elasticsearch_sink.tls]
-    # Absolute path to an additional CA certificate file, in DER or PEM format
-    # (X.509).
-    # 
-    # * optional
-    # * no default
-    ca_path = "/path/to/certificate_authority.crt"
-
-    # Absolute path to a certificate file used to identify this connection, in DER
-    # or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12
-    # archive, `key_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    crt_path = "/path/to/host_certificate.crt"
-
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
-    # Pass phrase used to unlock the encrypted key file. This has no effect unless
-    # `key_pass` above is set.
-    # 
-    # * optional
-    # * no default
-    key_pass = "PassWord1"
-
-    # If `true` (the default), Vector will validate the TLS certificate of the
-    # remote host. Do NOT set this to `false` unless you understand the risks of
-    # not verifying the remote certificate.
-    # 
-    # * optional
-    # * default: true
-    verify_certificate = true
-
-    # If `true` (the default), Vector will validate the configured remote host name
-    # against the remote host's TLS certificate. Do NOT set this to `false` unless
-    # you understand the risks of not verifying the remote hostname.
-    # 
-    # * optional
-    # * default: true
-    verify_hostname = true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### basic_auth.*
+
+#### basic_auth.password
+
+`required` `example: "password"`
+
+The basic authentication password.
+
+#### basic_auth.user
+
+`required` `example: "username"`
+
+The basic authentication user name.
+
+### batch_size
+
+`default: 10490000` `unit: bytes`
+
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### batch_timeout
+
+`default: 1` `unit: seconds`
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### doc_type
+
+`default: "_doc"`
+
+The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it.
+
+### headers.*
+
+#### headers.*
+
+`required` `example: (see above)`
+
+A custom header to be added to each outgoing Elasticsearch request.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### host
+
+`required` `example: "http://10.24.32.122:9000"`
+
+The host of your Elasticsearch cluster. This should be the full URL as shown in the example.
+
+### index
+
+`default: "vector-%F"`
+
+Index name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Template Syntax](#template-syntax) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### provider
+
+`default: "default"` `enum: "default" or "aws"`
+
+The provider of the Elasticsearch service.
+
+### query.*
+
+#### query.*
+
+`required` `example: (see above)`
+
+A custom parameter to be added to each Elasticsearch request.
+
+### rate_limit_duration
+
+`default: 1` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+
+### rate_limit_num
+
+`default: 5`
+
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+
+### region
+
+`no default` `example: "us-east-1"`
+
+When using the AWS provider, the [AWS region][urls.aws_elasticsearch_regions] of the target Elasticsearch instance.
+
+### request_in_flight_limit
+
+`default: 5`
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+### request_timeout_secs
+
+`default: 60` `unit: seconds`
+
+The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+
+### retry_attempts
+
+`default: 5`
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+### retry_backoff_secs
+
+`default: 5` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+### tls.*
+
+#### tls.ca_path
+
+`no default` `example: (see above)`
+
+Absolute path to an additional CA certificate file, in DER or PEM format (X.509).
+
+#### tls.crt_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12. If this is set and is not a PKCS#12 archive, `key_path` must also be set.
+
+#### tls.key_pass
+
+`no default` `example: "PassWord1"`
+
+Pass phrase used to unlock the encrypted key file. This has no effect unless `key_pass` above is set.
+
+#### tls.key_path
+
+`no default` `example: (see above)`
+
+Absolute path to a certificate key file used to identify this connection, in DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+
+#### tls.verify_certificate
+
+`default: true`
+
+If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate.
+
+#### tls.verify_hostname
+
+`default: true`
+
+If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
+
+### type
+
+`required` `must be: "elasticsearch"`
+
+The component type
+
+## Input/Output
 
 The `elasticsearch` sink batches [`log`][docs.data-model.log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). The encoding is dictated by the `encoding` option. For example:
 
@@ -461,14 +397,19 @@ issue, please:
 
 [assets.elasticsearch_sink]: ../../../assets/elasticsearch-sink.svg
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
+[urls.aws_elasticsearch_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#elasticsearch-service-regions
 [urls.elasticsearch]: https://www.elastic.co/products/elasticsearch
 [urls.elasticsearch_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+bug%22
 [urls.elasticsearch_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+elasticsearch%22+label%3A%22Type%3A+enhancement%22

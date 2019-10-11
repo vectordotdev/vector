@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -38,173 +38,135 @@ The `aws_kinesis_streams` sink [batches](#buffers-and-batches) [`log`][docs.data
   
   # REQUIRED - Requests
   encoding = "json" # enum: "json" or "text"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.aws_kinesis_streams_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_kinesis_streams"
-  type = "aws_kinesis_streams"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The AWS region of the target Kinesis stream resides.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  # The stream name of the target Kinesis Logs stream.
-  # 
-  # * required
-  # * no default
-  stream_name = "my-stream"
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * optional
-  # * no default
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # The log field used as the Kinesis record's partition key value.
-  # 
-  # * optional
-  # * no default
-  partition_key_field = "user_id"
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Buffer
-  #
-
-  [sinks.aws_kinesis_streams_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### batch_size
+
+`default: 1049000` `unit: bytes`
+
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### batch_timeout
+
+`default: 1` `unit: seconds`
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### encoding
+
+`required` `enum: "json" or "text"`
+
+The encoding format used to serialize the events before flushing. See [Encodings](#encodings) for more info.
+
+### endpoint
+
+`no default` `example: "127.0.0.0:5000"`
+
+Custom endpoint for use with AWS-compatible services.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### partition_key_field
+
+`no default` `example: "user_id"`
+
+The log field used as the Kinesis record's partition key value. See [Partitioning](#partitioning) for more info.
+
+### rate_limit_duration
+
+`default: 1` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+
+### rate_limit_num
+
+`default: 5`
+
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+
+### region
+
+`required` `example: "us-east-1"`
+
+The [AWS region][urls.aws_cw_logs_regions] of the target Kinesis stream resides.
+
+### request_in_flight_limit
+
+`default: 5`
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+### request_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+
+### retry_attempts
+
+`default: 5`
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+### retry_backoff_secs
+
+`default: 5` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+### stream_name
+
+`required` `example: "my-stream"`
+
+The [stream name][urls.aws_cw_logs_stream_name] of the target Kinesis Logs stream.
+
+### type
+
+`required` `must be: "aws_kinesis_streams"`
+
+The component type
+
+## Input/Output
 
 The `aws_kinesis_streams` sink batches [`log`][docs.data-model.log] up to the `batch_size` or `batch_timeout` options. When flushed, Vector will write to [AWS Kinesis Data Stream][urls.aws_kinesis_data_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html). The encoding is dictated by the `encoding` option. For example:
 
@@ -436,17 +398,23 @@ issue, please:
 
 [assets.aws_kinesis_streams_sink]: ../../../assets/aws_kinesis_streams-sink.svg
 [assets.sink-flow-serial]: ../../../assets/sink-flow-serial.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.add_fields]: ../../../usage/configuration/transforms/add_fields.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
+[urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
+[urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.aws_kinesis_data_streams]: https://aws.amazon.com/kinesis/data-streams/
 [urls.aws_kinesis_partition_key]: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecordsRequestEntry.html#Streams-Type-PutRecordsRequestEntry-PartitionKey
 [urls.aws_kinesis_service_limits]: https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html

@@ -17,10 +17,10 @@ description: Accepts `log` events and allows you to convert logs into one or mor
 
 The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and allows you to convert logs into one or more metrics.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -37,80 +37,59 @@ The `log_to_metric` transform accepts [`log`][docs.data-model.log] events and al
     # OPTIONAL
     increment_by_value = false # default, relevant when type = "counter"
     tags = {host = "${HOSTNAME}", region = "us-east-1", status = "{{status}}"}
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.log_to_metric_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "log_to_metric"
-  type = "log_to_metric"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Metrics
-  #
-
-  [[transforms.log_to_metric_transform.metrics]]
-    # The metric type.
-    # 
-    # * required
-    # * no default
-    # * enum: "counter", "gauge", "histogram", and "set"
-    type = "counter"
-    type = "gauge"
-    type = "histogram"
-    type = "set"
-
-    # The log field to use as the metric.
-    # 
-    # * required
-    # * no default
-    field = "duration"
-
-    # If `true` the metric will be incremented by the `field` value. If `false` the
-    # metric will be incremented by 1 regardless of the `field` value.
-    # 
-    # * only relevant when type = "counter"
-    # * optional
-    # * default: false
-    increment_by_value = false
-
-    # The name of the metric. Defaults to `<field>_total` for `counter` and
-    # `<field>` for `gauge`.
-    # 
-    # * required
-    # * no default
-    name = "duration_total"
-
-    [transforms.log_to_metric_transform.metrics.tags]
-      # Key/value pairs representing the metric tags.
-      # 
-      # * required
-      # * no default
-      host = "${HOSTNAME}"
-      region = "us-east-1"
-      status = "{{status}}"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### metrics.*
+
+#### metrics.field
+
+`required` `example: "duration"`
+
+The log field to use as the metric. See [Null Fields](#null-fields) for more info.
+
+#### metrics.increment_by_value
+
+`default: false`
+
+If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value. Only relevant when type = "counter"
+
+#### metrics.name
+
+`required` `example: "duration_total"`
+
+The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`.
+
+#### metrics.tags.*
+
+##### metrics.tags.*
+
+`required` `example: (see above)`
+
+Key/value pairs representing the metric tags.
+
+#### metrics.type
+
+`required` `enum: "counter", "gauge", "histogram", and "set"`
+
+The metric type.
+
+### type
+
+`required` `must be: "log_to_metric"`
+
+The component type
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Timings" %}
@@ -147,7 +126,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -204,7 +183,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -261,7 +240,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -326,7 +305,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -401,7 +380,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -477,11 +456,14 @@ issue, please:
 
 
 [assets.log_to_metric_transform]: ../../../assets/log_to_metric-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model.metric]: ../../../about/data-model/metric.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sinks.prometheus]: ../../../usage/configuration/sinks/prometheus.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.log_to_metric_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+bug%22
 [urls.log_to_metric_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+log_to_metric%22+label%3A%22Type%3A+enhancement%22

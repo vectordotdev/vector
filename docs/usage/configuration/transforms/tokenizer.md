@@ -17,82 +17,60 @@ description: Accepts `log` events and allows you to tokenize a field's value by 
 
 The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "tokenizer" # must be: "tokenizer"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.tokenizer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tokenizer"
-  type = "tokenizer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The log field names assigned to the resulting tokens, in order.
-  # 
-  # * required
-  # * no default
-  field_names = ["timestamp", "level", "message"]
-
-  # If `true` the `field` will be dropped after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to tokenize.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.tokenizer_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_field
+
+`default: true`
+
+If `true` the `field` will be dropped after parsing.
+
+### field
+
+`default: "message"`
+
+The log field to tokenize.
+
+### field_names
+
+`required` `example: (see above)`
+
+The log field names assigned to the resulting tokens, in order.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "tokenizer"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+## Input/Output
 
 Given the following log line:
 
@@ -119,7 +97,7 @@ fields = ["remote_addr", "ident", "user_id", "timestamp", "message", "status", "
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -230,13 +208,16 @@ Finally, consider the following alternatives:
 
 
 [assets.tokenizer_transform]: ../../../assets/tokenizer-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_tokenizer_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+bug
 [urls.new_tokenizer_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+tokenizer&labels=Type%3A+enhancement

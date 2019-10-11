@@ -2,11 +2,15 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Timings" %}
@@ -43,7 +47,7 @@ You can convert the `time` field into a `histogram` metric:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -100,7 +104,7 @@ You can count the number of responses by status code:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -157,7 +161,7 @@ field's value:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -222,7 +226,7 @@ You can reduce this logs into multiple `gauge` metrics:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-Multiple [`metric` events][docs.data-model.metric] will be emitted with the following
+Multiple [`metric` events][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript
@@ -297,7 +301,7 @@ You can count the number of unique `remote_addr` values by using a set:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`metric` event][docs.data-model.metric] will be emitted with the following
+A [`metric` event][docs.data-model.metric] will be output with the following
 structure:
 
 ```javascript

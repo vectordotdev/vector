@@ -17,53 +17,46 @@ description: Accepts `log` events and allows you to parse a log field value as J
 
 The `json_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field value as JSON.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "json_parser" # must be: "json_parser"
   inputs = ["my-source-id"]
   drop_invalid = true
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.json_parser_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "json_parser"
-  type = "json_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # If `true` events with invalid JSON will be dropped, otherwise the event will
-  # be kept and passed through.
-  # 
-  # * required
-  # * no default
-  drop_invalid = true
-
-  # The log field to decode as JSON. Must be a `string` value type.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_invalid
+
+`required` `example: true`
+
+If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through. See [Invalid JSON](#invalid-json) for more info.
+
+### field
+
+`default: "message"`
+
+The log field to decode as JSON. Must be a `string` value type. See [Invalid JSON](#invalid-json) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "json_parser"`
+
+The component type
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Simple" %}
@@ -223,11 +216,14 @@ Finally, consider the following alternatives:
 
 
 [assets.json_parser_transform]: ../../../assets/json_parser-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.correctness]: ../../../correctness.md
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.json_parser_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+bug%22
 [urls.json_parser_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+json_parser%22+label%3A%22Type%3A+enhancement%22

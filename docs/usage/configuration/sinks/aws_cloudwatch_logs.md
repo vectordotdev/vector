@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] events to [AWS CloudWatch Logs][urls.aws_cw_logs] via the [`PutLogEvents` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html).
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
@@ -39,191 +39,147 @@ The `aws_cloudwatch_logs` sink [batches](#buffers-and-batches) [`log`][docs.data
   
   # REQUIRED - Requests
   encoding = "json" # enum: "json" or "text"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.aws_cloudwatch_logs_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "aws_cloudwatch_logs"
-  type = "aws_cloudwatch_logs"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The group name of the target CloudWatch Logs stream.
-  # 
-  # * required
-  # * no default
-  group_name = "{{ file }}"
-  group_name = "ec2/{{ instance_id }}"
-  group_name = "group-name"
-
-  # The AWS region of the target CloudWatch Logs stream resides.
-  # 
-  # * required
-  # * no default
-  region = "us-east-1"
-
-  # The stream name of the target CloudWatch Logs stream.
-  # 
-  # * required
-  # * no default
-  stream_name = "{{ instance_id }}"
-  stream_name = "%Y-%m-%d"
-  stream_name = "stream-name"
-
-  # Dynamically create a log group if it does not already exist. This will ignore
-  # `create_missing_stream` directly after creating the group and will create the
-  # first stream.
-  # 
-  # * optional
-  # * default: true
-  create_missing_group = true
-
-  # Dynamically create a log stream if it does not already exist.
-  # 
-  # * optional
-  # * default: true
-  create_missing_stream = true
-
-  # Custom endpoint for use with AWS-compatible services.
-  # 
-  # * optional
-  # * no default
-  endpoint = "127.0.0.0:5000"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  #
-  # Requests
-  #
-
-  # The encoding format used to serialize the events as before flushing.
-  # 
-  # * required
-  # * no default
-  # * enum: "json" or "text"
-  encoding = "json"
-  encoding = "text"
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  request_timeout_secs = 30
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1049000
-  # * unit: bytes
-  batch_size = 1049000
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Buffer
-  #
-
-  [sinks.aws_cloudwatch_logs_sink.buffer]
-    # The buffer's type / location. `disk` buffers are persistent and will be
-    # retained between restarts.
-    # 
-    # * optional
-    # * default: "memory"
-    # * enum: "memory" or "disk"
-    type = "memory"
-    type = "disk"
-
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
-    # The maximum size of the buffer on the disk.
-    # 
-    # * only relevant when type = "disk"
-    # * optional
-    # * no default
-    # * unit: bytes
-    max_size = 104900000
-
-    # The maximum number of events allowed in the buffer.
-    # 
-    # * only relevant when type = "memory"
-    # * optional
-    # * default: 500
-    # * unit: events
-    num_items = 500
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### batch_size
+
+`default: 1049000` `unit: bytes`
+
+The maximum size of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### batch_timeout
+
+`default: 1` `unit: seconds`
+
+The maximum age of a batch before it is flushed. See [Buffers & Batches](#buffers-batches) for more info.
+
+### buffer.*
+
+#### buffer.max_size
+
+`no default` `example: 104900000` `unit: bytes`
+
+The maximum size of the buffer on the disk. Only relevant when type = "disk"
+
+#### buffer.num_items
+
+`default: 500` `unit: events`
+
+The maximum number of [events][docs.event] allowed in the buffer. Only relevant when type = "memory"
+
+#### buffer.type
+
+`default: "memory"` `enum: "memory" or "disk"`
+
+The buffer's type / location. `disk` buffers are persistent and will be retained between restarts.
+
+#### buffer.when_full
+
+`default: "block"` `enum: "block" or "drop_newest"`
+
+The behavior when the buffer becomes full.
+
+### create_missing_group
+
+`default: true`
+
+Dynamically create a [log group][urls.aws_cw_logs_group_name] if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream.
+
+### create_missing_stream
+
+`default: true`
+
+Dynamically create a [log stream][urls.aws_cw_logs_stream_name] if it does not already exist.
+
+### encoding
+
+`required` `enum: "json" or "text"`
+
+The encoding format used to serialize the events as before flushing. See [Encodings](#encodings) for more info.
+
+### endpoint
+
+`no default` `example: "127.0.0.0:5000"`
+
+Custom endpoint for use with AWS-compatible services.
+
+### group_name
+
+`required` `example: "{{ file }}"`
+
+The [group name][urls.aws_cw_logs_group_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### rate_limit_duration
+
+`default: 1` `unit: seconds`
+
+The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.
+
+### rate_limit_num
+
+`default: 5`
+
+The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.
+
+### region
+
+`required` `example: "us-east-1"`
+
+The [AWS region][urls.aws_cw_logs_regions] of the target CloudWatch Logs stream resides.
+
+### request_in_flight_limit
+
+`default: 5`
+
+The maximum number of in-flight requests allowed at any given time. See [Rate Limits](#rate-limits) for more info.
+
+### request_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The maximum time a request can take before being aborted. See [Timeouts](#timeouts) for more info.
+
+### retry_attempts
+
+`default: 5`
+
+The maximum number of retries to make for failed requests. See [Retry Policy](#retry-policy) for more info.
+
+### retry_backoff_secs
+
+`default: 5` `unit: seconds`
+
+The amount of time to wait before attempting a failed request again. See [Retry Policy](#retry-policy) for more info.
+
+### stream_name
+
+`required` `example: "{{ instance_id }}"`
+
+The [stream name][urls.aws_cw_logs_stream_name] of the target CloudWatch Logs stream.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Partitioning](#partitioning) and [Template Syntax](#template-syntax) for more info.
+
+### type
+
+`required` `must be: "aws_cloudwatch_logs"`
+
+The component type
+
+## Input/Output
 
 ```http
 POST / HTTP/1.1
@@ -450,13 +406,17 @@ issue, please:
 
 [assets.aws_cloudwatch_logs_sink]: ../../../assets/aws_cloudwatch_logs-sink.svg
 [assets.sink-flow-partitioned]: ../../../assets/sink-flow-partitioned.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
+[docs.event]: ../../../setup/getting-started/sending-your-first-event.md
 [docs.guarantees#at-least-once-delivery]: ../../../about/guarantees.md#at-least-once-delivery
 [docs.guarantees]: ../../../about/guarantees.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.aws_access_keys]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 [urls.aws_cloudwatch_logs_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+aws_cloudwatch_logs%22+label%3A%22Type%3A+bug%22
@@ -466,7 +426,10 @@ issue, please:
 [urls.aws_credential_process]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html
 [urls.aws_credentials_file]: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 [urls.aws_cw_logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
+[urls.aws_cw_logs_group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
+[urls.aws_cw_logs_regions]: https://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region
 [urls.aws_cw_logs_service_limits]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html
+[urls.aws_cw_logs_stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
 [urls.iam_instance_profile]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
 [urls.new_aws_cloudwatch_logs_sink_bug]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs&labels=Type%3A+bug
 [urls.new_aws_cloudwatch_logs_sink_enhancement]: https://github.com/timberio/vector/issues/new?labels=sink%3A+aws_cloudwatch_logs&labels=Type%3A+enhancement

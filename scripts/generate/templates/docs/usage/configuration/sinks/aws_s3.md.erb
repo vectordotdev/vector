@@ -2,11 +2,15 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
+## Input/Output
 
 The `aws_s3` sink batches [`log`][docs.data-model.log] up to the `batch_size` or
 `batch_timeout` options. When flushed, Vector will write to [AWS S3][urls.aws_s3]

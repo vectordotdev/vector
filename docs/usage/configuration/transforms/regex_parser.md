@@ -17,82 +17,60 @@ description: Accepts `log` events and allows you to parse a log field's value wi
 
 The `regex_parser` transform accepts [`log`][docs.data-model.log] events and allows you to parse a log field's value with a [Regular Expression][urls.regex].
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "regex_parser" # must be: "regex_parser"
   inputs = ["my-source-id"]
   regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.regex_parser_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "regex_parser"
-  type = "regex_parser"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The Regular Expression to apply. Do not inlcude the leading or trailing `/`.
-  # 
-  # * required
-  # * no default
-  regex = "^(?P<host>[\\w\\.]+) - (?P<user>[\\w]+) (?P<bytes_in>[\\d]+) \\[(?P<timestamp>.*)\\] \"(?P<method>[\\w]+) (?P<path>.*)\" (?P<status>[\\d]+) (?P<bytes_out>[\\d]+)$"
-
-  # If the specified `field` should be dropped (removed) after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The log field to parse.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  #
-  # Types
-  #
-
-  [transforms.regex_parser_transform.types]
-    # A definition of mapped log field types. They key is the log field name and
-    # the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_field
+
+`default: true`
+
+If the specified `field` should be dropped (removed) after parsing.
+
+### field
+
+`default: "message"`
+
+The log field to parse. See [Failed Parsing](#failed-parsing) for more info.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### regex
+
+`required` `example: (see above)`
+
+The Regular Expression to apply. Do not inlcude the leading or trailing `/`. See [Failed Parsing](#failed-parsing) and [Regex Debugger](#regex-debugger) for more info.
+
+### type
+
+`required` `must be: "regex_parser"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped log field types. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+## Input/Output
 
 Given the following log line:
 
@@ -125,7 +103,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -289,14 +267,17 @@ Finally, consider the following alternatives:
 
 
 [assets.regex_parser_transform]: ../../../assets/regex_parser-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.performance]: ../../../performance.md
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.split]: ../../../usage/configuration/transforms/split.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_regex_parser_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+bug
 [urls.new_regex_parser_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+regex_parser&labels=Type%3A+enhancement

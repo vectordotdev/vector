@@ -2,11 +2,15 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Simple" %}

@@ -17,66 +17,51 @@ description: Ingests data through the TCP protocol and outputs `log` events.
 
 The `tcp` source ingests data through the TCP protocol and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "tcp" # must be: "tcp"
   address = "0.0.0.0:9000"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.tcp_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "tcp"
-  type = "tcp"
-
-  # The address to bind the socket to.
-  # 
-  # * required
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  # The timeout before a connection is forcefully closed during shutdown.
-  # 
-  # * optional
-  # * default: 30
-  # * unit: seconds
-  shutdown_timeout_secs = 30
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### address
+
+`required` `example: "0.0.0.0:9000"`
+
+The address to bind the socket to.
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### shutdown_timeout_secs
+
+`default: 30` `unit: seconds`
+
+The timeout before a connection is forcefully closed during shutdown.
+
+### type
+
+`required` `must be: "tcp"`
+
+The component type
+
+## Input/Output
 
 Given the following input line:
 
@@ -88,7 +73,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

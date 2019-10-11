@@ -17,63 +17,41 @@ description: Accepts `log` events and allows you to coerce log fields into fixed
 
 The `coercer` transform accepts [`log`][docs.data-model.log] events and allows you to coerce log fields into fixed types.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "coercer" # must be: "coercer"
   inputs = ["my-source-id"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.coercer_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "coercer"
-  type = "coercer"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Types
-  #
-
-  [transforms.coercer_transform.types]
-    # A definition of log field type conversions. They key is the log field name
-    # and the value is the type. `strftime` specifiers are supported for the
-    # `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "coercer"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of log field type conversions. They key is the log field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+## Input/Output
 
 Given the following input event:
 
@@ -111,7 +89,7 @@ And the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -197,10 +175,13 @@ Finally, consider the following alternatives:
 
 
 [assets.coercer_transform]: ../../../assets/coercer-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.coercer_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+bug%22
 [urls.coercer_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+coercer%22+label%3A%22Type%3A+enhancement%22

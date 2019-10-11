@@ -24,10 +24,10 @@ as it will help shape the roadmap of this component.
 
 The `lua` transform accepts [`log`][docs.data-model.log] events and allows you to transform events with a full embedded [Lua][urls.lua] engine.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "lua" # must be: "lua"
@@ -43,54 +43,37 @@ if event["host"] == nil then
   event["host"] = hostname
 end
 """
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.lua_transform]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "lua"
-  type = "lua"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The inline Lua source to evaluate.
-  # 
-  # * required
-  # * no default
-  source = """
-require("script") # a `script.lua` file must be in your `search_dirs`
-
-if event["host"] == nil then
-  local f = io.popen ("/bin/hostname")
-  local hostname = f:read("*a") or ""
-  f:close()
-  hostname = string.gsub(hostname, "\n$", "")
-  event["host"] = hostname
-end
-"""
-
-  # A list of directories search when loading a Lua file via the `require`
-  # function.
-  # 
-  # * optional
-  # * no default
-  search_dirs = ["/etc/vector/lua"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### search_dirs
+
+`no default` `example: ["/etc/vector/lua"]`
+
+A list of directories search when loading a Lua file via the `require` function. See [Search Directories](#search-directories) for more info.
+
+### source
+
+`required` `example: (see above)`
+
+The inline Lua source to evaluate. See [Global Variables](#global-variables) for more info.
+
+### type
+
+`required` `must be: "lua"`
+
+The component type
+
+## Input/Output
 
 {% tabs %}
 {% tab title="Add fields" %}
@@ -212,12 +195,15 @@ Finally, consider the following alternatives:
 
 
 [assets.lua_transform]: ../../../assets/lua-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log#default-schema]: ../../../about/data-model/log.md#default-schema
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data_model]: ../../../about/data-model
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.lua]: https://www.lua.org/
 [urls.lua_docs]: https://www.lua.org/manual/5.3/

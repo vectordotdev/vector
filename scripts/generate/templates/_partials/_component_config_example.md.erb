@@ -1,14 +1,7 @@
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```toml
 <%= config_example(component.simple_options, path: "#{component.type.pluralize}.my_#{component.type}_id") %>
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```toml
-<%= config_spec(component.options_list, path: "#{component.type.pluralize}.#{component.id}") %>
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

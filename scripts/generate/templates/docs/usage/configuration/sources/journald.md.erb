@@ -2,11 +2,15 @@
 
 <%= component_header(component) %>
 
-## Config File
+## Example
 
 <%= component_config_example(component) %>
 
-## Examples
+## Options
+
+<%= options_sections(component.options_list, depth: 3) %>
+
+## Input/Output
 
 Given the following journald record:
 
@@ -40,7 +44,7 @@ MESSAGE=reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

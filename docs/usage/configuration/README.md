@@ -73,10 +73,11 @@ data_dir = "/var/lib/vector"
 
 ## Global Options
 
-| Key  | Type  | Description |
-|:-----|:-----:|:------------|
-| **OPTIONAL** | | |
-| `data_dir` | `string` | The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.<br />`no default` `example: "/var/lib/vector"` |
+### data_dir
+
+`no default` `example: "/var/lib/vector"`
+
+The directory used for persisting Vector state, such as on-disk buffers, file checkpoints, and more. Please make sure the Vector project has write permissions to this dir. See [Data Directory](#data-directory) for more info.
 
 ## Sources
 
@@ -150,12 +151,6 @@ and [sinks][docs.sinks] through the `inputs` option.
 Notice in the above example each input references the `id` assigned to a
 previous source or transform.
 
-### Config File Location
-
-The location of your Vector configuration file depends on your
-[platform][docs.platforms] or [operating system][docs.operating_systems]. For
-most Linux based systems the file can be found at `/etc/vector/vector.toml`.
-
 ### Data Directory
 
 Vector requires a `data_dir` value for on-disk operations. Currently, the only
@@ -188,6 +183,12 @@ quotes around the definition.
 You can escape environment variable by preceding them with a `$` character. For
 example `$${HOSTNAME}` will be treated _literally_ in the above environment
 variable example.
+
+### Example Location
+
+The location of your Vector configuration file depends on your
+[platform][docs.platforms] or [operating system][docs.operating_systems]. For
+most Linux based systems the file can be found at `/etc/vector/vector.toml`.
 
 ### Format
 

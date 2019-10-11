@@ -17,67 +17,56 @@ description: Streams `log` events to a file.
 
 The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a file.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "file" # must be: "file"
   inputs = ["my-source-id"]
   path = "vector-%Y-%m-%d.log"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.file_sink]
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "file"
-  type = "file"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # File name to write events to.
-  # 
-  # * required
-  # * no default
-  path = "vector-%Y-%m-%d.log"
-  path = "application-{{ application_id }}-%Y-%m-%d.log"
-
-  # The encoding format used to serialize the events before appending. The
-  # default is dynamic based on if the event is structured or not.
-  # 
-  # * optional
-  # * no default
-  # * enum: "ndjson" or "text"
-  encoding = "ndjson"
-  encoding = "text"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # The amount of time a file can be idle  and stay open. After not receiving any
-  # events for this timeout, the file will be flushed and closed.
-  # 
-  # * optional
-  # * default: "30"
-  idle_timeout_secs = "30"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
+
+## Options
+
+### encoding
+
+`no default` `enum: "ndjson" or "text"`
+
+The encoding format used to serialize the events before appending. The default is dynamic based on if the event is structured or not. See [Encodings](#encodings) for more info.
+
+### healthcheck
+
+`default: true`
+
+Enables/disables the sink healthcheck upon start.
+
+### idle_timeout_secs
+
+`default: "30"`
+
+The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### path
+
+`required` `example: "vector-%Y-%m-%d.log"`
+
+File name to write events to.This option supports dynamic values via [Vector's template syntax][docs.configuration#template-syntax]. See [Template Syntax](#template-syntax) for more info.
+
+### type
+
+`required` `must be: "file"`
+
+The component type
 
 ## How It Works
 
@@ -169,12 +158,15 @@ issue, please:
 
 
 [assets.file_sink]: ../../../assets/file-sink.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#template-syntax]: ../../../usage/configuration#template-syntax
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.guarantees#best-effort-delivery]: ../../../about/guarantees.md#best-effort-delivery
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
 [docs.sources.tcp]: ../../../usage/configuration/sources/tcp.md
+[docs.sources]: ../../../usage/configuration/sources
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.file_sink_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+bug%22
 [urls.file_sink_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22sink%3A+file%22+label%3A%22Type%3A+enhancement%22

@@ -17,75 +17,57 @@ description: Ingests data through the Syslog 5424 protocol and outputs `log` eve
 
 The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "syslog" # must be: "syslog"
   mode = "tcp" # enum: "tcp", "udp", and "unix"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.syslog_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "syslog"
-  type = "syslog"
-
-  # The input mode.
-  # 
-  # * required
-  # * no default
-  # * enum: "tcp", "udp", and "unix"
-  mode = "tcp"
-  mode = "udp"
-  mode = "unix"
-
-  # The TCP or UDP address to listen on.
-  # 
-  # * optional
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  # The unix socket path. *This should be absolute path.*
-  # 
-  # * only relevant when mode = "unix"
-  # * optional
-  # * no default
-  path = "/path/to/socket"
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### address
+
+`no default` `example: "0.0.0.0:9000"`
+
+The TCP or UDP address to listen on. Only relevant when mode = "tcp" or mode = "udp"
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### mode
+
+`required` `enum: "tcp", "udp", and "unix"`
+
+The input mode.
+
+### path
+
+`no default` `example: "/path/to/socket"`
+
+The unix socket path. *This should be absolute path.* Only relevant when mode = "unix"
+
+### type
+
+`required` `must be: "syslog"`
+
+The component type
+
+## Input/Output
 
 Given the following input line:
 
@@ -99,7 +81,7 @@ Given the following input
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

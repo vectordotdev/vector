@@ -17,88 +17,66 @@ description: Accepts `log` events and allows you to split a field's value on a g
 
 The `split` transform accepts [`log`][docs.data-model.log] events and allows you to split a field's value on a given separator and zip the tokens into ordered field names.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   type = "split" # must be: "split"
   inputs = ["my-source-id"]
   field_names = ["timestamp", "level", "message"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.split_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "split"
-  type = "split"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # The field names assigned to the resulting tokens, in order.
-  # 
-  # * required
-  # * no default
-  field_names = ["timestamp", "level", "message"]
-
-  # If `true` the `field` will be dropped after parsing.
-  # 
-  # * optional
-  # * default: true
-  drop_field = true
-
-  # The field to apply the split on.
-  # 
-  # * optional
-  # * default: "message"
-  field = "message"
-
-  # The separator to split the field on. If no separator is given, it will split
-  # on whitespace.
-  # 
-  # * optional
-  # * no default
-  separator = ","
-
-  #
-  # Types
-  #
-
-  [transforms.split_transform.types]
-    # A definition of mapped field types. They key is the field name and the value
-    # is the type. `strftime` specifiers are supported for the `timestamp` type.
-    # 
-    # * required
-    # * no default
-    # * enum: "string", "int", "float", "bool", and "timestamp|strftime"
-    status = "int"
-    duration = "float"
-    success = "bool"
-    timestamp = "timestamp|%s"
-    timestamp = "timestamp|%+"
-    timestamp = "timestamp|%F"
-    timestamp = "timestamp|%a %b %e %T %Y"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### drop_field
+
+`default: true`
+
+If `true` the `field` will be dropped after parsing.
+
+### field
+
+`default: "message"`
+
+The field to apply the split on.
+
+### field_names
+
+`required` `example: (see above)`
+
+The field names assigned to the resulting tokens, in order.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### separator
+
+`default: "whitespace"`
+
+The separator to split the field on. If no separator is given, it will split on whitespace.
+
+### type
+
+`required` `must be: "split"`
+
+The component type
+
+### types.*
+
+#### types.*
+
+`required` `enum: "string", "int", "float", "bool", and "timestamp|strftime"`
+
+A definition of mapped field types. They key is the field name and the value is the type. [`strftime` specifiers][urls.strftime_specifiers] are supported for the `timestamp` type.
+
+## Input/Output
 
 Given the following log line:
 
@@ -128,7 +106,7 @@ fields = ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 ```javascript
 {
@@ -221,13 +199,16 @@ Finally, consider the following alternatives:
 
 
 [assets.split_transform]: ../../../assets/split-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.grok_parser]: ../../../usage/configuration/transforms/grok_parser.md
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.regex_parser]: ../../../usage/configuration/transforms/regex_parser.md
 [docs.transforms.tokenizer]: ../../../usage/configuration/transforms/tokenizer.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.new_split_transform_bug]: https://github.com/timberio/vector/issues/new?labels=transform%3A+split&labels=Type%3A+bug
 [urls.new_split_transform_enhancement]: https://github.com/timberio/vector/issues/new?labels=transform%3A+split&labels=Type%3A+enhancement

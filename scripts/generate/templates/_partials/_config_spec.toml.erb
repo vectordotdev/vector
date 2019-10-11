@@ -18,7 +18,7 @@
     <%- else -%>
 <%= option.description.editorify(78).commentify.indent(2) %>
       <%- if option.relevant_when -%>
-  # * only relevant when <%= option.relevant_when_kvs.to_sentence %>
+  # * only relevant when <%= option.relevant_when_kvs.to_sentence(two_words_connector: " or ") %>
       <%- end -%>
       <%- spec.tags(option).each do |tag| -%>
   # * <%= tag %>

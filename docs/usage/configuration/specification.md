@@ -395,6 +395,7 @@ data_dir = "/var/lib/vector"
 
   # The TCP or UDP address to listen on.
   # 
+  # * only relevant when mode = "tcp" or mode = "udp"
   # * optional
   # * no default
   address = "0.0.0.0:9000"
@@ -798,6 +799,13 @@ data_dir = "/var/lib/vector"
     # * no default
     field = "duration"
 
+    # The name of the metric. Defaults to `<field>_total` for `counter` and
+    # `<field>` for `gauge`.
+    # 
+    # * required
+    # * no default
+    name = "duration_total"
+
     # If `true` the metric will be incremented by the `field` value. If `false` the
     # metric will be incremented by 1 regardless of the `field` value.
     # 
@@ -805,13 +813,6 @@ data_dir = "/var/lib/vector"
     # * optional
     # * default: false
     increment_by_value = false
-
-    # The name of the metric. Defaults to `<field>_total` for `counter` and
-    # `<field>` for `gauge`.
-    # 
-    # * required
-    # * no default
-    name = "duration_total"
 
     [transforms.log_to_metric.metrics.tags]
       # Key/value pairs representing the metric tags.
@@ -1275,14 +1276,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -1298,6 +1291,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Streams `metric` events to AWS CloudWatch Metrics via the `PutMetricData` API endpoint.
 [sinks.aws_cloudwatch_metrics]
@@ -1473,14 +1474,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -1496,6 +1489,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Batches `log` events to AWS S3 via the `PutObject` API endpoint.
 [sinks.aws_s3]
@@ -1668,14 +1669,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -1691,6 +1684,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
@@ -1871,19 +1872,19 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
     # 
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -2096,14 +2097,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -2119,6 +2112,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Headers
@@ -2162,19 +2163,19 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
     # 
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -2385,14 +2386,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -2408,6 +2401,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Headers
@@ -2440,19 +2441,19 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
     # 
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -2539,14 +2540,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -2563,17 +2556,19 @@ end
     # * unit: events
     num_items = 500
 
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
   #
   # Tls
   #
 
   [sinks.kafka.tls]
-    # Enable TLS during connections to the remote.
-    # 
-    # * optional
-    # * default: false
-    enabled = false
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     # 
@@ -2589,12 +2584,11 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # Enable TLS during connections to the remote.
     # 
     # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
+    # * default: false
+    enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
@@ -2602,6 +2596,13 @@ end
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
 # Exposes `metric` events to Prometheus metrics service.
 [sinks.prometheus]
@@ -2767,14 +2768,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -2790,6 +2783,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 
   #
   # Tls
@@ -2811,19 +2812,19 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
-    # 
-    # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
-
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
     # 
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -2933,14 +2934,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -2957,17 +2950,19 @@ end
     # * unit: events
     num_items = 500
 
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
   #
   # Tls
   #
 
   [sinks.tcp.tls]
-    # Enable TLS during connections to the remote.
-    # 
-    # * optional
-    # * default: false
-    enabled = false
-
     # Absolute path to an additional CA certificate file, in DER or PEM format
     # (X.509).
     # 
@@ -2983,12 +2978,11 @@ end
     # * no default
     crt_path = "/path/to/host_certificate.crt"
 
-    # Absolute path to a certificate key file used to identify this connection, in
-    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # Enable TLS during connections to the remote.
     # 
     # * optional
-    # * no default
-    key_path = "/path/to/host_certificate.key"
+    # * default: false
+    enabled = false
 
     # Pass phrase used to unlock the encrypted key file. This has no effect unless
     # `key_pass` above is set.
@@ -2996,6 +2990,13 @@ end
     # * optional
     # * no default
     key_pass = "PassWord1"
+
+    # Absolute path to a certificate key file used to identify this connection, in
+    # DER or PEM format (PKCS#8). If this is set, `crt_path` must also be set.
+    # 
+    # * optional
+    # * no default
+    key_path = "/path/to/host_certificate.key"
 
     # If `true` (the default), Vector will validate the TLS certificate of the
     # remote host. Do NOT set this to `false` unless you understand the risks of
@@ -3059,14 +3060,6 @@ end
     type = "memory"
     type = "disk"
 
-    # The behavior when the buffer becomes full.
-    # 
-    # * optional
-    # * default: "block"
-    # * enum: "block" or "drop_newest"
-    when_full = "block"
-    when_full = "drop_newest"
-
     # The maximum size of the buffer on the disk.
     # 
     # * only relevant when type = "disk"
@@ -3082,6 +3075,14 @@ end
     # * default: 500
     # * unit: events
     num_items = 500
+
+    # The behavior when the buffer becomes full.
+    # 
+    # * optional
+    # * default: "block"
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

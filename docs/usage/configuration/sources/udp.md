@@ -17,59 +17,45 @@ description: Ingests data through the UDP protocol and outputs `log` events.
 
 The `udp` source ingests data through the UDP protocol and outputs [`log`][docs.data-model.log] events.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sources.my_source_id]
   type = "udp" # must be: "udp"
   address = "0.0.0.0:9000"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sources.udp_source]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "udp"
-  type = "udp"
-
-  # The address to bind the socket to.
-  # 
-  # * required
-  # * no default
-  address = "0.0.0.0:9000"
-
-  # The maximum bytes size of incoming messages before they are discarded.
-  # 
-  # * optional
-  # * default: 102400
-  # * unit: bytes
-  max_length = 102400
-
-  #
-  # Context
-  #
-
-  # The key name added to each event representing the current host.
-  # 
-  # * optional
-  # * default: "host"
-  host_key = "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### address
+
+`required` `example: "0.0.0.0:9000"`
+
+The address to bind the socket to.
+
+### host_key
+
+`default: "host"`
+
+The key name added to each event representing the current host. See [Context](#context) for more info.
+
+### max_length
+
+`default: 102400` `unit: bytes`
+
+The maximum bytes size of incoming messages before they are discarded.
+
+### type
+
+`required` `must be: "udp"`
+
+The component type
+
+## Input/Output
 
 Given the following input line:
 
@@ -81,7 +67,7 @@ Given the following input line:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}

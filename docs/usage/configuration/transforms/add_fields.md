@@ -17,10 +17,10 @@ description: Accepts `log` events and allows you to add one or more log fields.
 
 The `add_fields` transform accepts [`log`][docs.data-model.log] events and allows you to add one or more log fields.
 
-## Config File
+## Example
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
@@ -37,54 +37,33 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
     my_timestamp_field = 1979-05-27T00:32:00Z
     my_nested_fields = {key1 = "value1", key2 = "value2"}
     my_list = ["first", "second", "third"]
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[transforms.add_fields_transform]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "add_fields"
-  type = "add_fields"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  #
-  # Fields
-  #
-
-  [transforms.add_fields_transform.fields]
-    # A key/value pair representing the new log fields to be added. Accepts all
-    # supported types. Use `.` for adding nested fields.
-    # 
-    # * required
-    # * no default
-    my_string_field = "string value"
-    my_env_var_field = "${ENV_VAR}"
-    my_int_field = 1
-    my_float_field = 1.2
-    my_bool_field = true
-    my_timestamp_field = 1979-05-27T00:32:00Z
-    my_nested_fields = {key1 = "value1", key2 = "value2"}
-    my_list = ["first", "second", "third"]
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-## Examples
+## Options
+
+### fields.*
+
+#### fields.*
+
+`required` `example: (see above)`
+
+A key/value pair representing the new log fields to be added. Accepts all [supported types][docs.configuration#value_types]. Use `.` for adding nested fields.
+
+### inputs
+
+`required` `example: ["my-source-id"]`
+
+A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.
+
+### type
+
+`required` `must be: "add_fields"`
+
+The component type
+
+## Input/Output
 
 Given the following configuration:
 
@@ -108,7 +87,7 @@ Given the following configuration:
 {% endcode-tabs-item %}
 {% endcode-tabs %}
 
-A [`log` event][docs.data-model.log] will be emitted with the following structure:
+A [`log` event][docs.data-model.log] will be output with the following structure:
 
 {% code-tabs %}
 {% code-tabs-item title="log" %}
@@ -251,14 +230,18 @@ Finally, consider the following alternatives:
 
 
 [assets.add_fields_transform]: ../../../assets/add_fields-transform.svg
+[docs.configuration#composition]: ../../../usage/configuration#composition
 [docs.configuration#environment-variables]: ../../../usage/configuration#environment-variables
 [docs.configuration#value-types]: ../../../usage/configuration#value-types
+[docs.configuration#value_types]: ../../../usage/configuration#value_types
 [docs.data-model.log#special-characters]: ../../../about/data-model/log.md#special-characters
 [docs.data-model.log]: ../../../about/data-model/log.md
 [docs.data-model]: ../../../about/data-model
 [docs.monitoring#logs]: ../../../usage/administration/monitoring.md#logs
+[docs.sources]: ../../../usage/configuration/sources
 [docs.transforms.lua]: ../../../usage/configuration/transforms/lua.md
 [docs.transforms.remove_fields]: ../../../usage/configuration/transforms/remove_fields.md
+[docs.transforms]: ../../../usage/configuration/transforms
 [docs.troubleshooting]: ../../../usage/guides/troubleshooting.md
 [urls.add_fields_transform_bugs]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+bug%22
 [urls.add_fields_transform_enhancements]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22transform%3A+add_fields%22+label%3A%22Type%3A+enhancement%22
