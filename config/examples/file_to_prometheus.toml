@@ -44,19 +44,19 @@ type = "histogram"
 field = "bytes_out"
 name = "bytes_out_histogram"
 
+[transforms.add_tags]
+inputs = ["log_to_metric"]
+type = "add_tags"
+tags = {env = "production"}
+
 # Output data
 [sinks.console_metrics]
 inputs = ["log_to_metric"]
 type = "console"
 encoding = "json"
 
-[sinks.console_logs]
-inputs = ["regex_parser"]
-type = "console"
-encoding = "text"
-
 [sinks.prometheus]
-inputs = ["log_to_metric"]
+inputs = ["add_tags"]
 type = "prometheus"
 namespace = "vector"
 buckets = [0.0, 10.0, 100.0, 1000.0, 10000.0, 100001.0]
