@@ -27,124 +27,13 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
 ## Config File
 
 {% code-tabs %}
-{% code-tabs-item title="vector.toml (simple)" %}
+{% code-tabs-item title="vector.toml" %}
 ```coffeescript
 [sinks.my_sink_id]
   type = "datadog_metrics" # must be: "datadog_metrics"
   inputs = ["my-source-id"]
   api_key = "3111111111111111aaaaaaaaaaaaaaaa"
   namespace = "service"
-
-  # For a complete list of options see the "advanced" tab above.
-```
-{% endcode-tabs-item %}
-{% code-tabs-item title="vector.toml (advanced)" %}
-```coffeescript
-[sinks.datadog_metrics_sink]
-  #
-  # General
-  #
-
-  # The component type
-  # 
-  # * required
-  # * no default
-  # * must be: "datadog_metrics"
-  type = "datadog_metrics"
-
-  # A list of upstream source or transform IDs. See Config Composition for more
-  # info.
-  # 
-  # * required
-  # * no default
-  inputs = ["my-source-id"]
-
-  # Datadog API key
-  # 
-  # * required
-  # * no default
-  api_key = "3111111111111111aaaaaaaaaaaaaaaa"
-
-  # A prefix that will be added to all metric names.
-  # 
-  # * required
-  # * no default
-  namespace = "service"
-
-  # Enables/disables the sink healthcheck upon start.
-  # 
-  # * optional
-  # * default: true
-  healthcheck = true
-
-  # Datadog endpoint to send metrics to.
-  # 
-  # * optional
-  # * default: "https://api.datadoghq.com"
-  host = "https://api.datadoghq.com"
-  host = "https://api.datadoghq.eu"
-
-  #
-  # Batching
-  #
-
-  # The maximum size of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 20
-  # * unit: bytes
-  batch_size = 20
-
-  # The maximum age of a batch before it is flushed.
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  batch_timeout = 1
-
-  #
-  # Requests
-  #
-
-  # The window used for the `request_rate_limit_num` option
-  # 
-  # * optional
-  # * default: 1
-  # * unit: seconds
-  rate_limit_duration = 1
-
-  # The maximum number of requests allowed within the `rate_limit_duration`
-  # window.
-  # 
-  # * optional
-  # * default: 5
-  rate_limit_num = 5
-
-  # The maximum number of in-flight requests allowed at any given time.
-  # 
-  # * optional
-  # * default: 5
-  request_in_flight_limit = 5
-
-  # The maximum time a request can take before being aborted.
-  # 
-  # * optional
-  # * default: 60
-  # * unit: seconds
-  request_timeout_secs = 60
-
-  # The maximum number of retries to make for failed requests.
-  # 
-  # * optional
-  # * default: 5
-  retry_attempts = 5
-
-  # The amount of time to wait before attempting a failed request again.
-  # 
-  # * optional
-  # * default: 5
-  # * unit: seconds
-  retry_backoff_secs = 5
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}
@@ -154,16 +43,16 @@ The `datadog_metrics` sink [batches](#buffers-and-batches) [`metric`][docs.data-
 | Key  | Type  | Description |
 |:-----|:-----:|:------------|
 | **REQUIRED** - General | | |
-| `type` | `string` | The component type<br />`required` `must be: "datadog_metrics"` |
-| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `api_key` | `string` | Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)<br />`required` `example: (see above)` |
+| `inputs` | `[string]` | A list of upstream [source][docs.sources] or [transform][docs.transforms] IDs. See [Config Composition][docs.configuration#composition] for more info.<br />`required` `example: ["my-source-id"]` |
 | `namespace` | `string` | A prefix that will be added to all metric names.<br />`required` `example: "service"` |
-| **OPTIONAL** - General | | |
-| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
-| `host` | `string` | Datadog endpoint to send metrics to.<br />`default: "https://api.datadoghq.com"` |
+| `type` | `string` | The component type<br />`required` `must be: "datadog_metrics"` |
 | **OPTIONAL** - Batching | | |
 | `batch_size` | `int` | The maximum size of a batch before it is flushed.<br />`default: 20` `unit: bytes` |
 | `batch_timeout` | `int` | The maximum age of a batch before it is flushed.<br />`default: 1` `unit: seconds` |
+| **OPTIONAL** - General | | |
+| `healthcheck` | `bool` | Enables/disables the sink healthcheck upon start. See [Health Checks](#health-checks) for more info.<br />`default: true` |
+| `host` | `string` | Datadog endpoint to send metrics to.<br />`default: "https://api.datadoghq.com"` |
 | **OPTIONAL** - Requests | | |
 | `rate_limit_duration` | `int` | The window used for the `request_rate_limit_num` option See [Rate Limits](#rate-limits) for more info.<br />`default: 1` `unit: seconds` |
 | `rate_limit_num` | `int` | The maximum number of requests allowed within the `rate_limit_duration` window. See [Rate Limits](#rate-limits) for more info.<br />`default: 5` |
