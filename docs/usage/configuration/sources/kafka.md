@@ -30,25 +30,25 @@ The `kafka` source ingests data through Kafka 0.9 or later and outputs [`log`][d
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["kafka", "The name of this component"] # required, type: string, must be: "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required, type: string, example: "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name" # required, type: string, example: "consumer-group-name"
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # required, type: [string], example: ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  type = ["kafka", "The name of this component"] # must be: "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  group_id = "consumer-group-name"
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["kafka", "The name of this component"] # required, type: string, must be: "kafka"
-  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092" # required, type: string, example: "10.14.22.123:9092,10.14.23.332:9092"
-  group_id = "consumer-group-name" # required, type: string, example: "consumer-group-name"
-  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"] # required, type: [string], example: ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
+  type = ["kafka", "The name of this component"] # must be: "kafka"
+  bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+  group_id = "consumer-group-name"
+  topics = ["topic-1", "topic-2", "^(prefix1|prefix2)-.+"]
   
   # OPTIONAL
-  auto_offset_reset = "smallest" # optional, default: "largest", type: string
-  key_field = "user_id" # optional, no default, type: string, example: "user_id"
-  session_timeout_ms = 5000 # optional, default: 10000, type: int, unit: milliseconds
+  auto_offset_reset = "smallest" # default: "largest"
+  key_field = "user_id" # no default
+  session_timeout_ms = 5000 # default: 10000, unit: milliseconds
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

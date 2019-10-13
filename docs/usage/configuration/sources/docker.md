@@ -30,18 +30,18 @@ The `docker` source ingests data through the docker engine daemon and outputs [`
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["docker", "The name of this component"] # required, type: string, must be: "docker"
+  type = ["docker", "The name of this component"] # must be: "docker"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED
-  type = ["docker", "The name of this component"] # required, type: string, must be: "docker"
+  type = ["docker", "The name of this component"] # must be: "docker"
   
   # OPTIONAL
-  include_containers = "ffd2bc2cb74a" # optional, no default, type: [string], example: "ffd2bc2cb74a"
-  include_labels = "key=value" # optional, no default, type: [string], example: "key=value"
+  include_containers = "ffd2bc2cb74a" # no default
+  include_labels = "key=value" # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

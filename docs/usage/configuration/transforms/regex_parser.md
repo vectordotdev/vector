@@ -24,9 +24,9 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["regex_parser", "The name of this component"] # required, type: string, must be: "regex_parser"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$" # required, type: string, example: "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  type = ["regex_parser", "The name of this component"] # must be: "regex_parser"
+  inputs = ["my-source-id"]
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -43,13 +43,13 @@ The `regex_parser` transform accepts [`log`][docs.data-model.log] events and all
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["regex_parser", "The name of this component"] # required, type: string, must be: "regex_parser"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$" # required, type: string, example: "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
+  type = ["regex_parser", "The name of this component"] # must be: "regex_parser"
+  inputs = ["my-source-id"]
+  regex = "^(?P<timestamp>.*) (?P<level>\\w*) (?P<message>.*)$"
   
   # OPTIONAL - General
-  drop_field = true # optional, default: true, type: bool
-  field = "message" # optional, default: "message", type: string
+  drop_field = true # default: true
+  field = "message" # default: "message"
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

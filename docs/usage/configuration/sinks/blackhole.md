@@ -23,21 +23,21 @@ The `blackhole` sink [streams](#streaming) [`log`][docs.data-model.log] and [`me
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["blackhole", "The name of this component"] # required, type: string, must be: "blackhole"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  print_amount = 1000 # required, type: int, example: 1000
+  type = ["blackhole", "The name of this component"] # must be: "blackhole"
+  inputs = ["my-source-id"]
+  print_amount = 1000
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["blackhole", "The name of this component"] # required, type: string, must be: "blackhole"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  print_amount = 1000 # required, type: int, example: 1000
+  type = ["blackhole", "The name of this component"] # must be: "blackhole"
+  inputs = ["my-source-id"]
+  print_amount = 1000
   
   # OPTIONAL
-  healthcheck = true # optional, default: true, type: bool
+  healthcheck = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

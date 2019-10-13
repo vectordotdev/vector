@@ -24,9 +24,9 @@ The `split` transform accepts [`log`][docs.data-model.log] events and allows you
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["split", "The name of this component"] # required, type: string, must be: "split"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  type = ["split", "The name of this component"] # must be: "split"
+  inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -43,14 +43,14 @@ The `split` transform accepts [`log`][docs.data-model.log] events and allows you
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["split", "The name of this component"] # required, type: string, must be: "split"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  type = ["split", "The name of this component"] # must be: "split"
+  inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - General
-  drop_field = true # optional, default: true, type: bool
-  field = "message" # optional, default: "message", type: string
-  separator = "," # optional, default: "whitespace", type: [string]
+  drop_field = true # default: true
+  field = "message" # default: "message"
+  separator = "," # default: "whitespace"
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

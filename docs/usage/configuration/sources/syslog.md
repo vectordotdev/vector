@@ -23,24 +23,24 @@ The `syslog` source ingests data through the Syslog 5424 protocol and outputs [`
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["syslog", "The name of this component"] # required, type: string, must be: "syslog"
-  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # required, type: string, enum: "tcp", "udp", and "unix"
+  type = ["syslog", "The name of this component"] # must be: "syslog"
+  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # enum: "tcp", "udp", and "unix"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["syslog", "The name of this component"] # required, type: string, must be: "syslog"
-  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # required, type: string, enum: "tcp", "udp", and "unix"
+  type = ["syslog", "The name of this component"] # must be: "syslog"
+  mode = ["tcp", "Read incoming Syslog data over the TCP protocol."] # enum: "tcp", "udp", and "unix"
   
   # OPTIONAL - General
-  address = "0.0.0.0:9000" # optional, no default, type: string, example: "0.0.0.0:9000", relevant when mode = "tcp" or mode = "udp"
-  max_length = 102400 # optional, default: 102400, type: int, unit: bytes
-  path = "/path/to/socket" # optional, no default, type: string, example: "/path/to/socket", relevant when mode = "unix"
+  address = "0.0.0.0:9000" # no default, relevant when mode = "tcp" or mode = "udp"
+  max_length = 102400 # default: 102400, unit: bytes
+  path = "/path/to/socket" # no default, relevant when mode = "unix"
   
   # OPTIONAL - Context
-  host_key = "host" # optional, default: "host", type: string
+  host_key = "host" # default: "host"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

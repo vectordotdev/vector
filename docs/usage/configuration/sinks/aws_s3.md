@@ -31,56 +31,56 @@ The `aws_s3` sink [batches](#buffers-and-batches) [`log`][docs.data-model.log] e
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["aws_s3", "The name of this component"] # required, type: string, must be: "aws_s3"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  bucket = "my-bucket" # required, type: string, example: "my-bucket"
-  region = "us-east-1" # required, type: string, example: "us-east-1"
+  type = ["aws_s3", "The name of this component"] # must be: "aws_s3"
+  inputs = ["my-source-id"]
+  bucket = "my-bucket"
+  region = "us-east-1"
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # optional, default: 10490000, type: int, unit: bytes
-  batch_timeout = 300 # optional, default: 300, type: int, unit: seconds
+  batch_size = 10490000 # default: 10490000, unit: bytes
+  batch_timeout = 300 # default: 300, unit: seconds
   
   # OPTIONAL - Object Names
-  key_prefix = "date=%F/" # optional, default: "date=%F", type: string
+  key_prefix = "date=%F/" # default: "date=%F"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["aws_s3", "The name of this component"] # required, type: string, must be: "aws_s3"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  bucket = "my-bucket" # required, type: string, example: "my-bucket"
-  region = "us-east-1" # required, type: string, example: "us-east-1"
+  type = ["aws_s3", "The name of this component"] # must be: "aws_s3"
+  inputs = ["my-source-id"]
+  bucket = "my-bucket"
+  region = "us-east-1"
   
   # OPTIONAL - General
-  endpoint = "127.0.0.0:5000" # optional, no default, type: string, example: "127.0.0.0:5000"
-  healthcheck = true # optional, default: true, type: bool
+  endpoint = "127.0.0.0:5000" # no default
+  healthcheck = true # default: true
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # optional, default: 10490000, type: int, unit: bytes
-  batch_timeout = 300 # optional, default: 300, type: int, unit: seconds
+  batch_size = 10490000 # default: 10490000, unit: bytes
+  batch_timeout = 300 # default: 300, unit: seconds
   
   # OPTIONAL - Object Names
-  filename_append_uuid = true # optional, default: true, type: bool
-  filename_extension = "log" # optional, default: "log", type: bool
-  filename_time_format = "%s" # optional, default: "%s", type: string
-  key_prefix = "date=%F/" # optional, default: "date=%F", type: string
+  filename_append_uuid = true # default: true
+  filename_extension = "log" # default: "log"
+  filename_time_format = "%s" # default: "%s"
+  key_prefix = "date=%F/" # default: "date=%F"
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
-  rate_limit_num = 5 # optional, default: 5, type: int
-  request_in_flight_limit = 5 # optional, default: 5, type: int
-  request_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
-  retry_attempts = 5 # optional, default: 5, type: int
-  retry_backoff_secs = 5 # optional, default: 5, type: int, unit: seconds
+  rate_limit_duration = 1 # default: 1, unit: seconds
+  rate_limit_num = 5 # default: 5
+  request_in_flight_limit = 5 # default: 5
+  request_timeout_secs = 30 # default: 30, unit: seconds
+  retry_attempts = 5 # default: 5
+  retry_backoff_secs = 5 # default: 5, unit: seconds
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
-    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
-    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
+    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

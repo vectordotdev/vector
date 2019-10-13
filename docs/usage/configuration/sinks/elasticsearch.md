@@ -30,49 +30,49 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["elasticsearch", "The name of this component"] # required, type: string, must be: "elasticsearch"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  host = "http://10.24.32.122:9000" # required, type: string, example: "http://10.24.32.122:9000"
+  type = ["elasticsearch", "The name of this component"] # must be: "elasticsearch"
+  inputs = ["my-source-id"]
+  host = "http://10.24.32.122:9000"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["elasticsearch", "The name of this component"] # required, type: string, must be: "elasticsearch"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  host = "http://10.24.32.122:9000" # required, type: string, example: "http://10.24.32.122:9000"
+  type = ["elasticsearch", "The name of this component"] # must be: "elasticsearch"
+  inputs = ["my-source-id"]
+  host = "http://10.24.32.122:9000"
   
   # OPTIONAL - General
-  doc_type = "_doc" # optional, default: "_doc", type: string
-  healthcheck = true # optional, default: true, type: bool
-  index = "vector-%Y-%m-%d" # optional, default: "vector-%F", type: string
-  provider = ["default", "A generic Elasticsearch provider."] # optional, default: "default", type: string, enum: "default" or "aws"
-  region = "us-east-1" # optional, no default, type: string, example: "us-east-1"
+  doc_type = "_doc" # default: "_doc"
+  healthcheck = true # default: true
+  index = "vector-%Y-%m-%d" # default: "vector-%F"
+  provider = ["default", "A generic Elasticsearch provider."] # default: "default", enum: "default" or "aws"
+  region = "us-east-1" # no default
   
   # OPTIONAL - Batching
-  batch_size = 10490000 # optional, default: 10490000, type: int, unit: bytes
-  batch_timeout = 1 # optional, default: 1, type: int, unit: seconds
+  batch_size = 10490000 # default: 10490000, unit: bytes
+  batch_timeout = 1 # default: 1, unit: seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
-  rate_limit_num = 5 # optional, default: 5, type: int
-  request_in_flight_limit = 5 # optional, default: 5, type: int
-  request_timeout_secs = 60 # optional, default: 60, type: int, unit: seconds
-  retry_attempts = 5 # optional, default: 5, type: int
-  retry_backoff_secs = 5 # optional, default: 5, type: int, unit: seconds
+  rate_limit_duration = 1 # default: 1, unit: seconds
+  rate_limit_num = 5 # default: 5
+  request_in_flight_limit = 5 # default: 5
+  request_timeout_secs = 60 # default: 60, unit: seconds
+  retry_attempts = 5 # default: 5
+  retry_backoff_secs = 5 # default: 5, unit: seconds
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # required, type: string, example: "password"
-    user = "username" # required, type: string, example: "username"
+    password = "password"
+    user = "username"
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
-    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
-    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
+    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
   
   # OPTIONAL - Headers
   [sinks.my_sink_id.headers]
@@ -84,12 +84,12 @@ The `elasticsearch` sink [batches](#buffers-and-batches) [`log`][docs.data-model
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
-    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
-    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
-    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
-    verify_certificate = true # optional, default: true, type: bool
-    verify_hostname = true # optional, default: true, type: bool
+    ca_path = "/path/to/certificate_authority.crt" # no default
+    crt_path = "/path/to/host_certificate.crt" # no default
+    key_pass = "PassWord1" # no default
+    key_path = "/path/to/host_certificate.key" # no default
+    verify_certificate = true # default: true
+    verify_hostname = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

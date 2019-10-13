@@ -23,38 +23,38 @@ The `file` source ingests data through one or more local files and outputs [`log
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sources.my_source_id]
-  type = ["file", "The name of this component"] # required, type: string, must be: "file"
-  include = ["/var/log/nginx/*.log"] # required, type: [string], example: ["/var/log/nginx/*.log"]
+  type = ["file", "The name of this component"] # must be: "file"
+  include = ["/var/log/nginx/*.log"]
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sources.my_source_id]
   # REQUIRED - General
-  type = ["file", "The name of this component"] # required, type: string, must be: "file"
-  include = ["/var/log/nginx/*.log"] # required, type: [string], example: ["/var/log/nginx/*.log"]
+  type = ["file", "The name of this component"] # must be: "file"
+  include = ["/var/log/nginx/*.log"]
   
   # OPTIONAL - General
-  data_dir = "/var/lib/vector" # optional, no default, type: string, example: "/var/lib/vector"
-  exclude = ["/var/log/nginx/access.log"] # optional, no default, type: [string], example: ["/var/log/nginx/access.log"]
-  glob_minimum_cooldown = 1000 # optional, default: 1000, type: int, unit: milliseconds
-  ignore_older = 86400 # optional, no default, type: int, unit: seconds, example: 86400
-  max_line_bytes = 102400 # optional, default: 102400, type: int, unit: bytes
-  max_read_bytes = 2048 # optional, default: 2048, type: int, unit: bytes
-  message_start_indicator = "^(INFO|ERROR)" # optional, no default, type: string, example: "^(INFO|ERROR)"
-  multi_line_timeout = 1000 # optional, default: 1000, type: int, unit: milliseconds
-  oldest_first = false # optional, default: false, type: bool
-  start_at_beginning = false # optional, default: false, type: bool
+  data_dir = "/var/lib/vector" # no default
+  exclude = ["/var/log/nginx/access.log"] # no default
+  glob_minimum_cooldown = 1000 # default: 1000, unit: milliseconds
+  ignore_older = 86400 # no default, unit: seconds
+  max_line_bytes = 102400 # default: 102400, unit: bytes
+  max_read_bytes = 2048 # default: 2048, unit: bytes
+  message_start_indicator = "^(INFO|ERROR)" # no default
+  multi_line_timeout = 1000 # default: 1000, unit: milliseconds
+  oldest_first = false # default: false
+  start_at_beginning = false # default: false
   
   # OPTIONAL - Context
-  file_key = "file" # optional, default: "file", type: string
-  host_key = "host" # optional, default: "host", type: string
+  file_key = "file" # default: "file"
+  host_key = "host" # default: "host"
   
   # OPTIONAL - Fingerprinting
   [sources.my_source_id.fingerprinting]
-    strategy = ["checksum", "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."] # optional, default: "checksum", type: string, enum: "checksum" or "device_and_inode"
-    fingerprint_bytes = 256 # optional, default: 256, type: int, unit: bytes, relevant when fingerprinting.strategy = "checksum"
-    ignored_header_bytes = 0 # optional, default: 0, type: int, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    strategy = ["checksum", "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."] # default: "checksum", enum: "checksum" or "device_and_inode"
+    fingerprint_bytes = 256 # default: 256, unit: bytes, relevant when fingerprinting.strategy = "checksum"
+    ignored_header_bytes = 0 # default: 0, unit: bytes, relevant when fingerprinting.strategy = "checksum"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

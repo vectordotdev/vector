@@ -24,8 +24,8 @@ The `add_fields` transform accepts [`log`][docs.data-model.log] events and allow
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["add_fields", "The name of this component"] # required, type: string, must be: "add_fields"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  type = ["add_fields", "The name of this component"] # must be: "add_fields"
+  inputs = ["my-source-id"]
   
   # REQUIRED - Fields
   [transforms.my_transform_id.fields]

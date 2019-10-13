@@ -31,56 +31,56 @@ The `clickhouse` sink [batches](#buffers-and-batches) [`log`][docs.data-model.lo
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["clickhouse", "The name of this component"] # required, type: string, must be: "clickhouse"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  host = "http://localhost:8123" # required, type: string, example: "http://localhost:8123"
-  table = "mytable" # required, type: string, example: "mytable"
+  type = ["clickhouse", "The name of this component"] # must be: "clickhouse"
+  inputs = ["my-source-id"]
+  host = "http://localhost:8123"
+  table = "mytable"
   
   # OPTIONAL - requests
-  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # optional, default: "gzip", type: string, must be: "gzip" (if supplied)
+  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # default: "gzip", must be: "gzip" (if supplied)
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["clickhouse", "The name of this component"] # required, type: string, must be: "clickhouse"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  host = "http://localhost:8123" # required, type: string, example: "http://localhost:8123"
-  table = "mytable" # required, type: string, example: "mytable"
+  type = ["clickhouse", "The name of this component"] # must be: "clickhouse"
+  inputs = ["my-source-id"]
+  host = "http://localhost:8123"
+  table = "mytable"
   
   # OPTIONAL - General
-  database = "mydatabase" # optional, no default, type: string, example: "mydatabase"
-  healthcheck = true # optional, default: true, type: bool
+  database = "mydatabase" # no default
+  healthcheck = true # default: true
   
   # OPTIONAL - Batching
-  batch_size = 1049000 # optional, default: 1049000, type: int, unit: bytes
-  batch_timeout = 1 # optional, default: 1, type: int, unit: seconds
+  batch_size = 1049000 # default: 1049000, unit: bytes
+  batch_timeout = 1 # default: 1, unit: seconds
   
   # OPTIONAL - Requests
-  rate_limit_duration = 1 # optional, default: 1, type: int, unit: seconds
-  rate_limit_num = 5 # optional, default: 5, type: int
-  request_in_flight_limit = 5 # optional, default: 5, type: int
-  request_timeout_secs = 30 # optional, default: 30, type: int, unit: seconds
-  retry_attempts = 9223372036854775807 # optional, default: 9223372036854775807, type: int
-  retry_backoff_secs = 9223372036854775807 # optional, default: 9223372036854775807, type: int, unit: seconds
+  rate_limit_duration = 1 # default: 1, unit: seconds
+  rate_limit_num = 5 # default: 5
+  request_in_flight_limit = 5 # default: 5
+  request_timeout_secs = 30 # default: 30, unit: seconds
+  retry_attempts = 9223372036854775807 # default: 9223372036854775807
+  retry_backoff_secs = 9223372036854775807 # default: 9223372036854775807, unit: seconds
   
   # OPTIONAL - requests
-  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # optional, default: "gzip", type: string, must be: "gzip" (if supplied)
+  compression = ["gzip", "The payload will be compressed in [Gzip][urls.gzip] format before being sent."] # default: "gzip", must be: "gzip" (if supplied)
   
   # OPTIONAL - Basic auth
   [sinks.my_sink_id.basic_auth]
-    password = "password" # required, type: string, example: "password"
-    user = "username" # required, type: string, example: "username"
+    password = "password"
+    user = "username"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
-    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
-    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
-    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
-    verify_certificate = true # optional, default: true, type: bool
-    verify_hostname = true # optional, default: true, type: bool
+    ca_path = "/path/to/certificate_authority.crt" # no default
+    crt_path = "/path/to/host_certificate.crt" # no default
+    key_pass = "PassWord1" # no default
+    key_path = "/path/to/host_certificate.key" # no default
+    verify_certificate = true # default: true
+    verify_hostname = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

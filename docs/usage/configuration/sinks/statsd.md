@@ -30,22 +30,22 @@ The `statsd` sink [streams](#streaming) [`metric`][docs.data-model.metric] event
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["statsd", "The name of this component"] # required, type: string, must be: "statsd"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  namespace = "service" # required, type: string, example: "service"
+  type = ["statsd", "The name of this component"] # must be: "statsd"
+  inputs = ["my-source-id"]
+  namespace = "service"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["statsd", "The name of this component"] # required, type: string, must be: "statsd"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  namespace = "service" # required, type: string, example: "service"
+  type = ["statsd", "The name of this component"] # must be: "statsd"
+  inputs = ["my-source-id"]
+  namespace = "service"
   
   # OPTIONAL
-  address = "127.0.0.1:8125" # optional, default: "127.0.0.1:8125", type: string
-  healthcheck = true # optional, default: true, type: bool
+  address = "127.0.0.1:8125" # default: "127.0.0.1:8125"
+  healthcheck = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

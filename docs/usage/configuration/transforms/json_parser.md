@@ -23,21 +23,21 @@ The `json_parser` transform accepts [`log`][docs.data-model.log] events and allo
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["json_parser", "The name of this component"] # required, type: string, must be: "json_parser"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  drop_invalid = true # required, type: bool, example: true
+  type = ["json_parser", "The name of this component"] # must be: "json_parser"
+  inputs = ["my-source-id"]
+  drop_invalid = true
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED
-  type = ["json_parser", "The name of this component"] # required, type: string, must be: "json_parser"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  drop_invalid = true # required, type: bool, example: true
+  type = ["json_parser", "The name of this component"] # must be: "json_parser"
+  inputs = ["my-source-id"]
+  drop_invalid = true
   
   # OPTIONAL
-  field = "message" # optional, default: "message", type: string
+  field = "message" # default: "message"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

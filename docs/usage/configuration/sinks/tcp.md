@@ -24,44 +24,44 @@ The `tcp` sink [streams](#streaming) [`log`][docs.data-model.log] events to a TC
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["tcp", "The name of this component"] # required, type: string, must be: "tcp"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  address = "92.12.333.224:5000" # required, type: string, example: "92.12.333.224:5000"
+  type = ["tcp", "The name of this component"] # must be: "tcp"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000"
   
   # REQUIRED - requests
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # required, type: string, enum: "json" or "text"
+  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # enum: "json" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["tcp", "The name of this component"] # required, type: string, must be: "tcp"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  address = "92.12.333.224:5000" # required, type: string, example: "92.12.333.224:5000"
+  type = ["tcp", "The name of this component"] # must be: "tcp"
+  inputs = ["my-source-id"]
+  address = "92.12.333.224:5000"
   
   # REQUIRED - requests
-  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # required, type: string, enum: "json" or "text"
+  encoding = ["json", "Each event is encoded into JSON and the payload is represented as a JSON array."] # enum: "json" or "text"
   
   # OPTIONAL - General
-  healthcheck = true # optional, default: true, type: bool
+  healthcheck = true # default: true
   
   # OPTIONAL - Buffer
   [sinks.my_sink_id.buffer]
-    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # optional, default: "memory", type: string, enum: "memory" or "disk"
-    max_size = 104900000 # optional, no default, type: int, unit: bytes, example: 104900000, relevant when type = "disk"
-    num_items = 500 # optional, default: 500, type: int, unit: events, relevant when type = "memory"
-    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # optional, default: "block", type: string, enum: "block" or "drop_newest"
+    type = ["memory", "Stores the sink's buffer in memory. This is more performant (~3x), but less durable. Data will be lost if Vector is restarted abruptly."] # default: "memory", enum: "memory" or "disk"
+    max_size = 104900000 # no default, unit: bytes, relevant when type = "disk"
+    num_items = 500 # default: 500, unit: events, relevant when type = "memory"
+    when_full = ["block", "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."] # default: "block", enum: "block" or "drop_newest"
   
   # OPTIONAL - Tls
   [sinks.my_sink_id.tls]
-    ca_path = "/path/to/certificate_authority.crt" # optional, no default, type: string, example: "/path/to/certificate_authority.crt"
-    crt_path = "/path/to/host_certificate.crt" # optional, no default, type: string, example: "/path/to/host_certificate.crt"
-    enabled = false # optional, default: false, type: bool
-    key_pass = "PassWord1" # optional, no default, type: string, example: "PassWord1"
-    key_path = "/path/to/host_certificate.key" # optional, no default, type: string, example: "/path/to/host_certificate.key"
-    verify_certificate = true # optional, default: true, type: bool
-    verify_hostname = true # optional, default: true, type: bool
+    ca_path = "/path/to/certificate_authority.crt" # no default
+    crt_path = "/path/to/host_certificate.crt" # no default
+    enabled = false # default: false
+    key_pass = "PassWord1" # no default
+    key_path = "/path/to/host_certificate.key" # no default
+    verify_certificate = true # default: true
+    verify_hostname = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

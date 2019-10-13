@@ -210,13 +210,15 @@ class Templates
     description
   end
 
-  def option_tags(option, enum: true, example: true, relevant_when: true, type: true)
+  def option_tags(option, enum: true, example: true, optionality: true, relevant_when: true, type: true)
     tags = []
 
-    if option.required?
-      tags << "required"
-    else
-      tags << "optional"
+    if optionality
+      if option.required?
+        tags << "required"
+      else
+        tags << "optional"
+      end
     end
 
     if !option.default.nil?

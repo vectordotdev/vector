@@ -30,8 +30,8 @@ The `lua` transform accepts [`log`][docs.data-model.log] events and allows you t
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [transforms.my_transform_id]
-  type = ["lua", "The name of this component"] # required, type: string, must be: "lua"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  type = ["lua", "The name of this component"] # must be: "lua"
+  inputs = ["my-source-id"]
   source = """
 require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -49,8 +49,8 @@ end
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED
-  type = ["lua", "The name of this component"] # required, type: string, must be: "lua"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  type = ["lua", "The name of this component"] # must be: "lua"
+  inputs = ["my-source-id"]
   source = """
 require("script") # a `script.lua` file must be in your `search_dirs`
 
@@ -64,7 +64,7 @@ end
 """
   
   # OPTIONAL
-  search_dirs = ["/etc/vector/lua"] # optional, no default, type: [string], example: ["/etc/vector/lua"]
+  search_dirs = ["/etc/vector/lua"] # no default
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

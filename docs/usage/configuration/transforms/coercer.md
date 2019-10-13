@@ -24,8 +24,8 @@ The `coercer` transform accepts [`log`][docs.data-model.log] events and allows y
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["coercer", "The name of this component"] # required, type: string, must be: "coercer"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
+  type = ["coercer", "The name of this component"] # must be: "coercer"
+  inputs = ["my-source-id"]
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]

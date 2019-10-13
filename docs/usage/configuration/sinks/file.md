@@ -24,28 +24,28 @@ The `file` sink [streams](#streaming) [`log`][docs.data-model.log] events to a f
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["file", "The name of this component"] # required, type: string, must be: "file"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  path = "vector-%Y-%m-%d.log" # required, type: string, example: "vector-%Y-%m-%d.log"
+  type = ["file", "The name of this component"] # must be: "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   
   # REQUIRED - requests
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # enum: "ndjson" or "text"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED - General
-  type = ["file", "The name of this component"] # required, type: string, must be: "file"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  path = "vector-%Y-%m-%d.log" # required, type: string, example: "vector-%Y-%m-%d.log"
+  type = ["file", "The name of this component"] # must be: "file"
+  inputs = ["my-source-id"]
+  path = "vector-%Y-%m-%d.log"
   
   # REQUIRED - requests
-  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # required, type: string, enum: "ndjson" or "text"
+  encoding = ["ndjson", "Each event is encoded into JSON and the payload is new line delimited."] # enum: "ndjson" or "text"
   
   # OPTIONAL - General
-  healthcheck = true # optional, default: true, type: bool
-  idle_timeout_secs = "30" # optional, default: "30", type: int
+  healthcheck = true # default: true
+  idle_timeout_secs = "30" # default: "30"
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

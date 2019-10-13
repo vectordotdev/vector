@@ -23,21 +23,21 @@ The `console` sink [streams](#streaming) [`log`][docs.data-model.log] and [`metr
 {% code-tabs-item title="vector.toml (simple)" %}
 ```coffeescript
 [sinks.my_sink_id]
-  type = ["console", "The name of this component"] # required, type: string, must be: "console"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # required, type: string, enum: "stdout" or "stderr"
+  type = ["console", "The name of this component"] # must be: "console"
+  inputs = ["my-source-id"]
+  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # enum: "stdout" or "stderr"
 ```
 {% endcode-tabs-item %}
 {% code-tabs-item title="vector.toml (advanced)" %}
 ```coffeescript
 [sinks.my_sink_id]
   # REQUIRED
-  type = ["console", "The name of this component"] # required, type: string, must be: "console"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # required, type: string, enum: "stdout" or "stderr"
+  type = ["console", "The name of this component"] # must be: "console"
+  inputs = ["my-source-id"]
+  target = ["stdout", "Output will be written to [STDOUT][urls.stdout]"] # enum: "stdout" or "stderr"
   
   # OPTIONAL
-  healthcheck = true # optional, default: true, type: bool
+  healthcheck = true # default: true
 ```
 {% endcode-tabs-item %}
 {% endcode-tabs %}

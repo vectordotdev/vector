@@ -24,9 +24,9 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["tokenizer", "The name of this component"] # required, type: string, must be: "tokenizer"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  type = ["tokenizer", "The name of this component"] # must be: "tokenizer"
+  inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
@@ -43,13 +43,13 @@ The `tokenizer` transform accepts [`log`][docs.data-model.log] events and allows
 ```coffeescript
 [transforms.my_transform_id]
   # REQUIRED - General
-  type = ["tokenizer", "The name of this component"] # required, type: string, must be: "tokenizer"
-  inputs = ["my-source-id"] # required, type: [string], example: ["my-source-id"]
-  field_names = ["timestamp", "level", "message"] # required, type: [string], example: ["timestamp", "level", "message"]
+  type = ["tokenizer", "The name of this component"] # must be: "tokenizer"
+  inputs = ["my-source-id"]
+  field_names = ["timestamp", "level", "message"]
   
   # OPTIONAL - General
-  drop_field = true # optional, default: true, type: bool
-  field = "message" # optional, default: "message", type: string
+  drop_field = true # default: true
+  field = "message" # default: "message"
   
   # OPTIONAL - Types
   [transforms.my_transform_id.types]
